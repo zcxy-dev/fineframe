@@ -38,8 +38,11 @@ export function runEdit(options: RunOptions): Run {
     // for this server, to another folder.
     env: { ...process.env, ...options.env, INIT_CWD: options.cwd },
     stdio: ["ignore", "pipe", "pipe"],
-    // Its own process group, so stopping it also stops the analysis and FFmpeg it runs.
-    detached: true,
+    // Its own process group, so stopping it also stops the analysis and FFmpeg it runs. Windows
+    // has no process groups: there Node stops what a process started when it ends, and a detached
+    // edit would give each program it starts a console window and outlive a stopped server.
+    detached: process.platform !== "win32",
+    windowsHide: true,
   });
   const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
     (resolve, reject) => {

@@ -22,10 +22,7 @@ export async function pinnedFile(
   what: string,
   mode = 0o644,
 ): Promise<string> {
-  try {
-    await access(path);
-    return path;
-  } catch {}
+  if (await exists(path)) return path;
   process.stderr.write(`Downloading ${what} to ${path}\n`);
   const response = await fetch(url);
   if (!response.ok || !response.body) {
@@ -49,9 +46,21 @@ export async function pinnedFile(
       throw new Error(`${what} from ${url} has SHA-256 ${actual}, expected ${sha256}`);
     }
     await chmod(partial, mode);
-    await rename(partial, path);
+    await rename(partial, path).catch(async (error: unknown) => {
+      // Another download put it in place first; Windows will not replace it while it runs.
+      if (!(await exists(path))) throw error;
+    });
   } finally {
     await rm(partial, { force: true });
   }
   return path;
+}
+
+async function exists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
 }

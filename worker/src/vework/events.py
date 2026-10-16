@@ -97,7 +97,7 @@ def _classifier() -> Callable[[np.ndarray], np.ndarray]:
         return hf_hub_download(MODEL, name, revision=REVISION)
 
     download.hub(MODEL, REVISION, ["config.json", "model.onnx"])
-    labels = json.loads(Path(fetch("config.json")).read_text())["id2label"]
+    labels = json.loads(Path(fetch("config.json")).read_text(encoding="utf-8"))["id2label"]
     columns = [
         [int(i) for i, label in labels.items() if label in names] for names in KINDS.values()
     ]

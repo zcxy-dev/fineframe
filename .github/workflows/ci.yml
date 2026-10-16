@@ -133,13 +133,15 @@ jobs:
         if: runner.os == 'Windows' && !cancelled() # WIP
         run: |
           mise run start --no-open > "$RUNNER_TEMP/start.log" 2>&1 &
-          for _ in $(seq 900); do
-            grep -q "the page is at" "$RUNNER_TEMP/start.log" && break
+          start=$!
+          until grep -q "the page is at" "$RUNNER_TEMP/start.log"; do
+            kill -0 "$start" 2>/dev/null || { cat "$RUNNER_TEMP/start.log"; exit 1; }
             sleep 1
           done
           cat "$RUNNER_TEMP/start.log"
           curl -fsS http://127.0.0.1:3000/api/key
-          uv run --project worker --extra ml python -c "import torch; assert not torch.cuda.is_available(); print(torch.__version__)"
+          uv run --project worker --extra ml python -c \
+            "import torch; assert torch.version.cuda is None, torch.version.cuda; print(torch.__version__)"
       # copy-joined is the `-c copy` join the engine is measured against; every other run must
       # have no clicks and under 10 ms of drift.
       - name: Render a synthetic edit and score it (vebench)

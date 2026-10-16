@@ -16,7 +16,7 @@ CI installs neither the worker's `ml` extra nor the benchmark's `synth` extra, s
 
 ## Checks
 
-A change passes the steps in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Run the same commands locally before opening a pull request. Its `macos` and `macos-intel` jobs run the engine tests on Apple silicon and on Intel and score a [synthetic edit](packages/engine/scripts/synthetic-edit.ts), one run of it with effect overlays rendered by Remotion, with `vebench report`: every run except `copy-joined`, a deliberately naive baseline joined with `-c copy`, must have no clicks and under 10 ms of drift. `pnpm exec biome check --write` fixes TypeScript and JSON formatting.
+A change passes the steps in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Run the same commands locally before opening a pull request. Its `macos`, `macos-intel` and `windows` jobs run the engine tests on Apple silicon, on Intel and on Windows x64 and score a [synthetic edit](packages/engine/scripts/synthetic-edit.ts), one run of it with effect overlays rendered by Remotion, with `vebench report`: every run except `copy-joined`, a deliberately naive baseline joined with `-c copy`, must have no clicks and under 10 ms of drift. The `windows` job also runs the rest of the workspace's tests and the worker's checks, and starts the page with `mise run start` from the fresh checkout. `pnpm exec biome check --write` fixes TypeScript and JSON formatting.
 
 ## Where code goes
 

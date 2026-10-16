@@ -27,14 +27,19 @@ function fail(problem: string, fix: string): never {
   process.exit(1);
 }
 
+/** `program` with `args`, as spawn takes them: one command line where a shell runs it, since
+ * Node warns of arguments passed to a shell unescaped. Every argument here is a plain word. */
+const command = (program: string, args: string[]): [string, string[]] =>
+  shell ? [[program, ...args].join(" "), []] : [program, args];
+
 function run(program: string, args: string[], options: SpawnOptions = {}): void {
-  const result = spawnSync(program, args, { stdio: "inherit", env, shell, ...options });
+  const result = spawnSync(...command(program, args), { stdio: "inherit", env, shell, ...options });
   if (result.status !== 0)
     fail(`\`${program} ${args.join(" ")}\` failed.`, "Its output above says why.");
 }
 
 const has = (program: string) =>
-  spawnSync(program, ["--version"], { stdio: "ignore", env, shell }).status === 0;
+  spawnSync(...command(program, ["--version"]), { stdio: "ignore", env, shell }).status === 0;
 
 const wanted = Number(readFileSync(join(root, ".node-version"), "utf8").trim().split(".")[0]);
 if (Number(process.versions.node.split(".")[0]) < wanted) {
@@ -114,7 +119,7 @@ if (Math.max(...sources.map(newest)) > built) {
 }
 
 // In a process group of its own, stopped whole: pnpm does not pass a signal on to the server.
-const server = spawn("pnpm", ["start"], {
+const server = spawn(...command("pnpm", ["start"]), {
   cwd: web,
   stdio: "inherit",
   env,

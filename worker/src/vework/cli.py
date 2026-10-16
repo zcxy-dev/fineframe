@@ -11,6 +11,10 @@ from vework import correct, index, music, openrouter, transcribe, truth
 
 def main(argv: list[str] | None = None) -> None:
     """Run one vework command. Progress goes to stderr; failures exit with 1."""
+    # Messages name files and speech in any script. The engine reads them as UTF-8, while
+    # Windows would write them to a pipe in its ANSI code page, which has no CJK.
+    for stream in (sys.stdout, sys.stderr):
+        stream.reconfigure(encoding="utf-8")
     parser = _parser()
     args = parser.parse_args(argv)
     if args.command == "analyze":
@@ -58,7 +62,9 @@ def _analyze(args: argparse.Namespace) -> None:
     result = index.build(
         args.source, args.asr_model, _progress, context, correction, _stem(args.output), cloud
     )
-    args.output.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
+    args.output.write_text(
+        json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     if args.bench_run:
         args.bench_run.mkdir(parents=True, exist_ok=True)
         # vebench scores one time per transition: a hard cut's time, a dissolve's midpoint.
@@ -66,7 +72,7 @@ def _analyze(args: argparse.Namespace) -> None:
         (args.bench_run / "shots.json").write_text(json.dumps({"cuts": cuts}) + "\n")
         words = {"words": result["transcript"]["words"]}
         (args.bench_run / "transcript.json").write_text(
-            json.dumps(words, ensure_ascii=False) + "\n"
+            json.dumps(words, ensure_ascii=False) + "\n", encoding="utf-8"
         )
         # vebench maps each face to the truth speaker it overlaps most, so faces need not be
         # matched across shots.
@@ -88,7 +94,9 @@ def _analyze_music(args: argparse.Namespace) -> None:
     if args.attribution:
         license["attribution"] = args.attribution
     result = music.analyze(args.track, license, _progress)
-    args.output.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
+    args.output.write_text(
+        json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
 
 
 def _draft_truth(args: argparse.Namespace) -> None:
@@ -103,7 +111,7 @@ def _draft_truth(args: argparse.Namespace) -> None:
     (args.clip / "truth").mkdir(exist_ok=True)
     draft = truth.draft_transcript(source, args.asr_model, _progress)
     (args.clip / "truth" / "transcript.json").write_text(
-        json.dumps(draft, indent=2, ensure_ascii=False) + "\n"
+        json.dumps(draft, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
 
 
