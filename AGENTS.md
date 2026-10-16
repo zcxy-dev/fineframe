@@ -12,6 +12,6 @@
 - Update the README's "What works today" and the package README in the same pull request.
 
 ## Pitfalls
-- In `worker/`, `uv run` without `--extra ml` removes the `ml` extra from the environment; use `uv run --extra ml`.
+- In `worker/`, `uv sync` without `--extra ml` removes the `ml` extra from the environment; use `uv sync --extra ml` (`uv run` keeps it).
 - Keep one language mode per ASR chunk. The aligner strips non-letters, so `attach_punctuation` in `worker/src/vework/transcribe.py` must stay in step with `split_words_for_alignment` in transformers' Qwen3-ASR processor.
 - README.md, `packages/engine/README.md` and `packages/engine/src/plan/plan.ts` conflict between parallel pull requests; rebase right before merging.

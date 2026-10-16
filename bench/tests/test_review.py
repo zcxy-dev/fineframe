@@ -45,7 +45,7 @@ def fresh_round(round_dir, tmp_path):
 
 
 @contextmanager
-def serving(round_dir, rater="owner", seed=7):
+def serving(round_dir, rater="alex", seed=7):
     with review.Server(review.Session(round_dir, rater, seed)) as server:
         # A short poll keeps shutdown, and so each test, fast.
         thread = threading.Thread(target=server.serve_forever, args=(0.01,))
@@ -136,7 +136,7 @@ def test_the_page_and_api_never_name_a_version_or_item(fresh_round):
 
 def test_media_supports_ranges_for_seeking(fresh_round):
     single, pair = first(fresh_round, 1), first(fresh_round, 2)
-    whole = review.Session(fresh_round, "owner", 7).media(pair, "a").read_bytes()
+    whole = review.Session(fresh_round, "alex", 7).media(pair, "a").read_bytes()
     with serving(fresh_round) as url:
         media = url + f"media/{session(url)}/"
         status, headers, body = get(media + f"{pair}/a", {"Range": "bytes=10-19"})
@@ -162,7 +162,7 @@ def test_a_scripted_session_records_every_task_under_version_names(fresh_round):
         for version, path in edits.items()
     }
     shown = []
-    with serving(fresh_round, rater="owner", seed=42) as url:
+    with serving(fresh_round, rater="alex", seed=42) as url:
         while (state := json.loads(get(url + "api/state")[2]))["task"] is not None:
             task, sides = state["task"], state["sides"]
             shown.append(
@@ -178,7 +178,7 @@ def test_a_scripted_session_records_every_task_under_version_names(fresh_round):
     records = review.load_ratings(fresh_round / "ratings.jsonl")
     assert [r["versions"] for r in records] == shown
     for r in records:
-        assert r["rater"] == "owner" and r["seed"] == 42
+        assert r["rater"] == "alex" and r["seed"] == 42
         if len(r["versions"]) == 1:
             assert r["scores"] == {"release-1": scores(4)} and "preferred" not in r
         else:
@@ -254,7 +254,7 @@ def test_a_resumed_session_skips_what_this_rater_already_rated(fresh_round):
         post(url, {"task": first(fresh_round, 1, seed=3), "scores": {"a": scores(5)}})
         pair = first(fresh_round, 2, seed=3)
         post(url, {"task": pair, "scores": {"a": scores(5), "b": scores(1)}, "preferred": "a"})
-    again = review.Session(fresh_round, "owner", 11)
+    again = review.Session(fresh_round, "alex", 11)
     assert again.state()["rated"] == 2
     assert review.Session(fresh_round, "guest", 11).state()["rated"] == 0
 
@@ -271,11 +271,11 @@ def pair(rater, item, a, b, a_score, b_score, preferred):
 def test_summary_gives_means_alone_and_preference_rates_in_pairs():
     single, both = review.summarize(
         [
-            alone("owner", "x", "main", 5),
-            alone("owner", "y", "main", 4),
+            alone("alex", "x", "main", 5),
+            alone("alex", "y", "main", 4),
             alone("guest", "x", "main", 4),
-            pair("owner", "x", "after", "before", 5, 3, "after"),
-            pair("owner", "y", "before", "after", 2, 4, "after"),
+            pair("alex", "x", "after", "before", 5, 3, "after"),
+            pair("alex", "y", "before", "after", 2, 4, "after"),
             pair("guest", "x", "after", "before", 3, 3, None),
             pair("guest", "y", "after", "before", 2, 4, "before"),
         ]
@@ -298,10 +298,10 @@ def test_summary_gives_means_alone_and_preference_rates_in_pairs():
 
 def test_review_report_prints_markdown_for_edits_alone_and_pairs(capsys, tmp_path):
     lines = [
-        alone("owner", "x", "main", 5),
-        alone("owner", "y", "main", 4),
-        pair("owner", "x", "after", "before", 5, 3, "after"),
-        pair("owner", "y", "before", "after", 2, 4, "after"),
+        alone("alex", "x", "main", 5),
+        alone("alex", "y", "main", 4),
+        pair("alex", "x", "after", "before", 5, 3, "after"),
+        pair("alex", "y", "before", "after", 2, 4, "after"),
     ]
     (tmp_path / "ratings.jsonl").write_text("".join(json.dumps(r) + "\n" for r in lines))
     main(["review-report", str(tmp_path)])
@@ -325,13 +325,13 @@ def test_review_report_without_ratings_is_a_one_line_error(capsys, tmp_path):
     "line, message",
     [
         ("{not json", "Expecting property name"),
-        (json.dumps(alone("owner", "x", "main", 4) | {"preferred": None}), "rated alone"),
-        (json.dumps(pair("owner", "x", "v1", "v1", 4, 4, None)), "versions must"),
-        (json.dumps(alone("owner", "x", "main", 4) | {"versions": []}), "versions must"),
+        (json.dumps(alone("alex", "x", "main", 4) | {"preferred": None}), "rated alone"),
+        (json.dumps(pair("alex", "x", "v1", "v1", 4, 4, None)), "versions must"),
+        (json.dumps(alone("alex", "x", "main", 4) | {"versions": []}), "versions must"),
     ],
 )
 def test_a_damaged_ratings_line_names_its_line(tmp_path, line, message):
-    good = pair("owner", "x", "after", "before", 5, 3, "after")
+    good = pair("alex", "x", "after", "before", 5, 3, "after")
     (tmp_path / "ratings.jsonl").write_text(json.dumps(good) + "\n" + line + "\n")
     with pytest.raises(ValueError) as e:
         review.load_ratings(tmp_path / "ratings.jsonl")

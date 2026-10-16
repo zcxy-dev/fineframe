@@ -107,7 +107,7 @@ test("an edit: files streamed in, one edit at a time, live progress, then the do
   const refused = await create([{ path: "b.mp4", size: 2 }]);
   assert.equal(refused.response.status, 409);
   assert.match(refused.body.error ?? "", /Another edit is running/);
-  // Another site cannot start or create an edit through the owner's browser.
+  // Another site cannot start or create an edit through the user's browser.
   const foreign = { origin: "https://elsewhere.example" };
   const crossSite = await jobsRoute.POST(
     new Request(url, { method: "POST", headers: foreign, body: "{}" }),

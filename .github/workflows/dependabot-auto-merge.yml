@@ -18,8 +18,7 @@ jobs:
       - id: metadata
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
       # A merge made with GITHUB_TOKEN starts no workflow on main; the App's token does,
-      # so main's CI and deploy checks run on Dependabot updates too. A digest-only
-      # update (a Docker image pinned by digest) has no update type and merges too.
+      # so main's CI runs on Dependabot updates too.
       - id: app-token
         if: steps.metadata.outputs.update-type != 'version-update:semver-major'
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0

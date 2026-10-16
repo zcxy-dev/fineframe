@@ -1,6 +1,6 @@
 # @video-editor/effects
 
-Animated effect overlays for the edit, as [Remotion](https://www.remotion.dev) templates: titles, lower thirds, keyword highlights, chapter markers, callouts and wipes. Each entry in a [`project.json`](../schema/README.md#projectjson)'s `overlays` names a template and its params; the renderer draws it as transparent video and lays it over exactly the output frames it covers ([engine](../engine/README.md#how-it-renders)). Remotion is not MIT-licensed: see its [terms](../../README.md#license).
+Animated effect overlays for the edit, as [Remotion](https://www.remotion.dev) templates: titles, lower thirds, keyword highlights, chapter markers, callouts and wipes. Each entry in a [`project.json`](../schema/README.md#projectjson)'s `overlays` names a template and its params; the renderer draws it as transparent video and lays it over exactly the output frames it covers ([engine](../engine/README.md#how-it-renders)). Remotion is source-available, not MIT: see [who needs its company licence](../../THIRD_PARTY_NOTICES.md#remotion).
 
 ## Templates
 
@@ -42,7 +42,7 @@ The timings, curves, colours, type sizes and margins live in [`src/layout.ts`](s
 
 `renderOverlays(jobs)` renders each overlay at the output's size and frame rate, for exactly the frames it covers, and returns one file per job. The renderer calls it; nothing else needs to.
 
-- **Speed:** a new overlay costs about 0.2 s a frame at 1080p on the 8-core host, so the six templates at 16:9 take about 100 s; a cached one costs only its compositing.
+- **Speed:** a new overlay costs about 0.2 s a frame at 1080p on 8 cores of an EPYC 9355P, so the six templates at 16:9 take about 100 s; a cached one costs only its compositing.
 - **Format:** VP9 with alpha in WebM ([why](#format)). Reading the alpha needs the libvpx decoder ([FFmpeg requirements](../engine/README.md#ffmpeg)).
 - **Cache:** renders are kept in `~/.cache/video-editor/effects/` (or under `XDG_CACHE_HOME`). An overlay is keyed by its template, params (in any key order), aspect, size, frame rate and frame count, and a hash of this package's source and pinned dependencies. An unchanged overlay renders once. The bundled page each source version renders from takes about 45 MB; delete the folder to reclaim the space.
 - **Chrome:** Remotion renders in Chrome Headless Shell, which it downloads (about 92 MB) on the first render into `packages/effects/node_modules/.remotion/`. Renders run in a child process with this package as its working directory, because Remotion chooses that folder from the working directory. No licence key or usage event is sent to Remotion.
@@ -50,7 +50,7 @@ The timings, curves, colours, type sizes and margins live in [`src/layout.ts`](s
 
 ### Format
 
-The renderer composites an overlay in every piece of the edit it spans, so the format is chosen by render speed, file size and decoding cost. Each template at its typical length, 30 fps, rendered on the 8-core host while other jobs ran, with PNG frames from Chrome; decoding as the renderer does, into `yuva420p`:
+The renderer composites an overlay in every piece of the edit it spans, so the format is chosen by render speed, file size and decoding cost. Each template at its typical length, 30 fps, rendered on 8 cores of an EPYC 9355P shared with other jobs, with PNG frames from Chrome; decoding as the renderer does, into `yuva420p`:
 
 | | ProRes 4444 | VP9 with alpha |
 |---|---|---|
