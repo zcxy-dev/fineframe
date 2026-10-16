@@ -53,9 +53,17 @@ async function create(files: { path: string; size: number }[], body: object = { 
 }
 
 const put = (id: string, index: number, bytes: Uint8Array<ArrayBuffer>) =>
-  fileRoute.PUT(new Request(`${url}/${id}/files/${index}`, { method: "PUT", body: bytes }), {
-    params: Promise.resolve({ id, index: String(index) }),
-  });
+  fileRoute.PUT(
+    // The route checks the name the request is addressed to, as the proxy does for the others.
+    new Request(`${url}/${id}/files/${index}`, {
+      method: "PUT",
+      headers: { host: "127.0.0.1" },
+      body: bytes,
+    }),
+    {
+      params: Promise.resolve({ id, index: String(index) }),
+    },
+  );
 
 const start = (id: string) =>
   startRoute.POST(new Request(`${url}/${id}/start`, { method: "POST" }), ctx({ id }));

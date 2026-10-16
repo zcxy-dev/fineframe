@@ -1,4 +1,7 @@
-// Runs before every route and page.
+// Runs before every route and page but one: footage, which Next would copy in memory for the
+// proxy and cut at 10 MB, is streamed to disk by its own route, which calls `proxy` itself.
+
+export const config = { matcher: ["/((?!api/jobs/[^/]+/files/).*)"] };
 
 /**
  * Refuses a request addressed to any name but this machine's own, the address the server was

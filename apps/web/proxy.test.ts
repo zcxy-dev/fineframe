@@ -38,3 +38,22 @@ test("names allowed for a proxy in front, such as tailscale serve, get through",
   assert.equal(get("evil.example:3317")?.status, 403);
   delete process.env.VIDEO_EDITOR_ALLOWED_HOSTS;
 });
+
+test("footage bypasses the proxy, which would hold it in memory, and its route checks the name", async () => {
+  // Next keeps a copy of every body the proxy sees, and cuts it at 10 MB.
+  const { config } = await import("./proxy.ts");
+  const proxied = (path: string) => config.matcher.some((m) => new RegExp(`^${m}$`).test(path));
+  assert.ok(proxied("/"));
+  assert.ok(proxied("/api/jobs/abc/start"));
+  assert.ok(!proxied("/api/jobs/abc/files/0"));
+  const route = await import("./app/api/jobs/[id]/files/[index]/route.ts");
+  const response = await route.PUT(
+    new Request("http://127.0.0.1:3000/api/jobs/abc/files/0", {
+      method: "PUT",
+      headers: { host: "evil.example:3000" },
+      body: "footage",
+    }),
+    { params: Promise.resolve({ id: "abc", index: "0" }) },
+  );
+  assert.equal(response.status, 403);
+});
