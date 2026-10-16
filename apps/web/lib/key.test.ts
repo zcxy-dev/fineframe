@@ -93,7 +93,7 @@ test("a working key is saved for its owner alone, beside what .env holds, and ne
   assert.equal(await readFile(env, "utf8"), "# Mine\nOTHER=1\nANTHROPIC_API_KEY=sk-ant-good\n");
   if (process.platform === "win32") {
     // Windows ignores the mode. The access list takes nothing from the folder, which lets every
-    // user read, and leaves the owner and the machine's administrators, as root elsewhere.
+    // user read.
     const { stdout } = await icacls(env);
     assert.doesNotMatch(stdout, /\(I\)|\\Users:/, stdout);
     assert.ok(stdout.toLowerCase().includes(`\\${userInfo().username}:(f)`.toLowerCase()), stdout);

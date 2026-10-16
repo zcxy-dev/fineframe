@@ -73,16 +73,15 @@ export async function saveKey(key: string): Promise<void> {
   const partial = `${file}.${randomUUID()}.partial`;
   try {
     await writeFile(partial, next, { mode: 0o600 });
-    await rename(partial, file);
-    // Windows ignores the mode: the file's access list drops what it takes from the folder, which
-    // may let every user read, leaving the owner and, as root elsewhere, the administrators. Set
-    // once the file is in place, as replacing a file need not keep the new one's list.
+    // Windows ignores the mode: the access list drops what it takes from the folder, which may
+    // let every user of the machine read. The rename keeps the list.
     if (process.platform === "win32") {
       const domain = process.env.USERDOMAIN;
       const owner = `${domain ? `${domain}\\` : ""}${userInfo().username}`;
-      const args = [file, "/inheritance:r", "/grant:r", `${owner}:F`];
+      const args = [partial, "/inheritance:r", "/grant:r", `${owner}:F`];
       await promisify(execFile)("icacls", args, { windowsHide: true });
     }
+    await rename(partial, file);
   } finally {
     await rm(partial, { force: true });
   }

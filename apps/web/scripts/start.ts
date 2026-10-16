@@ -119,6 +119,7 @@ if (Math.max(...sources.map(newest)) > built) {
 }
 
 // In a process group of its own, stopped whole: pnpm does not pass a signal on to the server.
+// Windows has no process groups; taskkill ends the process tree there instead.
 const server = spawn(...command("pnpm", ["start"]), {
   cwd: web,
   stdio: "inherit",
@@ -127,8 +128,12 @@ const server = spawn(...command("pnpm", ["start"]), {
   detached: !shell,
 });
 const stop = () => {
+  if (shell) {
+    spawnSync("taskkill", ["/pid", String(server.pid), "/t", "/f"], { stdio: "ignore" });
+    return;
+  }
   try {
-    process.kill(shell ? (server.pid as number) : -(server.pid as number), "SIGTERM");
+    process.kill(-(server.pid as number), "SIGTERM");
   } catch {
     // Already stopped.
   }

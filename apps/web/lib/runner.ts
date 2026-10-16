@@ -1,5 +1,5 @@
 // Runs `pnpm edit` as its own process and reads its progress lines.
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { createInterface } from "node:readline";
 import type { Progress } from "@video-editor/schema";
 
@@ -22,6 +22,8 @@ export interface Run {
   stop: () => void;
 }
 
+const windows = process.platform === "win32";
+
 /** Edits still running, stopped when the server exits: in their own process group, nothing
  * else would stop them, and they would keep using memory the next edit needs. */
 const live = new Set<Run>();
@@ -39,9 +41,9 @@ export function runEdit(options: RunOptions): Run {
     env: { ...process.env, ...options.env, INIT_CWD: options.cwd },
     stdio: ["ignore", "pipe", "pipe"],
     // Its own process group, so stopping it also stops the analysis and FFmpeg it runs. Windows
-    // has no process groups: there Node stops what a process started when it ends, and a detached
-    // edit would give each program it starts a console window and outlive a stopped server.
-    detached: process.platform !== "win32",
+    // has no process groups (stop() ends the process tree there), and a detached edit would give
+    // each program it starts a console window.
+    detached: !windows,
     windowsHide: true,
   });
   const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
@@ -64,11 +66,18 @@ export function runEdit(options: RunOptions): Run {
     stop: () => {
       if (stopped || child.pid === undefined || child.exitCode !== null) return;
       stopped = true;
-      try {
-        process.kill(-child.pid, "SIGTERM");
-      } catch {
-        child.kill("SIGTERM");
+      // Synchronous, as the server's exit handler stops edits too.
+      if (windows) {
+        const tree = ["/pid", String(child.pid), "/t", "/f"];
+        if (spawnSync("taskkill", tree, { stdio: "ignore", windowsHide: true }).status === 0)
+          return;
+      } else {
+        try {
+          process.kill(-child.pid, "SIGTERM");
+          return;
+        } catch {}
       }
+      child.kill("SIGTERM");
     },
   };
   live.add(run);

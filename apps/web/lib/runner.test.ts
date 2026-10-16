@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -19,13 +19,18 @@ test("stopping an edit stops the programs it started too", async () => {
   const dir = await mkdtemp(join(tmpdir(), "runner-"));
   let pid = 0;
   try {
-    // The edit starts a program of its own, as it starts the analysis and FFmpeg, and says its
-    // process ID once it runs.
-    const child = `setInterval(() => {}, 1000)`;
+    // The edit starts a program through another, as it starts the analysis through uv: on
+    // Windows, what a program Node did not start starts is outside what Node stops. The program
+    // says its process ID once it runs.
+    const program = join(dir, "program.js");
+    await writeFile(
+      program,
+      `require("node:fs").writeFileSync(${JSON.stringify(join(dir, "pid"))}, String(process.pid));
+      setInterval(() => {}, 1000);`,
+    );
+    const line = `"${process.execPath}" "${program}"`;
     const edit = `
-      const { spawn } = require("node:child_process");
-      const child = spawn(process.execPath, ["-e", ${JSON.stringify(child)}], { stdio: "ignore" });
-      require("node:fs").writeFileSync(${JSON.stringify(join(dir, "pid"))}, String(child.pid));
+      require("node:child_process").spawn(${JSON.stringify(line)}, { shell: true, stdio: "ignore" });
       setInterval(() => {}, 1000);
     `;
     const run = runEdit({
