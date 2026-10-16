@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import { copyFile, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { type Project, validateProject, type Word } from "@video-editor/schema";
 import { cutEdit } from "./cut.ts";
@@ -205,7 +206,7 @@ test("a cut that takes out no words fails instead of passing for done", () => {
 });
 
 const run = promisify(execFile);
-const cli = new URL("./cli.ts", import.meta.url).pathname;
+const cli = fileURLToPath(new URL("./cli.ts", import.meta.url));
 
 test("pnpm render names each problem of an edited project by its JSON path", async (t) => {
   const dir = await scratch(t, "render-cli-");

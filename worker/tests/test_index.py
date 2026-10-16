@@ -49,13 +49,13 @@ def stub_models(monkeypatch):
 
 
 def test_the_shared_example_matches_the_model():
-    MediaIndex.model_validate(json.loads(EXAMPLE.read_text()), strict=True)
+    MediaIndex.model_validate(json.loads(EXAMPLE.read_text(encoding="utf-8")), strict=True)
 
 
 def test_a_built_index_matches_the_schema(talking_video, stub_models, tmp_path):
     out = tmp_path / "index.json"
     main(["analyze", str(talking_video), "-o", str(out)])
-    written = json.loads(out.read_text())
+    written = json.loads(out.read_text(encoding="utf-8"))
     MediaIndex.model_validate(written, strict=True)
     assert written["source"]["video"]["width"] == 160 and written["speech"]
     assert "corrections" not in written
@@ -90,7 +90,7 @@ def test_loudness_is_measured_at_the_sources_full_band_and_channels(layout, stub
          "-f", "null", "-"], capture_output=True, text=True, check=True,
     ).stderr  # fmt: skip
     integrated = float(re.findall(r"I:\s+(-?[\d.]+) LUFS", report)[-1])
-    short_term = json.loads(out.read_text())["loudness"]["short_term"]
+    short_term = json.loads(out.read_text(encoding="utf-8"))["loudness"]["short_term"]
     assert short_term == pytest.approx([integrated] * 4, abs=0.5)
 
 
@@ -99,14 +99,14 @@ def test_bench_outputs_name_each_speaking_face(talking_video, stub_models, tmp_p
     main(
         ["analyze", str(talking_video), "-o", str(tmp_path / "index.json"), "--bench-run", str(run)]
     )
-    turns = json.loads((run / "speakers.json").read_text())["turns"]
+    turns = json.loads((run / "speakers.json").read_text(encoding="utf-8"))["turns"]
     assert turns == [{"start": 0.25, "end": 1.5, "speaker": "face-0"}]
 
 
 def test_a_source_without_a_picture_has_no_framing(cover_art_audio, stub_models, tmp_path):
     out = tmp_path / "index.json"
     main(["analyze", str(cover_art_audio), "-o", str(out)])
-    assert "framing" not in json.loads(out.read_text())
+    assert "framing" not in json.loads(out.read_text(encoding="utf-8"))
 
 
 def test_a_corrected_index_records_its_corrections(talking_video, monkeypatch, tmp_path):
@@ -134,7 +134,7 @@ def test_a_corrected_index_records_its_corrections(talking_video, monkeypatch, t
     main(["analyze", str(talking_video), "-o", str(out), "--correct", "--glossary",
           str(glossary), "--asr-context"])  # fmt: skip
 
-    written = json.loads(out.read_text())
+    written = json.loads(out.read_text(encoding="utf-8"))
     MediaIndex.model_validate(written, strict=True)
     assert contexts == ["林佳穎"] and aligned == ["我們再來看"]
     assert written["transcript"]["text"] == "我們再來看"
@@ -161,7 +161,7 @@ def test_a_cloud_index_records_the_model_and_what_it_cost(talking_video, monkeyp
     out = tmp_path / "index.json"
     main(["analyze", str(talking_video), "-o", str(out), "--asr", "cloud"])
 
-    written = json.loads(out.read_text())
+    written = json.loads(out.read_text(encoding="utf-8"))
     MediaIndex.model_validate(written, strict=True)
     assert written["transcript"]["text"] == "大家好"
     minutes = written["source"]["duration"] / 60
@@ -203,7 +203,7 @@ def test_a_transition_on_the_first_frame_starts_at_time_zero(monkeypatch, tmp_pa
     monkeypatch.setattr(framing, "analyze", lambda *args: {"fps": 5.0, "shots": []})
     out = tmp_path / "index.json"
     main(["analyze", str(source), "-o", str(out)])
-    assert json.loads(out.read_text())["transitions"][0]["start"] == 0.0
+    assert json.loads(out.read_text(encoding="utf-8"))["transitions"][0]["start"] == 0.0
 
 
 @pytest.mark.ml
@@ -218,7 +218,7 @@ def test_analyze_writes_the_index_and_bench_outputs(shots_video, tmp_path, capsy
               "finding faces"]  # fmt: skip
     assert all(f"vework: {stage}" in progress for stage in stages)
 
-    index = json.loads(out.read_text())
+    index = json.loads(out.read_text(encoding="utf-8"))
     MediaIndex.model_validate(index, strict=True)
     assert index["version"] == 1
     assert index["source"]["video"]["width"] == 320
@@ -226,11 +226,11 @@ def test_analyze_writes_the_index_and_bench_outputs(shots_video, tmp_path, capsy
     assert index["speech"] == []  # silence holds no speech
     assert index["transcript"] == {"language": None, "text": "", "words": []}
     assert set(index["loudness"]["momentary"]) == {-70.0} and index["audio_events"] == []
-    assert json.loads((run / "transcript.json").read_text()) == {"words": []}
+    assert json.loads((run / "transcript.json").read_text(encoding="utf-8")) == {"words": []}
     # Test patterns hold no faces: four shots framed as screens, and no one speaks.
     assert [s["layout"] for s in index["framing"]["shots"]] == ["screen"] * 4
-    assert json.loads((run / "speakers.json").read_text()) == {"turns": []}
-    cuts = json.loads((run / "shots.json").read_text())["cuts"]
+    assert json.loads((run / "speakers.json").read_text(encoding="utf-8")) == {"turns": []}
+    cuts = json.loads((run / "shots.json").read_text(encoding="utf-8"))["cuts"]
     assert cuts[:2] == [3.0, 6.0] and cuts[2] == pytest.approx(8.5, abs=0.1)
 
 

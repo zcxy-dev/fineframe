@@ -763,9 +763,12 @@ test("a mix louder than loudness normalisation measures is still normalised", as
   assert.ok(Math.abs(after.input_i - target.integratedLufs) < 1, String(after.input_i));
 });
 
-// On Intel macOS the search for a ceiling lands 1.3 dB under it: AAC's overshoot on these
-// transients does not follow the ceiling (https://github.com/zcxy-dev/video-editor/issues/16).
-const peakSearchTodo = process.platform === "darwin" && process.arch === "x64" ? "#16" : false;
+// On Intel macOS and Windows the search for a ceiling lands 1.3 dB under it: AAC's overshoot on
+// these transients does not follow the ceiling (https://github.com/zcxy-dev/video-editor/issues/16).
+const peakSearchTodo =
+  (process.platform === "darwin" && process.arch === "x64") || process.platform === "win32"
+    ? "#16"
+    : false;
 test("a noisy mix with sharp transients keeps its true-peak ceiling once encoded", {
   todo: peakSearchTodo,
 }, async (t) => {
@@ -1127,8 +1130,12 @@ test("a match and a look render as their LUT computes them, wherever the output 
   };
   const graded = { ...plain, main: [{ ...clip("flat", 0, 0.5), grade }] } as Project;
   const before = await render(await write(dir, plain), join(dir, "plain.mp4"));
-  // A folder name with every character a filter graph treats specially.
-  const odd = join(dir, "out dir, [a]; it's: here");
+  // A folder name with every character a filter graph treats specially. Windows names hold no
+  // colon, but the drive letter puts one in every path there.
+  const odd = join(
+    dir,
+    process.platform === "win32" ? "out dir, [a]; it's here" : "out dir, [a]; it's: here",
+  );
   const after = await render(await write(dir, graded), join(odd, "graded.mp4"));
   const pixels = async (file: string) => {
     const raw = `${file}.rgb`;

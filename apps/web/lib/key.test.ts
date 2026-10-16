@@ -1,11 +1,13 @@
 // The key the page saves, against a stand-in for Anthropic's API on this machine.
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { tmpdir } from "node:os";
+import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { promisify } from "node:util";
 
 const dir = await mkdtemp(join(tmpdir(), "web-key-"));
 const env = join(dir, ".env");
@@ -86,7 +88,16 @@ test("a working key is saved for its owner alone, beside what .env holds, and ne
   // Checked with a model lookup, which costs nothing.
   assert.deepEqual(asked, [{ path: "/v1/models/claude-opus-5-5", key: "sk-ant-good" }]);
   assert.equal(await readFile(env, "utf8"), "# Mine\nOTHER=1\nANTHROPIC_API_KEY=sk-ant-good\n");
-  assert.equal((await stat(env)).mode & 0o777, 0o600);
+  if (process.platform === "win32") {
+    // Windows ignores the mode; the file's access list names its owner alone.
+    const { stdout } = await promisify(execFile)("icacls", [env]);
+    const entries = stdout.match(/[^\s:]+:\(/g) ?? [];
+    assert.equal(entries.length, 1, stdout);
+    const owner = `\\${userInfo().username}:(`.toLowerCase();
+    assert.ok(entries[0]?.toLowerCase().endsWith(owner), stdout);
+  } else {
+    assert.equal((await stat(env)).mode & 0o777, 0o600);
+  }
   assert.equal(await readKey(), "sk-ant-good");
   const shown = JSON.stringify(await status());
   assert.equal(shown, '{"set":true}');

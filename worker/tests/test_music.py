@@ -121,7 +121,7 @@ def test_a_synthetic_track_is_indexed_with_its_beats_and_sections(tmp_path):
     track, out = tmp_path / "beat.wav", tmp_path / "beat.music.json"
     corpus._write_wav(track, samples, synth.RATE)
     cli.main(["analyze-music", str(track), "-o", str(out), "--license", "CC0 1.0"])
-    index = json.loads(out.read_text())
+    index = json.loads(out.read_text(encoding="utf-8"))
     MusicIndex.model_validate(index, strict=True)
     assert index["license"] == {"name": "CC0 1.0"}
     assert index["tempo"] == {"bpm": pytest.approx(112, abs=1), "beats_per_bar": 4}

@@ -36,9 +36,11 @@ def test_anamorphic_footage_reports_its_pixel_shape_as_displayed(tmp_path):
 @pytest.mark.parametrize(("trc", "code"), [("smpte2084", 16), ("arib-std-b67", 18)])
 def test_hdr_footage_reports_its_transfer_and_matrix(tmp_path, trc, code):
     out = tmp_path / "hdr.mp4"
-    ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x180:r=25:d=1", "-c:v", "libx264",
-           "-pix_fmt", "yuv420p10le", "-color_primaries", "bt2020", "-color_trc", trc,
-           "-colorspace", "bt2020nc", str(out))  # fmt: skip
+    # Tagged on the frames: FFmpeg 7.1 and later, as on Windows and macOS, take the transfer from
+    # them rather than from the output options.
+    tags = f"setparams=color_primaries=bt2020:color_trc={trc}:colorspace=bt2020nc"
+    ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x180:r=25:d=1", "-vf", tags, "-c:v", "libx264",
+           "-pix_fmt", "yuv420p10le", str(out))  # fmt: skip
     video = probe(out).video
     assert (video.transfer, video.matrix) == (code, 9)
 

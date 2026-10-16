@@ -51,7 +51,7 @@ def fake_asr(monkeypatch, heard):
 
 def test_draft_is_one_untimed_line_per_sentence_from_the_large_model(clip, fake_asr):
     main(["draft-truth", str(clip)])
-    draft = json.loads((clip / "truth" / "transcript.json").read_text())
+    draft = json.loads((clip / "truth" / "transcript.json").read_text(encoding="utf-8"))
     assert fake_asr == ["Qwen/Qwen3-ASR-1.7B-hf"]
     assert "Qwen/Qwen3-ASR-1.7B-hf" in draft["draft"]
     # No start/end: aligner times scored as truth would only measure agreement with the aligner.
@@ -64,7 +64,7 @@ def test_draft_is_one_untimed_line_per_sentence_from_the_large_model(clip, fake_
 def test_a_chunk_of_several_sentences_drafts_a_line_for_each(clip, fake_asr, heard):
     heard[0] = "我们用 Claude API 剪片。处理视频！"
     main(["draft-truth", str(clip)])
-    lines = json.loads((clip / "truth" / "transcript.json").read_text())["words"]
+    lines = json.loads((clip / "truth" / "transcript.json").read_text(encoding="utf-8"))["words"]
     # The spaces around English words stay as the model wrote them.
     assert lines[:2] == [
         {"text": "我們用 Claude API 剪片。", "draft_time": [0.55, 1.25]},
@@ -77,7 +77,9 @@ def test_a_clip_without_speech_drafts_nothing_without_loading_the_model(
 ):
     monkeypatch.setattr(speech, "segments", lambda samples: [])
     main(["draft-truth", str(clip)])
-    assert json.loads((clip / "truth" / "transcript.json").read_text())["words"] == []
+    assert (
+        json.loads((clip / "truth" / "transcript.json").read_text(encoding="utf-8"))["words"] == []
+    )
     assert fake_asr == []
 
 
@@ -93,10 +95,10 @@ def test_corrected_truth_is_kept_unless_forced(clip, fake_asr, capsys):
     code, err = run(capsys, "draft-truth", str(clip))
     assert code == 1 and "transcript.json" in err and "--force" in err
     assert fake_asr == []  # refused before the model loaded
-    assert (truth / "transcript.json").read_text() == "corrected by hand"
+    assert (truth / "transcript.json").read_text(encoding="utf-8") == "corrected by hand"
 
     main(["draft-truth", str(clip), "--force"])
-    assert "draft" in json.loads((truth / "transcript.json").read_text())
+    assert "draft" in json.loads((truth / "transcript.json").read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize("name", ["transcript.srt", "transcript.txt"])
