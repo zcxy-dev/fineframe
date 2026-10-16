@@ -6,7 +6,7 @@ from functools import cache
 
 import numpy as np
 
-from vework import ml, timing
+from vework import download, ml, timing
 from vework.audio import RATE
 
 # The larger model is more accurate but too slow for a CPU (timings in the README).
@@ -302,6 +302,7 @@ def _models(asr_model: str | None):
     def load(auto, name):
         # Another model named with --asr-model runs at whatever its repository holds now.
         revision = REVISIONS.get(name)
+        download.hub(name, revision)
         model = auto.from_pretrained(name, revision=revision, dtype=dtype).to(device).eval()
         return model, AutoProcessor.from_pretrained(name, revision=revision)
 

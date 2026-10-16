@@ -7,7 +7,33 @@
 .header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   height: 72px;
+}
+
+.keyButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.keyButton:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.keyButton svg {
+  color: var(--success);
 }
 
 .brand {
@@ -598,6 +624,12 @@
   margin-top: 2px;
 }
 
+.fix {
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
 .go {
   display: flex;
   flex-direction: column;
@@ -635,6 +667,21 @@
 
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+.download {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.downloadName {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* Progress */
@@ -926,6 +973,60 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Key */
+
+.dialog {
+  width: min(460px, calc(100vw - 32px));
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 0.55);
+}
+
+.dialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+}
+
+.dialogBody .panelTitle {
+  margin-top: 0;
+}
+
+.dialogText {
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.dialogText a {
+  color: var(--text);
+  text-underline-offset: 3px;
+}
+
+.dialogActions {
+  display: flex;
+  gap: 10px;
+}
+
+.dialogActions .button {
+  height: 46px;
+}
+
+.primary.dialogPrimary {
+  flex: 1;
+  height: 46px;
+  width: auto;
+}
+
 /* Tablet: one column, settings below the footage. */
 @media (max-width: 1023px) {
   .shell {
@@ -954,6 +1055,10 @@
 
   .header {
     height: 60px;
+  }
+
+  .dialogBody {
+    padding: 20px;
   }
 
   .title {

@@ -6,3 +6,7 @@ uv = "0.13.0"
 # corepack then provides the pnpm pinned in package.json's packageManager.
 idiomatic_version_file_enable_tools = ["node", "python"]
 node.corepack = true
+
+# `mise run start`: from a fresh clone to the open page, installing the tools first.
+[tasks.start]
+run = "node apps/web/scripts/start.ts"

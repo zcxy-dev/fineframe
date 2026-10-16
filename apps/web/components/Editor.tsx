@@ -1,12 +1,15 @@
 "use client";
 
+import { estimateCost } from "@video-editor/engine/estimate";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Picked } from "../lib/collect.ts";
 import { durationOf } from "../lib/collect.ts";
+import { fixFor } from "../lib/fixes.ts";
 import type { Job } from "../lib/jobs.ts";
 import {
   DEFAULT_STYLE,
   formatBytes,
+  formatDollars,
   formatLength,
   namesFrom,
   roleOf,
@@ -14,7 +17,8 @@ import {
 } from "../lib/settings.ts";
 import styles from "./editor.module.css";
 import { Footage, type Item } from "./Footage.tsx";
-import { AlertIcon, CaptionsIcon, DownloadIcon, LockIcon, Mark } from "./icons.tsx";
+import { AlertIcon, CaptionsIcon, CheckIcon, DownloadIcon, LockIcon, Mark } from "./icons.tsx";
+import { KeyDialog } from "./KeyDialog.tsx";
 import { Player, ResultSummary } from "./ResultView.tsx";
 import { RunView } from "./RunView.tsx";
 import { type Choices, chosenLength, SettingsPanel } from "./SettingsPanel.tsx";
@@ -47,6 +51,20 @@ export function Editor() {
   });
   const [phase, setPhase] = useState<Phase>({ kind: "compose" });
   const upload = useRef<XMLHttpRequest | null>(null);
+  // Whether the server has an Anthropic key (never the key); null until it says.
+  const [keySet, setKeySet] = useState<boolean | null>(null);
+  const [asking, setAsking] = useState(false);
+
+  // The first time, with no key yet, the page asks for one.
+  useEffect(() => {
+    void fetch("/api/key")
+      .then((response) => response.json() as Promise<{ set: boolean }>)
+      .then(({ set }) => {
+        setKeySet(set);
+        if (!set) setAsking(true);
+      })
+      .catch(() => {});
+  }, []);
 
   // The page reopens on the edit in its address, or else on one that is running. One whose
   // files were still being sent cannot go on: the browser no longer has them.
@@ -134,6 +152,8 @@ export function Editor() {
     [items],
   );
   const length = chosenLength(choices);
+  const estimate =
+    "seconds" in length && footageSeconds > 0 ? estimateCost(footageSeconds, length.seconds) : null;
   const blocked = !hasVideo
     ? items.length === 0
       ? "Add footage to start"
@@ -146,6 +166,10 @@ export function Editor() {
 
   const start = async () => {
     if (blocked || !("seconds" in length)) return;
+    if (keySet === false) {
+      setAsking(true);
+      return;
+    }
     try {
       const response = await fetch("/api/jobs", {
         method: "POST",
@@ -161,8 +185,15 @@ export function Editor() {
           files: used.map((item) => ({ path: item.path, size: item.file.size })),
         }),
       });
-      const created = (await response.json()) as Job & { error?: string };
-      if (!response.ok) throw new Error(created.error ?? "The server refused the edit");
+      const created = (await response.json()) as Job & { error?: string; code?: string };
+      if (!response.ok) {
+        if (created.code === "key") {
+          setKeySet(false);
+          setAsking(true);
+        }
+        setPhase({ kind: "compose", error: created.error ?? "The server refused the edit" });
+        return;
+      }
       const total = used.reduce((sum, item) => sum + item.file.size, 0);
       let sent = 0;
       setPhase({ kind: "uploading", job: created, sent, total, file: 0 });
@@ -203,7 +234,29 @@ export function Editor() {
           <Mark />
           Video editor
         </span>
+        {keySet !== null && (
+          <button type="button" className={styles.keyButton} onClick={() => setAsking(true)}>
+            {keySet ? (
+              <>
+                <CheckIcon width={14} height={14} />
+                API key saved · Replace
+              </>
+            ) : (
+              "Add your API key"
+            )}
+          </button>
+        )}
       </header>
+      <KeyDialog
+        open={asking}
+        replacing={keySet === true}
+        onClose={() => setAsking(false)}
+        onSaved={() => {
+          setKeySet(true);
+          setAsking(false);
+          setPhase((current) => (current.kind === "compose" ? { kind: "compose" } : current));
+        }}
+      />
 
       {phase.kind === "compose" || phase.kind === "uploading" ? (
         <main className={styles.layout}>
@@ -284,7 +337,18 @@ export function Editor() {
                     ? `Make the ${formatLength(length.seconds)} video`
                     : "Make the video"}
                 </button>
-                {blocked && <p className={styles.help}>{blocked}</p>}
+                {blocked ? (
+                  <p className={styles.help}>{blocked}</p>
+                ) : keySet === false ? (
+                  <p className={styles.help}>Add your Anthropic API key to start</p>
+                ) : (
+                  estimate && (
+                    <p className={styles.help}>
+                      Claude will cost about {formatDollars(estimate.low)} to{" "}
+                      {formatDollars(estimate.high)} for this edit
+                    </p>
+                  )
+                )}
               </div>
             )}
             <p className={styles.note}>
@@ -307,7 +371,11 @@ export function Editor() {
               <Done job={job} onNew={() => setPhase({ kind: "compose" })} />
             )}
             {(status === "error" || status === "cancelled") && job && (
-              <Failed job={job} onBack={() => setPhase({ kind: "compose" })} />
+              <Failed
+                job={job}
+                onBack={() => setPhase({ kind: "compose" })}
+                onReplaceKey={() => setAsking(true)}
+              />
             )}
           </aside>
         </main>
@@ -369,8 +437,18 @@ function Done({ job, onNew }: { job: Job; onNew: () => void }) {
   );
 }
 
-function Failed({ job, onBack }: { job: Job; onBack: () => void }) {
+function Failed({
+  job,
+  onBack,
+  onReplaceKey,
+}: {
+  job: Job;
+  onBack: () => void;
+  onReplaceKey: () => void;
+}) {
   const cancelled = job.status === "cancelled";
+  const fix = !cancelled && job.error ? fixFor(job.error) : null;
+  const spent = job.claude ? total(job.claude) : null;
   return (
     <>
       <div>
@@ -383,6 +461,15 @@ function Failed({ job, onBack }: { job: Job; onBack: () => void }) {
           <AlertIcon width={16} height={16} />
           {job.error ?? "Something went wrong"}
         </p>
+      )}
+      {fix && <p className={styles.fix}>{fix.text}</p>}
+      {spent !== null && spent !== 0 && (
+        <p className={styles.help}>Claude cost {formatDollars(spent)} before the edit stopped.</p>
+      )}
+      {fix?.kind === "key" && (
+        <button type="button" className={styles.button} onClick={onReplaceKey}>
+          Replace the API key
+        </button>
       )}
       <button type="button" className={styles.primary} onClick={onBack}>
         Back to the footage
@@ -419,6 +506,10 @@ function Summary({ job }: { job: Job }) {
   if (job.settings.names.length > 0) {
     rows.push(["Names and terms", String(job.settings.names.length)]);
   }
+  if (job.claude) {
+    rows.push(["Claude, planning", formatDollars(job.claude.plan.dollars)]);
+    rows.push(["Claude, checking cuts", formatDollars(job.claude.check.dollars)]);
+  }
   return (
     <dl className={styles.summary}>
       {rows.map(([name, value]) => (
@@ -429,6 +520,12 @@ function Summary({ job }: { job: Job }) {
       ))}
     </dl>
   );
+}
+
+/** What Claude cost in all; null when a price is unknown. */
+function total(cost: NonNullable<Job["claude"]>): number | null {
+  const { plan, check } = cost;
+  return plan.dollars === null || check.dollars === null ? null : plan.dollars + check.dollars;
 }
 
 /** Sends a file as a request body, reporting the bytes sent; fetch cannot report them. */

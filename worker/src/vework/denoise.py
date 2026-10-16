@@ -2,7 +2,6 @@ import hashlib
 import io
 import os
 import tarfile
-import urllib.request
 from collections.abc import Callable
 from functools import cache
 from pathlib import Path
@@ -10,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from scipy.signal import lfilter
 
-from vework import ml
+from vework import download, ml
 
 MODEL = "DeepFilterNet3"
 # The model's ONNX export, pinned by commit and checked by hash. Its own Python package cannot be
@@ -238,8 +237,7 @@ def _download() -> Path:
     if all((folder / f"{part}.onnx").is_file() for part in PARTS):
         return folder
     try:
-        with urllib.request.urlopen(URL, timeout=60) as response:
-            archive = response.read()
+        archive = download.url(URL, MODEL)
     except OSError as exc:
         raise RuntimeError(f"{MODEL}: could not download {URL}: {exc}") from exc
     if hashlib.sha256(archive).hexdigest() != SHA256:

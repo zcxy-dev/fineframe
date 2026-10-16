@@ -1,7 +1,12 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
-import { type DoneProgress, type Progress, validateProgress } from "@video-editor/schema";
+import {
+  type ClaudeCost,
+  type DoneProgress,
+  type Progress,
+  validateProgress,
+} from "@video-editor/schema";
 import { ffmpeg, run } from "../ffmpeg.ts";
 import { QUIET } from "../graph/encode.ts";
 import type { LookId } from "../looks.ts";
@@ -11,6 +16,7 @@ import {
   ClaudeError,
   checkClaude,
   totalUsage,
+  type Usage,
 } from "../plan/claude.ts";
 import type { MusicInput } from "../plan/music.ts";
 import { type Aspect, LENGTH_RANGE, type PlanInput, plan } from "../plan/plan.ts";
@@ -21,6 +27,7 @@ import {
   type AnalysisOptions,
   analyze,
   analyzeMusic,
+  type Download,
   defaultCache,
   indexName,
   localWorker,
@@ -99,27 +106,56 @@ const CHECK_SHARE = 0.3;
 export async function edit(options: EditOptions): Promise<EditResult> {
   const emit = options.onProgress ?? (() => {});
   let last = 0;
-  const report = (stage: Stage, fraction: number, message: string, file?: string) => {
+  const report: Reporter = (stage, fraction, message, file, download) => {
     last = Math.max(last, Math.min(1, Math.round(fraction * 10_000) / 10_000));
-    emit(validateProgress({ stage, fraction: last, message, ...(file ? { file } : {}) }));
+    emit(
+      validateProgress({
+        stage,
+        fraction: last,
+        message,
+        ...(file ? { file } : {}),
+        ...(download ? { download } : {}),
+      }),
+    );
   };
+  // Every request's usage, whichever step made it, so a failed edit still says what it cost.
+  const spent: Usage[] = [];
   try {
-    const result = await steps(options, report);
+    const result = await steps(options, report, spent);
     const { video, captions } = result.outputs;
     const { music } = result.outputs;
     const message = `Finished: ${result.seconds.toFixed(1)} s at ${options.aspect} in ${basename(video)}${captions ? `, captions in ${basename(captions)}` : ""}${music ? `, the music's licences in ${basename(music)}` : ""}`;
-    emit(validateProgress({ stage: "done", fraction: 1, message, outputs: result.outputs }));
+    const claude = costByStage(spent);
+    emit(
+      validateProgress({ stage: "done", fraction: 1, message, claude, outputs: result.outputs }),
+    );
     return result;
   } catch (error) {
-    emit(validateProgress({ stage: "error", fraction: last, message: (error as Error).message }));
+    const message = (error as Error).message;
+    const claude = spent.length > 0 ? { claude: costByStage(spent) } : {};
+    emit(validateProgress({ stage: "error", fraction: last, message, ...claude }));
     throw error;
   }
 }
 
-async function steps(
-  options: EditOptions,
-  report: (stage: Stage, fraction: number, message: string, file?: string) => void,
-): Promise<EditResult> {
+type Reporter = (
+  stage: Stage,
+  fraction: number,
+  message: string,
+  file?: string,
+  download?: Download,
+) => void;
+
+/** Usage summed by the stage that asked: the plan, or the review with what it escalates. */
+export function costByStage(usages: readonly Usage[]): ClaudeCost {
+  const stage = (purposes: Usage["purpose"][]) => {
+    const total = totalUsage(usages.filter((usage) => purposes.includes(usage.purpose)));
+    return { dollars: total.dollars, requests: total.calls };
+  };
+  return { plan: stage(["plan"]), check: stage(["check", "judge"]) };
+}
+
+async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Promise<EditResult> {
   const [shortest, longest] = LENGTH_RANGE;
   if (!(options.length >= shortest && options.length <= longest)) {
     throw new EditError(
@@ -166,12 +202,18 @@ async function steps(
   // Images are only decoded, which is quick: a bad one fails before the long analysis.
   for (const file of files.filter((f) => f.kind === "image")) await checkImage(file);
   await mkdir(dirname(video), { recursive: true });
-  let claude = options.claude;
-  if (!claude) {
+  let asked = options.claude;
+  if (!asked) {
     report("analyze", 0, "Checking that Claude can plan the edit");
     await checkClaude();
-    claude = anthropicClaude();
+    asked = anthropicClaude();
   }
+  const ask = asked;
+  const claude: Claude = async (request) => {
+    const reply = await ask(request);
+    spent.push(reply.usage);
+    return reply;
+  };
   const worker = options.worker ?? (await localWorker());
   const cache = options.cache ?? defaultCache();
 
@@ -187,7 +229,8 @@ async function steps(
       const path = join(cache, musicIndexName(worker, await fingerprintOf(file.path), license));
       if (existsSync(path)) report("analyze", 0, "Analysed before", file.given);
       else {
-        const step = (_: number, message: string) => report("analyze", 0, message, file.given);
+        const step = (_: number, message: string, download?: Download) =>
+          report("analyze", 0, message, file.given, download);
         await analyzeMusic(worker, file, path, license, step, log);
       }
       music.push({ index: path, source: file.path });
@@ -208,8 +251,8 @@ async function steps(
       }
       // Empty files leave nothing pending; the analysis then fails on them.
       const span = pending > 0 ? (share * index.bytes) / pending : 0;
-      const step = (fraction: number, message: string) =>
-        report("analyze", at + fraction * span, message, file.given);
+      const step = (fraction: number, message: string, download?: Download) =>
+        report("analyze", at + fraction * span, message, file.given, download);
       await analyze(worker, file, index.path, analysis, step, log);
       at += span;
     }
@@ -299,7 +342,7 @@ async function steps(
       },
       seconds: rendered.seconds,
       timings,
-      usage: totalUsage(edit.state.usage),
+      usage: totalUsage(spent),
       analyzed: indexes.size - cached,
       cached,
       reviews,

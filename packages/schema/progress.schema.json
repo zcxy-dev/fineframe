@@ -26,7 +26,23 @@
         "message": {
           "description": "One line for a person to read; on error, what went wrong.",
           "type": "string"
-        }
+        },
+        "download": {
+          "description": "A model the analysis is downloading on its first use, while it downloads.",
+          "type": "object",
+          "required": ["name", "bytes", "total"],
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "description": "The model, as its repository names it.",
+              "type": "string",
+              "minLength": 1
+            },
+            "bytes": { "description": "Bytes downloaded so far.", "type": "integer", "minimum": 0 },
+            "total": { "description": "Bytes to download in all.", "type": "integer", "minimum": 1 }
+          }
+        },
+        "claude": { "$ref": "#/$defs/ClaudeCost" }
       }
     },
     "DoneProgress": {
@@ -37,6 +53,7 @@
         "stage": { "const": "done" },
         "fraction": { "const": 1 },
         "message": { "type": "string" },
+        "claude": { "$ref": "#/$defs/ClaudeCost" },
         "outputs": {
           "description": "Absolute paths of what the run wrote.",
           "type": "object",
@@ -57,6 +74,29 @@
             }
           }
         }
+      }
+    },
+    "ClaudeCost": {
+      "description": "What Claude cost by stage: planning, and the review after each render with the decisions it escalates. On the done line, and on an error line once a request was made.",
+      "type": "object",
+      "required": ["plan", "check"],
+      "additionalProperties": false,
+      "properties": {
+        "plan": { "$ref": "#/$defs/Spend" },
+        "check": { "$ref": "#/$defs/Spend" }
+      }
+    },
+    "Spend": {
+      "type": "object",
+      "required": ["dollars", "requests"],
+      "additionalProperties": false,
+      "properties": {
+        "dollars": {
+          "description": "US dollars at list price; null when a model's price is unknown.",
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "requests": { "type": "integer", "minimum": 0 }
       }
     }
   }

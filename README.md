@@ -41,7 +41,7 @@ A single web page drives it: drop the files, pick the length and aspect ratio, p
 | **Render:** [`project.json` to MP4](packages/engine/) with cuts, dissolves, dips, B-roll, framing that holds still or pans frame by frame, punch-ins and push-ins, a bounded auto grade, colour matching, looks and two-pass loudness. Rotated, HDR and variable-frame-rate footage comes out upright, in BT.709 and at one frame rate. Every cut is frame- and sample-exact, with no clicks and no audio drift ([measurements](packages/engine/README.md#measurements)). MP4, Matroska and WebM footage plays on its media index's timeline, to the millisecond. Matched cameras land within the ΔE00 bar on synthetic footage; real multi-camera footage is not matched yet ([colour measurements](packages/engine/README.md#colour-measurements)) | ✅ |
 | **Music:** background music only from tracks you supply, each with the licence you state for it. [`vework analyze-music`](worker/README.md#music) finds tempo, beats and downbeats, sections and loudness. The planner has Claude pick the track and section that fit the content's mood; code fits it to the length on whole phrases, ending on the track's own ending or a fade, and ducks it under speech so the voice stays at least 18 dB over it, quieter speakers included, with B-roll cuts on the beat ([details](packages/engine/README.md#planning)). `pnpm edit --music` takes the tracks, each with its licence in a text file beside it, and writes the licences next to the video. Measured on synthetic music and edits and on a corpus talk show with licensed tracks ([numbers](packages/engine/README.md#music-measurements)); people's ratings are not measured yet | ✅ |
 | **One command:** [`pnpm edit`](packages/engine/README.md#editing-footage) turns a folder of footage, and music if you give it, into the finished video at the length and aspect asked (9:16, 1:1 or 16:9): each file is analysed once and cached, then the edit is planned, rendered with its captions, music and effects, and every cut reviewed. Progress comes out as JSON lines for the web page. Measured on synthetic footage and on openly licensed interviews and talks ([numbers](packages/engine/README.md#edit-measurements)); cuts in the real footage are checked against the analysis's own word timings until its transcripts are corrected | ✅ |
-| **Web page:** [one page](apps/web/README.md) runs `pnpm edit` on footage dropped in as files or folders, with any audio files among them offered as music under one licence you state: a length preset or any length from 15 s to 1 h, the aspect, a style and names and terms; live progress by stage; the video in the page with the track it plays, and MP4 and SRT downloads. One edit at a time; a reload reopens the edit from its address | ✅ |
+| **Web page:** [one page](apps/web/README.md), started from a fresh clone with `mise run start`, runs `pnpm edit` on footage dropped in as files or folders, with any audio files among them offered as music under one licence you state: a length preset or any length from 15 s to 1 h, the aspect, a style and names and terms; live progress by stage, with each model's download on its first use (size, percentage, time left); the video in the page with the track it plays, and MP4 and SRT downloads. The first time, it asks for the Anthropic API key and checks it; it estimates what Claude will cost before an edit and shows what planning and the cut checks cost after. Failures its owner can fix (the key, the disk, a file it cannot read, the connection) say what to do. One edit at a time; a reload reopens the edit from its address | ✅ |
 | **Effects:** six animated templates for Traditional Chinese and English text: a title, a lower third, a keyword highlight, a chapter marker, a screen-recording callout and a wipe over a cut. They are rendered with [Remotion](https://www.remotion.dev) as transparent video and laid over exactly the frames each covers, cached once rendered ([details](packages/effects/)). Planned edits use five of them sparingly: Claude picks keyword pops for the strongest moments, a title for a long edit, chapters for an edit of two minutes or more, each marked as it starts with a wipe over the cut into it, and lower thirds for people named in `--names`, and code times each on the speech, one at a time. Callouts are not planned: no index holds where on a screen recording the thing named is ([details](packages/engine/README.md#planning)) | ✅ |
 | **Captions:** [burned in word by word](packages/engine/README.md#captions) as the speech was said, in Taiwan Traditional Chinese with English words kept in English. Four presets; rows break at pauses and between words, never inside an English word, with no closing punctuation starting a row; each word lights on the frame it is said; a caption moves off a face under it. A SubRip file beside the video matches the picture. Checked by eye on synthetic footage and one corpus clip; not yet rated in the blind review | ✅ |
 | **Studio voice:** vework measures each source's speech (the room's noise floor, loudness and its range, clipping, reverberation, boom and presence) and removes its noise and much of the room with [DeepFilterNet3](https://github.com/Rikorose/DeepFilterNet). The engine chooses each source's chain from those measurements: denoising only as far as the room needs, a light de-reverb only where the room is still heard, an 80 Hz high-pass, EQ, a leveller where the level wanders, compression to one speech level for every source, de-essing and a peak limiter. Loudness is then -14 LUFS for 9:16 and 1:1 and -16 for 16:9, at -1 dBTP. Music is set under the processed voice. Measured on deliberately degraded synthetic clips and three noisy corpus clips: the room 12 to 25 dB further under the speech, a talk show's loudness range from 13 to 16 LU down to 3.6 and 3.7, no clicks or drift at cuts and word timings unchanged ([numbers](packages/engine/README.md#voice-measurements)); hand-checked transcripts and a blind review are still to judge it | ✅ |
@@ -56,22 +56,25 @@ Analysis and rendering run locally. Planning sends Anthropic each file's transcr
 ## Quick start
 
 **Requirements:**
-- [mise](https://mise.jdx.dev), which installs the pinned Node, Python and `uv`; Node's corepack then provides the pinned pnpm. Either [activate mise](https://mise.jdx.dev/getting-started.html) in your shell, or prefix the commands below with `mise exec --`.
-- About 2 GB for the Python environment, plus the model weights downloaded on first use.
+- [mise](https://mise.jdx.dev), which installs the pinned Node, Python and `uv`; Node's corepack then provides the pinned pnpm.
+- About 2 GB for the Python environment, plus the model weights downloaded on first use (3.4 GB for the speech model on a CPU).
+- An [Anthropic API key](https://console.anthropic.com/settings/keys): Claude plans the edit and checks its cuts, about US$0.05 to 0.15 an edit.
 
 ```bash
 git clone https://github.com/zcxy-dev/video-editor.git
 cd video-editor
-mise install
-pnpm install
-(cd worker && uv sync --extra ml)
+mise run start
+```
 
-# Claude plans the edit and checks its cuts with your Anthropic key, about US$0.10 to 0.13 an edit:
-# copy .env.example to .env (git-ignored) and fill in ANTHROPIC_API_KEY.
+`mise run start` installs the tools, the packages and the Python environment, builds the [web page](apps/web/README.md), starts it on 127.0.0.1 and opens it in the browser. mise asks once to trust the repository's `mise.toml`. The first time, the page asks for the API key, checks it with Anthropic and keeps it in the git-ignored `.env`. Run it again the same way; with mise [activated](https://mise.jdx.dev/getting-started.html) in your shell, `pnpm start` does the same.
+
+From the command line, once `mise run start` has set things up (or after `mise install`, `pnpm install` and `uv sync --extra ml` in `worker/`), with the key in `.env` (copy `.env.example`):
+
+```bash
 pnpm edit footage/ --length 60s --aspect 9:16 -o out/edit.mp4
 ```
 
-Or run the [web page](apps/web/README.md). `pnpm edit --help` lists the options; [`packages/engine`](packages/engine/README.md#editing-footage) says what the command writes and how it reports progress. The analysis on its own writes one file's media index:
+`pnpm edit --help` lists the options; [`packages/engine`](packages/engine/README.md#editing-footage) says what the command writes and how it reports progress. The analysis on its own writes one file's media index:
 
 ```bash
 cd worker

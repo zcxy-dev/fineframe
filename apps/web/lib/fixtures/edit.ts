@@ -1,7 +1,9 @@
-// Stands in for `pnpm edit` in tests: records its arguments, prints progress lines (one going
-// back, as a stage may report), waits while $FAKE_EDIT_HOLD names a file that exists, then writes
-// the outputs and the done line, with a project that plays the first --music track.
-// $FAKE_EDIT_NO_CAPTIONS leaves the captions file empty, as the engine does when no speech is kept.
+// Stands in for `pnpm edit` in tests: records its arguments, prints progress lines (a model's
+// download among them, and one going back, as a stage may report), waits while $FAKE_EDIT_HOLD
+// names a file that exists, then writes the outputs and the done line with what Claude cost, with
+// a project that plays the first --music track. It fails unless ANTHROPIC_API_KEY is
+// $FAKE_EDIT_KEY. $FAKE_EDIT_NO_CAPTIONS leaves the captions file empty, as the engine does when no
+// speech is kept.
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, relative } from "node:path";
@@ -9,7 +11,17 @@ import { dirname, relative } from "node:path";
 const args = process.argv.slice(2);
 await writeFile("args.json", JSON.stringify(args));
 const say = (line: object) => process.stdout.write(`${JSON.stringify(line)}\n`);
-say({ stage: "analyze", fraction: 0.1, message: "Transcribing", file: "footage/a.mp4" });
+if (process.env.ANTHROPIC_API_KEY !== process.env.FAKE_EDIT_KEY) {
+  say({ stage: "error", fraction: 0, message: "Not the key the page saved" });
+  process.exit(1);
+}
+const file = "footage/a.mp4";
+const model = "Qwen/Qwen3-ASR-0.6B-hf";
+for (const bytes of [0, 4000]) {
+  const download = { name: model, bytes, total: 4000 };
+  say({ stage: "analyze", fraction: 0, message: `Downloading ${model}`, file, download });
+}
+say({ stage: "analyze", fraction: 0.1, message: "Transcribing", file });
 process.stderr.write("vework: transcribing\n");
 const hold = process.env.FAKE_EDIT_HOLD;
 while (hold && existsSync(hold)) await new Promise((done) => setTimeout(done, 20));
@@ -37,5 +49,6 @@ say({
   stage: "done",
   fraction: 1,
   message: "Finished",
+  claude: { plan: { dollars: 0.07, requests: 1 }, check: { dollars: 0.012, requests: 9 } },
   outputs: { video: out, project, captions },
 });

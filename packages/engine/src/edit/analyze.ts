@@ -4,7 +4,7 @@ import { mkdir, readdir, readFile, rename, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { MusicIndex, Source } from "@video-editor/schema";
+import type { MusicIndex, Source, StageProgress } from "@video-editor/schema";
 import { EditError } from "./error.ts";
 import type { MediaFile } from "./inputs.ts";
 
@@ -83,11 +83,18 @@ const STEPS: [RegExp, (n: number) => number][] = [
   [/^finding beats/, () => 0.1],
 ];
 
+/** A model vework is downloading on its first use. */
+export type Download = NonNullable<StageProgress["download"]>;
+
+/** How far vework is through a file, what it is doing and any model it is downloading. */
+export type Report = (fraction: number, message: string, download?: Download) => void;
+
 /**
  * Runs `vework analyze` on one file, writing its media index to `index`, and the denoised speech
  * vework writes beside it, only once they are whole.
- * vework's steps are reported as the fraction of the file done, with its message; anything else
- * it prints goes to `log`. A failure throws with vework's own error, which says what to do when
+ * vework's steps are reported as the fraction of the file done, with its message, and a model it
+ * downloads with its bytes, at the fraction reached before; anything else it prints goes to
+ * `log`. A failure throws with vework's own error, which says what to do when
  * its environment is not set up.
  */
 export function analyze(
@@ -95,7 +102,7 @@ export function analyze(
   file: MediaFile,
   index: string,
   options: AnalysisOptions,
-  report: (fraction: number, message: string) => void,
+  report: Report,
   log: (line: string) => void,
 ): Promise<void> {
   const extra: string[] = [];
@@ -114,7 +121,7 @@ export function analyzeMusic(
   file: MediaFile,
   index: string,
   license: License,
-  report: (fraction: number, message: string) => void,
+  report: Report,
   log: (line: string) => void,
 ): Promise<void> {
   const extra = ["--license", license.name];
@@ -141,7 +148,7 @@ async function vework(
   file: MediaFile,
   index: string,
   extra: readonly string[],
-  report: (fraction: number, message: string) => void,
+  report: Report,
   log: (line: string) => void,
 ): Promise<void> {
   // A folder of its own, since vework names the denoised speech after the index it writes.
@@ -155,12 +162,20 @@ async function vework(
     let error: string | undefined;
     let lastLine = "";
     let failed = false;
+    let reached = 0;
     const take = (line: string) => {
       if (!line.trim()) return;
       lastLine = line;
       const said = line.match(/^vework: (.*)$/)?.[1];
       const why = said?.match(/^error: (.*)$/)?.[1];
       if (why) error = why;
+      const downloading = said?.match(/^downloading (.+): (\d+) of (\d+) bytes$/);
+      if (downloading) {
+        const [, name = "", bytes, total] = downloading;
+        const download = { name, bytes: Number(bytes), total: Number(total) };
+        report(reached, `Downloading ${name}`, download);
+        return;
+      }
       const step = said && !why ? STEPS.find(([pattern]) => pattern.test(said)) : undefined;
       if (!said || !step) {
         log(line);
@@ -168,6 +183,7 @@ async function vework(
       }
       const [, n, of] = said.match(step[0]) ?? [];
       const fraction = step[1](of ? (Number(n) - 1) / Number(of) : 0);
+      reached = fraction;
       report(fraction, said.charAt(0).toUpperCase() + said.slice(1));
     };
     // Each stream keeps its own unfinished line: Python buffers stdout when it is piped, so a

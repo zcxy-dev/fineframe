@@ -122,6 +122,13 @@ export function formatClock(seconds: number): string {
   return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${minutes}:${rest}`;
 }
 
+/** US dollars as the page shows them: $0.07, or unknown for a model without a price. */
+export function formatDollars(dollars: number | null): string {
+  if (dollars === null) return "unknown";
+  if (dollars > 0 && dollars < 0.01) return "under $0.01";
+  return `$${dollars.toFixed(2)}`;
+}
+
 export function formatBytes(bytes: number): string {
   const units = ["B", "KB", "MB", "GB", "TB"];
   let value = bytes;

@@ -8,7 +8,9 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
-import type { Progress } from "@video-editor/schema";
+import type { ClaudeCost, Progress } from "@video-editor/schema";
+import type { FixKind } from "./fixes.ts";
+import { readKey } from "./key.ts";
 import { safeRelativePath } from "./paths.ts";
 import { type Run, runEdit } from "./runner.ts";
 import { type FileEntry, type Role, roleOf, type Settings } from "./settings.ts";
@@ -38,6 +40,10 @@ export interface Job {
   stages: Partial<Record<Stage, { start: number; end?: number }>>;
   /** The latest line of a stage. */
   progress?: { stage: Stage; fraction: number; message: string; file?: string };
+  /** A model downloading on its first use, while it downloads. */
+  download?: { name: string; bytes: number; total: number; secondsLeft?: number };
+  /** What Claude cost, by stage, once the edit is done or failed after a request. */
+  claude?: ClaudeCost;
   result?: {
     message: string;
     captions: boolean;
@@ -47,12 +53,15 @@ export interface Job {
   error?: string;
 }
 
-/** A request the job cannot take in its state; the message is for the page. */
+/** A request the job cannot take in its state; the message is for the page, and `code` names
+ * what its owner can fix. */
 export class JobError extends Error {
   readonly status: 400 | 403 | 404 | 409 | 507;
-  constructor(message: string, status: 400 | 403 | 404 | 409 | 507) {
+  readonly code: FixKind | undefined;
+  constructor(message: string, status: 400 | 403 | 404 | 409 | 507, code?: FixKind) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -61,6 +70,21 @@ export interface JobsOptions {
   root: string;
   /** The edit command: a program and its first arguments. */
   command: readonly string[];
+  /** The Anthropic API key the edit uses, read when an edit is created and started. */
+  key: () => Promise<string | undefined>;
+}
+
+/** Seconds a download has left at its rate since it started; undefined until it can say. */
+export function secondsLeft(
+  start: { at: number; bytes: number },
+  now: { at: number; bytes: number },
+  total: number,
+): number | undefined {
+  const elapsed = now.at - start.at;
+  const arrived = now.bytes - start.bytes;
+  // The first seconds' rate says little: connections are still opening.
+  if (elapsed < 3000 || arrived <= 0) return undefined;
+  return ((total - now.bytes) * elapsed) / arrived / 1000;
 }
 
 const VIDEO = join("out", "edit.mp4");
@@ -72,6 +96,9 @@ const LOG = "edit.log";
 export class Jobs {
   readonly #root: string;
   readonly #command: readonly string[];
+  readonly #key: () => Promise<string | undefined>;
+  /** Where each running job's current download started, for its time left. */
+  readonly #downloads = new Map<string, { name: string; at: number; bytes: number }>();
   readonly #jobs = new Map<string, Job>();
   readonly #runs = new Map<string, Run>();
   readonly #listeners = new Map<string, Set<(job: Job) => void>>();
@@ -80,6 +107,7 @@ export class Jobs {
   constructor(options: JobsOptions) {
     this.#root = resolve(options.root);
     this.#command = options.command;
+    this.#key = options.key;
     this.#loaded = this.#load();
   }
 
@@ -103,6 +131,7 @@ export class Jobs {
     await this.#loaded;
     // Refused now rather than at start, before the page sends any footage.
     this.#refuseWhileRunning();
+    await this.#requireKey();
     const files: JobFile[] = [];
     const seen = new Set<string>();
     for (const entry of entries) {
@@ -111,7 +140,13 @@ export class Jobs {
       if (seen.has(path)) throw new JobError(`${path}: given twice`, 400);
       seen.add(path);
       const use = roleOf(path);
-      if (!use) throw new JobError(`${path}: not a video, a still image or music`, 400);
+      if (!use) {
+        throw new JobError(
+          `${path}: not a video, a still image or music. Leave it out, or convert it to MP4`,
+          400,
+          "file",
+        );
+      }
       if (!Number.isSafeInteger(entry.size) || entry.size <= 0) {
         throw new JobError(`${path}: empty`, 400);
       }
@@ -129,7 +164,12 @@ export class Jobs {
     // The edit's work files and outputs need room too; footage the size of what is left would
     // fail halfway through the render instead of now.
     if (needed * 1.2 > bavail * bsize) {
-      throw new JobError("Not enough free disk space on the server for this footage", 507);
+      throw new JobError(
+        `Not enough free disk space for this footage: it needs about ${gigabytes(needed * 1.2)} ` +
+          `and ${gigabytes(bavail * bsize)} is free. Free some space, or leave some files out`,
+        507,
+        "disk",
+      );
     }
     const job: Job = {
       id: randomUUID(),
@@ -212,11 +252,12 @@ export class Jobs {
   /** Starts the edit once every file has arrived. */
   async start(id: string): Promise<Job> {
     const job = await this.get(id);
+    const key = await this.#requireKey();
     if (job.status !== "uploading") throw new JobError("This edit has already started", 409);
     const missing = job.files.find((file) => file.received !== file.size);
     if (missing) throw new JobError(`${missing.path} has not arrived yet`, 409);
     this.#refuseWhileRunning();
-    // Running from here, before the first await, so a second start at the same moment is refused.
+    // Running from here, before the next await, so a second start at the same moment is refused.
     job.status = "running";
     job.started = Date.now();
     const dir = this.#dir(job);
@@ -253,6 +294,8 @@ export class Jobs {
       command: this.#command,
       args,
       cwd: dir,
+      // The key the page saved, over any the server's environment holds.
+      env: { ANTHROPIC_API_KEY: key },
       onProgress: (line) => this.#progress(job, line),
       onLog: (line) => log.push(line),
     });
@@ -264,6 +307,13 @@ export class Jobs {
     return job;
   }
 
+  async #requireKey(): Promise<string> {
+    const key = await this.#key();
+    if (!key)
+      throw new JobError("Add your Anthropic API key first: Claude plans the edit", 400, "key");
+    return key;
+  }
+
   #refuseWhileRunning(): void {
     if ([...this.#jobs.values()].some((other) => other.status === "running")) {
       throw new JobError("Another edit is running; wait for it to finish or cancel it", 409);
@@ -272,6 +322,20 @@ export class Jobs {
 
   #progress(job: Job, line: Progress): void {
     const now = Date.now();
+    if (line.claude) job.claude = line.claude;
+    if ("download" in line && line.download) {
+      const { name, bytes, total } = line.download;
+      let start = this.#downloads.get(job.id);
+      if (start?.name !== name) {
+        start = { name, at: now, bytes };
+        this.#downloads.set(job.id, start);
+      }
+      const left = secondsLeft(start, { at: now, bytes }, total);
+      job.download = { name, bytes, total, ...(left === undefined ? {} : { secondsLeft: left }) };
+    } else {
+      delete job.download;
+      this.#downloads.delete(job.id);
+    }
     if (line.stage === "done") {
       job.result = { message: line.message, captions: line.outputs.captions !== undefined };
     } else if (line.stage === "error") {
@@ -295,6 +359,8 @@ export class Jobs {
 
   async #finish(job: Job, code: number | null, log: readonly string[]): Promise<void> {
     this.#runs.delete(job.id);
+    this.#downloads.delete(job.id);
+    delete job.download;
     const now = Date.now();
     job.finished = now;
     for (const stage of Object.values(job.stages)) stage.end ??= now;
@@ -388,6 +454,10 @@ async function playedMusic(dir: string): Promise<string[]> {
   return [...new Set(paths)];
 }
 
+function gigabytes(bytes: number): string {
+  return `${(bytes / 1e9).toFixed(1)} GB`;
+}
+
 /** Where jobs go unless VIDEO_EDITOR_JOBS says otherwise: beside the engine's own cache. */
 export function defaultRoot(): string {
   return process.env.VIDEO_EDITOR_JOBS ?? join(homedir(), ".cache", "video-editor", "jobs");
@@ -399,6 +469,7 @@ export function jobs(): Jobs {
   const global = globalThis as { videoEditorJobs?: Jobs };
   global.videoEditorJobs ??= new Jobs({
     root: defaultRoot(),
+    key: readKey,
     command: [
       process.execPath,
       process.env.VIDEO_EDITOR_EDIT_CLI ??

@@ -8,6 +8,8 @@ export interface RunOptions {
   command: readonly string[];
   args: readonly string[];
   cwd: string;
+  /** Set in its environment besides the server's own. */
+  env?: Record<string, string>;
   onProgress: (line: Progress) => void;
   /** Each line for a person: stderr, and any stdout line that is not progress. */
   onLog: (line: string) => void;
@@ -34,7 +36,7 @@ export function runEdit(options: RunOptions): Run {
     cwd: options.cwd,
     // The command resolves its paths against INIT_CWD when pnpm sets it; pnpm may have set it
     // for this server, to another folder.
-    env: { ...process.env, INIT_CWD: options.cwd },
+    env: { ...process.env, ...options.env, INIT_CWD: options.cwd },
     stdio: ["ignore", "pipe", "pipe"],
     // Its own process group, so stopping it also stops the analysis and FFmpeg it runs.
     detached: true,

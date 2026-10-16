@@ -1,5 +1,5 @@
 // The page's server routes against a stand-in for `pnpm edit` (../../../lib/fixtures/edit.ts),
-// so they run without the models, FFmpeg or a key.
+// so they run without the models, FFmpeg or a real key.
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -16,6 +16,12 @@ process.env.VIDEO_EDITOR_EDIT_CLI = fileURLToPath(
   new URL("../../../lib/fixtures/edit.ts", import.meta.url),
 );
 process.env.FAKE_EDIT_HOLD = hold;
+// The key the page saved, which the edit gets over the server's own.
+const env = join(root, ".env");
+await writeFile(env, "ANTHROPIC_API_KEY=sk-ant-saved\n");
+process.env.VIDEO_EDITOR_ENV_FILE = env;
+process.env.ANTHROPIC_API_KEY = "sk-ant-server";
+process.env.FAKE_EDIT_KEY = "sk-ant-saved";
 
 // After the environment is set: the job store reads it once.
 const jobsRoute = await import("./route.ts");
@@ -53,6 +59,17 @@ const put = (id: string, index: number, bytes: Uint8Array<ArrayBuffer>) =>
 
 const start = (id: string) =>
   startRoute.POST(new Request(`${url}/${id}/start`, { method: "POST" }), ctx({ id }));
+
+test("without a key, an edit is refused before its footage is sent, for the page to ask", async () => {
+  await rm(env);
+  delete process.env.ANTHROPIC_API_KEY;
+  const { response, body } = await create([{ path: "a.mp4", size: 10 }]);
+  assert.equal(response.status, 400);
+  assert.match(body.error ?? "", /Anthropic API key/);
+  assert.equal((body as { code?: string }).code, "key");
+  await writeFile(env, "ANTHROPIC_API_KEY=sk-ant-saved\n");
+  process.env.ANTHROPIC_API_KEY = "sk-ant-server";
+});
 
 test("bad input is refused, saying why", async () => {
   const video = [{ path: "a.mp4", size: 10 }];
@@ -151,6 +168,19 @@ test("an edit: files streamed in, one edit at a time, live progress, then the do
     assert.ok((fractions[i] as number) >= (fractions[i - 1] as number), "the bar never goes back");
   }
   assert.ok(seen.some((each) => each.progress?.file === "footage/a.mp4"));
+  // A model's download shows while it lasts; what Claude cost by stage shows once done.
+  const download = seen.find((each) => each.download)?.download;
+  assert.deepEqual(download && { ...download, secondsLeft: undefined }, {
+    name: "Qwen/Qwen3-ASR-0.6B-hf",
+    bytes: 0,
+    total: 4000,
+    secondsLeft: undefined,
+  });
+  assert.equal(seen.at(-1)?.download, undefined);
+  assert.deepEqual(seen.at(-1)?.claude, {
+    plan: { dollars: 0.07, requests: 1 },
+    check: { dollars: 0.012, requests: 9 },
+  });
 
   // The command got the footage, the music with its licence, and the settings.
   const args = JSON.parse(await readFile(join(dir, "args.json"), "utf8")) as string[];
