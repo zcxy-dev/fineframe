@@ -2,7 +2,7 @@ import { setTimeout } from "node:timers/promises";
 import Anthropic from "@anthropic-ai/sdk";
 
 /** What an edit spends on Claude: `best` plans with Opus, `economy` with Sonnet at half its
- * price per token. */
+ * price per token in and out. */
 export type Quality = "best" | "economy";
 export const QUALITIES: readonly Quality[] = ["best", "economy"];
 /** Edit planning and the decisions a cut check escalates, by quality. */

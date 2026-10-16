@@ -142,6 +142,7 @@ async function recorder(file: string): Promise<{ claude: Claude; save: () => Pro
   const keyOf = (request: ClaudeRequest) =>
     createHash("sha256")
       .update(request.purpose)
+      .update(request.model)
       .update(request.content.map((block) => (block.type === "text" ? block.text : "")).join("\n"))
       .digest("hex");
   const live = anthropicClaude();
