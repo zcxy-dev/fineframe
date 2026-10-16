@@ -28,13 +28,16 @@ ANALYSIS_SIZE = 640
 MAX_FACES = 32
 
 # Detector scores: a weaker face next to a strong one is more often a false detection than a
-# second person, and a faint one more often than not. Either counts only when its mouth moves
-# with the speech: a head turned aside scores lower than one facing the camera, so a speaker
-# seen in profile scores 0.5 to 0.85 beside a listener's 0.9.
+# second person, and a faint one more often than not. Either counts only when it is named the
+# speaker for UNSURE_SPEECH seconds of the shot: a head turned aside scores lower than one facing
+# the camera, so a drawn speaker turned 30 to 40 degrees scores 0.5 to 0.87 beside a listener's
+# 0.9.
 FAINT_FACE_SCORE = 0.5
 FACE_SCORE_THRESHOLD = 0.72
 STRONG_FACE_SCORE = 0.90
 COMPETING_FACE_SCORE = 0.85
+# More than a nod or a laugh, and as long as the engine's shortest turn (MIN_TURN in framing.ts).
+UNSURE_SPEECH = 2.0
 # A face counts in a shot when it is seen in this share of the shot's samples.
 MIN_TRACK_PRESENCE = 0.35
 MAX_TRACK_GAP = 1.0  # seconds a track may go unseen and still continue
@@ -149,15 +152,30 @@ def cut_times(transitions: list[dict]) -> list[float]:
 def frame_shot(
     samples: list[Sample], start: float, end: float, speech: list[dict], ids: Iterator[int]
 ) -> dict:
-    """One shot of the index: its layout, the faces that count and who speaks when."""
+    """One shot of the index: its layout, the faces that count and who speaks when. An unsure
+    face that speaks too little is dropped, and who speaks judged again without it, until every
+    unsure face left speaks enough."""
     seen = seen_tracks(track_faces(samples), len(samples))
-    talking = {span["face"] for span in speakers(list(enumerate(seen)), start, end, speech)}
-    present = [track for k, track in enumerate(seen) if k in talking or not unsure(track, seen)]
-    numbered = [(next(ids), track) for track in present]
+    present = list(enumerate(seen))
+    while True:
+        spans = speakers(present, start, end, speech)
+        spoken: dict[int, float] = {}
+        for span in spans:
+            spoken[span["face"]] = spoken.get(span["face"], 0.0) + span["end"] - span["start"]
+        kept = [
+            (k, track)
+            for k, track in present
+            if not unsure(track, seen) or spoken.get(k, 0.0) >= UNSURE_SPEECH
+        ]
+        if len(kept) == len(present):
+            break
+        present = kept
+    renumbered = {k: next(ids) for k, _ in present}
+    numbered = [(renumbered[k], track) for k, track in present]
     return {
         "start": round(start, 6),
         "end": round(end, 6),
-        "layout": classify_shot(present),
+        "layout": classify_shot([track for _, track in present]),
         "faces": [
             {
                 "id": i,
@@ -168,7 +186,7 @@ def frame_shot(
             }
             for i, track in numbered
         ],
-        "speakers": speakers(numbered, start, end, speech),
+        "speakers": [{**span, "face": renumbered[span["face"]]} for span in spans],
     }
 
 
@@ -182,7 +200,8 @@ def framing_faces(faces: list[Face]) -> list[Face]:
 
 
 def unsure(track: Track, tracks: list[Track]) -> bool:
-    """A faint face, or a weak one in a shot with a confident one: a person only if they speak."""
+    """A faint face, or a weak one in a shot with a confident one: a person only if they speak
+    (frame_shot)."""
     score = track.median_score()
     return score < FACE_SCORE_THRESHOLD or (
         score < COMPETING_FACE_SCORE

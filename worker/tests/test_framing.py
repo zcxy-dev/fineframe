@@ -52,20 +52,42 @@ def test_a_weak_face_beside_a_sole_confident_one_does_not_stop_it_jumping():
     assert [len(t.samples) for t in framing.track_faces(jump)] == [3, 3]
 
 
-def test_a_weak_face_beside_a_confident_one_counts_only_when_it_speaks():
-    def shot(weak_mouth: float) -> dict:
-        samples = [
-            Sample(k / 5, [face(0.3, score=0.95, mouth=1.0, still=1.0),
-                           face(0.7, score=0.8, mouth=weak_mouth, still=1.0)])
-            for k in range(20)
-        ]  # fmt: skip
-        return framing.frame_shot(samples, 0.0, 4.0, [{"start": 1.0, "end": 3.0}], count())
+def unsure_shot(faces, moving_until: float = 0.0, length: float = 4.0) -> dict:
+    """A shot of `faces` (score, centre) with speech from 1 s to 3 s; the last face's mouth
+    moves from 1 s until `moving_until`, the others' never."""
+    samples = []
+    for k in range(int(length * 5)):
+        t = k / 5
+        found = []
+        for i, (score, cx) in enumerate(faces):
+            moving = i == len(faces) - 1 and 1.0 <= t < moving_until
+            found.append(face(cx, score=score, mouth=6.0 if moving else 1.0, still=1.0))
+        samples.append(Sample(t, found))
+    return framing.frame_shot(samples, 0.0, length, [{"start": 1.0, "end": 3.0}], count())
 
-    silent = shot(weak_mouth=1.0)
+
+def test_a_weak_face_beside_a_confident_one_counts_only_when_it_speaks():
+    silent = unsure_shot([(0.95, 0.3), (0.8, 0.7)])
     assert (silent["layout"], len(silent["faces"]), silent["speakers"]) == ("talking_head", 1, [])
-    talking = shot(weak_mouth=6.0)
+    talking = unsure_shot([(0.95, 0.3), (0.8, 0.7)], moving_until=3.0)
     assert (talking["layout"], [f["id"] for f in talking["faces"]]) == ("two_shot", [0, 1])
     assert talking["speakers"] == [{"face": 1, "start": 1.0, "end": 3.0}]
+
+
+def test_a_faint_face_counts_only_when_it_speaks_for_long_enough():
+    assert unsure_shot([(0.6, 0.5)])["faces"] == []
+    # A second of moving mouth is a nod or a laugh, not a speaker.
+    brief = unsure_shot([(0.95, 0.3), (0.6, 0.7)], moving_until=2.0)
+    assert (brief["layout"], len(brief["faces"]), brief["speakers"]) == ("talking_head", 1, [])
+    alone = unsure_shot([(0.6, 0.5)], moving_until=3.0)
+    assert alone["layout"] == "talking_head"
+    assert alone["speakers"] == [{"face": 0, "start": 1.0, "end": 3.0}]
+
+
+def test_a_sole_confident_face_jumps_past_faint_ones():
+    jump = [Sample(t, [face(cx, score=0.8), face(0.9, score=0.6)])
+            for t, cx in ((0.0, 0.2), (0.2, 0.6), (0.4, 0.62))]  # fmt: skip
+    assert [len(t.samples) for t in framing.track_faces(jump)] == [3, 3]
 
 
 @pytest.mark.parametrize(
@@ -300,8 +322,8 @@ def test_finds_two_people_and_who_of_them_speaks(tmp_path):
     ("size", "turn"), [((640, 360), 30.0), ((640, 360), 40.0), ((1280, 720), 35.0)]
 )
 def test_a_speaker_turned_aside_is_named_over_a_listener_facing_the_camera(tmp_path, size, turn):
-    # YuNet scores the listener facing it 0.90, and the speaker 0.74 to 0.87 turned 30 degrees,
-    # 0.5 to 0.8 turned 40 and 0.5 to 0.7 drawn larger turned 35.
+    # YuNet scores the listener facing it 0.90, and the speaker turned aside 0.5 to 0.87: 0.74 to
+    # 0.87 turned 30 degrees, 0.5 to 0.8 turned 40 and 0.5 to 0.7 drawn larger turned 35.
     path = tmp_path / "turned.mp4"
     draw_people(path, [[(0.4, 5.6)], []], size=size, head=0.11, turn=(turn, 0.0))
     found = framing.analyze(path, probe.probe(path).video, [], [{"start": 0.4, "end": 5.6}])
