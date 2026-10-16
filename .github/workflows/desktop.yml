@@ -76,8 +76,11 @@ jobs:
         run: |
           installer=$(ls apps/desktop/dist/*.exe)
           powershell -NoProfile -Command "Start-Process -Wait -FilePath '$installer' -ArgumentList '/S'"
-          app="$(cygpath -w "$LOCALAPPDATA")\\Programs\\Video Editor\\Video Editor.exe"
-          test -f "$app"
+          programs="$(cygpath -u "$LOCALAPPDATA")/Programs"
+          app=$(find "$programs" -maxdepth 3 -name 'Video Editor.exe' | head -1)
+          if [ -z "$app" ]; then ls -R "$programs" | head -50; exit 1; fi
+          app=$(cygpath -w "$app")
+          echo "installed at $app"
           # The installer may open the app when it finishes; a second copy would only hand over to
           # that one and quit, so the smoke test starts from none running.
           sleep 5
