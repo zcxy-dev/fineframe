@@ -78,8 +78,8 @@ jobs:
           pnpm check-gen
 
   # The renderer on macOS, Apple silicon and Intel, and on Windows, with each one's pinned
-  # FFmpeg: the engine tests, then a synthetic edit scored by vebench; on Windows the worker's
-  # checks too.
+  # FFmpeg: the engine tests, then a synthetic edit scored by vebench. On Windows also the rest of
+  # the workspace, the worker and the page as `mise run start` starts it.
   platforms:
     name: ${{ matrix.check }}
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
@@ -95,7 +95,7 @@ jobs:
             timeout: 30
           - check: windows
             runner: windows-latest
-            timeout: 45
+            timeout: 20
     runs-on: ${{ matrix.runner }}
     timeout-minutes: ${{ matrix.timeout }}
     permissions:
@@ -117,10 +117,10 @@ jobs:
       # Paths, processes and the start script differ on Windows, so the rest of the workspace is
       # tested there too.
       - name: Test the other packages
-        if: runner.os == 'Windows' && !cancelled() # WIP
+        if: runner.os == 'Windows'
         run: pnpm --filter '!@video-editor/engine' -r test
       - name: Check the worker
-        if: runner.os == 'Windows' && !cancelled() # WIP
+        if: runner.os == 'Windows'
         working-directory: worker
         run: |
           uv sync --locked
@@ -130,7 +130,7 @@ jobs:
       # From the checkout to the page answering, as `mise run start` does it for a new user: the
       # packages, the analysis environment with its CPU PyTorch, the build and the server.
       - name: Start the page
-        if: runner.os == 'Windows' && !cancelled() # WIP
+        if: runner.os == 'Windows'
         run: |
           mise run start --no-open > "$RUNNER_TEMP/start.log" 2>&1 &
           start=$!
@@ -145,7 +145,6 @@ jobs:
       # copy-joined is the `-c copy` join the engine is measured against; every other run must
       # have no clicks and under 10 ms of drift.
       - name: Render a synthetic edit and score it (vebench)
-        if: ${{ !cancelled() }} # WIP
         run: |
           node packages/engine/scripts/synthetic-edit.ts "$RUNNER_TEMP/edit" --width 320 --height 180
           cd bench
@@ -154,28 +153,3 @@ jobs:
           jq -e 'del(.["copy-joined"]) | length == 2 and all(.[];
             .errors == [] and .missing == [] and .render.clicks == 0 and .render.max_abs_drift_ms < 10)' \
             "$RUNNER_TEMP/report.json"
-
-  # WIP: the key test against main's key.ts must fail on Windows; removed before merging.
-  windows-key:
-    if: github.event_name == 'pull_request'
-    runs-on: windows-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
-        with:
-          cache: false
-      - name: The key test fails without the fix
-        run: |
-          pnpm install --frozen-lockfile
-          git show origin/main:apps/web/lib/key.ts > apps/web/lib/key.ts
-          cd apps/web
-          if node --test lib/key.test.ts; then exit 1; fi
