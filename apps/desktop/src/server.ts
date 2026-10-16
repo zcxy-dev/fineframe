@@ -4,7 +4,7 @@
 // Electron.
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { createWriteStream } from "node:fs";
-import { chmod, mkdir } from "node:fs/promises";
+import { chmod, lstat, mkdir, readFile, symlink } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { delimiter, dirname, join } from "node:path";
@@ -20,6 +20,28 @@ export interface Places {
   data: string;
   /** Where the server's output is written. */
   log: string;
+}
+
+/**
+ * Makes again the links between the workspace's packages that the Windows installer could not
+ * carry (scripts/stage.ts lists them in links.json), as junctions, which need no administrator.
+ * Each is made once; elsewhere there is no list and nothing to do.
+ */
+export async function restoreLinks(editor: string): Promise<void> {
+  const list = await readFile(join(editor, "links.json"), "utf8").catch(() => null);
+  if (!list) return;
+  for (const { path, target } of JSON.parse(list) as { path: string; target: string }[]) {
+    const link = join(editor, ...path.split("/"));
+    if (
+      await lstat(link).then(
+        () => true,
+        () => false,
+      )
+    )
+      continue;
+    await mkdir(dirname(link), { recursive: true });
+    await symlink(join(editor, ...target.split("/")), link, "junction");
+  }
 }
 
 /** A port nothing listens on at 127.0.0.1, as the system hands one out. */
@@ -49,6 +71,8 @@ export function serverEnvironment(
   inherited: NodeJS.ProcessEnv = process.env,
 ): NodeJS.ProcessEnv {
   const python = join(places.data, "python");
+  // Windows names it Path, and would take either of two spellings.
+  const path = Object.keys(inherited).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
   return {
     ...inherited,
     ELECTRON_RUN_AS_NODE: "1",
@@ -59,7 +83,7 @@ export function serverEnvironment(
     VIDEO_EDITOR_ENV_FILE: join(places.data, "keys.env"),
     VIDEO_EDITOR_SETUP: "1",
     VIDEO_EDITOR_STOP_WITH_STDIN: "1",
-    PATH: [places.bin, inherited.PATH].filter(Boolean).join(delimiter),
+    [path]: [places.bin, inherited[path]].filter(Boolean).join(delimiter),
     UV_PROJECT_ENVIRONMENT: join(python, "env"),
     UV_PYTHON_INSTALL_DIR: join(python, "cpython"),
     UV_CACHE_DIR: join(python, "cache"),
@@ -99,6 +123,7 @@ export async function startServer(
   node: string,
   inherited: NodeJS.ProcessEnv = process.env,
 ): Promise<Server> {
+  await restoreLinks(places.editor);
   const port = await freePort();
   const url = `http://127.0.0.1:${port}`;
   const web = join(places.editor, "apps", "web");

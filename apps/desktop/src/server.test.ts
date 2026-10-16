@@ -1,11 +1,11 @@
 // The desktop app's server against a stand-in for Next.js that answers like the page and starts
 // a process of its own, as an edit or the analysis's setup would.
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { test } from "node:test";
-import { type Places, serverEnvironment, startServer } from "./server.ts";
+import { type Places, restoreLinks, serverEnvironment, startServer } from "./server.ts";
 
 const alive = (pid: number) => {
   try {
@@ -68,6 +68,10 @@ test("the server runs from the app's folders and keeps keys and Python out of an
     serverEnvironment({ ...places, bin: null }, 1, { PATH: "/usr/bin" }).PATH,
     "/usr/bin",
   );
+  // Windows spells it Path; a second spelling beside it would leave which one counts to chance.
+  const windows = serverEnvironment(places, 1, { Path: "C:\\Windows" });
+  assert.equal(windows.Path, `/app/bin${delimiter}C:\\Windows`);
+  assert.equal(windows.PATH, undefined);
 });
 
 test("the server starts on a free loopback port, and stopping it stops what it started", async (t) => {
@@ -82,12 +86,35 @@ test("the server starts on a free loopback port, and stopping it stops what it s
   assert.equal(started.cwd, join(places.editor, "apps", "web"));
   assert.equal(started.keys, join(places.data, "keys.env"));
   assert.equal(started.setup, "1");
-  // The app's folder is its owner's alone.
-  assert.equal((await stat(places.data)).mode & 0o777, 0o700);
+  // The app's folder is its owner's alone (on Windows, as the user's own folders are).
+  if (process.platform !== "win32") assert.equal((await stat(places.data)).mode & 0o777, 0o700);
   assert.ok(alive(started.child));
 
   await server.stop();
   assert.ok(!alive(server.child.pid as number));
   assert.ok(!alive(started.child), "the server's own child stops with it");
   assert.match(await readFile(places.log, "utf8"), /listening/);
+});
+
+test("the links the Windows installer leaves out are made again, once", async (t) => {
+  const editor = await mkdtemp(join(tmpdir(), "desktop-links-"));
+  t.after(() => rm(editor, { recursive: true, force: true }));
+  await mkdir(join(editor, "packages", "engine", "src"), { recursive: true });
+  await writeFile(join(editor, "packages", "engine", "src", "index.ts"), "export {};\n");
+  const listed = [
+    { path: "apps/web/node_modules/@video-editor/engine", target: "packages/engine" },
+  ];
+  await writeFile(join(editor, "links.json"), JSON.stringify(listed));
+  const link = join(editor, "apps", "web", "node_modules", "@video-editor", "engine");
+
+  await restoreLinks(editor);
+  // A link, not a copy: Node runs TypeScript only from outside node_modules.
+  assert.equal(await realpath(link), await realpath(join(editor, "packages", "engine")));
+  await restoreLinks(editor);
+  assert.equal(
+    await realpath(join(link, "src", "index.ts")),
+    await realpath(join(editor, "packages", "engine", "src", "index.ts")),
+  );
+  // Without a list, as from a clone or on macOS and Linux, nothing happens.
+  await restoreLinks(join(editor, "packages"));
 });

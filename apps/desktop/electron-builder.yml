@@ -27,6 +27,13 @@ mac:
   gatekeeperAssess: false
 dmg:
   writeUpdateInfo: false
+win:
+  target: nsis
+nsis:
+  # Installed for the user alone, needing no administrator, and opened when installed.
+  oneClick: true
+  perMachine: false
+  runAfterFinish: true
 linux:
   target: AppImage
   executableName: video-editor

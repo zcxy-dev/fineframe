@@ -138,7 +138,12 @@ test("an OpenRouter key is checked with OpenRouter and saved beside the Anthropi
     await readFile(env, "utf8"),
     "# Mine\nOTHER=1\nANTHROPIC_API_KEY=sk-ant-good\nOPENROUTER_API_KEY=sk-or-good\n",
   );
-  assert.equal((await stat(env)).mode & 0o777, 0o600);
+  if (process.platform === "win32") {
+    const { stdout } = await icacls(env);
+    assert.doesNotMatch(stdout, /\(I\)|\\Users:/, stdout);
+  } else {
+    assert.equal((await stat(env)).mode & 0o777, 0o600);
+  }
   assert.equal(await readKey("openrouter"), "sk-or-good");
   assert.equal((await put({ key: "sk-or-good", service: "other" })).status, 400);
 });

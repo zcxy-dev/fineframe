@@ -63,10 +63,13 @@ export class Setup {
   #running: Promise<void> | null = null;
   readonly #worker: string;
   readonly #enabled: boolean;
+  readonly #uv: readonly string[];
 
-  constructor(options: { worker: string; enabled: boolean }) {
+  /** `uv`: the program and its first arguments, uv on PATH unless given. */
+  constructor(options: { worker: string; enabled: boolean; uv?: readonly string[] }) {
     this.#worker = options.worker;
     this.#enabled = options.enabled;
+    this.#uv = options.uv ?? ["uv"];
     if (!this.#enabled) this.#state = { state: "ready" };
   }
 
@@ -114,7 +117,11 @@ export class Setup {
     let started: { at: number; bytes: number } | null = null;
     const log: string[] = [];
     await new Promise<void>((done, fail) => {
-      const child = spawn("uv", args, { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
+      const [program, ...first] = this.#uv as [string, ...string[]];
+      const child = spawn(program, [...first, ...args], {
+        stdio: ["ignore", "ignore", "pipe"],
+        windowsHide: true,
+      });
       live.add(child.pid ?? 0);
       createInterface({ input: child.stderr }).on("line", (line) => {
         log.push(line);

@@ -12,7 +12,7 @@
 // `--shots` saves the window at each step.
 //
 // On Linux, run it under a display, such as `xvfb-run -a`. The clip's speech comes from the
-// system's voice: `say` on macOS, espeak-ng on Linux.
+// system's voice: `say` on macOS, the speech synthesizer .NET ships on Windows, espeak-ng on Linux.
 import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -52,6 +52,18 @@ const home = { XDG_CONFIG_HOME: join(work, "config"), XDG_CACHE_HOME: join(work,
 
 // --- The clip: a test pattern and the sentences spoken, a pause after each. ---
 
+/** A PowerShell command that speaks `sentence` into the WAV file `file`. */
+function windowsSpeech(file: string, sentence: string): string {
+  const quoted = (text: string) => `'${text.replaceAll("'", "''")}'`;
+  return [
+    "Add-Type -AssemblyName System.Speech",
+    "$voice = New-Object System.Speech.Synthesis.SpeechSynthesizer",
+    `$voice.SetOutputToWaveFile(${quoted(file)})`,
+    `$voice.Speak(${quoted(sentence)})`,
+    "$voice.Dispose()",
+  ].join("; ");
+}
+
 async function makeClip(): Promise<string> {
   const dir = join(work, "clip");
   await mkdir(dir, { recursive: true });
@@ -61,7 +73,9 @@ async function makeClip(): Promise<string> {
     const [program, ...args] =
       process.platform === "darwin"
         ? ["say", "-o", file, sentence]
-        : ["espeak-ng", "-s", "150", "-w", file, sentence];
+        : process.platform === "win32"
+          ? ["powershell", "-NoProfile", "-Command", windowsSpeech(file, sentence)]
+          : ["espeak-ng", "-s", "150", "-w", file, sentence];
     const result = spawnSync(program as string, args, { stdio: "inherit" });
     if (result.status !== 0) throw new Error(`${program} could not speak the clip's sentences`);
     voices.push(file);
@@ -228,7 +242,18 @@ async function shot(page: Page, name: string): Promise<void> {
 /** The processes `root` started, and theirs, by their ids: a process in a group of its own is
  * still its parent's child. */
 function descendants(root: number): number[] {
-  const listing = spawnSync("ps", ["-A", "-o", "pid=,ppid="], { encoding: "utf8" }).stdout;
+  const listing =
+    process.platform === "win32"
+      ? spawnSync(
+          "powershell",
+          [
+            "-NoProfile",
+            "-Command",
+            'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId)" }',
+          ],
+          { encoding: "utf8" },
+        ).stdout
+      : spawnSync("ps", ["-A", "-o", "pid=,ppid="], { encoding: "utf8" }).stdout;
   const children = new Map<number, number[]>();
   for (const line of listing.trim().split("\n")) {
     const [child, parent] = line.trim().split(/\s+/).map(Number) as [number, number];
@@ -271,9 +296,13 @@ const app = await electron.launch({ executablePath: resolve(executable), env, ti
 const pid = app.process().pid as number;
 // Everything the app starts while it runs, to check none of it outlives the app.
 const started = new Set<number>();
-const tracking = setInterval(() => {
-  for (const child of descendants(pid)) started.add(child);
-}, 250);
+const tracking = setInterval(
+  () => {
+    for (const child of descendants(pid)) started.add(child);
+    // Listing Windows' processes takes about a second.
+  },
+  process.platform === "win32" ? 1000 : 250,
+);
 const page = await app.firstWindow();
 page.on("pageerror", (error) => say(`page error: ${error.message}`));
 await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 120_000 });
@@ -396,9 +425,12 @@ await app.close();
 await new Promise((done) => setTimeout(done, 2000));
 const left = [...started].filter(alive);
 if (left.length > 0) {
-  const listing = spawnSync("ps", ["-o", "pid=,command=", "-p", left.join(",")], {
-    encoding: "utf8",
-  }).stdout;
+  const listing =
+    process.platform === "win32"
+      ? left.join(", ")
+      : spawnSync("ps", ["-o", "pid=,command=", "-p", left.join(",")], {
+          encoding: "utf8",
+        }).stdout;
   problems.push(`still running after quitting:\n${listing}`);
 }
 if (

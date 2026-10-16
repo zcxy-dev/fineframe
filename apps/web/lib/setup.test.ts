@@ -1,8 +1,8 @@
 // The analysis's setup in the desktop app, against a stand-in for uv that prints what uv prints.
 import assert from "node:assert/strict";
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { join } from "node:path";
 import { test } from "node:test";
 import { defaultAsr, parseUvLine, Setup } from "./setup.ts";
 
@@ -36,13 +36,11 @@ test("the environment installs once from the lockfile, reporting its download, a
   for (const file of ["pyproject.toml", "uv.lock", join("src", "vework", "cli.py")]) {
     await writeFile(join(worker, file), "");
   }
-  const bin = join(dir, "bin");
-  await mkdir(bin);
   // Records its arguments, then prints two downloads the way uv does, slowly enough to be seen.
+  const fake = join(dir, "uv.cjs");
   await writeFile(
-    join(bin, "uv"),
-    `#!/usr/bin/env node
-const { appendFileSync } = require("node:fs");
+    fake,
+    `const { appendFileSync } = require("node:fs");
 appendFileSync(${JSON.stringify(join(dir, "calls"))}, JSON.stringify(process.argv.slice(2)) + "\\n");
 const lines = ["Downloading cpython-3.12.15-linux-x86_64-gnu (download) (30.0MiB)", " Downloaded cpython-3.12.15-linux-x86_64-gnu (download)", "Downloading torch (3.0MiB)", "Downloading numpy (1.0MiB)", " Downloaded numpy", " Downloaded torch"];
 let i = 0;
@@ -50,17 +48,13 @@ const next = () => (i < lines.length ? (process.stderr.write(lines[i++] + "\\n")
 next();
 `,
   );
-  await chmod(join(bin, "uv"), 0o755);
-  const saved = {
-    PATH: process.env.PATH,
-    UV_PROJECT_ENVIRONMENT: process.env.UV_PROJECT_ENVIRONMENT,
-  };
-  process.env.PATH = `${bin}${delimiter}${process.env.PATH}`;
+  const uv = [process.execPath, fake];
+  const saved = { UV_PROJECT_ENVIRONMENT: process.env.UV_PROJECT_ENVIRONMENT };
   process.env.UV_PROJECT_ENVIRONMENT = join(dir, "env");
   await mkdir(join(dir, "env"));
   t.after(() => Object.assign(process.env, saved));
 
-  const setup = new Setup({ worker, enabled: true });
+  const setup = new Setup({ worker, enabled: true, uv });
   assert.equal(setup.state.state, "installing");
   const seen: number[] = [];
   const totals = new Set<number>();
@@ -90,16 +84,16 @@ next();
   ]);
 
   // The same code again is only checked; changed code reinstalls the worker.
-  await new Setup({ worker, enabled: true }).ready();
+  await new Setup({ worker, enabled: true, uv }).ready();
   await writeFile(join(worker, "src", "vework", "cli.py"), "# changed\n");
-  await new Setup({ worker, enabled: true }).ready();
+  await new Setup({ worker, enabled: true, uv }).ready();
   const [, same, changed] = await calls();
   assert.deepEqual(same, first);
   assert.deepEqual(changed, [...first, "--reinstall-package", "vework"]);
 
   // A failure says so, and is tried again when asked.
   process.env.FAKE_UV_FAIL = "1";
-  const failing = new Setup({ worker, enabled: true });
+  const failing = new Setup({ worker, enabled: true, uv });
   await assert.rejects(failing.ready(), /Setting up the analysis failed/);
   assert.equal(failing.state.state, "failed");
   delete process.env.FAKE_UV_FAIL;
