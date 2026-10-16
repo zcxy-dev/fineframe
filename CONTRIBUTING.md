@@ -16,7 +16,7 @@ CI installs neither the worker's `ml` extra nor the benchmark's `synth` extra, s
 
 ## Checks
 
-A change passes the steps in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Run the same commands locally before opening a pull request. Its `macos` job runs the engine tests on Apple silicon and scores a [synthetic edit](packages/engine/scripts/synthetic-edit.ts), one run of it with effect overlays rendered by Remotion, with `vebench report`: every run but the `-c copy` join must have no clicks and under 10 ms of drift. `pnpm exec biome check --write` fixes TypeScript and JSON formatting.
+A change passes the steps in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Run the same commands locally before opening a pull request. Its `macos` job runs the engine tests on Apple silicon and scores a [synthetic edit](packages/engine/scripts/synthetic-edit.ts), one run of it with effect overlays rendered by Remotion, with `vebench report`: every run except `copy-joined`, a deliberately naive baseline joined with `-c copy`, must have no clicks and under 10 ms of drift. `pnpm exec biome check --write` fixes TypeScript and JSON formatting.
 
 ## Where code goes
 
@@ -31,7 +31,7 @@ A change passes the steps in [`.github/workflows/ci.yml`](.github/workflows/ci.y
 - **Keep data synthetic.** Tests generate their own media (ffmpeg `lavfi`, synthetic tones).
 - **Corpus footage** follows [bench/README.md](bench/README.md#corpus-layout).
 - **Never commit** other people's media, credentials or `.env` files.
-- **Keep third-party notices in one file.** Code adapted from another project keeps that project's copyright and licence in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), which lists the files it is in. The project is named nowhere else: not in code, comments, docs, tests, commits or pull requests. Its brand assets (logos, product names) are not covered by its licence; don't copy them.
+- **Keep third-party notices in one file.** A new model, font, program or dependency gets a row in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md#components) with its licence, checked against its own licence file or model card. Code adapted from another project keeps that project's copyright and licence in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), which lists the files it is in. The project is named nowhere else: not in code, comments, docs, tests, commits or pull requests. Its brand assets (logos, product names) are not covered by its licence; don't copy them.
 
 ## Pull requests
 

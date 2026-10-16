@@ -21,3 +21,4 @@ body:
     attributes:
       label: Environment
       description: OS, CPU or GPU, and the commit you ran.
+      placeholder: Ubuntu 24.04, 8-core CPU, no GPU, commit abc1234, FFmpeg 7.0.2, Node 24, Python 3.12

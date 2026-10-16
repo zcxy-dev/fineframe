@@ -1,4 +1,4 @@
-"""Blind review of our edits: people rate an edit alone, or two versions of it side by side.
+"""Blind review of finished edits: people rate an edit alone, or two versions of it side by side.
 
 A round is a folder of `<item>/<version>.mp4` edits, one item per footage and target length.
 """
@@ -364,7 +364,7 @@ def summarize(records: list[dict]) -> list[dict]:
 
 
 def report(round_dir: Path) -> str:
-    """The round's results as Markdown, ready to post on the roadmap issue."""
+    """The round's results as Markdown, ready to post in an issue."""
     records = load_ratings(round_dir / RATINGS)
     if not records:
         raise ValueError(f"{round_dir / RATINGS}: no ratings yet; run vebench review first")

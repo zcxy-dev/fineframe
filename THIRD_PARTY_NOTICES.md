@@ -1,6 +1,100 @@
 # Third-party notices
 
-## Beat This!
+The project's own code is under the [MIT License](LICENSE). It uses the components below, each under its own licence. Nothing in this repository bundles a model weight, a font or a binary: the tools download them from their publishers on first use, or the package managers install them. Licences were checked against each component's own licence file or model card at the version or revision the project pins.
+
+## Components
+
+### Models and data, downloaded on first use
+
+| Component | Licence | How it reaches you |
+|---|---|---|
+| [Qwen3-ASR-0.6B-hf, Qwen3-ASR-1.7B-hf](https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf) and [Qwen3-ForcedAligner-0.6B-hf](https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B-hf) | Apache-2.0 | Hugging Face, pinned revision; worker `ml` extra |
+| [CED-Base](https://huggingface.co/mispeech/ced-base), ONNX export | Apache-2.0 on its model card (see [notes](#ced-base)) | Hugging Face, pinned revision; worker `ml` extra |
+| [YuNet](https://huggingface.co/opencv/face_detection_yunet) (`face_detection_yunet_2023mar.onnx`) | MIT | Hugging Face, pinned revision and SHA-256; worker `ml` extra |
+| [Beat This!](https://github.com/CPJKU/beat_this) `final0` checkpoint | MIT | JKU Linz's file server, SHA-256 checked; worker `ml` extra |
+| [DeepFilterNet3](https://github.com/Rikorose/DeepFilterNet) ONNX export | MIT OR Apache-2.0 | GitHub, pinned commit and SHA-256; worker `ml` extra |
+| [Noto Sans CJK TC](https://github.com/notofonts/noto-cjk) Bold and Black | OFL-1.1 | GitHub, pinned commit and SHA-256; renderer, for captions |
+| [FFmpeg](https://ffmpeg.org) static builds from [imageio-binaries](https://github.com/imageio/imageio-binaries): 7.0.2 on Linux, 7.1 on macOS | GPL-3.0-or-later (Linux, Intel macOS), GPL-2.0-or-later (Apple silicon) | GitHub, pinned commit and SHA-256; renderer, run as a separate program (see [notes](#ffmpeg)) |
+| Chrome Headless Shell ([Chromium](https://www.chromium.org)) | Chromium's BSD-3-Clause licence and the third-party licences it lists; Google's build also refers to the Chrome terms of service | Downloaded by Remotion on the first effect render: from Google's [Chrome for Testing](https://github.com/GoogleChromeLabs/chrome-for-testing), on Linux with glibc 2.35 or later from Remotion's own build, and on older Linux arm64 from Playwright's Chromium build |
+| [Kokoro-82M-v1.1-zh](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh) weights and voices | Apache-2.0 | Hugging Face, pinned revision; benchmark `synth` extra only |
+
+### Python packages, installed by uv (direct dependencies)
+
+Models that come inside a package: the TransNetV2 weights in transnetv2-pytorch, Silero VAD's in silero-vad, nagisa's tagger, OpenCC's dictionaries and spaCy's `en_core_web_sm`.
+
+| Package | Licence | Used by |
+|---|---|---|
+| [anthropic](https://github.com/anthropics/anthropic-sdk-python) | MIT | worker |
+| [av](https://github.com/PyAV-Org/PyAV) (PyAV) | BSD-3-Clause; its wheels bundle FFmpeg linked with x264 and x265 (GPL-2.0-or-later) | worker |
+| [numpy](https://numpy.org) | BSD-3-Clause and bundled permissive licences | worker, benchmark |
+| [opencc](https://github.com/BYVoid/OpenCC) | Apache-2.0 | worker, benchmark `synth` |
+| [pydantic](https://github.com/pydantic/pydantic) | MIT | worker |
+| [scipy](https://scipy.org) | BSD-3-Clause | worker |
+| [beat-this](https://github.com/CPJKU/beat_this) | MIT | worker `ml` |
+| [huggingface-hub](https://github.com/huggingface/huggingface_hub) | Apache-2.0 | worker `ml`, benchmark `synth` |
+| [nagisa](https://github.com/taishi-i/nagisa) | MIT | worker `ml`, Japanese alignment |
+| [onnxruntime](https://github.com/microsoft/onnxruntime) | MIT | worker `ml` |
+| [opencv-python-headless](https://github.com/opencv/opencv-python) | Apache-2.0; its wheels bundle FFmpeg under LGPL-2.1-or-later | worker `ml` |
+| [silero-vad](https://github.com/snakers4/silero-vad) | MIT | worker `ml` |
+| [soynlp](https://github.com/lovit/soynlp) | GPL-3.0 on PyPI, LGPL-3.0 in its repository (see [notes](#copyleft-dependencies)) | worker `ml`, Korean alignment |
+| [torch](https://github.com/pytorch/pytorch) | BSD-3-Clause and bundled permissive licences | worker `ml`, benchmark `synth` |
+| [transformers](https://github.com/huggingface/transformers) | Apache-2.0 | worker `ml` |
+| [transnetv2-pytorch](https://github.com/allenday/transnetv2_pytorch) | MIT | worker `ml` |
+| [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg) | BSD-2-Clause; its wheels bundle the FFmpeg builds above | benchmark; worker tests |
+| [rapidfuzz](https://github.com/rapidfuzz/RapidFuzz) | MIT | benchmark |
+| [kokoro](https://github.com/hexgrad/kokoro) and [misaki](https://github.com/hexgrad/misaki) | Apache-2.0 | benchmark `synth` |
+| [jieba](https://github.com/fxsjy/jieba) | MIT | benchmark `synth` |
+| [pillow](https://github.com/python-pillow/Pillow) | MIT-CMU | benchmark `synth` |
+| [en_core_web_sm](https://github.com/explosion/spacy-models) | MIT | benchmark `synth` |
+| [datamodel-code-generator](https://github.com/koxudaxi/datamodel-code-generator), [pytest](https://github.com/pytest-dev/pytest), [ruff](https://github.com/astral-sh/ruff) | MIT | development |
+
+### npm packages, installed by pnpm (direct dependencies)
+
+| Package | Licence | Used by |
+|---|---|---|
+| [@anthropic-ai/sdk](https://github.com/anthropics/anthropic-sdk-typescript) | MIT | engine |
+| [remotion](https://www.remotion.dev), @remotion/bundler, @remotion/renderer | [Remotion License](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md), source-available (see [notes](#remotion)) | effects |
+| [react](https://react.dev), react-dom | MIT | effects, web page |
+| [ajv](https://github.com/ajv-validator/ajv) | MIT | schema, effects |
+| [@fontsource/noto-sans-tc](https://fontsource.org/fonts/noto-sans-tc) | OFL-1.1 | effects, web page |
+| [@fontsource-variable/inter](https://fontsource.org/fonts/inter) | OFL-1.1 | web page |
+| [next](https://nextjs.org) | MIT | web page |
+| [typescript](https://www.typescriptlang.org) | Apache-2.0 | development |
+| [@biomejs/biome](https://biomejs.dev) | MIT OR Apache-2.0 | development |
+| [json-schema-to-typescript](https://github.com/bcherny/json-schema-to-typescript), @types/node, @types/react, @types/react-dom | MIT | development |
+
+## Notes
+
+### Remotion
+
+Remotion is source-available, not open source. Its licence is free for individuals, for-profit organisations with up to three employees, non-profits, and evaluation before any commercial use; any other organisation that renders with it needs a [Remotion company licence](https://www.remotion.pro/license). The effect templates render with Remotion, so this applies to whoever runs the editor, not to people who only watch its output. The licence also forbids selling or sublicensing a derivative of Remotion itself.
+
+### FFmpeg
+
+The renderer runs FFmpeg as a separate program and needs libx264, which is GPL; the builds it downloads are therefore GPL builds, and the [Remotion compositor](https://www.remotion.dev/docs/miscellaneous/ffmpeg-license) and the PyAV wheels carry GPL-licensed FFmpeg code as well. The project's own code stays MIT: the repository does not distribute these binaries, which are downloaded or installed separately. Anyone who redistributes them, for example in a desktop app or a container image, must meet the GPL, including offering the corresponding source, or ship an LGPL build of FFmpeg instead, which means encoding H.264 without libx264.
+
+The pinned Intel macOS build (`ffmpeg-macos-x86_64-v7.1`) is configured with `--enable-nonfree` and declares itself not redistributable. It is to be replaced ([#6](https://github.com/zcxy-dev/video-editor/issues/6)); until then, `VIDEO_EDITOR_FFMPEG` points the renderer at another FFmpeg.
+
+### Copyleft dependencies
+
+- **soynlp**, installed with the worker's `ml` extra for the forced aligner's Korean word splitting, is marked GPL-3.0 on PyPI while its repository's licence file is LGPL-3.0.
+- **soxr** (LGPL-2.1-or-later) comes with beat-this in the worker's `ml` extra.
+- The benchmark's `synth` extra installs **phonemizer-fork** (GPL-3.0-or-later), **espeakng-loader**, whose wheel bundles espeak-ng (GPL-3.0), and **num2words** (LGPL-2.1), through kokoro's English support. The corpus generator never calls them.
+- **sharp**'s libvips (LGPL-3.0-or-later) is installed as an optional dependency of Next.js; the web page does not use it.
+
+### CED-Base
+
+The ONNX export's model card states Apache-2.0. The same weights are published on Zenodo under CC-BY-4.0, and the CED training code is GPL-3.0. The project uses the Hugging Face export under its stated licence.
+
+### Training data
+
+A model's licence covers its weights, not the data it was trained on. Some of that data has its own terms: YuNet was trained on WIDER FACE (CC BY-NC-ND), CED on AudioSet's YouTube clips, and Beat This! notes that some of its training audio is copyrighted.
+
+## Adapted code
+
+Code adapted from these projects keeps their copyright and licence below, with the files it is in.
+
+### Beat This!
 
 - `worker/src/vework/beats.py`
 
@@ -28,7 +122,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## BridgeClip
+### BridgeClip
 
 - `packages/engine/src/captions/ass.ts`
 - `packages/engine/src/captions/place.ts`
@@ -61,7 +155,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## DeepFilterNet
+### DeepFilterNet
 
 - `worker/src/vework/denoise.py`
 
@@ -87,7 +181,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## libebur128
+### libebur128
 
 - `worker/src/vework/loudness.py`
 
@@ -113,7 +207,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-## OpenCut
+### OpenCut
 
 - `packages/schema/src/time.ts`
 
@@ -127,7 +221,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## video-use
+### video-use
 
 - `packages/engine/src/grade.ts`
 - `packages/engine/src/graph/video.ts`

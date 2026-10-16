@@ -15,7 +15,7 @@ footage/ (any number of clips)  +  length (15 s … 1 h)  +  aspect (9:16 · 1:1
         ▼
 analyze     shots · speech and pauses · transcript with word timings · faces · audio events
 plan        pick the best takes, remove fillers and dead air, fit the requested length
-render      cuts · framing · color · voice · music · animated captions · effects · loudness
+render      cuts · framing · colour · voice · music · animated captions · effects · loudness
 check       review every cut, fix what is wrong, at most three passes
         │
         ▼
@@ -84,7 +84,7 @@ The [media index format](packages/schema/media-index.schema.json) is defined wit
 
 **Which speech model runs:**
 
-| Model | Weights to download | Speed on an 8-core CPU (EPYC 9355P) | Peak memory |
+| Model | Weights to download | Speed on 8 cores of an EPYC 9355P | Peak memory |
 |---|---|---|---|
 | Qwen3-ASR-0.6B | 3.4 GB | ~1.3× the clip's length | ~9 GB |
 | Qwen3-ASR-1.7B | 5.9 GB | ~14× the clip's length | ~14 GB |
@@ -99,29 +99,12 @@ Setup, checks and the rules every change follows are in [CONTRIBUTING.md](CONTRI
 
 ## Acknowledgements
 
-- **Models:**
-  - [Qwen3-ASR and Qwen3-ForcedAligner](https://github.com/QwenLM/Qwen3-ASR) (Apache-2.0)
-  - [TransNetV2](https://github.com/soCzech/TransNetV2), through [transnetv2-pytorch](https://github.com/allenday/transnetv2_pytorch) (MIT)
-  - [Silero VAD](https://github.com/snakers4/silero-vad) (MIT)
-  - [CED](https://github.com/RicherMans/CED), through its [ONNX export](https://huggingface.co/mispeech/ced-base) (Apache-2.0)
-  - [YuNet](https://github.com/ShiqiYu/libfacedetection.train), through [OpenCV Zoo's copy](https://huggingface.co/opencv/face_detection_yunet) (MIT)
-  - [Beat This!](https://github.com/CPJKU/beat_this) code and weights (MIT), for beats and downbeats
-  - [DeepFilterNet3](https://github.com/Rikorose/DeepFilterNet), through its ONNX export (MIT or Apache-2.0)
-  - [Kokoro-82M-v1.1-zh](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh) weights and voices (Apache-2.0), through [kokoro](https://github.com/hexgrad/kokoro) (Apache-2.0), for the synthetic corpus
-  - [spaCy](https://github.com/explosion/spaCy) and its `en_core_web_sm` model (MIT), for English pronunciation in the synthetic corpus
-- **Libraries:**
-  - [OpenCC](https://github.com/BYVoid/OpenCC) (Apache-2.0)
-  - [PyAV](https://github.com/PyAV-Org/PyAV) (BSD-3-Clause)
-  - [ONNX Runtime](https://github.com/microsoft/onnxruntime) (MIT)
-  - [OpenCV](https://github.com/opencv/opencv), through [opencv-python-headless](https://github.com/opencv/opencv-python) (Apache-2.0)
-  - [SciPy](https://scipy.org) (BSD-3-Clause)
-  - [misaki](https://github.com/hexgrad/misaki) (Apache-2.0), with [jieba](https://github.com/fxsjy/jieba) (MIT) and [pypinyin](https://github.com/mozillazg/python-pinyin) (MIT), for Kokoro's pronunciation. Its English extra also installs espeak-ng (GPL-3.0), which the generator never calls.
-  - [Pillow](https://github.com/python-pillow/Pillow) (MIT-CMU), which draws the synthetic pictures
-  - [Remotion](https://www.remotion.dev) ([Remotion License](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md)) and [React](https://react.dev) (MIT), which render the effect overlays in Chrome Headless Shell
-  - [Noto Sans TC](https://github.com/notofonts/noto-cjk) (OFL-1.1), through [Fontsource](https://fontsource.org) (MIT), for the effects' type and the web page's Chinese text, and Noto Sans CJK TC (OFL-1.1) for the captions
-  - [Next.js](https://nextjs.org) (MIT) for the web page, set in [Inter](https://github.com/rsms/inter) (OFL-1.1) through Fontsource
-  - [FFmpeg](https://ffmpeg.org). The renderer, the tests and the benchmark run the static GPL builds that [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg) ships (7.0.2 on Linux, 7.1 on macOS), as a separate program.
+The editor is built on these models and libraries: [Qwen3-ASR and Qwen3-ForcedAligner](https://github.com/QwenLM/Qwen3-ASR) for the transcript, [TransNetV2](https://github.com/soCzech/TransNetV2) for shots, [Silero VAD](https://github.com/snakers4/silero-vad) for speech, [CED](https://github.com/RicherMans/CED) for audio events, [YuNet](https://github.com/ShiqiYu/libfacedetection.train) for faces, [Beat This!](https://github.com/CPJKU/beat_this) for beats, [DeepFilterNet](https://github.com/Rikorose/DeepFilterNet) for the voice, [OpenCC](https://github.com/BYVoid/OpenCC) for Traditional Chinese, [FFmpeg](https://ffmpeg.org) and libass for rendering, [Remotion](https://www.remotion.dev) for the effects, [Next.js](https://nextjs.org) for the web page, [Noto CJK](https://github.com/notofonts/noto-cjk) and [Inter](https://github.com/rsms/inter) for type, and [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh) for the synthetic corpus's voices.
 
 ## License
 
-[MIT](LICENSE). Notices for code adapted from other projects are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The effect templates render with Remotion, which has its own licence: free for individuals and companies of up to 3 people, while larger companies need a [company licence](https://www.remotion.pro/license) ([terms](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md)).
+The project's code is [MIT](LICENSE). [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists every model, font and program it uses and every package it depends on directly, with its licence and how it reaches you, and keeps the notices of code adapted from other projects. Three of them need attention before commercial use or redistribution:
+
+- **Remotion**, which renders the effect templates, is source-available: free for individuals and companies of up to three employees, while larger companies need a [company licence](https://www.remotion.pro/license).
+- **FFmpeg**: the builds the renderer downloads and the PyAV wheels the worker installs are GPL, and the pinned Intel macOS build is marked not redistributable. Redistributing FFmpeg, for example in a desktop app, means meeting the GPL or shipping an LGPL build ([details](THIRD_PARTY_NOTICES.md#ffmpeg)).
+- **Optional extras** install a few GPL packages: soynlp in the worker's `ml` extra, and espeak-ng and phonemizer in the benchmark's `synth` extra ([details](THIRD_PARTY_NOTICES.md#copyleft-dependencies)).

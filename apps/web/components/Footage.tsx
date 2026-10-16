@@ -19,7 +19,7 @@ export interface Item {
   path: string;
   file: File;
   use: Role;
-  /** Music the owner chose not to offer the edit. */
+  /** Music the user chose not to offer the edit. */
   off?: boolean;
   /** Seconds; undefined while it is read, null when the browser cannot read it. */
   duration?: number | null;

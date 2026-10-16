@@ -1,12 +1,13 @@
 # vebench
 
-Scores the editor's output against hand-checked ground truth, so every pipeline change is
-measured on the same clips with the same numbers.
+Scores the editor's output against ground truth (the synthetic corpus's exact truth, or
+hand-checked truth for real footage), so every pipeline change is measured on the same clips
+with the same numbers.
 A [blind review](#blind-review) covers what numbers cannot: people rate the finished edits.
 
 ## Corpus layout
 
-Corpus footage is self-recorded or CC-licensed, and only the truth files are committed.
+Corpus footage is self-recorded or CC-licensed, and only its truth files may be committed. No real-footage corpus is published yet; the [synthetic corpus](#synthetic-corpus) is generated on demand.
 
 ```text
 corpus/<clip>/
@@ -114,7 +115,7 @@ uv run vebench synth synthetic/ --seed 0
 ```
 
 It writes 16 minutes of clips and 85 MB to `bench/synthetic/`, which git ignores, in 5 to
-7 minutes on an 8-core CPU; the first run also downloads 330 MB of speech model. The same
+7 minutes on 8 cores of an EPYC 9355P; the first run also downloads 330 MB of speech model. The same
 seed gives the same files with the same lockfile on the same machine.
 
 | Clips | Content |
@@ -231,7 +232,7 @@ A run's pooled numbers cover only the clips it was scored on.
 
 ## Blind review
 
-People rate our finished edits without knowing which version of the pipeline made them. A round
+People rate the editor's finished edits without knowing which version of the pipeline made them. A round
 is a folder with one subfolder per footage and target length:
 
 ```text
@@ -241,7 +242,7 @@ bench/review/<round>/             git-ignored
 ```
 
 ```bash
-uv run vebench review review/round-1 --rater owner   # prints the local address to open
+uv run vebench review review/round-1 --rater alex   # prints the local address to open
 uv run vebench review-report review/round-1          # prints the results as Markdown
 ```
 
@@ -266,9 +267,9 @@ uv run vebench review-report review/round-1          # prints the results as Mar
 Two lines of `ratings.jsonl`, an edit rated alone and a pair, with the scores shortened:
 
 ```json
-{"time": "2026-10-15T08:00:00+00:00", "rater": "owner", "seed": 2026, "item": "talk-60s",
+{"time": "2026-10-15T08:00:00+00:00", "rater": "alex", "seed": 2026, "item": "talk-60s",
  "versions": ["main"], "scores": {"main": {"story": 4, "…": 4}}}
-{"time": "2026-10-15T08:04:00+00:00", "rater": "owner", "seed": 2026, "item": "talk-5min",
+{"time": "2026-10-15T08:04:00+00:00", "rater": "alex", "seed": 2026, "item": "talk-5min",
  "versions": ["after", "before"],
  "scores": {"after": {"story": 4, "…": 4}, "before": {"story": 3, "…": 3}}, "preferred": "after"}
 ```

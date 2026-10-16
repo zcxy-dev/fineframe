@@ -36,7 +36,7 @@ music/                vework analyze-music for each track
 
 ### Edit measurements
 
-Each row is one `pnpm edit` run with the real API on an 8-core CPU shared with other jobs (load average 8 to 10). Every file was analysed with the 0.6B speech model and no transcript correction; the analysis time is from the first edit of that footage, the rest from a later one that found the indexes cached. The synthetic group comes from the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0); the other two are openly licensed web recordings whose transcripts nobody has corrected yet, so their cuts are checked against the words as the analysis timed them. `vebench edit` scores each project and `vebench render` each video:
+Each row is one `pnpm edit` run with the real API on 8 cores of an EPYC 9355P shared with other jobs (load average 8 to 10). Every file was analysed with the 0.6B speech model and no transcript correction; the analysis time is from the first edit of that footage, the rest from a later one that found the indexes cached. The synthetic group comes from the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0); the other two are openly licensed web recordings whose transcripts nobody has corrected yet, so their cuts are checked against the words as the analysis timed them. `vebench edit` scores each project and `vebench render` each video:
 
 ```bash
 pnpm -s edit bench/synthetic/chat-b{1,2,3}/source.mp4 --length 60s --aspect 9:16 \
@@ -501,7 +501,7 @@ On the real clips, without a hand-checked transcript, the render's transcript wa
 
 ## FFmpeg
 
-On first use the renderer downloads its pinned FFmpeg build ([which one](../../README.md#acknowledgements)), checks it against its SHA-256 and keeps it in `~/.cache/video-editor/`. CI tests the Linux x64 and macOS Apple silicon builds, rendering a [synthetic edit](scripts/synthetic-edit.ts) on macOS that vebench scores for clicks and drift; the Linux arm64 and Intel macOS builds have every library the renderer needs but are not tested.
+On first use the renderer downloads its pinned FFmpeg build ([which one](../../THIRD_PARTY_NOTICES.md#ffmpeg)), checks it against its SHA-256 and keeps it in `~/.cache/video-editor/`. CI tests the Linux x64 and macOS Apple silicon builds, rendering a [synthetic edit](scripts/synthetic-edit.ts) on macOS that vebench scores for clicks and drift; the Linux arm64 and Intel macOS builds have every library the renderer needs but are not tested.
 
 `VIDEO_EDITOR_FFMPEG` points the renderer at another FFmpeg instead. Whichever binary it uses must be FFmpeg 7.0 or later, which reads a filter graph from a file (`-/filter_complex`), and must have every filter, encoder and decoder the renderer needs: libass, libx264, zimg, loudnorm and libvpx's VP9 decoder, which reads the overlays' alpha, among them. If it is older or one is missing, the first render fails before any work and names each one.
 

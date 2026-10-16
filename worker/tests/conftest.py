@@ -13,7 +13,7 @@ def pytest_collection_modifyitems(items):
         for item in items:
             if "ml" in item.keywords:
                 item.add_marker(skip)
-    # Real API calls cost money and need the owner's key, so CI never makes them.
+    # Real API calls cost money and need your own key, so CI never makes them.
     if not os.environ.get("ANTHROPIC_API_KEY"):
         skip = pytest.mark.skip(reason="needs ANTHROPIC_API_KEY (uv run --env-file ../.env)")
         for item in items:

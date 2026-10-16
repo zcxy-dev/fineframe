@@ -66,7 +66,7 @@ function attachment(name: string): string {
 }
 
 /**
- * Refuses a request another site sends through the owner's browser: a plain form or text POST
+ * Refuses a request another site sends through the user's browser: a plain form or text POST
  * needs no CORS preflight, and listening on 127.0.0.1 does not stop it.
  */
 export function checkOrigin(request: Request): void {
