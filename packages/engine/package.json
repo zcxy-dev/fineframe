@@ -5,6 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./claude": "./src/plan/claude.ts",
+    "./estimate": "./src/plan/estimate.ts",
     "./length": "./src/edit/length.ts",
     "./looks": "./src/looks.ts",
     "./media": "./src/edit/media.ts"

@@ -1,4 +1,5 @@
-// Stands in for `vework analyze` in tests: prints progress as vework does, then writes the media
+// Stands in for `vework analyze` in tests: prints progress as vework does, a model's download
+// among it, then writes the media
 // index found next to the source (<name>.index.json) and a stand-in for the denoised speech
 // beside it, as vework names it, or fails as vework does on a file it cannot read. For
 // `vework analyze-music` it writes the music index next to the track (<name>.music.json) with
@@ -30,6 +31,8 @@ if (command === "analyze-music") {
 }
 const steps = ["probing", "detecting shots", "finding speech", "measuring loudness"];
 steps.push("finding audio events", "finding faces", "removing noise from speech");
+steps.push("downloading Qwen/Qwen3-ASR-0.6B-hf: 0 of 4000 bytes");
+steps.push("downloading Qwen/Qwen3-ASR-0.6B-hf: 4000 of 4000 bytes");
 steps.push("transcribing 1/2", "transcribing 2/2");
 for (const step of [...steps, "aligning 1/1"]) {
   process.stderr.write(`vework: ${step}\n`);

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
-from vework import ml
+from vework import download, ml
 from vework.audio import RATE
 
 # CED (Apache-2.0), an AudioSet tagger, exported to ONNX with its mel front end and int8 weights:
@@ -96,6 +96,7 @@ def _classifier() -> Callable[[np.ndarray], np.ndarray]:
     def fetch(name: str) -> str:
         return hf_hub_download(MODEL, name, revision=REVISION)
 
+    download.hub(MODEL, REVISION, ["config.json", "model.onnx"])
     labels = json.loads(Path(fetch("config.json")).read_text())["id2label"]
     columns = [
         [int(i) for i, label in labels.items() if label in names] for names in KINDS.values()

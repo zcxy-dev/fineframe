@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Job, Stage } from "../lib/jobs.ts";
-import { formatClock, formatLength } from "../lib/settings.ts";
+import { formatBytes, formatClock, formatLength } from "../lib/settings.ts";
 import styles from "./editor.module.css";
 import { AlertIcon, CheckIcon } from "./icons.tsx";
 
@@ -75,6 +75,8 @@ export function RunView({ job }: { job: Job }) {
         </span>
       </p>
 
+      {job.download && running && <DownloadView download={job.download} />}
+
       <ol className={styles.steps}>
         {ORDER.map((stage, i) => {
           const times = job.stages[stage];
@@ -104,6 +106,42 @@ export function RunView({ job }: { job: Job }) {
       </ol>
     </section>
   );
+}
+
+/** A model downloading on its first use: how much has arrived and how long the rest will take. */
+function DownloadView({ download }: { download: NonNullable<Job["download"]> }) {
+  const { name, bytes, total, secondsLeft } = download;
+  const percent = Math.floor((bytes / total) * 100);
+  return (
+    <div className={styles.download}>
+      <div className={styles.uploadHead}>
+        <span className={styles.downloadName}>Downloading {name}</span>
+        <span className={styles.tabular}>{percent}%</span>
+      </div>
+      <div
+        className={styles.bar}
+        role="progressbar"
+        aria-label={`Downloading ${name}`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+      >
+        <div className={styles.barFill} style={{ width: `${(bytes / total) * 100}%` }} />
+      </div>
+      <p className={styles.help}>
+        {formatBytes(bytes)} of {formatBytes(total)}
+        {secondsLeft !== undefined && ` · about ${formatLeft(secondsLeft)} left`} · only the first
+        time it is used
+      </p>
+    </div>
+  );
+}
+
+/** A wait in words: 40 s, 3 min, 1 h 5 min. */
+function formatLeft(seconds: number): string {
+  if (seconds < 60) return `${Math.max(1, Math.round(seconds / 5) * 5)} s`;
+  const minutes = Math.round(seconds / 60);
+  return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 }
 
 function StageTime({ start, end, running }: { start?: number; end?: number; running: boolean }) {

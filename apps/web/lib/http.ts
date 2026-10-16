@@ -79,7 +79,8 @@ export function checkOrigin(request: Request): void {
 /** A JobError as the JSON the page reads; anything else is a bug, logged and hidden. */
 export function errorResponse(error: unknown): Response {
   if (error instanceof JobError) {
-    return Response.json({ error: error.message }, { status: error.status });
+    const code = error.code ? { code: error.code } : {};
+    return Response.json({ error: error.message, ...code }, { status: error.status });
   }
   console.error(error);
   return Response.json({ error: "Something went wrong on the server" }, { status: 500 });

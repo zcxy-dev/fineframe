@@ -7,10 +7,11 @@ and its peak picking: it decodes the track itself and computes the model's input
 
 import hashlib
 import inspect
-import urllib.request
 from pathlib import Path
 
 import numpy as np
+
+from vework import download
 
 # The authors' main model, trained on every dataset but GTZAN; MIT, like the code.
 MODEL = "final0"
@@ -129,7 +130,7 @@ def _checkpoint() -> Path:
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
         part = path.with_suffix(".part")
-        urllib.request.urlretrieve(URL, part)
+        part.write_bytes(download.url(URL, f"Beat This! {MODEL}"))
         part.rename(path)
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     if digest != SHA256:

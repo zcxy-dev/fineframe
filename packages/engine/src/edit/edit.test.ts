@@ -48,7 +48,9 @@ async function recordedClaude(
   const claude: Claude = async (request) => {
     purposes.push(request.purpose);
     if (request.purpose === "plan") schemas.push(request.schema);
-    const usage = { input: 0, cacheWrite: 0, cacheRead: 0, output: 0, dollars: 0 };
+    // A plan costs 5 cents and a check a tenth of a cent, so the done line's sums show.
+    const dollars = request.purpose === "plan" ? 0.05 : 0.001;
+    const usage = { input: 0, cacheWrite: 0, cacheRead: 0, output: 0, dollars };
     return {
       json: request.purpose === "plan" ? decisions : fine,
       usage: { purpose: request.purpose, model: request.model, ...usage },
@@ -126,6 +128,23 @@ test("a footage folder becomes the video, its project, its captions and progress
   for (const step of ["Finding faces", "Removing noise from speech", "Transcribing 2/2"]) {
     assert.ok(messages.includes(step), step);
   }
+  // A model downloading on first use is a line with its bytes, holding the bar where it was.
+  const downloads = lines.flatMap((line) => ("download" in line && line.download ? [line] : []));
+  assert.deepEqual(
+    downloads.map((line) => [line.message, line.download]),
+    [
+      [
+        "Downloading Qwen/Qwen3-ASR-0.6B-hf",
+        { name: "Qwen/Qwen3-ASR-0.6B-hf", bytes: 0, total: 4000 },
+      ],
+      [
+        "Downloading Qwen/Qwen3-ASR-0.6B-hf",
+        { name: "Qwen/Qwen3-ASR-0.6B-hf", bytes: 4000, total: 4000 },
+      ],
+    ],
+  );
+  const before = lines[lines.indexOf(downloads[0] as Progress) - 1];
+  assert.equal(downloads[0]?.fraction, before?.fraction);
   for (let i = 1; i < lines.length; i++) {
     assert.ok((lines[i]?.fraction ?? 0) >= (lines[i - 1]?.fraction ?? 0), `line ${i} goes back`);
   }
@@ -133,6 +152,10 @@ test("a footage folder becomes the video, its project, its captions and progress
     stage: "done",
     fraction: 1,
     message: `Finished: ${result.seconds.toFixed(1)} s at 9:16 in talk.mp4, captions in talk.srt`,
+    claude: {
+      plan: { dollars: 0.05, requests: 1 },
+      check: { dollars: 0.001 * (purposes.length - 1), requests: purposes.length - 1 },
+    },
     outputs: result.outputs,
   });
   assert.deepEqual(purposes.slice(0, 2), ["plan", "check"]);
@@ -446,7 +469,32 @@ test("a plan Claude cannot make fails saying the analysis is kept, and leaves no
       ),
   );
   assert.equal(lines.at(-1)?.stage, "error");
+  assert.ok(!("claude" in (lines.at(-1) as object)), "nothing was spent");
   assert.ok(!existsSync(join(dir, "out", ".talk.edit")), "the work folder is removed");
+});
+
+test("an edit that fails after a plan says what Claude cost on its error line", async (t) => {
+  const dir = await scratch(t, "edit-spent-");
+  const { options, lines } = await footage(dir);
+  const unusable: Claude = async (request) => ({
+    json: {},
+    usage: {
+      purpose: request.purpose,
+      model: request.model,
+      input: 0,
+      cacheWrite: 0,
+      cacheRead: 0,
+      output: 0,
+      dollars: 0.05,
+    },
+  });
+  await assert.rejects(edit({ ...options, claude: unusable }));
+  const last = lines.at(-1);
+  assert.equal(last?.stage, "error");
+  assert.deepEqual(last && "claude" in last ? last.claude : undefined, {
+    plan: { dollars: 0.05, requests: 1 },
+    check: { dollars: 0, requests: 0 },
+  });
 });
 
 test("the command reports arguments it cannot use as an error line too", async (t) => {
