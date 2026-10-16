@@ -75,18 +75,22 @@ class Client:
     ) -> list[tuple[str, str | None]]:
         """Each chunk's text and the language the model names for it (None when it names none)."""
         heard: list[tuple[str, str | None]] = [("", None)] * len(wavs)
+        spent = self.cost
         pool = ThreadPoolExecutor(WORKERS)
         try:
             futures = {pool.submit(self._one, wav): i for i, wav in enumerate(wavs)}
             for done, future in enumerate(as_completed(futures), 1):
-                heard[futures[future]] = future.result()
-                progress(f"transcribing {done}/{len(wavs)} (US${self.cost:.4f} so far)")
+                text, lang, cost = future.result()
+                heard[futures[future]] = (text, lang)
+                # Counted as each chunk is reported: chunks still in flight may have added theirs.
+                spent += cost
+                progress(f"transcribing {done}/{len(wavs)} (US${spent:.4f} so far)")
         finally:
             # A failed chunk fails the analysis; the chunks still queued are not sent.
             pool.shutdown(cancel_futures=True)
         return heard
 
-    def _one(self, wav: np.ndarray) -> tuple[str, str | None]:
+    def _one(self, wav: np.ndarray) -> tuple[str, str | None, float]:
         body = {
             "model": self.model,
             "input_audio": {"data": base64.b64encode(flac(wav)).decode(), "format": "flac"},
@@ -94,9 +98,10 @@ class Client:
             "provider": PROVIDER,
         }
         reply = self._request("POST", "/audio/transcriptions", body)
+        cost = float((reply.get("usage") or {}).get("cost") or 0.0)
         with self._lock:
-            self.cost += float((reply.get("usage") or {}).get("cost") or 0.0)
-        return reply.get("text") or "", language(reply.get("language"))
+            self.cost += cost
+        return reply.get("text") or "", language(reply.get("language")), cost
 
     def _request(self, method: str, path: str, body: dict | None = None) -> dict:
         data = json.dumps(body).encode() if body is not None else None

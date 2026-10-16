@@ -1,4 +1,5 @@
 import base64
+import concurrent.futures
 import io
 import json
 import threading
@@ -93,6 +94,19 @@ def test_each_chunk_is_sent_as_flac_speech_only_and_in_order(fake):
 
 
 def test_progress_counts_chunks_and_dollars(fake):
+    server = fake({"/audio/transcriptions": [heard("你好")]})
+    said = []
+    server.client().recognize([np.zeros(8_000, np.float32)] * 2, said.append)
+    assert said == ["transcribing 1/2 (US$0.0002 so far)", "transcribing 2/2 (US$0.0004 so far)"]
+
+
+def test_progress_counts_only_the_chunks_it_reports(fake, monkeypatch):
+    # Both chunks finish before the first is reported, as two parallel requests can.
+    def all_then_each(futures):
+        concurrent.futures.wait(futures)
+        return iter(list(futures))
+
+    monkeypatch.setattr(openrouter, "as_completed", all_then_each)
     server = fake({"/audio/transcriptions": [heard("你好")]})
     said = []
     server.client().recognize([np.zeros(8_000, np.float32)] * 2, said.append)
