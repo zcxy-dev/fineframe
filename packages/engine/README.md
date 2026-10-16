@@ -226,8 +226,10 @@ cd ../../bench && uv run vebench report synthetic/
 ## Rendering
 
 ```bash
-pnpm --filter @video-editor/engine render edit/project.json -o out/edit.mp4
+pnpm render edit/project.json -o out/edit.mp4
 ```
+
+The command renders a project as it is, after validating it: a project changed by hand that breaks the schema, or what the schema cannot express (see [`packages/schema`](../schema/README.md#using-it)), fails with every problem by its JSON path. `--cut` takes stretches out first ([changing an edit](#changing-an-edit)). From code:
 
 ```ts
 import { writeFile } from "node:fs/promises";
@@ -253,6 +255,36 @@ Beside the video it writes:
 The `stems` option also writes the mix's parts into a folder, before loudness normalisation scales them alike: `voice.wav`, the main track and B-roll sound, and `music.wav`, the music as ducked. `vebench mix` measures the voice's lead over the music from them, and the review draws its cut strips from `voice.wav`, so music does not fill the pauses it looks for.
 
 Each video source needs its media index from `vework analyze`: the renderer reads the sound, the colour tags and the frame rate from it, and a voice chain that denoises plays the denoised speech the index names. A source whose size or SHA-256 differs from its fingerprint fails the render.
+
+### Changing an edit
+
+A finished edit changes by changing its `<name>.project.json` and rendering it again, which takes as long as a render, without analysing or planning again. The [agent skill](../../skills/video-editor/SKILL.md) has the recipes an agent follows for each kind of change.
+
+```bash
+pnpm render out/edit.project.json --cut 29-33 -o out/edit-v2.mp4
+```
+
+`--cut <from>-<to>`, in seconds or minutes:seconds of the video the project renders, takes that stretch out ([`cut.ts`](src/cut.ts)), any number of times:
+
+- **Words:** a word goes when its middle falls in a stretch, and a clip goes when a stretch covers it or none of its words is left. A stretch that takes out no word fails.
+- **Cuts:** a clip that loses words from inside it splits around them, and each new end is placed in the pause beside the words kept as the planner places cuts: at least 40 ms from a word, on a source frame, with whole output frames between them. The ends a cut does not touch, and the pauses between the words kept, stay as they were.
+- **The rest moves up with the speech:** caption words that went leave their lines, and the rest keep their times against the speech; overlays and B-roll clips start at the first moment left of their time, and go when all of it went; music plays on without a gap and ends where the edit does.
+- **What went:** stderr lists the words cut from each clip, the overlays and B-roll removed, and the ones that overlapped a cut, which may now stand over other words.
+- **Length:** a cut that leaves the edit outside the tolerance of `output.target` fails and prints the new length, as the renderer would; `--retarget` makes that length the target instead, for a shorter edit wanted as it is.
+
+The edit as cut is written to `<name>.project.json` beside the video, which may not be the project it was cut from.
+
+**Measured** on a 60 s 9:16 edit of the [synthetic](../../bench/README.md#synthetic-corpus) conversation chat-b (seed 0) with music, a lower third and two keywords: a fresh agent with only the skill made three versions from what a person would say, twice, the second time after the skill was revised from what the first run found unclear. It cut the 4.1 s segment about clicks at the joins with `--cut 29.14-32.72` and `--retarget`, fixed a misheard caption (能比如說 to 嗯　比如說) and added a title, shortened to end where the first keyword starts. The planned edit rendered in 32 s on 8 cores of an EPYC 9355P; the agents' renders took 39 s to 2.8 min, with other renders running beside them. By hand, one more cut took a sentence out of the middle of a clip (`--cut 43.56-47.56 --retarget`), which split it in the pauses on either side, and two more versions covered the other recipes: a lower third's role, a keyword removed and one added, a chapter, the music 3 dB down, then no music, the `warm` look and the `sweep` captions. `vebench report` on all of them:
+
+| Version | Length | Cuts inside words | Clicks, drift |
+|---|---|---|---|
+| The planned edit | 59.57 s | 0 of 14 | 0 of 6, 0.0 ms |
+| Segment cut, `--retarget` (both runs) | 55.47 s | 0 of 12 | 0 of 5, 0.0 ms; also 0 of 5 rendered without music |
+| Caption fixed, then title added (both runs) | 55.47 s | 0 of 12 | 0 of 5, 0.0 ms |
+| A sentence cut from inside a clip | 54.83 s | 0 of 16 | 0 of 7, 0.0 ms |
+| The other recipes, two versions | 59.57 s | 0 of 14 | 0 of 6, 0.0 ms |
+
+On frames from each version the captions showed the words then said and lit the word being said, the keyword added landed on its word, and every frame after the cut matched the planned edit's frame 4.133 s later, captions included.
 
 ## What it renders
 

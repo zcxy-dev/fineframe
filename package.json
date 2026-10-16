@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node apps/web/scripts/start.ts",
     "edit": "node packages/engine/src/edit/cli.ts",
+    "render": "node packages/engine/src/cli.ts",
     "lint": "biome check",
     "typecheck": "pnpm -r typecheck && tsc -p bench",
     "test": "pnpm -r test",

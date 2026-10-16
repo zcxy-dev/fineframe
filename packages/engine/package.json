@@ -15,7 +15,6 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test",
     "edit": "node src/edit/cli.ts",
-    "render": "node src/cli.ts",
     "plan": "node src/plan/cli.ts"
   },
   "dependencies": {
