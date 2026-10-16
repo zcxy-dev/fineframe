@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds the static FFmpeg the renderer pins for Intel Macs from the sources pinned below, with
-# libass, libx264, libvpx and zimg and nothing nonfree, so the binary may be redistributed under
+# libass, libx264, libvpx, zimg and libopus and nothing nonfree, so the binary may be redistributed under
 # GPL-2.0-or-later. Writes into the folder given: `ffmpeg`, `sources.tar.gz` (every source it
 # was built from and this script, the corresponding source the GPL asks for) and `SHA256SUMS`.
 # .github/workflows/ffmpeg-macos-x64.yml runs it on GitHub's macos-15-intel runner. It needs
@@ -23,6 +23,7 @@ freetype 36bc4f1cc413335368ee656c42afca65c5a3987e8768cc28cf11ba775e785a5f https:
 fribidi 6949dcde27d41cebad1fd741fcafc36d55a1020d2d872d4a6eb3914caabbada2 https://github.com/fribidi/fribidi/releases/download/v1.0.17/fribidi-1.0.17.tar.xz
 harfbuzz d07a007327277708a2a73ae437887cdbaf282937f6d03ca5467723e9099af586 https://github.com/harfbuzz/harfbuzz/releases/download/14.6.0/harfbuzz-14.6.0.tar.xz
 libass 2dca25c0e0c837ddf00b52011b3f82cac1e4ddd3ad018227806b0c2288864acc https://github.com/libass/libass/releases/download/0.17.5/libass-0.17.5.tar.xz
+opus 65c1d2f78b9f2fb20082c38cbe47c951ad5839345876e46941612ee87f9a7ce1 https://downloads.xiph.org/releases/opus/opus-1.5.2.tar.gz
 ffmpeg de668509caf9e35e3cd162473441fdb29538c6d96ed080292b3cf9e6fc5d558f https://ffmpeg.org/releases/ffmpeg-7.1.5.tar.xz
 "
 REPOSITORIES="
@@ -74,12 +75,14 @@ meson_static=(--prefix="$prefix" --libdir=lib --buildtype=release --default-libr
   -Dgobject=disabled -Dcairo=disabled -Dicu=disabled -Dgraphite2=disabled -Dcoretext=disabled \
   -Dtests=disabled -Ddocs=disabled -Dintrospection=disabled -Dutilities=disabled &&
   ninja -C build install)
+(cd "$work/opus" && ./configure "${static[@]}" --disable-doc --disable-extra-programs &&
+  make -j"$jobs" install)
 # The renderer hands libass the caption fonts itself, so it needs no system font provider.
 (cd "$work/libass" && ./configure "${static[@]}" --disable-fontconfig --disable-coretext \
   --disable-require-system-font-provider --disable-libunibreak && make -j"$jobs" install)
 # No autodetection: every library is named, and the rest are macOS's own.
 (cd "$work/ffmpeg" && ./configure --prefix="$prefix" --pkg-config-flags=--static --extra-libs=-lc++ \
-  --disable-autodetect --enable-gpl --enable-libx264 --enable-libvpx --enable-libzimg \
+  --disable-autodetect --enable-gpl --enable-libx264 --enable-libvpx --enable-libzimg --enable-libopus \
   --enable-libass --enable-libfreetype --enable-libharfbuzz --enable-libfribidi \
   --enable-zlib --enable-bzlib --enable-iconv --disable-ffplay --disable-ffprobe --disable-doc &&
   make -j"$jobs" install)
