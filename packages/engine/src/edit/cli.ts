@@ -12,7 +12,8 @@ import { parseLength } from "./length.ts";
 const [shortest, longest] = LENGTH_RANGE;
 const usage = `Usage: pnpm edit <footage folder or file>... --length <length> \\
     --aspect <9:16 | 1:1 | 16:9> -o <out.mp4> [--names <terms.txt>] [--correct] \\
-    [--look <${[...lookIds, "none"].join(" | ")}>] [--quality <best | economy>] \\
+    [--asr <local | cloud>] [--look <${[...lookIds, "none"].join(" | ")}>] \\
+    [--quality <best | economy>] \\
     [--music <track or folder>]... [--music-license <licence>]
 
 Edits footage into a finished video within 5 % of the length asked. A folder stands for the
@@ -25,6 +26,9 @@ files directly in it: videos to cut, and still images to show as B-roll.
                  the speech model and to --correct; a person's name there can show in a
                  lower third
       --correct  have Claude correct each transcript before its words are timed
+      --asr      where the speech is heard: local (default, the most accurate) or cloud, on
+                 OpenRouter with OPENROUTER_API_KEY, for machines without 9 GB of memory to
+                 spare; cloud sends the speech audio, never video
       --look     the look over the edit: clean unless another is named, or none
       --quality  best plans with Claude Opus; economy with Claude Sonnet, for about half
                  the cost. best unless given
@@ -38,7 +42,8 @@ files directly in it: videos to cut, and still images to show as B-roll.
 Progress goes to stdout as JSON lines (packages/schema/progress.schema.json), and everything
 for a person to stderr. Each file's analysis is kept in ~/.cache/video-editor/indexes, so
 editing the same footage again starts at the plan. Claude plans the edit and checks its cuts:
-ANTHROPIC_API_KEY comes from the environment or the git-ignored .env at the repository root.`;
+ANTHROPIC_API_KEY, and OPENROUTER_API_KEY for --asr cloud, come from the environment or the
+git-ignored .env at the repository root.`;
 
 // A caller reading stdout, such as the web page, gets the reason as the last progress line.
 const fail = (message: string): never => {
@@ -57,6 +62,7 @@ const parsed = (() => {
         output: { type: "string", short: "o" },
         names: { type: "string" },
         correct: { type: "boolean" },
+        asr: { type: "string" },
         look: { type: "string" },
         quality: { type: "string" },
         music: { type: "string", short: "m", multiple: true },
@@ -81,6 +87,8 @@ if (length === null) fail(`${values.length} is not a length`);
 const aspect = values.aspect as Aspect;
 if (!["9:16", "1:1", "16:9"].includes(aspect))
   fail(`the aspect is 9:16, 1:1 or 16:9, not ${aspect}`);
+const asr = values.asr ?? "local";
+if (asr !== "local" && asr !== "cloud") fail(`--asr is local or cloud, not ${asr}`);
 const look = values.look ?? "clean";
 if (look !== "none" && !isLookId(look)) {
   fail(`the look is ${[...lookIds, "none"].join(", ")}, not ${look}`);
@@ -110,6 +118,7 @@ try {
     out: values.output as string,
     ...(values.names ? { names: values.names } : {}),
     correct: values.correct ?? false,
+    asr: asr as "local" | "cloud",
     look: look as LookId | "none",
     quality: quality as Quality,
     music: values.music ?? [],

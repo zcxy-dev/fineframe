@@ -54,6 +54,9 @@ export interface EditOptions {
   names?: string;
   /** Claude corrects each transcript before its words are timed. */
   correct?: boolean;
+  /** Where the speech is heard: by the local model (the default), or on OpenRouter with the
+   * user's key, for machines without the memory for the local one. */
+  asr?: "local" | "cloud";
   /** The look over the edit (../looks.ts): clean unless given, none with "none". */
   look?: LookId | "none";
   /** Music tracks and folders of them that the edit may play, each with its licence in
@@ -197,6 +200,7 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
   const videos = files.filter((file) => file.kind === "video");
   if (videos.length === 0) throw new EditError("No video among the inputs to cut the edit from");
   const analysis: AnalysisOptions = { correct: options.correct ?? false };
+  if (options.asr === "cloud") analysis.asr = "cloud";
   if (options.names) {
     const text = await readFile(options.names, "utf8").catch((error: Error) => {
       throw new EditError(`${options.names}: cannot read the names file (${error.message})`);

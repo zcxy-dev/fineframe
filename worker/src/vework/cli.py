@@ -6,7 +6,7 @@ from pathlib import Path
 
 import av
 
-from vework import correct, index, music, transcribe, truth
+from vework import correct, index, music, openrouter, transcribe, truth
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -20,6 +20,8 @@ def main(argv: list[str] | None = None) -> None:
             parser.error("--glossary needs --correct or --asr-context")
         if args.asr_context and not args.glossary:
             parser.error("--asr-context needs --glossary")
+        if args.asr_context and args.asr == "cloud":
+            parser.error("--asr-context needs --asr local: OpenRouter takes no context prompt")
     try:
         if args.command == "draft-truth":
             _draft_truth(args)
@@ -44,13 +46,17 @@ def _analyze(args: argparse.Namespace) -> None:
     if problem:
         raise ValueError(problem)
     glossary = correct.read_glossary(args.glossary) if args.glossary else ()
+    cloud = None
+    if args.asr == "cloud":
+        cloud = openrouter.Client(args.asr_model or openrouter.MODEL)
+        cloud.check()
     correction = None
     if args.correct:
         correct.require_credentials()
         correction = correct.Settings(args.title or args.source.stem, glossary, args.batch)
     context = "\n".join(glossary) if args.asr_context else ""
     result = index.build(
-        args.source, args.asr_model, _progress, context, correction, _stem(args.output)
+        args.source, args.asr_model, _progress, context, correction, _stem(args.output), cloud
     )
     args.output.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
     if args.bench_run:
@@ -138,9 +144,19 @@ def _parser() -> argparse.ArgumentParser:
         help="media index to write (JSON); the denoised speech goes beside it as <name>.voice.wav",
     )
     p.add_argument(
+        "--asr",
+        choices=["local", "cloud"],
+        default="local",
+        help="where the speech model runs: local (default, the most accurate, and nothing leaves "
+        "this machine) or cloud, on OpenRouter with your own key (OPENROUTER_API_KEY), for "
+        "machines without the memory for the local model; cloud sends the speech audio, never "
+        "video, and the words are still timed locally",
+    )
+    p.add_argument(
         "--asr-model",
         help=f"speech model (default: {transcribe.GPU_ASR_MODEL} with a CUDA GPU, "
-        f"{transcribe.CPU_ASR_MODEL} otherwise)",
+        f"{transcribe.CPU_ASR_MODEL} otherwise; with --asr cloud, {openrouter.MODEL}, or any "
+        "OpenRouter speech-to-text model)",
     )
     p.add_argument("--bench-run", type=Path, help="also write vebench outputs to this folder")
     p.add_argument(

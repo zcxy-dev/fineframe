@@ -144,7 +144,7 @@
       }
     },
     "Transcript": {
-      "description": "Qwen3-ASR, converted to Taiwan Traditional Chinese, corrected by Claude when asked (see `corrections`) and timed by Qwen3-ForcedAligner, each word edge then placed from the audio below its grid. Empty, with a null language, when the file has no speech.",
+      "description": "Qwen3-ASR (or the OpenRouter model in `cloud`), converted to Taiwan Traditional Chinese, corrected by Claude when asked (see `corrections`) and timed by Qwen3-ForcedAligner, each word edge then placed from the audio below its grid. Empty, with a null language, when the file has no speech.",
       "type": "object",
       "required": ["language", "text", "words"],
       "additionalProperties": false,
@@ -162,6 +162,25 @@
           "description": "In time order: one word per Han character or English word, carrying the punctuation next to it.",
           "type": "array",
           "items": { "$ref": "#/$defs/Word" }
+        },
+        "cloud": {
+          "description": "Present when the speech was heard on OpenRouter (`vework analyze --asr cloud`) rather than by the local speech model; the words are still timed locally.",
+          "type": "object",
+          "required": ["model", "cost", "cost_per_minute"],
+          "additionalProperties": false,
+          "properties": {
+            "model": { "description": "The OpenRouter model slug.", "type": "string" },
+            "cost": {
+              "description": "US dollars OpenRouter charged for the transcription.",
+              "type": "number",
+              "minimum": 0
+            },
+            "cost_per_minute": {
+              "description": "The cost per minute of the source's audio track.",
+              "type": "number",
+              "minimum": 0
+            }
+          }
         }
       }
     },

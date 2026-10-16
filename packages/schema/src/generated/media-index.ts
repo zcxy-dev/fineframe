@@ -116,7 +116,7 @@ export interface SpeechSegment {
   end: Seconds;
 }
 /**
- * Qwen3-ASR, converted to Taiwan Traditional Chinese, corrected by Claude when asked (see `corrections`) and timed by Qwen3-ForcedAligner, each word edge then placed from the audio below its grid. Empty, with a null language, when the file has no speech.
+ * Qwen3-ASR (or the OpenRouter model in `cloud`), converted to Taiwan Traditional Chinese, corrected by Claude when asked (see `corrections`) and timed by Qwen3-ForcedAligner, each word edge then placed from the audio below its grid. Empty, with a null language, when the file has no speech.
  */
 export interface Transcript {
   /**
@@ -131,6 +131,23 @@ export interface Transcript {
    * In time order: one word per Han character or English word, carrying the punctuation next to it.
    */
   words: Word[];
+  /**
+   * Present when the speech was heard on OpenRouter (`vework analyze --asr cloud`) rather than by the local speech model; the words are still timed locally.
+   */
+  cloud?: {
+    /**
+     * The OpenRouter model slug.
+     */
+    model: string;
+    /**
+     * US dollars OpenRouter charged for the transcription.
+     */
+    cost: number;
+    /**
+     * The cost per minute of the source's audio track.
+     */
+    cost_per_minute: number;
+  };
 }
 export interface Word {
   text: string;

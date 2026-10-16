@@ -284,3 +284,46 @@ def test_default_model_fits_the_hardware(monkeypatch):
     assert transcribe.default_asr_model() == transcribe.CPU_ASR_MODEL
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     assert transcribe.default_asr_model() == transcribe.GPU_ASR_MODEL
+
+
+def test_a_cloud_recognizer_hears_every_chunk_at_once_and_only_the_aligner_loads(monkeypatch):
+    monkeypatch.setattr(transcribe, "_models", lambda model: pytest.fail("speech model loaded"))
+    aligned = []
+
+    def align(wav, text, language):
+        aligned.append((text, language, len(wav)))
+        return [(c, i * 0.2, (i + 1) * 0.2) for i, c in enumerate(c for c in text if c != "。")]
+
+    monkeypatch.setattr(transcribe, "_aligner", lambda half: half and align)
+    sent = []
+
+    def recognizer(wavs, progress):
+        sent.extend(len(w) for w in wavs)
+        return [("处理视频。", None), ("", None)]
+
+    result = transcribe.transcribe(
+        np.zeros(16_000 * 300, np.float32), [seg(10, 12), seg(250, 250.2)], recognizer=recognizer
+    )
+    # Chunks are padded as for the local model; a language the cloud did not name is read from
+    # the script, so the one-language-per-chunk rule and the Taiwan conversion still hold.
+    assert sent == [32_000, 8_000]
+    assert aligned == [("處理影片。", "Chinese", 32_000)]
+    assert result["language"] == "zh" and result["words"][0]["start"] == 10.0
+
+
+def test_the_aligner_does_not_load_when_the_cloud_heard_nothing(monkeypatch):
+    monkeypatch.setattr(transcribe, "_aligner", lambda half: pytest.fail("aligner loaded"))
+    result = transcribe.transcribe(
+        np.zeros(16_000 * 3, np.float32), [seg(0.5, 2.5)], recognizer=lambda w, p: [("", None)]
+    )
+    assert result == {"language": None, "text": "", "words": []}
+
+
+@pytest.mark.parametrize(
+    ("text", "language"),
+    [("会社に行く", "Japanese"), ("안녕하세요", "Korean"), ("hello there", "English")],
+)
+def test_a_language_the_model_did_not_name_is_read_from_the_script(monkeypatch, text, language):
+    calls = fake_models(monkeypatch, text, None)
+    transcribe.transcribe(np.zeros(16_000 * 3, np.float32), [seg(0.5, 2.5)])
+    assert calls[0][:2] == (text, language)

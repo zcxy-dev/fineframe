@@ -80,6 +80,19 @@ class SpeechSegment(BaseModel):
     end: Annotated[float, Field(ge=0.0)]
 
 
+class Cloud(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    model: Annotated[str, Field(description="The OpenRouter model slug.")]
+    cost: Annotated[
+        float, Field(description="US dollars OpenRouter charged for the transcription.", ge=0.0)
+    ]
+    cost_per_minute: Annotated[
+        float, Field(description="The cost per minute of the source's audio track.", ge=0.0)
+    ]
+
+
 class Correction(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -257,6 +270,12 @@ class Transcript(BaseModel):
             description="In time order: one word per Han character or English word, carrying the punctuation next to it."
         ),
     ]
+    cloud: Annotated[
+        Cloud | None,
+        Field(
+            description="Present when the speech was heard on OpenRouter (`vework analyze --asr cloud`) rather than by the local speech model; the words are still timed locally."
+        ),
+    ] = None
 
 
 class Loudness(BaseModel):

@@ -23,6 +23,8 @@ export interface AnalysisOptions {
   /** Names and terms said in the footage, one per line: they bias the speech model and guide
    * the correction. */
   names?: { path: string; text: string };
+  /** Where the speech is heard: by the local model, or on OpenRouter with the user's key. */
+  asr?: "local" | "cloud";
 }
 
 const WORKER = fileURLToPath(new URL("../../../../worker/", import.meta.url));
@@ -59,7 +61,12 @@ export function indexName(
   fingerprint: Source["fingerprint"],
   options: AnalysisOptions,
 ): string {
-  const settings = JSON.stringify([worker.version, options.correct, options.names?.text ?? null]);
+  const settings = JSON.stringify([
+    worker.version,
+    options.correct,
+    options.names?.text ?? null,
+    options.asr ?? "local",
+  ]);
   const key = createHash("sha256").update(settings).digest("hex").slice(0, 16);
   return `${fingerprint.sha256}-${key}.index.json`;
 }
@@ -107,7 +114,12 @@ export function analyze(
 ): Promise<void> {
   const extra: string[] = [];
   if (options.correct) extra.push("--correct");
-  if (options.names) extra.push("--glossary", options.names.path, "--asr-context");
+  if (options.asr === "cloud") extra.push("--asr", "cloud");
+  if (options.names) {
+    // OpenRouter takes no context prompt; the names still guide the correction.
+    extra.push("--glossary", options.names.path);
+    if (options.asr !== "cloud") extra.push("--asr-context");
+  }
   return vework(worker, "analyze", file, index, extra, report, log);
 }
 
