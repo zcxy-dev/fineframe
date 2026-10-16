@@ -8,8 +8,9 @@
 // each length it writes to <first clip>/runs/<system>-<length>s/: project.json (as reviewed)
 // and planned.json (before the first review), output.mp4, edit_cuts.json and the stems
 // voice.wav and music.wav from the renderer, claude.json (every reply, replayed instead of
-// calling the API when the same request comes again) and usage.json. The system is
-// video-editor unless --system names another; --music offers the tracks of music indexes.
+// calling the API when the same request comes again) and usage.json, with every request's
+// tokens and cost. The system is video-editor unless --system names another; --music offers
+// the tracks of music indexes, and --quality economy plans with the cheaper model.
 // --naive also writes naive-<length>s/: every clip whole, in file order, cut off at the length.
 
 import { createHash } from "node:crypto";
@@ -29,6 +30,7 @@ import {
   anthropicClaude,
   type Claude,
   type ClaudeRequest,
+  type Quality,
   recordedClaude,
   totalUsage,
 } from "../src/plan/claude.ts";
@@ -47,11 +49,13 @@ const { values, positionals } = parseArgs({
     "no-review": { type: "boolean" },
     music: { type: "string", multiple: true },
     system: { type: "string" },
+    quality: { type: "string" },
   },
 });
 const usage =
   "Usage: node scripts/plan-corpus.ts <corpus> --group <prefix>... --lengths 30,60 " +
-  "[--aspect 16:9] [--naive] [--no-review] [--music <music.json | folder>]... [--system <name>]";
+  "[--aspect 16:9] [--naive] [--no-review] [--music <music.json | folder>]... [--system <name>] " +
+  "[--quality <best | economy>]";
 if (positionals.length !== 1 || !values.group || !values.lengths) {
   console.error(usage);
   process.exit(2);
@@ -83,6 +87,7 @@ for (const group of values.group) {
       music,
       out: join(folder, "project.json"),
       claude,
+      quality: (values.quality ?? "best") as Quality,
       onProgress: log,
     });
     await renderEdit(edit, folder);
@@ -113,6 +118,7 @@ for (const group of values.group) {
         ]),
       ),
       reviews: passes,
+      requests: edit.state.usage,
     };
     await writeFile(join(folder, "usage.json"), `${JSON.stringify(summary, null, 2)}\n`);
   }
@@ -136,6 +142,7 @@ async function recorder(file: string): Promise<{ claude: Claude; save: () => Pro
   const keyOf = (request: ClaudeRequest) =>
     createHash("sha256")
       .update(request.purpose)
+      .update(request.model)
       .update(request.content.map((block) => (block.type === "text" ? block.text : "")).join("\n"))
       .digest("hex");
   const live = anthropicClaude();

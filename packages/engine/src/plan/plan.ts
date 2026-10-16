@@ -28,7 +28,14 @@ import { punchIns, type ShotFacts } from "../punch.ts";
 import { fingerprintOf, gridTicks } from "../sources.ts";
 import { loudnessFor, planVoice } from "../voice.ts";
 import { captionLines, outputWords, type TimedWord } from "./captions.ts";
-import { anthropicClaude, type Claude, PLAN_MODEL, totalUsage, type Usage } from "./claude.ts";
+import {
+  anthropicClaude,
+  type Claude,
+  PLAN_MODELS,
+  type Quality,
+  totalUsage,
+  type Usage,
+} from "./claude.ts";
 import { calloutSpan, plannedOverlays } from "./effects.ts";
 import { type FillerCandidate, fillerCandidates, findWords } from "./fillers.ts";
 import { BREATH_RANGE, fitLength, type Span } from "./fit.ts";
@@ -113,6 +120,8 @@ export interface PlanOptions {
   look?: Look | null;
   /** Names of people and terms said in the footage; a lower third shows only a name from these. */
   names?: string[];
+  /** The model that plans, and judges the cut checks a review doubts: best unless given. */
+  quality?: Quality;
   /** Defaults to the Anthropic API. */
   claude?: Claude;
   onProgress?: (message: string) => void;
@@ -155,6 +164,8 @@ export interface PlanState {
   aspect: Aspect;
   out: string;
   claude: Claude;
+  /** The model that plans and judges doubtful cut checks. */
+  planModel: string;
   sources: Map<string, PlanSource>;
   /** The music offered, by id, and how the request lists it; empty without music. */
   music: Map<string, MusicSource>;
@@ -260,6 +271,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
     aspect: options.aspect,
     out,
     claude: options.claude ?? anthropicClaude(),
+    planModel: PLAN_MODELS[options.quality ?? "best"],
     sources,
     music,
     musicListing: music.size > 0 ? describeMusic(music.values()) : "",
@@ -285,7 +297,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
     regions: new Map(),
     stills: new Map(),
     look: options.look === undefined ? DEFAULT_LOOK : options.look,
-    model: PLAN_MODEL,
+    model: PLAN_MODELS[options.quality ?? "best"],
     planCalls: 0,
     reviews: 0,
     usage: [],
@@ -301,7 +313,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
     chapters: state.extras.chapters,
     names,
   });
-  progress(`Planning ${state.short ? "a short" : "a long"} edit with ${PLAN_MODEL}`);
+  progress(`Planning ${state.short ? "a short" : "a long"} edit with ${state.planModel}`);
   await decide(state, request);
   return write(state, await assemble(state));
 }
@@ -314,7 +326,7 @@ async function decide(state: PlanState, request: string): Promise<void> {
   state.planCalls++;
   const reply = await state.claude({
     purpose: "plan",
-    model: PLAN_MODEL,
+    model: state.planModel,
     system: planSystem(state.extras),
     content: [
       { type: "text", text: state.packed, cache: true },

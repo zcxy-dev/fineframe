@@ -102,6 +102,25 @@ test("a recorded plan becomes a project that validates, fits and cuts only betwe
   assert.equal(request?.content[0]?.type === "text" && request.content[0].cache, true);
 });
 
+test("an economy edit is planned with Sonnet, from the same request", async (t) => {
+  const dir = await scratch(t, "plan-economy-");
+  const index = await makeTalk(dir);
+  const best = recordedClaude({ plan: [await recorded()] });
+  const economy = recordedClaude({ plan: [await recorded()] });
+  const options = { inputs: [index], length: 15, aspect: "16:9" as const };
+  await plan({ ...options, out: join(dir, "best", "project.json"), claude: best.claude });
+  const edit = await plan({
+    ...options,
+    out: join(dir, "economy", "project.json"),
+    claude: economy.claude,
+    quality: "economy",
+  });
+  const [request] = economy.requests;
+  assert.equal(request?.model, "claude-sonnet-5-5");
+  assert.deepEqual({ ...request, model: "" }, { ...best.requests[0], model: "" });
+  assert.equal(edit.project.plan?.model, "claude-sonnet-5-5");
+});
+
 test("Claude's effects become overlays timed on the speech, one at a time and only as allowed", async (t) => {
   const dir = await scratch(t, "plan-effects-");
   // Four takes of the talk, so a one-minute edit keeps the whole story and opens on a title.

@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TICKS_PER_SECOND } from "@video-editor/schema";
 import { outputWords, type TimedWord } from "./captions.ts";
-import { CHECK_MODEL, ClaudeError, PLAN_MODEL, type Usage } from "./claude.ts";
+import { CHECK_MODEL, ClaudeError, totalUsage, type Usage } from "./claude.ts";
 import { lengthOf } from "./place.ts";
-import { assemble, PlanError, type PlannedEdit, type PlanSource, write } from "./plan.ts";
+import { assemble, dollars, PlanError, type PlannedEdit, type PlanSource, write } from "./plan.ts";
 import { CHECK_SCHEMA, CHECK_SYSTEM, type CutVerdict } from "./prompt.ts";
 import { cutStrip, SILENCE } from "./strip.ts";
 import { joinWords } from "./text.ts";
@@ -116,7 +116,7 @@ export async function review(
         }
         const judged = await state.claude({
           purpose: "judge",
-          model: PLAN_MODEL,
+          model: state.planModel,
           system: CHECK_SYSTEM,
           content: [
             ...content,
@@ -141,6 +141,11 @@ export async function review(
     await rm(dir, { recursive: true, force: true });
   }
   state.usage.push(...usage);
+  const judged = findings.filter((finding) => finding.escalated).length;
+  progress(
+    `Review ${pass}: ${cuts.length} cuts checked, ${judged} judged by ${state.planModel} ` +
+      `(${dollars(totalUsage(usage).dollars)})`,
+  );
 
   // Each change, as the step that undoes it, should the edit no longer fit afterwards.
   const changes: (() => void)[] = [];
