@@ -15,6 +15,8 @@ import {
   type Claude,
   ClaudeError,
   checkClaude,
+  PLAN_MODELS,
+  type Quality,
   totalUsage,
   type Usage,
 } from "../plan/claude.ts";
@@ -65,6 +67,8 @@ export interface EditOptions {
   /** Lines for a person: what the analysis prints besides its progress, and the review's
    * findings. */
   onLog?: (line: string) => void;
+  /** The model that plans and judges doubtful cut checks: best (Opus) unless given. */
+  quality?: Quality;
   /** Defaults to the Anthropic API, checked before any analysis. */
   claude?: Claude;
   /** Defaults to vework in the repository's worker/. */
@@ -206,7 +210,7 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
   let asked = options.claude;
   if (!asked) {
     report("analyze", 0, "Checking that Claude can plan the edit");
-    await checkClaude();
+    await checkClaude(PLAN_MODELS[options.quality ?? "best"]);
     asked = anthropicClaude();
   }
   const ask = asked;
@@ -294,6 +298,7 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
           .map((line) => line.trim())
           .filter((line) => line && !line.startsWith("#")),
         claude,
+        ...(options.quality ? { quality: options.quality } : {}),
         onProgress: (message) => planProgress(message),
       }),
     );

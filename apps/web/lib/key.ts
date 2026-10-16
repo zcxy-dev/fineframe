@@ -6,7 +6,7 @@ import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseEnv } from "node:util";
 import Anthropic from "@anthropic-ai/sdk";
-import { PLAN_MODEL } from "@video-editor/engine/claude";
+import { PLAN_MODELS } from "@video-editor/engine/claude";
 
 const NAME = "ANTHROPIC_API_KEY";
 
@@ -38,7 +38,7 @@ export function keyProblem(key: string): string | null {
 export async function checkKey(key: string): Promise<string | null> {
   const client = new Anthropic({ apiKey: key, maxRetries: 1, timeout: 20_000 });
   try {
-    await client.models.retrieve(PLAN_MODEL);
+    await client.models.retrieve(PLAN_MODELS.best);
     return null;
   } catch (error) {
     if (error instanceof Anthropic.AuthenticationError) {
@@ -48,7 +48,7 @@ export async function checkKey(key: string): Promise<string | null> {
       error instanceof Anthropic.PermissionDeniedError ||
       error instanceof Anthropic.NotFoundError
     ) {
-      return `This key cannot use ${PLAN_MODEL}, which plans the edit. Use a key from an account that has it`;
+      return `This key cannot use ${PLAN_MODELS.best}, which plans the edit. Use a key from an account that has it`;
     }
     if (error instanceof Anthropic.APIConnectionError) {
       return "Could not reach Anthropic to check the key. Check the internet connection and try again";

@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { type Progress, validateProgress } from "@video-editor/schema";
 import { isLookId, type LookId, lookIds } from "../looks.ts";
-import { ClaudeError } from "../plan/claude.ts";
+import { ClaudeError, QUALITIES, type Quality } from "../plan/claude.ts";
 import { type Aspect, dollars, LENGTH_RANGE, PlanError } from "../plan/plan.ts";
 import { edit } from "./edit.ts";
 import { EditError } from "./error.ts";
@@ -12,7 +12,7 @@ import { parseLength } from "./length.ts";
 const [shortest, longest] = LENGTH_RANGE;
 const usage = `Usage: pnpm edit <footage folder or file>... --length <length> \\
     --aspect <9:16 | 1:1 | 16:9> -o <out.mp4> [--names <terms.txt>] [--correct] \\
-    [--look <${[...lookIds, "none"].join(" | ")}>] \\
+    [--look <${[...lookIds, "none"].join(" | ")}>] [--quality <best | economy>] \\
     [--music <track or folder>]... [--music-license <licence>]
 
 Edits footage into a finished video within 5 % of the length asked. A folder stands for the
@@ -26,6 +26,8 @@ files directly in it: videos to cut, and still images to show as B-roll.
                  lower third
       --correct  have Claude correct each transcript before its words are timed
       --look     the look over the edit: clean unless another is named, or none
+      --quality  best plans with Claude Opus; economy with Claude Sonnet, for about half
+                 the cost. best unless given
   -m, --music    background music Claude may choose from: an audio file, or a folder of them.
                  Use only music you have the right to use. Each track's licence is the first
                  line of <name>.txt beside it (a web address and a credit line may follow);
@@ -56,6 +58,7 @@ const parsed = (() => {
         names: { type: "string" },
         correct: { type: "boolean" },
         look: { type: "string" },
+        quality: { type: "string" },
         music: { type: "string", short: "m", multiple: true },
         "music-license": { type: "string" },
         help: { type: "boolean", short: "h" },
@@ -83,6 +86,11 @@ if (look !== "none" && !isLookId(look)) {
   fail(`the look is ${[...lookIds, "none"].join(", ")}, not ${look}`);
 }
 
+const quality = values.quality ?? "best";
+if (!QUALITIES.includes(quality as Quality)) {
+  fail(`the quality is best or economy, not ${quality}`);
+}
+
 const env = new URL("../../../../.env", import.meta.url);
 if (existsSync(env)) process.loadEnvFile(env);
 // pnpm runs scripts in the package's folder; the paths, and the files progress names, are the
@@ -102,6 +110,7 @@ try {
     ...(values.names ? { names: values.names } : {}),
     correct: values.correct ?? false,
     look: look as LookId | "none",
+    quality: quality as Quality,
     music: values.music ?? [],
     ...(values["music-license"] ? { musicLicense: values["music-license"] } : {}),
     onProgress: (line) => {
@@ -111,13 +120,14 @@ try {
     },
     onLog: say,
   });
-  const { timings: t, usage: u } = result;
+  const { timings: t, usage: u, stages } = result;
   const seconds = (value: number) => `${value.toFixed(1)} s`;
   say(
     `edit: analyze ${seconds(t.analyze)} (analysed ${result.analyzed}, from the cache ` +
       `${result.cached}), plan ${seconds(t.plan)}, render ${seconds(t.render)}, check ` +
-      `${seconds(t.check)} (reviews: ${result.reviews}); Claude for planning and review ` +
-      `${dollars(u.dollars)} (requests: ${u.calls})`,
+      `${seconds(t.check)} (reviews: ${result.reviews}); Claude ${dollars(u.dollars)}: plan ` +
+      `${dollars(stages.plan.dollars)}, check ${dollars(stages.check.dollars)} ` +
+      `(requests: ${u.calls})`,
   );
 } catch (error) {
   // A known error reached the caller as the last progress line and on stderr; anything else

@@ -6,7 +6,7 @@ import { loadJson, validateProject } from "@video-editor/schema";
 import { ffmpeg, run } from "../ffmpeg.ts";
 import { QUIET } from "../graph/encode.ts";
 import { scratch } from "../testing.ts";
-import { ClaudeError, recordedClaude } from "./claude.ts";
+import { ClaudeError, type Quality, recordedClaude } from "./claude.ts";
 import { plan } from "./plan.ts";
 import type { CutVerdict, Decisions } from "./prompt.ts";
 import { MAX_REVIEW_PASSES, review } from "./review.ts";
@@ -29,6 +29,7 @@ async function planned(
   verdicts: CutVerdict[],
   judge: CutVerdict[] = [],
   replan?: (decisions: Decisions) => Decisions,
+  quality: Quality = "best",
 ) {
   const dir = await scratch(t, "review-");
   const index = await makeTalk(dir);
@@ -44,6 +45,7 @@ async function planned(
     aspect: "16:9",
     out,
     claude: recorded.claude,
+    quality,
   });
   edit.state.claude = async (request) => {
     if (request.purpose !== "check") return recorded.claude(request);
@@ -112,6 +114,17 @@ test("a doubtful check goes to the planning model, whose answer stands", async (
   assert.equal(result.findings[0]?.escalated, true);
   const judge = requests.find((r) => r.purpose === "judge");
   assert.equal(judge?.model, "claude-opus-5-5");
+});
+
+test("an economy edit's doubtful checks go to Sonnet, and each pass says what it cost", async (t) => {
+  const unsure: CutVerdict = { ...clipped, fix: "drop_after", confidence: 0.4 };
+  const { edit, video, requests } = await planned(t, [unsure, fine], [fine], undefined, "economy");
+  const lines: string[] = [];
+  const result = await review(edit, video, { onProgress: (line) => lines.push(line) });
+  assert.equal(result.findings[0]?.escalated, true);
+  const judge = requests.find((r) => r.purpose === "judge");
+  assert.equal(judge?.model, "claude-sonnet-5-5");
+  assert.ok(lines.includes("Review 1: 2 cuts checked, 1 judged by claude-sonnet-5-5 ($0.0000)"));
 });
 
 /** Drops on both sides of every cut leave too little for the length, so the refit asks the

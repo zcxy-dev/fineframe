@@ -1,9 +1,17 @@
 import { setTimeout } from "node:timers/promises";
 import Anthropic from "@anthropic-ai/sdk";
 
-/** Edit planning and the decisions a cut check escalates. */
-export const PLAN_MODEL = "claude-opus-5-5";
-/** Bulk frame checks: one request per cut, and one per callout to find what it points at. */
+/** What an edit spends on Claude: `best` plans with Opus, `economy` with Sonnet at half its
+ * price per token. */
+export type Quality = "best" | "economy";
+export const QUALITIES: readonly Quality[] = ["best", "economy"];
+/** Edit planning and the decisions a cut check escalates, by quality. */
+export const PLAN_MODELS: Record<Quality, string> = {
+  best: "claude-opus-5-5",
+  economy: "claude-sonnet-5-5",
+};
+/** Bulk frame checks, whatever the quality: one request per cut, and one per callout to find
+ * what it points at. */
 export const CHECK_MODEL = "claude-haiku-5-5";
 
 /** What one request to Claude asks, independent of the SDK, so tests can replay recorded
@@ -50,10 +58,12 @@ export class ClaudeError extends Error {
 // US dollars per million tokens. Cache writes cost 1.25 × input (5-minute TTL).
 const PRICES: Record<string, { input: number; output: number; cacheRead: number }> = {
   "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2 },
+  "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2 },
   "claude-haiku-5-5": { input: 0.1, output: 0.5, cacheRead: 0.01 },
-  // Where a declined Opus 5.5 request falls back to.
+  // Where a declined Opus 5.5 or Sonnet 5.5 request falls back to.
   "claude-opus-5": { input: 5, output: 25, cacheRead: 0.5 },
   "claude-opus-4-8": { input: 5, output: 25, cacheRead: 0.5 },
+  "claude-sonnet-5": { input: 2, output: 10, cacheRead: 0.2 },
 };
 
 export function cost(
@@ -88,9 +98,9 @@ export function totalUsage(usages: readonly Usage[]) {
 
 /**
  * Claude through the Anthropic SDK, which reads ANTHROPIC_API_KEY (or an `ant auth login`
- * profile). Opus requests stream, since a long plan can run for minutes, and opt into the
- * server-side fallback: a request Opus declines is answered by the model Anthropic recommends
- * for that kind of refusal, and the usage names the model that answered.
+ * profile). Requests to a planning model stream, since a long plan can run for minutes, and opt
+ * into the server-side fallback: a request it declines is answered by the model Anthropic
+ * recommends for that kind of refusal, and the usage names the model that answered.
  */
 export function anthropicClaude(client = new Anthropic({ maxRetries: 5 })): Claude {
   return async (request) => {
@@ -123,7 +133,7 @@ export function anthropicClaude(client = new Anthropic({ maxRetries: 5 })): Clau
     };
     // Haiku has no server-side fallback; a check it declines is reported as unchecked.
     const send = () =>
-      request.model.startsWith("claude-opus")
+      PLANNERS.has(request.model)
         ? client.beta.messages
             .stream({ ...params, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" })
             .finalMessage()
@@ -157,6 +167,8 @@ export function anthropicClaude(client = new Anthropic({ maxRetries: 5 })): Clau
   };
 }
 
+const PLANNERS = new Set(Object.values(PLAN_MODELS));
+
 /** The SDK retries a request that fails before its reply starts, but not a reply that breaks
  * off once it has: the connection lost mid-stream, or an error event the server sends in it. A
  * plan can stream for minutes, so those are asked again too. */
@@ -167,16 +179,19 @@ const broken = (error: InstanceType<typeof Anthropic.AnthropicError>) =>
     : error.cause instanceof Error;
 
 /**
- * Fails, saying why, when the planning model cannot be called: no key, a wrong one, or no access
- * to it. Run before work that takes long, so an edit does not fail only once its footage is
- * analysed. Looking a model up costs nothing.
+ * Fails, saying why, when `model`, the planning model, cannot be called: no key, a wrong one, or
+ * no access to it. Run before work that takes long, so an edit does not fail only once its
+ * footage is analysed. Looking a model up costs nothing.
  */
-export async function checkClaude(client = new Anthropic({ maxRetries: 2 })): Promise<void> {
+export async function checkClaude(
+  model = PLAN_MODELS.best,
+  client = new Anthropic({ maxRetries: 2 }),
+): Promise<void> {
   try {
-    await client.models.retrieve(PLAN_MODEL);
+    await client.models.retrieve(model);
   } catch (error) {
     throw new ClaudeError(
-      `Planning needs Claude (${PLAN_MODEL}), which answered: ${(error as Error).message}. ` +
+      `Planning needs Claude (${model}), which answered: ${(error as Error).message}. ` +
         "Set ANTHROPIC_API_KEY, or put it in the .env at the repository root",
     );
   }

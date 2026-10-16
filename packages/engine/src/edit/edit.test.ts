@@ -185,6 +185,35 @@ test("a footage folder becomes the video, its project, its captions and progress
   assert.ok(thirdProject.main.every((clip) => clip.grade?.look?.id === "warm"));
 });
 
+test("an economy edit plans with Sonnet, and what Claude cost is told per stage", async (t) => {
+  const dir = await scratch(t, "edit-economy-");
+  const { options, lines } = await footage(dir);
+  const { claude } = await recordedClaude();
+  const models: string[] = [];
+  // A plan costs 5 cents and a check a tenth of one.
+  const priced: Claude = async (request) => {
+    models.push(request.model);
+    const reply = await claude(request);
+    const dollars = request.purpose === "plan" ? 0.05 : 0.001;
+    return { ...reply, usage: { ...reply.usage, dollars } };
+  };
+  const result = await edit({ ...options, claude: priced, quality: "economy" });
+  assert.equal(models[0], "claude-sonnet-5-5");
+  const checks = models.length - 1;
+  assert.deepEqual(
+    [result.stages.plan.dollars, result.stages.check.dollars?.toFixed(4)],
+    [0.05, (checks * 0.001).toFixed(4)],
+  );
+  assert.equal(result.usage.calls, models.length);
+  const messages = lines.map((line) => line.message);
+  assert.ok(messages.includes("claude-sonnet-5-5 planned the edit ($0.0500)"), messages.join("\n"));
+  assert.ok(
+    messages.some((m) =>
+      /^Review 1: \d+ cuts checked, 0 judged by claude-sonnet-5-5 \(\$0\.00\d\d\)$/.test(m),
+    ),
+  );
+});
+
 test("music with its licence is analysed once, chosen by Claude, and credited beside the video", async (t) => {
   const dir = await scratch(t, "edit-music-");
   const { folder, options, lines, analyses } = await footage(dir);
@@ -342,7 +371,7 @@ test("a missing or wrong key fails the check before any analysis, saying where t
   const address = server.address() as { port: number };
   const client = new Anthropic({ apiKey: "wrong", baseURL: `http://127.0.0.1:${address.port}` });
   await assert.rejects(
-    checkClaude(client),
+    checkClaude(undefined, client),
     (error: Error) =>
       error instanceof ClaudeError &&
       /invalid x-api-key/.test(error.message) &&
@@ -515,6 +544,10 @@ test("the command reports arguments it cannot use as an error line too", async (
   for (const [args, pattern] of [
     [[".", "--length", "60", "--aspect", "4:3", "-o", "x.mp4"], /4:3/],
     [[".", "--length", "soon", "--aspect", "9:16", "-o", "x.mp4"], /soon is not a length/],
+    [
+      [".", "--length", "60", "--aspect", "9:16", "-o", "x.mp4", "--quality", "cheap"],
+      /best or economy, not cheap/,
+    ],
     [[".", "--length", "60", "--aspect", "9:16"], /-o/],
     [[".", "--length", "60", "--aspect", "9:16", "-o", "x.mp4", "--bogus"], /--bogus/],
     [[".", "--length", "60", "--aspect", "9:16", "-o", "x.mp4", "--look", "neon"], /neon/],
