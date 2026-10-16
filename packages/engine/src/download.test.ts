@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
-import { copyFile } from "node:fs/promises";
+import { copyFile, readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
@@ -41,4 +41,36 @@ test("a program another download put in place first is kept, even while it runs"
     await once(running, "exit");
     server.close();
   }
+});
+
+test("a pinned download reports its bytes against the size the server gives", async (t) => {
+  const body = Buffer.alloc(300_000, 7);
+  const server = createServer((_, response) => {
+    response.writeHead(200, { "Content-Length": body.length });
+    // In pieces, so the progress has more than one step to report.
+    response.write(body.subarray(0, 100_000));
+    setTimeout(() => response.end(body.subarray(100_000)), 20);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/file`;
+  const sha256 = createHash("sha256").update(body).digest("hex");
+  const path = join(await scratch(t, "download-"), "file");
+
+  const heard: [number, number][] = [];
+  await pinnedFile(url, sha256, path, "a test file", 0o644, (bytes, total) =>
+    heard.push([bytes, total]),
+  );
+  assert.deepEqual(await readFile(path), body);
+  assert.ok(heard.length > 1);
+  assert.ok(heard.every(([, total]) => total === body.length));
+  assert.ok(heard.every(([bytes], i) => i === 0 || bytes > (heard[i - 1] as [number, number])[0]));
+  assert.deepEqual(heard.at(-1), [body.length, body.length]);
+
+  // Once it is there, nothing is downloaded or reported.
+  heard.length = 0;
+  await pinnedFile(url, sha256, path, "a test file", 0o644, (bytes, total) =>
+    heard.push([bytes, total]),
+  );
+  assert.deepEqual(heard, []);
 });

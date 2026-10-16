@@ -15,13 +15,17 @@ import {
   roleOf,
   styleName,
 } from "../lib/settings.ts";
+import type { SetupState } from "../lib/setup.ts";
 import styles from "./editor.module.css";
 import { Footage, type Item } from "./Footage.tsx";
 import { AlertIcon, CaptionsIcon, CheckIcon, DownloadIcon, LockIcon, Mark } from "./icons.tsx";
 import { KeyDialog } from "./KeyDialog.tsx";
 import { Player, ResultSummary } from "./ResultView.tsx";
-import { RunView } from "./RunView.tsx";
-import { type Choices, chosenLength, SettingsPanel } from "./SettingsPanel.tsx";
+import { DownloadView, RunView } from "./RunView.tsx";
+import { type Choices, chosenLength, type Machine, SettingsPanel } from "./SettingsPanel.tsx";
+
+/** What /api/setup says: whether the analysis can run yet, and this computer's memory. */
+type Setup = SetupState & Machine & { asr: Choices["asr"] };
 
 type Phase =
   | { kind: "compose"; error?: string }
@@ -48,23 +52,52 @@ export function Editor() {
     style: DEFAULT_STYLE,
     names: "",
     musicLicense: "",
+    asr: "local",
   });
   const [phase, setPhase] = useState<Phase>({ kind: "compose" });
   const upload = useRef<XMLHttpRequest | null>(null);
-  // Whether the server has an Anthropic key (never the key); null until it says.
-  const [keySet, setKeySet] = useState<boolean | null>(null);
-  const [asking, setAsking] = useState(false);
+  // Whether the server has an Anthropic key and an OpenRouter one (never the keys); null until
+  // it says.
+  const [keys, setKeys] = useState<{ set: boolean; openrouter: boolean } | null>(null);
+  const keySet = keys?.set ?? null;
+  const [asking, setAsking] = useState<"anthropic" | "openrouter" | null>(null);
+  const [setup, setSetup] = useState<Setup | null>(null);
 
   // The first time, with no key yet, the page asks for one.
   useEffect(() => {
     void fetch("/api/key")
-      .then((response) => response.json() as Promise<{ set: boolean }>)
-      .then(({ set }) => {
-        setKeySet(set);
-        if (!set) setAsking(true);
+      .then((response) => response.json() as Promise<{ set: boolean; openrouter: boolean }>)
+      .then((found) => {
+        setKeys(found);
+        if (!found.set) setAsking("anthropic");
       })
       .catch(() => {});
   }, []);
+
+  // Whether the analysis can run yet, followed while it is set up; and where speech is heard
+  // unless the owner chooses, from this computer's memory.
+  const installing = setup === null || setup.state === "installing";
+  useEffect(() => {
+    if (!installing) return;
+    let live = true;
+    const read = () =>
+      fetch("/api/setup")
+        .then((response) => response.json() as Promise<Setup>)
+        .then((found) => {
+          if (!live) return;
+          setSetup((current) => {
+            if (!current) setChoices((choices) => ({ ...choices, asr: found.asr }));
+            return found;
+          });
+        })
+        .catch(() => {});
+    void read();
+    const timer = setInterval(read, 1000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [installing]);
 
   // The page reopens on the edit in its address, or else on one that is running. One whose
   // files were still being sent cannot go on: the browser no longer has them.
@@ -154,20 +187,29 @@ export function Editor() {
   const length = chosenLength(choices);
   const estimate =
     "seconds" in length && footageSeconds > 0 ? estimateCost(footageSeconds, length.seconds) : null;
-  const blocked = !hasVideo
-    ? items.length === 0
-      ? "Add footage to start"
-      : "Add at least one video: the edit is cut from video"
-    : "problem" in length
-      ? length.problem
-      : music > 0 && !choices.musicLicense.trim()
-        ? "Say under which licence you use the music"
-        : null;
+  const blocked =
+    setup?.state === "installing"
+      ? "Setting up the analysis first"
+      : setup?.state === "failed"
+        ? "The analysis could not be set up"
+        : !hasVideo
+          ? items.length === 0
+            ? "Add footage to start"
+            : "Add at least one video: the edit is cut from video"
+          : "problem" in length
+            ? length.problem
+            : music > 0 && !choices.musicLicense.trim()
+              ? "Say under which licence you use the music"
+              : null;
 
   const start = async () => {
     if (blocked || !("seconds" in length)) return;
     if (keySet === false) {
-      setAsking(true);
+      setAsking("anthropic");
+      return;
+    }
+    if (choices.asr === "cloud" && keys?.openrouter === false) {
+      setAsking("openrouter");
       return;
     }
     try {
@@ -181,15 +223,20 @@ export function Editor() {
             style: choices.style,
             names: namesFrom(choices.names),
             ...(music > 0 ? { musicLicense: choices.musicLicense.trim() } : {}),
+            asr: choices.asr,
           },
           files: used.map((item) => ({ path: item.path, size: item.file.size })),
         }),
       });
       const created = (await response.json()) as Job & { error?: string; code?: string };
       if (!response.ok) {
-        if (created.code === "key") {
-          setKeySet(false);
-          setAsking(true);
+        if (created.code === "key" || created.code === "openrouter") {
+          const service = created.code === "key" ? "anthropic" : "openrouter";
+          setKeys(
+            (current) =>
+              current && { ...current, [service === "anthropic" ? "set" : "openrouter"]: false },
+          );
+          setAsking(service);
         }
         setPhase({ kind: "compose", error: created.error ?? "The server refused the edit" });
         return;
@@ -235,7 +282,7 @@ export function Editor() {
           Video editor
         </span>
         {keySet !== null && (
-          <button type="button" className={styles.keyButton} onClick={() => setAsking(true)}>
+          <button type="button" className={styles.keyButton} onClick={() => setAsking("anthropic")}>
             {keySet ? (
               <>
                 <CheckIcon width={14} height={14} />
@@ -248,12 +295,17 @@ export function Editor() {
         )}
       </header>
       <KeyDialog
-        open={asking}
-        replacing={keySet === true}
-        onClose={() => setAsking(false)}
+        service={asking ?? "anthropic"}
+        open={asking !== null}
+        replacing={asking === "openrouter" ? keys?.openrouter === true : keySet === true}
+        onClose={() => setAsking(null)}
         onSaved={() => {
-          setKeySet(true);
-          setAsking(false);
+          const service = asking ?? "anthropic";
+          setKeys((current) => ({
+            set: service === "anthropic" || (current?.set ?? false),
+            openrouter: service === "openrouter" || (current?.openrouter ?? false),
+          }));
+          setAsking(null);
           setPhase((current) => (current.kind === "compose" ? { kind: "compose" } : current));
         }}
       />
@@ -268,6 +320,9 @@ export function Editor() {
                 removed, and captions to go with it.
               </p>
             </div>
+            {setup && setup.state !== "ready" && (
+              <SetupView setup={setup} onRetry={() => void retrySetup().then(setSetup)} />
+            )}
             <Footage
               items={items}
               skipped={skipped}
@@ -291,6 +346,9 @@ export function Editor() {
               onChange={setChoices}
               footageSeconds={footageSeconds}
               music={music}
+              machine={setup}
+              openrouter={keys?.openrouter ?? null}
+              onAddOpenRouter={() => setAsking("openrouter")}
             />
             {phase.kind === "compose" && phase.error && (
               <p className={styles.error} role="alert">
@@ -341,6 +399,8 @@ export function Editor() {
                   <p className={styles.help}>{blocked}</p>
                 ) : keySet === false ? (
                   <p className={styles.help}>Add your Anthropic API key to start</p>
+                ) : choices.asr === "cloud" && keys?.openrouter === false ? (
+                  <p className={styles.help}>Add your OpenRouter API key to start</p>
                 ) : (
                   estimate && (
                     <p className={styles.help}>
@@ -354,8 +414,9 @@ export function Editor() {
             <p className={styles.note}>
               <LockIcon width={14} height={14} />
               <span>
-                Footage stays on the server that runs this page. Claude reads the transcripts and
-                stills around each cut; no video or audio file is uploaded.
+                {choices.asr === "cloud"
+                  ? "Footage stays on this computer. OpenRouter hears the speech audio; Claude reads the transcripts and stills around each cut. No video file is uploaded."
+                  : "Footage stays on the server that runs this page. Claude reads the transcripts and stills around each cut; no video or audio file is uploaded."}
               </span>
             </p>
           </aside>
@@ -374,7 +435,7 @@ export function Editor() {
               <Failed
                 job={job}
                 onBack={() => setPhase({ kind: "compose" })}
-                onReplaceKey={() => setAsking(true)}
+                onReplaceKey={(service) => setAsking(service)}
               />
             )}
           </aside>
@@ -444,7 +505,7 @@ function Failed({
 }: {
   job: Job;
   onBack: () => void;
-  onReplaceKey: () => void;
+  onReplaceKey: (service: "anthropic" | "openrouter") => void;
 }) {
   const cancelled = job.status === "cancelled";
   const fix = !cancelled && job.error ? fixFor(job.error) : null;
@@ -467,8 +528,13 @@ function Failed({
         <p className={styles.help}>Claude cost {formatDollars(spent)} before the edit stopped.</p>
       )}
       {fix?.kind === "key" && (
-        <button type="button" className={styles.button} onClick={onReplaceKey}>
+        <button type="button" className={styles.button} onClick={() => onReplaceKey("anthropic")}>
           Replace the API key
+        </button>
+      )}
+      {fix?.kind === "openrouter" && (
+        <button type="button" className={styles.button} onClick={() => onReplaceKey("openrouter")}>
+          Replace the OpenRouter key
         </button>
       )}
       <button type="button" className={styles.primary} onClick={onBack}>
@@ -486,6 +552,7 @@ function Summary({ job }: { job: Job }) {
     ["Length", formatLength(job.settings.length)],
     ["Aspect", job.settings.aspect],
     ["Style", styleName(job.settings.style)],
+    ["Speech", job.settings.asr === "cloud" ? "OpenRouter" : "On this computer"],
     [
       "Footage",
       `${videos} ${videos === 1 ? "video" : "videos"}${photos ? `, ${photos} ${photos === 1 ? "photo" : "photos"}` : ""}`,
@@ -520,6 +587,45 @@ function Summary({ job }: { job: Job }) {
       ))}
     </dl>
   );
+}
+
+/** The analysis's setup on the desktop app's first start: its download, or why it failed. */
+function SetupView({ setup, onRetry }: { setup: Setup; onRetry: () => void }) {
+  return (
+    <section className={`${styles.card} ${styles.setup}`} aria-label="Setting up the analysis">
+      <div>
+        <h2 className={styles.panelTitle}>
+          {setup.state === "failed"
+            ? "The analysis could not be set up"
+            : "Setting up the analysis"}
+        </h2>
+        <p className={styles.help}>
+          Only the first time: Python and the packages that analyse footage download and install on
+          this computer. Add your keys and footage meanwhile.
+        </p>
+      </div>
+      {setup.state === "failed" ? (
+        <>
+          <p className={styles.error} role="alert">
+            <AlertIcon width={16} height={16} />
+            {setup.error}
+          </p>
+          <button type="button" className={styles.button} onClick={onRetry}>
+            Try again
+          </button>
+        </>
+      ) : setup.download ? (
+        <DownloadView download={setup.download} />
+      ) : (
+        <p className={styles.help}>Starting…</p>
+      )}
+    </section>
+  );
+}
+
+async function retrySetup(): Promise<Setup> {
+  const response = await fetch("/api/setup", { method: "POST" });
+  return (await response.json()) as Setup;
 }
 
 /** What Claude cost in all; null when a price is unknown. */

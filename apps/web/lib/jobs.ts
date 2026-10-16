@@ -10,7 +10,7 @@ import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import type { ClaudeCost, Progress } from "@video-editor/schema";
 import type { FixKind } from "./fixes.ts";
-import { readKey } from "./key.ts";
+import { readKey, type Service } from "./key.ts";
 import { safeRelativePath } from "./paths.ts";
 import { type Run, runEdit } from "./runner.ts";
 import { type FileEntry, type Role, roleOf, type Settings } from "./settings.ts";
@@ -70,8 +70,8 @@ export interface JobsOptions {
   root: string;
   /** The edit command: a program and its first arguments. */
   command: readonly string[];
-  /** The Anthropic API key the edit uses, read when an edit is created and started. */
-  key: () => Promise<string | undefined>;
+  /** The API key the edit uses for each service, read when an edit is created and started. */
+  key: (service: Service) => Promise<string | undefined>;
 }
 
 /** Seconds a download has left at its rate since it started; undefined until it can say. */
@@ -96,7 +96,7 @@ const LOG = "edit.log";
 export class Jobs {
   readonly #root: string;
   readonly #command: readonly string[];
-  readonly #key: () => Promise<string | undefined>;
+  readonly #key: (service: Service) => Promise<string | undefined>;
   /** Where each running job's current download started, for its time left. */
   readonly #downloads = new Map<string, { name: string; at: number; bytes: number }>();
   readonly #jobs = new Map<string, Job>();
@@ -131,7 +131,7 @@ export class Jobs {
     await this.#loaded;
     // Refused now rather than at start, before the page sends any footage.
     this.#refuseWhileRunning();
-    await this.#requireKey();
+    await this.#requireKeys(settings);
     const files: JobFile[] = [];
     const seen = new Set<string>();
     for (const entry of entries) {
@@ -252,7 +252,7 @@ export class Jobs {
   /** Starts the edit once every file has arrived. */
   async start(id: string): Promise<Job> {
     const job = await this.get(id);
-    const key = await this.#requireKey();
+    const keys = await this.#requireKeys(job.settings);
     if (job.status !== "uploading") throw new JobError("This edit has already started", 409);
     const missing = job.files.find((file) => file.received !== file.size);
     if (missing) throw new JobError(`${missing.path} has not arrived yet`, 409);
@@ -277,6 +277,7 @@ export class Jobs {
       ...music.flatMap((file) => ["--music", footage(file)]),
       // Joined, so a licence starting with "-" is not read as an option.
       ...(music.length > 0 && musicLicense ? [`--music-license=${musicLicense}`] : []),
+      ...(job.settings.asr === "cloud" ? ["--asr", "cloud"] : []),
     ];
     try {
       if (names.length > 0) {
@@ -294,8 +295,8 @@ export class Jobs {
       command: this.#command,
       args,
       cwd: dir,
-      // The key the page saved, over any the server's environment holds.
-      env: { ANTHROPIC_API_KEY: key },
+      // The keys the page saved, over any the server's environment holds.
+      env: keys,
       onProgress: (line) => this.#progress(job, line),
       onLog: (line) => log.push(line),
     });
@@ -307,11 +308,21 @@ export class Jobs {
     return job;
   }
 
-  async #requireKey(): Promise<string> {
-    const key = await this.#key();
+  /** The keys an edit with `settings` needs, as the edit's environment reads them. */
+  async #requireKeys(settings: Settings): Promise<Record<string, string>> {
+    const key = await this.#key("anthropic");
     if (!key)
       throw new JobError("Add your Anthropic API key first: Claude plans the edit", 400, "key");
-    return key;
+    if (settings.asr !== "cloud") return { ANTHROPIC_API_KEY: key };
+    const openrouter = await this.#key("openrouter");
+    if (!openrouter) {
+      throw new JobError(
+        "Add your OpenRouter API key first: it hears the speech, or choose this computer",
+        400,
+        "openrouter",
+      );
+    }
+    return { ANTHROPIC_API_KEY: key, OPENROUTER_API_KEY: openrouter };
   }
 
   #refuseWhileRunning(): void {

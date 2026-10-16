@@ -1,0 +1,34 @@
+# Installers: `pnpm -C apps/desktop dist` on each system builds that system's own.
+appId: io.github.zcxy-dev.video-editor
+productName: Video Editor
+copyright: Copyright © zcxy-dev
+directories:
+  output: dist
+  buildResources: assets
+files:
+  - package.json
+  - src/**/*.ts
+  - "!src/**/*.test.ts"
+# From build/ itself: electron-builder leaves out the node_modules at the top of a folder it
+# copies, which editor/'s are.
+extraResources:
+  - from: build
+    to: .
+    filter: ["editor/**/*", "bin/**/*"]
+artifactName: Video-Editor-${version}-${os}-${arch}.${ext}
+publish: null
+mac:
+  target: dmg
+  category: public.app-category.video
+  # Signed ad hoc, which Apple silicon needs to run it at all; not with a Developer ID yet, so
+  # the first launch needs "Open Anyway" (README).
+  identity: "-"
+  hardenedRuntime: false
+  gatekeeperAssess: false
+dmg:
+  writeUpdateInfo: false
+linux:
+  target: AppImage
+  executableName: video-editor
+  category: AudioVideo
+  synopsis: A fully automatic video editor

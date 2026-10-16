@@ -1124,3 +1124,12 @@
     padding: 8px;
   }
 }
+
+/* The analysis's setup, on the desktop app's first start */
+
+.setup {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}

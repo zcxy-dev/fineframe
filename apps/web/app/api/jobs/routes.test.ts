@@ -22,6 +22,7 @@ await writeFile(env, "ANTHROPIC_API_KEY=sk-ant-saved\n");
 process.env.VIDEO_EDITOR_ENV_FILE = env;
 process.env.ANTHROPIC_API_KEY = "sk-ant-server";
 process.env.FAKE_EDIT_KEY = "sk-ant-saved";
+delete process.env.OPENROUTER_API_KEY;
 
 // After the environment is set: the job store reads it once.
 const jobsRoute = await import("./route.ts");
@@ -43,6 +44,8 @@ const settings = {
   names: ["王小明", "GPU"],
   // A leading "-" must not read as one of the command's own options.
   musicLicense: "-CC0 1.0",
+  // Whatever this computer's memory would choose.
+  asr: "local",
 };
 
 async function create(files: { path: string; size: number }[], body: object = { settings }) {
@@ -96,6 +99,7 @@ test("bad input is refused, saying why", async () => {
       /licence/,
     ],
     [{ settings: { ...settings, musicLicense: "CC0\nMIT" } }, video, /licence/],
+    [{ settings: { ...settings, asr: "elsewhere" } }, video, /Speech is heard/],
     [{ settings }, [], /Drop some footage/],
   ];
   for (const [body, files, pattern] of cases) {
@@ -237,4 +241,28 @@ test("an edit: files streamed in, one edit at a time, live progress, then the do
   assert.equal((await latest()).result?.captions, false);
   const missing = await videoRoute.GET(new Request(`${url}/nope/video`), ctx({ id: "nope" }));
   assert.equal(missing.status, 404);
+});
+
+test("speech heard on OpenRouter needs its key, which the edit gets with --asr cloud", async () => {
+  const cloud = { settings: { ...settings, musicLicense: undefined, asr: "cloud" } };
+  const refused = await create([{ path: "c.mp4", size: 2 }], cloud);
+  assert.equal(refused.response.status, 400);
+  assert.match(refused.body.error ?? "", /OpenRouter API key/);
+  assert.equal((refused.body as { code?: string }).code, "openrouter");
+
+  await writeFile(env, "ANTHROPIC_API_KEY=sk-ant-saved\nOPENROUTER_API_KEY=sk-or-saved\n");
+  const { body: job } = await create([{ path: "c.mp4", size: 2 }], cloud);
+  assert.equal(job.settings.asr, "cloud");
+  assert.equal((await put(job.id, 0, new Uint8Array(2))).status, 200);
+  assert.equal((await start(job.id)).status, 200);
+  const latest = async () =>
+    (await (await jobRoute.GET(new Request(url), ctx({ id: job.id }))).json()) as Job;
+  while ((await latest()).status === "running") await new Promise((done) => setTimeout(done, 20));
+  const dir = join(root, job.id);
+  const args = JSON.parse(await readFile(join(dir, "args.json"), "utf8")) as string[];
+  assert.deepEqual(args.slice(args.indexOf("--asr"), args.indexOf("--asr") + 2), [
+    "--asr",
+    "cloud",
+  ]);
+  assert.equal(await readFile(join(dir, "openrouter.txt"), "utf8"), "sk-or-saved");
 });

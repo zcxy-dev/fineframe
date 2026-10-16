@@ -1,6 +1,6 @@
 # Third-party notices
 
-The project's own code is under the [MIT License](LICENSE). It uses the components below, each under its own licence. Nothing in this repository bundles a model weight, a font or a binary: the tools download them on first use, from their publishers or, for the Intel macOS FFmpeg, from a release of this repository, or the package managers install them. Licences were checked against each component's own licence file or model card at the version or revision the project pins.
+The project's own code is under the [MIT License](LICENSE). It uses the components below, each under its own licence. Nothing in this repository bundles a model weight, a font or a binary: the tools download them on first use, from their publishers or, for the Intel macOS FFmpeg, from a release of this repository, or the package managers install them. The desktop app's installers do carry programs: Electron, uv and the npm packages the editor runs, but no FFmpeg, model or Python package ([what they carry](#desktop-installers)). Licences were checked against each component's own licence file or model card at the version or revision the project pins.
 
 ## Components
 
@@ -15,6 +15,8 @@ The project's own code is under the [MIT License](LICENSE). It uses the componen
 | [DeepFilterNet3](https://github.com/Rikorose/DeepFilterNet) ONNX export | MIT OR Apache-2.0 | GitHub, pinned commit and SHA-256; worker `ml` extra |
 | [Noto Sans CJK TC](https://github.com/notofonts/noto-cjk) Bold and Black | OFL-1.1 | GitHub, pinned commit and SHA-256; renderer, for captions |
 | [FFmpeg](https://ffmpeg.org) static builds: from [imageio-binaries](https://github.com/imageio/imageio-binaries), 7.0.2 on Linux, 7.1 on Apple silicon and on Windows ([gyan.dev](https://www.gyan.dev/ffmpeg/builds/)'s essentials build); on Intel macOS, 7.1.5 built by this project | GPL-3.0-or-later (Linux, Windows), GPL-2.0-or-later (macOS) | GitHub, pinned commit or this repository's release, and SHA-256; renderer, run as a separate program (see [notes](#ffmpeg)) |
+| Remotion's compositor (`@remotion/compositor-*`), with its own FFmpeg | [Remotion License](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md); its FFmpeg is configured with `--enable-gpl`, libx264, libx265 and libfdk-aac | Installed with @remotion/renderer by pnpm; for the desktop app, downloaded from npm on the first effect render, checked against `pnpm-lock.yaml` (see [notes](#desktop-installers)) |
+| [CPython](https://www.python.org) builds from [python-build-standalone](https://github.com/astral-sh/python-build-standalone) | PSF-2.0, with the licences of the libraries each build includes | Desktop app only: installed by uv into the app's folder on its first start |
 | Chrome Headless Shell ([Chromium](https://www.chromium.org)) | Chromium's BSD-3-Clause licence and the third-party licences it lists; Google's build also refers to the Chrome terms of service | Downloaded by Remotion on the first effect render: from Google's [Chrome for Testing](https://github.com/GoogleChromeLabs/chrome-for-testing), on Linux with glibc 2.35 or later from Remotion's own build, and on older Linux arm64 from Playwright's Chromium build |
 | [Kokoro-82M-v1.1-zh](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh) weights and voices | Apache-2.0 | Hugging Face, pinned revision; benchmark `synth` extra only |
 
@@ -62,6 +64,9 @@ Models that come inside a package: the TransNetV2 weights in transnetv2-pytorch,
 | [typescript](https://www.typescriptlang.org) | Apache-2.0 | development |
 | [@biomejs/biome](https://biomejs.dev) | MIT OR Apache-2.0 | development |
 | [json-schema-to-typescript](https://github.com/bcherny/json-schema-to-typescript), @types/node, @types/react, @types/react-dom | MIT | development |
+| [electron](https://www.electronjs.org) | MIT; the Chromium and Node.js it is built from keep their licences, listed in `LICENSES.chromium.html` inside the app | desktop app, in its installers |
+| [electron-builder](https://www.electron.build) | MIT | desktop app, building the installers |
+| [playwright-core](https://playwright.dev) | Apache-2.0 | desktop app, its smoke test |
 
 ## Notes
 
@@ -84,7 +89,25 @@ Anyone who redistributes these builds, for example in a desktop app or a contain
 - **soynlp**, installed with the worker's `ml` extra for the forced aligner's Korean word splitting, is marked GPL-3.0 on PyPI while its repository's licence file is LGPL-3.0.
 - **soxr** (LGPL-2.1-or-later) comes with beat-this in the worker's `ml` extra.
 - The benchmark's `synth` extra installs **phonemizer-fork** (GPL-3.0-or-later), **espeakng-loader**, whose wheel bundles espeak-ng (GPL-3.0), and **num2words** (LGPL-2.1), through kokoro's English support. The corpus generator never calls them.
-- **sharp**'s libvips (LGPL-3.0-or-later) is installed as an optional dependency of Next.js; the web page does not use it.
+- **sharp**'s libvips (LGPL-3.0-or-later) is installed as an optional dependency of Next.js; the web page does not use it, and the desktop app's installers leave it out.
+- **mediabunny** (MPL-2.0), which Remotion depends on, is in the desktop app's installers as its published source, unchanged.
+
+### Desktop installers
+
+Each of the [desktop app](apps/desktop/README.md)'s installers carries:
+
+- **Electron** (MIT), with the Chromium and Node.js it is built from; their licences are in `LICENSES.chromium.html` and `LICENSE.electron.txt` inside the app.
+- **[uv](https://github.com/astral-sh/uv)** (MIT OR Apache-2.0), pinned by version and SHA-256, which installs the analysis's Python on the first start.
+- **The editor's code and the npm packages it runs**, the production dependencies listed above and theirs, as pnpm installs them, under their own licences: almost all MIT, ISC, Apache-2.0 or BSD; Remotion under the [Remotion License](#remotion); mediabunny under MPL-2.0; caniuse-lite's data under CC-BY-4.0.
+
+Left out on purpose, and downloaded on first use instead, from their publishers, as when the editor runs from a clone:
+
+- **FFmpeg.** The renderer's pinned build downloads on the first edit, as [above](#ffmpeg).
+- **Remotion's compositor**, whose FFmpeg is built with `--enable-gpl` and with libfdk-aac, a combination the GPL does not allow to be passed on. It downloads from npm on the first effect render, checked against the integrity in `pnpm-lock.yaml`.
+- **The analysis's Python**, its packages (PyAV's GPL FFmpeg among them) and the models, which uv and vework download into the user's folders.
+- **sharp** and its libvips, which the page does not use.
+
+The installers are not signed with an Apple Developer ID or a Windows code-signing certificate yet; the macOS app is signed ad hoc, which Apple silicon requires to run it.
 
 ### CED-Base
 

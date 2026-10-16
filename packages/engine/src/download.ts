@@ -11,9 +11,13 @@ export function cacheDir(): string {
   return join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "video-editor");
 }
 
+/** Bytes downloaded so far, of `total` (0 when the server does not say). */
+export type DownloadProgress = (bytes: number, total: number) => void;
+
 /**
  * The file at `path`, downloaded from `url` and checked against its SHA-256 first if it is not
- * there yet. `what` names it in the message printed while it downloads.
+ * there yet. `what` names it in the message printed while it downloads; `onProgress` hears each
+ * chunk as it arrives.
  */
 export async function pinnedFile(
   url: string,
@@ -21,6 +25,7 @@ export async function pinnedFile(
   path: string,
   what: string,
   mode = 0o644,
+  onProgress?: DownloadProgress,
 ): Promise<string> {
   if (await exists(path)) return path;
   process.stderr.write(`Downloading ${what} to ${path}\n`);
@@ -33,9 +38,13 @@ export async function pinnedFile(
   // never reads a half-written or unverified file.
   const partial = `${path}.${process.pid}.partial`;
   const hash = createHash("sha256");
+  const total = Number(response.headers.get("content-length")) || 0;
+  let bytes = 0;
   const hashing = new Transform({
     transform(chunk, _encoding, done) {
       hash.update(chunk);
+      bytes += chunk.length;
+      onProgress?.(bytes, total);
       done(null, chunk);
     },
   });

@@ -2,14 +2,15 @@
 // download among them, and one going back, as a stage may report), waits while $FAKE_EDIT_HOLD
 // names a file that exists, then writes the outputs and the done line with what Claude cost, with
 // a project that plays the first --music track. It fails unless ANTHROPIC_API_KEY is
-// $FAKE_EDIT_KEY. $FAKE_EDIT_NO_CAPTIONS leaves the captions file empty, as the engine does when no
-// speech is kept.
+// $FAKE_EDIT_KEY, and records the OpenRouter key it was given in openrouter.txt.
+// $FAKE_EDIT_NO_CAPTIONS leaves the captions file empty, as the engine does when no speech is kept.
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, relative } from "node:path";
 
 const args = process.argv.slice(2);
 await writeFile("args.json", JSON.stringify(args));
+await writeFile("openrouter.txt", process.env.OPENROUTER_API_KEY ?? "");
 const say = (line: object) => process.stdout.write(`${JSON.stringify(line)}\n`);
 if (process.env.ANTHROPIC_API_KEY !== process.env.FAKE_EDIT_KEY) {
   say({ stage: "error", fraction: 0, message: "Not the key the page saved" });

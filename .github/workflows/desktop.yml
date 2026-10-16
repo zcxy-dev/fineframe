@@ -1,0 +1,120 @@
+name: desktop
+
+# Builds the desktop app's installers on each system they are for, then runs each built app as
+# a person would the first time (apps/desktop/scripts/smoke.ts): it installs the analysis, makes
+# an edit of a synthetic clip with stand-ins for Claude and OpenRouter, and quits, leaving nothing
+# running. A pull request that changes the app or the page builds and checks them; a tag v<version>
+# also attaches them to a draft release of that tag, for the owner to publish.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - .github/workflows/desktop.yml
+      - apps/desktop/**
+      - apps/web/**
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: desktop-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-arm64
+            runner: macos-latest
+            installer: dmg
+          - name: macos-x64
+            runner: macos-15-intel
+            installer: dmg
+          - name: linux-x64
+            runner: ubuntu-latest
+            installer: AppImage
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        with:
+          cache: false
+      # The smoke test speaks its clip with the system's voice: `say` on macOS, espeak-ng here.
+      - name: Install espeak-ng
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y espeak-ng
+      - name: Build the installer
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter @video-editor/desktop dist
+      - name: Run the built app (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          dmg=$(ls apps/desktop/dist/*.dmg)
+          hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/app" "$dmg"
+          node apps/desktop/scripts/smoke.ts "$RUNNER_TEMP/app/Video Editor.app/Contents/MacOS/Video Editor" \
+            --shots "$RUNNER_TEMP/shots"
+          hdiutil detach "$RUNNER_TEMP/app"
+      - name: Run the built app (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          xvfb-run -a -s "-screen 0 1440x960x24" \
+            node apps/desktop/scripts/smoke.ts apps/desktop/dist/*.AppImage --shots "$RUNNER_TEMP/shots"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installer-${{ matrix.name }}
+          path: apps/desktop/dist/*.${{ matrix.installer }}
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: screenshots-${{ matrix.name }}
+          path: ${{ runner.temp }}/shots/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  release:
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: installer-*
+          path: installers
+          merge-multiple: true
+      # The tag names the app's version, so the installers' names match the release's.
+      - name: Attach the installers to a draft release
+        run: |
+          version=$(jq -r .version apps/desktop/package.json)
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "The tag $GITHUB_REF_NAME is not v$version, the version in apps/desktop/package.json"
+            exit 1
+          fi
+          (cd installers && sha256sum -- * > SHA256SUMS)
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft \
+              --verify-tag --title "Video Editor $version" \
+              --notes "Installers for macOS (Apple silicon and Intel) and Linux. They are not signed yet: the README says how to open the app the first time (https://github.com/$GITHUB_REPOSITORY#install)."
+          fi
+          gh release upload "$GITHUB_REF_NAME" installers/* --repo "$GITHUB_REPOSITORY" --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
