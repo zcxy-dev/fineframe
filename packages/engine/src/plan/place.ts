@@ -132,7 +132,13 @@ function startOnFrame(want: number, low: number, high: number, grid: number | nu
 
 /** `start` plus the whole number of output frames that ends nearest `want` inside [low, high];
  * with none inside, the first that ends after `low`, so the last word is never clipped. */
-function endOnFrame(start: number, want: number, low: number, high: number, frame: number): number {
+export function endOnFrame(
+  start: number,
+  want: number,
+  low: number,
+  high: number,
+  frame: number,
+): number {
   let frames = Math.max(1, Math.round((want - start) / frame));
   if (start + frames * frame > high) frames = Math.floor((high - start) / frame);
   if (start + frames * frame < low) frames = Math.ceil((low - start) / frame);

@@ -226,8 +226,10 @@ cd ../../bench && uv run vebench report synthetic/
 ## Rendering
 
 ```bash
-pnpm --filter @video-editor/engine render edit/project.json -o out/edit.mp4
+pnpm render edit/project.json -o out/edit.mp4
 ```
+
+The command renders a project as it is, after validating it: a project changed by hand that breaks the schema, or what the schema cannot express (see [`packages/schema`](../schema/README.md#using-it)), fails with every problem by its JSON path. `--cut` takes stretches out first ([changing an edit](#changing-an-edit)). From code:
 
 ```ts
 import { writeFile } from "node:fs/promises";

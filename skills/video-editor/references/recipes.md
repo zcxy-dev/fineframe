@@ -1,0 +1,73 @@
+# Recipes for changing an edit
+
+Each recipe starts from the newest version, here `out/edit.project.json`, and makes the next one, here `edit-v2`. The schema with every field's meaning is `packages/schema/project.schema.json`; the effect templates and their limits are in `packages/effects/src/catalog.ts`.
+
+**Ticks.** Every time and length is an integer: 120 000 ticks a second. Seconds × 120 000, rounded, gives ticks; `start` of captions, overlays, B-roll and music is on the output timeline, from the video's first frame.
+
+**Editing a copy.** Recipes other than cutting change a copy of the project in the same folder, so its relative paths still resolve. Use your own file tools on the copy, or for a change across many entries:
+
+```bash
+node -e '
+const fs = require("node:fs");
+const p = JSON.parse(fs.readFileSync("out/edit.project.json", "utf8"));
+// … change p …
+fs.writeFileSync("out/edit-v2.project.json", JSON.stringify(p, null, 2) + "\n");'
+pnpm -s render out/edit-v2.project.json -o out/edit-v2.mp4
+```
+
+Several changes can go into one version and one render.
+
+## Cut a part: drop a segment, trim one, remove a sentence
+
+```bash
+pnpm -s render out/edit.project.json --cut 12.4-17.9 -o out/edit-v2.mp4
+```
+
+- The range is in seconds (or `m:ss`) of the video the project renders, from the start of the first words to drop to the end of the last: take them from `edit.srt`, or from `captions.lines[].start` and `end` ÷ 120 000. A whole segment of the main track runs between two neighbouring times of `edit_cuts.json` (from 0 for the first). Trimming a segment is cutting its first or last sentences. Give `--cut` once per range; all of them are times in the input video.
+- A word goes when its middle is inside the range. Every new cut lands in the pause beside the words kept, and captions, overlays, B-roll and music move up with the speech. The command writes the cut edit to `out/edit-v2.project.json`.
+- Read its stderr: it prints the words it cut from each clip, the overlays it removed because their whole time was cut, and the ones that overlapped the cut. Check the words are exactly the ones meant. A keyword or lower third that overlapped the cut may now stand over other words: remove it from `edit-v2.project.json` if its word went (below), and render again.
+- It refuses a cut that leaves the edit outside ±5 % of its planned length, and prints the new length. If the user wants the shorter video, copy the project, set `output.target.duration` in the copy to the ticks the error gives, and cut from the copy. A much shorter edit is better planned again (`SKILL.md`).
+
+## Fix a caption word
+
+Find the line in `captions.lines` whose `text` holds the word. Change the word in `text` and in the matching entry of `words`, its `text` only; leave every time as it is.
+
+```json
+{ "text": "我是阿哲", "words": [{ "text": "我", … }, { "text": "是", … }, { "text": "阿哲", … }] }
+```
+
+A word lights as it is said, so a fix that spans two `words` entries puts its first part in the first and the rest in the second; each keeps at least one character. The SubRip file is written again from the lines. A character the caption font cannot draw fails the render with the line's path.
+
+A name the speech model misheard throughout is better fixed at the source next time: list it in the `--names` file of the next `pnpm edit`.
+
+## Change the title or a lower third
+
+Both are `overlays` entries, by `template`:
+
+- `title`: `params.text`, at most 24 characters, and an optional `params.subtitle`, at most 40.
+- `lower-third`: `params.name`, at most 16 characters, and an optional `params.role`, at most 28.
+
+Change the params; keep `start` and `duration`. To add a lower third, add an entry `{ "template": "lower-third", "params": { "name": "…", "role": "…" }, "start": …, "duration": 480000 }`, starting about 1 s after the person first speaks on camera, at a time no other overlay covers. To add a title, the same with `"template": "title"`, `start` 0 and `duration` 360000.
+
+## Remove or add a keyword or chapter
+
+- **Remove** an overlay by deleting its entry. A `chapter` comes with the `wipe` that covers the cut just before it (the wipe ends shortly after the chapter starts): delete both, then renumber the chapters left, `params.index` from 1 and `params.total` to their number.
+- **Add a keyword:** `{ "template": "keyword", "params": { "text": "…", "position": "upper" }, "start": …, "duration": 180000 }`. `text` is the word or number as spoken, at most 12 characters; `start` is that word's `start` in `captions.lines[].words` less 18 000 (0.15 s), so the swipe lands as it is said. Keep `position` `upper` at 9:16 unless no one is on camera. Overlays show one at a time: pick a moment no other overlay covers, and keep keywords to one to three a minute.
+- **Add a chapter:** `{ "template": "chapter", "params": { "title": "…", "index": n, "total": m }, "start": …, "duration": 420000 }`, starting with the chapter's first words; `title` at most 20 characters; renumber every chapter. A chapter suits an edit of two minutes or more.
+
+Any overlay can take `params.accent`, a `#rrggbb` colour for its accent instead of the house amber. A changed overlay renders again, in a few seconds; unchanged ones come from the cache.
+
+## Change the music level, or remove the music
+
+- **Level:** `audio.music[i].gainDb` is the music's level in dB; −3 more is about a third quieter. The music still ducks under speech by `ducking.depthDb`. The finished mix is normalised to `audio.loudness`, so the voice stays at the same loudness.
+- **Remove:** delete `audio.music`. The video then has no `edit-v2.music.txt`.
+
+## Change the look or the caption style
+
+- **Look:** each clip of `main` and `broll` has `grade.look`, `{ "id": "clean", "intensity": 1 }`. The looks are `clean` (a gentle contrast lift), `warm` (soft, golden highlights, for people and vlogs), `cool` (firmer contrast, blue shadows, for tech and screens) and `film` (matte blacks, teal shadows, warm light). Set the same `id` on every clip; `intensity` from 0 to 1 blends it in. Delete `grade.look` for no look. Leave `grade.auto` and `grade.match` as they are: they correct and match the cameras.
+
+  ```js
+  for (const clip of [...p.main, ...(p.broll ?? [])]) clip.grade = { ...clip.grade, look: { id: "warm", intensity: 1 } };
+  ```
+
+- **Caption style:** `captions.preset` is `bold`, `spotlight`, `sweep` (karaoke) or `boxed`.
