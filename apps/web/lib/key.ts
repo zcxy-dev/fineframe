@@ -74,8 +74,9 @@ export async function saveKey(key: string): Promise<void> {
   try {
     await writeFile(partial, next, { mode: 0o600 });
     await rename(partial, file);
-    // Windows ignores the mode; the file's access list keeps its owner alone instead. Set once
-    // the file is in place, as replacing a file there need not keep the new one's list.
+    // Windows ignores the mode: the file's access list drops what it takes from the folder, which
+    // may let every user read, leaving the owner and, as root elsewhere, the administrators. Set
+    // once the file is in place, as replacing a file need not keep the new one's list.
     if (process.platform === "win32") {
       const domain = process.env.USERDOMAIN;
       const owner = `${domain ? `${domain}\\` : ""}${userInfo().username}`;

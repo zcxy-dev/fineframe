@@ -155,11 +155,11 @@ jobs:
             .errors == [] and .missing == [] and .render.clicks == 0 and .render.max_abs_drift_ms < 10)' \
             "$RUNNER_TEMP/report.json"
 
-  # WIP: one run of the worker's ml tests on Windows, removed before merging.
-  windows-ml:
+  # WIP: the key test against main's key.ts must fail on Windows; removed before merging.
+  windows-key:
     if: github.event_name == 'pull_request'
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 15
     permissions:
       contents: read
     defaults:
@@ -168,12 +168,14 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
         with:
           cache: false
-      - name: Run the worker's ml tests
-        working-directory: worker
+      - name: The key test fails without the fix
         run: |
-          uv sync --locked --extra ml
-          uv run pytest -q -m ml -rs
+          pnpm install --frozen-lockfile
+          git show origin/main:apps/web/lib/key.ts > apps/web/lib/key.ts
+          cd apps/web
+          if node --test lib/key.test.ts; then exit 1; fi

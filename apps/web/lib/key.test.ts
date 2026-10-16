@@ -10,6 +10,9 @@ import { test } from "node:test";
 import { promisify } from "node:util";
 
 const dir = await mkdtemp(join(tmpdir(), "web-key-"));
+const icacls = (...args: string[]) => promisify(execFile)("icacls", args);
+// A folder every user of the machine may read, as a clone outside the user's own folder is.
+if (process.platform === "win32") await icacls(dir, "/grant", "*S-1-5-32-545:(OI)(CI)R");
 const env = join(dir, ".env");
 process.env.VIDEO_EDITOR_ENV_FILE = env;
 delete process.env.ANTHROPIC_API_KEY;
@@ -89,12 +92,11 @@ test("a working key is saved for its owner alone, beside what .env holds, and ne
   assert.deepEqual(asked, [{ path: "/v1/models/claude-opus-5-5", key: "sk-ant-good" }]);
   assert.equal(await readFile(env, "utf8"), "# Mine\nOTHER=1\nANTHROPIC_API_KEY=sk-ant-good\n");
   if (process.platform === "win32") {
-    // Windows ignores the mode; the file's access list names its owner alone.
-    const { stdout } = await promisify(execFile)("icacls", [env]);
-    const entries = stdout.match(/[^\s:]+:\(/g) ?? [];
-    assert.equal(entries.length, 1, stdout);
-    const owner = `\\${userInfo().username}:(`.toLowerCase();
-    assert.ok(entries[0]?.toLowerCase().endsWith(owner), stdout);
+    // Windows ignores the mode. The access list takes nothing from the folder, which lets every
+    // user read, and leaves the owner and the machine's administrators, as root elsewhere.
+    const { stdout } = await icacls(env);
+    assert.doesNotMatch(stdout, /\(I\)|\\Users:/, stdout);
+    assert.ok(stdout.toLowerCase().includes(`\\${userInfo().username}:(f)`.toLowerCase()), stdout);
   } else {
     assert.equal((await stat(env)).mode & 0o777, 0o600);
   }
