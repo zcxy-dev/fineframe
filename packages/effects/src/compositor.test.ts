@@ -30,3 +30,18 @@ test("the lockfile holds the integrity of every system's compositor at the rende
   }
   assert.equal(lockedIntegrity(lockfile, "@remotion/compositor-darwin-arm64", "0.0.0"), null);
 });
+
+test("a lockfile checked out with Windows line endings is read the same", () => {
+  const entry = [
+    "packages:",
+    "",
+    "  '@remotion/compositor-win32-x64-msvc@1.2.3':",
+    `    resolution: {integrity: sha512-${"A".repeat(86)}==}`,
+    "",
+  ];
+  const lf = entry.join("\n");
+  const crlf = entry.join("\r\n");
+  const name = "@remotion/compositor-win32-x64-msvc";
+  assert.equal(lockedIntegrity(crlf, name, "1.2.3"), lockedIntegrity(lf, name, "1.2.3"));
+  assert.notEqual(lockedIntegrity(crlf, name, "1.2.3"), null);
+});

@@ -309,6 +309,17 @@ await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 120_000 });
 const origin = new URL(page.url()).origin;
 say(`the page is at ${origin}`);
 const api = async <T>(path: string): Promise<T> => (await fetch(`${origin}${path}`)).json() as T;
+// Every first-use download the page shows, watched from the start: on a fast network the
+// analysis environment can finish installing while the key dialog is still open.
+const downloads = new Set<string>();
+const watching = setInterval(async () => {
+  try {
+    const setup = await api<{ download?: { name: string } }>("/api/setup");
+    if (setup.download) downloads.add(setup.download.name);
+    const job = await api<{ download?: { name: string } } | null>("/api/jobs/latest");
+    if (job?.download) downloads.add(job.download.name);
+  } catch {}
+}, 250);
 
 /**
  * Plays the finished video in the window's own player, as its owner would: waits for it to load,
@@ -380,15 +391,6 @@ async function makeEdit(): Promise<string[]> {
 
   const machine = await api<{ memory: number; asr: string }>("/api/setup");
   say(`${(machine.memory / 1024 ** 3).toFixed(0)} GB of memory: speech defaults to ${machine.asr}`);
-  const downloads = new Set<string>();
-  const watching = setInterval(async () => {
-    try {
-      const setup = await api<{ download?: { name: string } }>("/api/setup");
-      if (setup.download) downloads.add(setup.download.name);
-      const job = await api<{ download?: { name: string } } | null>("/api/jobs/latest");
-      if (job?.download) downloads.add(job.download.name);
-    } catch {}
-  }, 500);
   if ((await api<{ state: string }>("/api/setup")).state === "installing") {
     await page.getByText(/Downloading the analysis environment/).waitFor({ timeout: 300_000 });
     await shot(page, "2-setting-up");

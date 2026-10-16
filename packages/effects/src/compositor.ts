@@ -27,6 +27,8 @@ export function compositorPackage(platform = process.platform, arch = process.ar
 
 /** The SHA-512 integrity pnpm-lock.yaml holds for `name@version`, or null. */
 export function lockedIntegrity(lockfile: string, name: string, version: string): string | null {
+  // A Windows checkout may have turned the lockfile's line endings into CRLF.
+  lockfile = lockfile.replaceAll("\r\n", "\n");
   const at = lockfile.indexOf(`\n  '${name}@${version}':\n`);
   if (at < 0) return null;
   const entry = lockfile.slice(at, at + 400).match(/integrity: (sha512-[A-Za-z0-9+/=]+)/);

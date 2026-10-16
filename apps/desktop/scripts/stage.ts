@@ -157,8 +157,7 @@ await writeFile(join(build, `uv.${packed}`), archive);
 if (windows) {
   const tar = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe");
   run(tar, ["-xf", "uv.zip", "-C", "bin", "uv.exe"], build);
-}
-else {
+} else {
   run(
     "tar",
     ["-xzf", "uv.tar.gz", "--strip-components=1", "-C", "bin", `uv-${uv.target}/uv`],

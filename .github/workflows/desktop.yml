@@ -76,8 +76,13 @@ jobs:
         run: |
           installer=$(ls apps/desktop/dist/*.exe)
           powershell -NoProfile -Command "Start-Process -Wait -FilePath '$installer' -ArgumentList '/S'"
-          node apps/desktop/scripts/smoke.ts "$LOCALAPPDATA/Programs/Video Editor/Video Editor.exe" \
-            --shots "$RUNNER_TEMP/shots"
+          app="$(cygpath -w "$LOCALAPPDATA")\\Programs\\Video Editor\\Video Editor.exe"
+          test -f "$app"
+          # The installer may open the app when it finishes; a second copy would only hand over to
+          # that one and quit, so the smoke test starts from none running.
+          sleep 5
+          powershell -NoProfile -Command "Get-Process | Where-Object { \$_.Path -eq '$app' } | ForEach-Object { Write-Output \"stopping \$(\$_.Id)\"; Stop-Process -Id \$_.Id -Force }"
+          node apps/desktop/scripts/smoke.ts "$app" --shots "$RUNNER_TEMP/shots"
       - name: Run the built app (Linux)
         if: runner.os == 'Linux'
         run: |
