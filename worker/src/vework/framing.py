@@ -28,7 +28,10 @@ ANALYSIS_SIZE = 640
 MAX_FACES = 32
 
 # Detector scores: a weaker face next to a strong one is more often a false detection than a
-# second person.
+# second person, and a faint one more often than not. Either counts only when its mouth moves
+# with the speech: a head turned aside scores lower than one facing the camera, so a speaker
+# seen in profile scores 0.5 to 0.85 beside a listener's 0.9.
+FAINT_FACE_SCORE = 0.5
 FACE_SCORE_THRESHOLD = 0.72
 STRONG_FACE_SCORE = 0.90
 COMPETING_FACE_SCORE = 0.85
@@ -107,6 +110,9 @@ class Track:
         boxes = [face.box for _, face in self.samples]
         return Box(*(median(getattr(b, axis) for b in boxes) for axis in ("x", "y", "w", "h")))
 
+    def median_score(self) -> float:
+        return median(face.score for _, face in self.samples)
+
 
 def analyze(path: Path, video: VideoInfo, transitions: list[dict], speech: list[dict]) -> dict:
     """The `framing` section of a video's media index."""
@@ -144,13 +150,14 @@ def frame_shot(
     samples: list[Sample], start: float, end: float, speech: list[dict], ids: Iterator[int]
 ) -> dict:
     """One shot of the index: its layout, the faces that count and who speaks when."""
-    tracks = track_faces(samples)
-    layout, present = classify_shot(tracks, len(samples))
+    seen = seen_tracks(track_faces(samples), len(samples))
+    talking = {span["face"] for span in speakers(list(enumerate(seen)), start, end, speech)}
+    present = [track for k, track in enumerate(seen) if k in talking or not unsure(track, seen)]
     numbered = [(next(ids), track) for track in present]
     return {
         "start": round(start, 6),
         "end": round(end, 6),
-        "layout": layout,
+        "layout": classify_shot(present),
         "faces": [
             {
                 "id": i,
@@ -166,10 +173,21 @@ def frame_shot(
 
 
 def framing_faces(faces: list[Face]) -> list[Face]:
-    """Weak competing detections must not displace a confident real face."""
+    """The confident faces of a sample: faint and weak competing detections must not displace
+    them."""
+    faces = [face for face in faces if face.score >= FACE_SCORE_THRESHOLD]
     if any(face.score >= STRONG_FACE_SCORE for face in faces):
         return [face for face in faces if face.score >= COMPETING_FACE_SCORE]
     return faces
+
+
+def unsure(track: Track, tracks: list[Track]) -> bool:
+    """A faint face, or a weak one in a shot with a confident one: a person only if they speak."""
+    score = track.median_score()
+    return score < FACE_SCORE_THRESHOLD or (
+        score < COMPETING_FACE_SCORE
+        and any(other.median_score() >= STRONG_FACE_SCORE for other in tracks)
+    )
 
 
 def is_corner_overlay(box: Box) -> bool:
@@ -182,20 +200,23 @@ def is_corner_overlay(box: Box) -> bool:
 def track_faces(samples: list[Sample]) -> list[Track]:
     """Associate nearby faces, keeping an unambiguous subject through jumps.
 
-    A sole visible face can move farther than the normal association radius between samples.
+    A sole confident face can move farther than the normal association radius between samples.
     Keep that track while its size stays compatible; never take that shortcut after a frame
-    with several people or a long dropout.
+    with several confident people or a long dropout. Weak faces beside it are tracked too, but
+    only by distance.
     """
     tracks: list[Track] = []
     sole: int | None = None
     recent: list[int] = []  # tracks seen within MAX_TRACK_GAP: an hour-long shot has thousands
     for sample in samples:
-        faces = framing_faces(sample.faces)
+        faces = sample.faces
+        confident = framing_faces(faces)
         recent = [i for i in recent if sample.t - tracks[i].samples[-1][0] <= MAX_TRACK_GAP]
         used: set[int] = set()
-        for face in sorted(faces, key=lambda f: -f.box.area):
+        # The confident face first, so a weak one near it never takes its track.
+        for face in sorted(faces, key=lambda f: (f not in confident, -f.box.area)):
             box, best, best_dist = face.box, None, 0.12
-            if len(faces) == 1 and sole is not None:
+            if len(confident) == 1 and face is confident[0] and sole is not None:
                 last_t, last = tracks[sole].samples[-1]
                 # A zoom cut can exceed the usual 2x size gate; webcam overlays still need
                 # their own tracks to be told apart.
@@ -217,21 +238,26 @@ def track_faces(samples: list[Sample]) -> list[Track]:
             tracks[best].samples.append((sample.t, face))
             used.add(best)
         recent += [i for i in used if i not in recent]
-        if len(faces) == 1:
-            sole = next(iter(used))
-        elif faces:
+        if len(confident) == 1:
+            sole = next(i for i in used if tracks[i].samples[-1][1] is confident[0])
+        elif confident:
             sole = None
     return tracks
 
 
-def classify_shot(tracks: list[Track], shot_samples: int) -> tuple[str, list[Track]]:
-    """The shot's layout and the face tracks that count in it, in order of first appearance."""
-    present = [
+def seen_tracks(tracks: list[Track], shot_samples: int) -> list[Track]:
+    """The face tracks seen long enough and large enough to be someone in the shot, in order of
+    first appearance."""
+    return [
         t
         for t in tracks
         if len(t.samples) >= max(1, MIN_TRACK_PRESENCE * shot_samples)
         and t.median_box().h >= MIN_FACE_HEIGHT
     ]
+
+
+def classify_shot(present: list[Track]) -> str:
+    """The layout of a shot with these face tracks in it."""
     on_camera = [t for t in present if not is_corner_overlay(t.median_box())]
     on_camera.sort(key=lambda t: -t.median_box().area)
     layout = "screen"
@@ -247,7 +273,7 @@ def classify_shot(tracks: list[Track], shot_samples: int) -> tuple[str, list[Tra
         layout = "talking_head"
     elif not on_camera and present:
         layout = "screen_cam"
-    return layout, present
+    return layout
 
 
 def speakers(
@@ -385,7 +411,7 @@ def _detector(size: tuple[int, int]) -> Callable[[np.ndarray, list[np.ndarray]],
     if hashlib.sha256(Path(weights).read_bytes()).hexdigest() != SHA256:
         raise RuntimeError(f"{MODEL}: {weights} does not match its SHA-256; delete it to refetch")
     width, height = size
-    detector = cv2.FaceDetectorYN.create(weights, "", size, FACE_SCORE_THRESHOLD, 0.3, 50)
+    detector = cv2.FaceDetectorYN.create(weights, "", size, FAINT_FACE_SCORE, 0.3, 50)
 
     def patch(image: np.ndarray, centre: tuple[float, float], size: tuple[int, int]):
         return cv2.getRectSubPix(image, size, centre)

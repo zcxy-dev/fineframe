@@ -1,4 +1,5 @@
 import subprocess
+from itertools import count
 
 import imageio_ffmpeg
 import numpy as np
@@ -38,11 +39,33 @@ def test_a_sole_face_that_jumps_stays_one_track_but_two_people_do_not_merge():
     assert len(framing.track_faces(pair)) == 2
 
 
-def test_a_weak_detection_next_to_a_confident_face_is_dropped():
+def test_a_weak_detection_next_to_a_confident_face_is_not_confident():
     faces = [face(0.3, score=0.95), face(0.7, score=0.8)]
     assert framing.framing_faces(faces) == faces[:1]
     weak = [face(0.3, score=0.8), face(0.7, score=0.78)]
     assert framing.framing_faces(weak) == weak
+
+
+def test_a_weak_face_beside_a_sole_confident_one_does_not_stop_it_jumping():
+    jump = [Sample(t, [face(cx, score=0.95), face(0.9, score=0.8)])
+            for t, cx in ((0.0, 0.2), (0.2, 0.6), (0.4, 0.62))]  # fmt: skip
+    assert [len(t.samples) for t in framing.track_faces(jump)] == [3, 3]
+
+
+def test_a_weak_face_beside_a_confident_one_counts_only_when_it_speaks():
+    def shot(weak_mouth: float) -> dict:
+        samples = [
+            Sample(k / 5, [face(0.3, score=0.95, mouth=1.0, still=1.0),
+                           face(0.7, score=0.8, mouth=weak_mouth, still=1.0)])
+            for k in range(20)
+        ]  # fmt: skip
+        return framing.frame_shot(samples, 0.0, 4.0, [{"start": 1.0, "end": 3.0}], count())
+
+    silent = shot(weak_mouth=1.0)
+    assert (silent["layout"], len(silent["faces"]), silent["speakers"]) == ("talking_head", 1, [])
+    talking = shot(weak_mouth=6.0)
+    assert (talking["layout"], [f["id"] for f in talking["faces"]]) == ("two_shot", [0, 1])
+    assert talking["speakers"] == [{"face": 1, "start": 1.0, "end": 3.0}]
 
 
 @pytest.mark.parametrize(
@@ -63,14 +86,14 @@ def test_a_weak_detection_next_to_a_confident_face_is_dropped():
 )
 def test_shot_layouts(people, layout, count):
     samples = [Sample(k / 5, people) for k in range(10)]
-    found, present = framing.classify_shot(framing.track_faces(samples), len(samples))
-    assert (found, len(present)) == (layout, count)
+    present = framing.seen_tracks(framing.track_faces(samples), len(samples))
+    assert (framing.classify_shot(present), len(present)) == (layout, count)
 
 
 def test_a_face_seen_in_too_little_of_the_shot_does_not_count():
     samples = [Sample(k / 5, [face(0.3)] + ([face(0.7)] if k < 2 else [])) for k in range(10)]
-    layout, present = framing.classify_shot(framing.track_faces(samples), len(samples))
-    assert (layout, len(present)) == ("talking_head", 1)
+    present = framing.seen_tracks(framing.track_faces(samples), len(samples))
+    assert (framing.classify_shot(present), len(present)) == ("talking_head", 1)
 
 
 def conversation(moving: dict[int, list[tuple[float, float]]], length: float = 8.0):
@@ -189,9 +212,12 @@ def test_samples_start_with_the_first_frame_of_a_late_picture(numbered_video, tm
     assert times[0] == pytest.approx(0.6) and times[-1] == pytest.approx(2.4)
 
 
-def draw_people(path, talk, seconds=6.0, fps=25, size=(640, 360)):
+def draw_people(path, talk, seconds=6.0, fps=25, size=(640, 360), head=0.08, turn=(0.0, 0.0)):
     """Two drawn people at a desk whose mouths open and close at random while they talk: faces
-    YuNet finds, with eyes, brows, a nose and a shaded edge. `talk` lists each one's spans."""
+    YuNet finds, with eyes, brows, a nose and a shaded edge. `talk` lists each one's spans,
+    `head` their heads' radius as a share of the picture's height and `turn` how far each head
+    is turned to the viewer's right, in degrees: its eyes, nose and mouth slide across it, the
+    far eye narrows and hair covers the back of the head."""
     import cv2
 
     width, height = size
@@ -208,25 +234,43 @@ def draw_people(path, talk, seconds=6.0, fps=25, size=(640, 360)):
             if k % 3 == 0:  # syllables of uneven length
                 speaking = any(a <= t < b for a, b in talk[i])
                 openness[i] = rng.uniform(0, 1) if speaking else 0.0
-            y, r = 0.42 * height, 0.08 * height
+            y, r = 0.42 * height, head * height
             cv2.rectangle(frame, (int(x - 2.2 * r), int(y + 1.1 * r)),
                           (int(x + 2.2 * r), height), (140, 90, 60), -1)  # fmt: skip
-            cv2.ellipse(frame, (int(x), int(y - 0.3 * r)), (int(1.05 * r), int(0.9 * r)),
-                        0, 0, 360, (40, 50, 70), -1)  # fmt: skip
+            yaw = np.radians(turn[i])
+
+            # Where a point on the head's surface, `angle` from its front, is seen across it.
+            def across(angle, x=x, r=r, yaw=yaw):
+                return x + r * np.sin(angle + yaw)
+
+            cv2.ellipse(frame, (int(x - 0.25 * r * np.sin(yaw)), int(y - 0.3 * r)),
+                        (int(1.05 * r), int(0.9 * r)), 0, 0, 360, (40, 50, 70), -1)  # fmt: skip
             cv2.ellipse(frame, (int(x), int(y)), (int(r), int(r)), 0, 0, 360, (90, 120, 170), -1)
-            cv2.ellipse(frame, (int(x), int(y)), (int(0.86 * r), int(0.88 * r)),
-                        0, 0, 360, (120, 160, 215), -1)  # fmt: skip
+            cv2.ellipse(frame, (int(x + 0.07 * r * np.sin(yaw)), int(y)),
+                        (int(0.86 * r), int(0.88 * r)), 0, 0, 360, (120, 160, 215), -1)  # fmt: skip
+            if abs(np.sin(yaw)) > 0.2:  # hair over the back of the head
+                cv2.ellipse(frame, (int(x - np.sign(yaw) * 0.55 * r), int(y - 0.1 * r)),
+                            (int(0.5 * r * abs(np.sin(yaw))), int(0.85 * r)),
+                            0, 0, 360, (40, 50, 70), -1)  # fmt: skip
             for side in (-1, 1):
-                ex, ey = int(x + side * 0.38 * r), int(y - 0.1 * r)
-                cv2.ellipse(frame, (ex, ey), (int(0.19 * r), int(0.09 * r)), 0, 0, 360,
-                            (245, 245, 245), -1)  # fmt: skip
-                cv2.circle(frame, (ex, ey), int(0.08 * r), (35, 30, 30), -1)
-                cv2.line(frame, (int(ex - 0.21 * r), int(ey - 0.24 * r)),
-                         (int(ex + 0.19 * r), int(ey - 0.28 * r)), (30, 30, 50), 2)  # fmt: skip
-            nose = np.array([[x, y], [x - 0.11 * r, y + 0.3 * r], [x + 0.11 * r, y + 0.3 * r]])
+                eye = side * np.arcsin(0.38)
+                facing = np.cos(eye + yaw) / np.cos(eye)  # how squarely the eye is seen
+                ex, ey = int(across(eye)), int(y - 0.1 * r)
+                cv2.ellipse(frame, (ex, ey), (max(1, int(0.19 * r * facing)), int(0.09 * r)),
+                            0, 0, 360, (245, 245, 245), -1)  # fmt: skip
+                cv2.circle(frame, (int(ex + 0.03 * r * np.sin(yaw)), ey),
+                           max(1, int(0.08 * r * facing)), (35, 30, 30), -1)  # fmt: skip
+                brow = ((int(ex - 0.21 * r * facing), int(ey - 0.24 * r)),
+                        (int(ex + 0.19 * r * facing), int(ey - 0.28 * r)))  # fmt: skip
+                cv2.line(frame, *brow, (30, 30, 50), 2)
+            nx, tip, wide = across(0.0), across(0.0) + 0.25 * r * np.sin(yaw), np.cos(yaw)
+            nose = np.array([[nx, y], [tip - 0.11 * r * wide, y + 0.3 * r],
+                             [tip + 0.11 * r * wide, y + 0.3 * r]])  # fmt: skip
             cv2.fillPoly(frame, [nose.astype(np.int32)], (90, 120, 170))
-            mouth = (int(0.3 * r), max(1, int((0.04 + 0.25 * openness[i]) * r)))
-            cv2.ellipse(frame, (int(x), int(y + 0.5 * r)), mouth, 0, 0, 360, (40, 30, 90), -1)
+            mouth = (max(1, int(0.3 * r * max(wide, 0.35))),
+                     max(1, int((0.04 + 0.25 * openness[i]) * r)))  # fmt: skip
+            cv2.ellipse(frame, (int(nx + 0.05 * r * np.sin(yaw)), int(y + 0.5 * r)), mouth,
+                        0, 0, 360, (40, 30, 90), -1)  # fmt: skip
         encoder.stdin.write(frame.tobytes())
     encoder.stdin.close()
     assert encoder.wait() == 0
@@ -248,6 +292,24 @@ def test_finds_two_people_and_who_of_them_speaks(tmp_path):
     assert [(s["face"], s["start"], s["end"]) for s in shot["speakers"]] == [
         (left["id"], 0.4, 2.6),
         (right["id"], 3.4, 5.6),
+    ]
+
+
+@pytest.mark.ml
+@pytest.mark.parametrize(
+    ("size", "turn"), [((640, 360), 30.0), ((640, 360), 40.0), ((1280, 720), 35.0)]
+)
+def test_a_speaker_turned_aside_is_named_over_a_listener_facing_the_camera(tmp_path, size, turn):
+    # YuNet scores the listener facing it 0.90, and the speaker 0.74 to 0.87 turned 30 degrees,
+    # 0.5 to 0.8 turned 40 and 0.5 to 0.7 drawn larger turned 35.
+    path = tmp_path / "turned.mp4"
+    draw_people(path, [[(0.4, 5.6)], []], size=size, head=0.11, turn=(turn, 0.0))
+    found = framing.analyze(path, probe.probe(path).video, [], [{"start": 0.4, "end": 5.6}])
+    (shot,) = found["shots"]
+    assert shot["layout"] == "two_shot"
+    speaker, listener = sorted(shot["faces"], key=lambda f: f["boxes"][0]["x"])
+    assert [(s["face"], s["start"], s["end"]) for s in shot["speakers"]] == [
+        (speaker["id"], 0.4, 5.6)
     ]
 
 
