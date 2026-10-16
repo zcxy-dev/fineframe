@@ -10,8 +10,12 @@ import {
   REQUIRED_DECODERS,
   REQUIRED_ENCODERS,
   REQUIRED_FILTERS,
+  run,
 } from "./ffmpeg.ts";
 import { scratch } from "./testing.ts";
+
+// The tests below point the renderer at fake builds; the last one restores this.
+const configured = process.env[FFMPEG_ENV];
 
 const FILTERS = `Filters:
   T.. = Timeline support
@@ -102,4 +106,13 @@ test("an FFmpeg that cannot read a filter graph from a file fails before any ren
     assert.ok(!error.message.includes("filter crop"), error.message);
     return true;
   });
+});
+
+test("the FFmpeg the renderer runs may be redistributed", async () => {
+  if (configured === undefined) delete process.env[FFMPEG_ENV];
+  else process.env[FFMPEG_ENV] = configured;
+  const out = await run(await ffmpeg(), ["-hide_banner", "-buildconf"]);
+  const configuration = out.stdout + out.stderr;
+  assert.match(configuration, /--enable-gpl/);
+  assert.doesNotMatch(configuration, /--enable-nonfree/);
 });
