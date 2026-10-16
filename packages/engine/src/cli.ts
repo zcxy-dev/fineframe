@@ -55,8 +55,9 @@ function parseTime(text: string): number | null {
   return Number(minutes ?? 0) * 60 + Number(seconds);
 }
 const ranges = (values.cut ?? []).map((text) => {
-  const [from, to] = text.split("-").map(parseTime);
-  if (from == null || to == null || to <= from) {
+  const parts = text.split("-");
+  const [from, to] = parts.map(parseTime);
+  if (parts.length !== 2 || from == null || to == null || to <= from) {
     console.error(`render: error: --cut ${text} is not <from>-<to>, such as 12.5-15\n\n${usage}`);
     process.exit(2);
   }

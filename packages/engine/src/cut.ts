@@ -12,7 +12,7 @@ import {
   validateMediaIndex,
   type Word,
 } from "@video-editor/schema";
-import { endOnFrame, MARGIN, type PlaceSource, placeClips } from "./plan/place.ts";
+import { endOnFrame, MARGIN, type PlacedClip, type PlaceSource, placeClips } from "./plan/place.ts";
 import { joinWords } from "./plan/text.ts";
 import { gridTicks } from "./sources.ts";
 
@@ -70,7 +70,13 @@ export function cutEdit(
   sources: ReadonlyMap<string, PlaceSource>,
 ): CutResult {
   const frame = ticksPerFrame(project.output.fps);
-  const inRange = (t: number) => ranges.some(([a, b]) => t >= a && t < b);
+  // Which ranges took something out, so one that took nothing fails instead of passing for done.
+  const used = new Set<number>();
+  const inRange = (t: number) => {
+    const r = ranges.findIndex(([a, b]) => t >= a && t < b);
+    if (r >= 0) used.add(r);
+    return r >= 0;
+  };
   const seconds = (ticks: number) => (ticks / TICKS_PER_SECOND).toFixed(2);
   const notes: string[] = [];
 
@@ -94,7 +100,9 @@ export function cutEdit(
     position = start + clip.out - clip.in;
     const end = position;
     const at = (ticks: number) => start + ticks - clip.in;
-    if (ranges.some(([a, b]) => a <= start && b >= end)) {
+    const covering = ranges.findIndex(([a, b]) => a <= start && b >= end);
+    if (covering >= 0) {
+      used.add(covering);
       notes.push(`Cut /main/${i} whole, ${seconds(start)}–${seconds(end)} s`);
       continue;
     }
@@ -111,7 +119,8 @@ export function cutEdit(
     const said = (list: number[]) =>
       joinWords(list.map((index) => source.words[index]?.text ?? ""));
     notes.push(`Cut from /main/${i}, ${seconds(start)}–${seconds(end)} s: ${said(gone)}`);
-    // Runs of the words left, each played by a clip of its own.
+    // Runs of the words left, each played by a clip of its own whose ends next to the words cut
+    // are placed as the planner places a cut; a pause inside a run stays as it was.
     const runs: number[][] = [];
     for (const index of words) {
       if (gone.includes(index)) continue;
@@ -122,24 +131,28 @@ export function cutEdit(
     for (const run of runs) {
       const head = run[0] === words[0];
       const tail = run.at(-1) === words.at(-1);
-      const placed = placeClips([{ source: clip.source, words: run }], sources, frame);
-      for (const [p, piece] of placed.entries()) {
-        const clipIn = head && p === 0 ? clip.in : piece.in;
-        const last = source.words[piece.last] as Word;
-        const after = source.words[piece.last + 1];
-        const limit = source.duration > 0 ? source.duration : 1e9;
-        const clipOut = endOnFrame(
-          clipIn,
-          tail && p === placed.length - 1 ? clip.out : piece.out,
-          secondsToTicks(last.end + MARGIN),
-          secondsToTicks(after ? after.start - MARGIN : limit),
-          frame,
-        );
-        const split: Clip = { ...clip, in: clipIn, out: clipOut };
-        if (!(head && p === 0)) delete split.transition;
-        place(split, at(clipIn));
-      }
+      const edge = (index: number) =>
+        placeClips([{ source: clip.source, words: [index] }], sources, frame)[0] as PlacedClip;
+      const first = run[0] as number;
+      const lastIndex = run.at(-1) as number;
+      const clipIn = head ? clip.in : edge(first).in;
+      const last = source.words[lastIndex] as Word;
+      const after = source.words[lastIndex + 1];
+      const limit = source.duration > 0 ? source.duration : 1e9;
+      const clipOut = endOnFrame(
+        clipIn,
+        tail ? clip.out : edge(lastIndex).out,
+        secondsToTicks(last.end + MARGIN),
+        secondsToTicks(after ? after.start - MARGIN : limit),
+        frame,
+      );
+      const split: Clip = { ...clip, in: clipIn, out: clipOut };
+      if (!head) delete split.transition;
+      place(split, at(clipIn));
     }
+  }
+  for (const [r, [a, b]] of ranges.entries()) {
+    if (!used.has(r)) throw new Error(`${seconds(a)}–${seconds(b)} s takes out no words`);
   }
   if (main.length === 0) throw new Error("The cut leaves nothing of the edit");
 
@@ -155,12 +168,16 @@ export function cutEdit(
     const k = kept.filter((k) => k.from > t).sort((a, b) => a.from - b.from)[0];
     return k ? { from: k.from, to: k.to } : null;
   };
-  // How much of [a, b) of the old output plays on.
+  // How much of [a, b) of the old output plays on. Clips a dissolve overlaps cover some of the
+  // old output twice, which counts once.
+  const covered: [number, number][] = [];
+  for (const k of [...kept].sort((x, y) => x.from - y.from)) {
+    const last = covered.at(-1);
+    if (last && k.from <= last[1]) last[1] = Math.max(last[1], k.from + k.length);
+    else covered.push([k.from, k.from + k.length]);
+  }
   const keptOf = (a: number, b: number) =>
-    kept.reduce(
-      (sum, k) => sum + Math.max(0, Math.min(b, k.from + k.length) - Math.max(a, k.from)),
-      0,
-    );
+    covered.reduce((sum, [x, y]) => sum + Math.max(0, Math.min(b, y) - Math.max(a, x)), 0);
   // How far a moment that plays on moves, or null for one cut out.
   const moveBy = (t: number): number | null => {
     const to = map(t);

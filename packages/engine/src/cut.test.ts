@@ -162,6 +162,48 @@ test("a Chinese line loses a cut word and keeps its own spacing", () => {
   assert.equal(cut.project.captions?.lines[0]?.text, "我們今天來聊好的嗎？");
 });
 
+test("music and B-roll keep the length left of them when a dissolve plays inside them", () => {
+  const project = edit();
+  const second = project.main[1] as Project["main"][number];
+  second.transition = { type: "dissolve", duration: s(0.5) };
+  project.output.target.duration = s(7.5);
+  const music = project.audio.music?.[0] as NonNullable<Project["audio"]["music"]>[number];
+  music.out = music.in + s(7.5);
+  project.broll = [{ source: "b", in: s(10), out: s(17.5), start: 0 }];
+  // w5, said 2.6 to 2.9 s.
+  const { project: cut, length } = cutEdit(project, [[s(2.5), s(3)]], sources);
+  assert.equal(length, s(7));
+  const track = cut.audio.music?.[0];
+  assert.equal((track?.out ?? 0) - (track?.in ?? 0), s(7));
+  const broll = cut.broll?.[0];
+  assert.equal((broll?.out ?? 0) - (broll?.in ?? 0), s(7));
+});
+
+test("a cut leaves the pauses it does not reach as they were", () => {
+  const spoken: Word[] = [
+    { text: "w0", start: 0.1, end: 0.4 },
+    { text: "w1", start: 0.6, end: 0.9 },
+    { text: "w2", start: 2.0, end: 2.3 },
+    { text: "w3", start: 2.5, end: 2.8 },
+  ];
+  const paused = new Map<string, PlaceSource>([
+    ["a", { id: "a", words: spoken, duration: 60, frameTicks: FRAME }],
+  ]);
+  const project = projectOf([{ source: "a", in: 0, out: s(3) }]);
+  const { project: cut } = cutEdit(project, [[s(2.45), s(2.85)]], paused);
+  // The 1.1 s pause between w1 and w2 stays inside the one clip left.
+  assert.equal(cut.main.length, 1);
+  assert.equal(cut.main[0]?.in, 0);
+  assert.ok((cut.main[0]?.out ?? 0) > s(2.3));
+});
+
+test("a cut that takes out no words fails instead of passing for done", () => {
+  assert.throws(
+    () => cutEdit(edit(), [[s(0.42), s(0.58)]], sources),
+    /0\.42–0\.58 s takes out no words/,
+  );
+});
+
 const run = promisify(execFile);
 const cli = new URL("./cli.ts", import.meta.url).pathname;
 
@@ -205,6 +247,10 @@ test("pnpm render --cut says when the cut leaves the planned length", async (t) 
   assert.doesNotMatch(kept.stderr, /outside the/);
   const cut = validateProject(JSON.parse(await readFile(join(dir, "v2.project.json"), "utf8")));
   assert.deepEqual(cut.output.target, { duration: s(5), tolerance: 0.05 });
+  const twice = await run("node", [cli, path, "--cut", "1-2-3", "-o", join(dir, "v2.mp4")]).catch(
+    (e) => e,
+  );
+  assert.equal(twice.code, 2);
   const bad = await run("node", [cli, path, "--cut", "8-5", "-o", join(dir, "v2.mp4")]).catch(
     (e) => e,
   );
