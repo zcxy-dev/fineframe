@@ -34,16 +34,16 @@ Beside the video: `edit.project.json` (the whole edit), `edit.srt` (the captions
 
 Each change makes a new version beside the last, so the user can compare them and go back:
 
-1. Read the project. Times are integer ticks, 120 000 per second, on the output timeline for captions, overlays, B-roll and music `start`. Find what the user means: their words in `captions.lines[].text`, or in `edit.srt`, whose times are the same in seconds; segment *k* of the main track runs between cuts *k* − 1 and *k* of `edit_cuts.json` (from 0 for the first), which every render rewrites for the version it made.
+1. Read the project. Times are integer ticks, 120 000 per second, on the output timeline for captions, overlays, B-roll and music `start`. Find what the user means: their words in `captions.lines[].text`, whose `words` say when each was said, or in `edit.srt`, which starts each caption at its first word but keeps it up after the last; segment *k* of the main track runs between cuts *k* − 1 and *k* of `edit_cuts.json` (from 0 for the first), which every render rewrites for the version it made.
 2. Find the recipe in [references/recipes.md](references/recipes.md) and follow it. Each recipe either renders with `--cut`, or edits a copy, `edit-v2.project.json` in the same folder (paths in it are relative to its folder), and renders that.
-3. Render: `pnpm -s render out/edit-v2.project.json -o out/edit-v2.mp4`. It validates the project first and names every problem by its JSON path; fix them and render again. A re-render takes about as long as the video plays, plus a few seconds for each new or changed overlay.
+3. Render: `pnpm -s render out/edit-v2.project.json -o out/edit-v2.mp4`. It validates the project first and names every problem by its JSON path; fix them and render again. A re-render of a one-minute video takes about half a minute on 8 free cores, a few minutes on a busy machine, plus a few seconds for each new or changed overlay.
 4. Check the result before reporting it: the length the render prints (`seconds` in its JSON), a frame from where the change is (`ffmpeg -ss <seconds> -i out/edit-v2.mp4 -frames:v 1 frame.png`, then look at the image), and the captions near it in `edit-v2.srt`. Without `ffmpeg` on the PATH, use the renderer's own, which `node -e 'import("./packages/engine/src/ffmpeg.ts").then(async (m) => console.log(await m.ffmpeg()))'` prints. Tell the user what changed and where, and the new length.
 
 The next change starts from the newest version (`edit-v2.project.json`, then `-v3`, …).
 
 ## What needs a new plan
 
-These change what the planner chose, so say so to the user and run `pnpm edit` again with the new options; the analysis is cached, so it takes a minute or two and one more Claude plan:
+These change what the planner chose, so say so to the user and run `pnpm edit` again with the new options, to a new output name such as `out/edit-90s.mp4`; the analysis is cached, so it takes a minute or two and one more Claude plan:
 
 - A different length beyond ±5 % of the planned one, or a different aspect.
 - Putting back something the plan left out, reordering the story, or other footage.

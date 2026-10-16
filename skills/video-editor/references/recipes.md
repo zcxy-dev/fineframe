@@ -1,6 +1,6 @@
 # Recipes for changing an edit
 
-Each recipe starts from the newest version, here `out/edit.project.json`, and makes the next one, here `edit-v2`. The schema with every field's meaning is `packages/schema/project.schema.json`; the effect templates and their limits are in `packages/effects/src/catalog.ts`.
+Each recipe starts from the newest version, here `out/edit.project.json`, and makes the next one, here `edit-v2`. For a field no recipe covers, the schema says what each one means (`packages/schema/project.schema.json`), and the effect templates' catalog gives their params and limits (`packages/effects/src/catalog.ts`).
 
 **Ticks.** Every time and length is an integer: 120 000 ticks a second. Seconds × 120 000, rounded, gives ticks; `start` of captions, overlays, B-roll and music is on the output timeline, from the video's first frame.
 
@@ -23,7 +23,7 @@ Several changes can go into one version and one render.
 pnpm -s render out/edit.project.json --cut 12.4-17.9 -o out/edit-v2.mp4
 ```
 
-- The range is in seconds (or `m:ss`) of the video the project renders, from the start of the first words to drop to the end of the last: take them from `edit.srt`, or from `captions.lines[].start` and `end` ÷ 120 000. A whole segment of the main track runs between two neighbouring times of `edit_cuts.json` (from 0 for the first). Trimming a segment is cutting its first or last sentences. Give `--cut` once per range; all of them are times in the input video.
+- The range is in seconds (or `m:ss`) of the video the project renders, from the start of the first words to drop to the end of the last: take them from the `start` of the first and the `end` of the last of their `captions.lines[].words`, ÷ 120 000. An `edit.srt` caption stays up after its last word, so its end can reach into the next segment. A whole segment of the main track runs between two neighbouring times of `edit_cuts.json` (from 0 for the first). Trimming a segment is cutting its first or last sentences. Give `--cut` once per range; all of them are times in the input video.
 - A word goes when its middle is inside the range, and the pauses beside the words cut go with them, so the edit gets shorter by more than the range when a whole segment goes. Every new cut lands in the pause beside the words kept, and captions, overlays, B-roll and music move up with the speech. The command writes the cut edit to `out/edit-v2.project.json`; the render's `seconds` is its new length.
 - Read its stderr: it prints the words it cut from each clip, the overlays it removed because their whole time was cut, and the ones that overlapped the cut. Check the words are exactly the ones meant. A keyword or lower third that overlapped the cut may now stand over other words: remove it from `edit-v2.project.json` if its word went (below), and render again.
 - It refuses a cut that leaves the edit outside ±5 % of its planned length, and prints the length the cut would leave. Tell the user; if they want the shorter video, run the same command with `--retarget`, which makes that length the planned one. A much shorter edit is better planned again (`SKILL.md`).

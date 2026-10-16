@@ -274,6 +274,17 @@ pnpm render out/edit.project.json --cut 29-33 -o out/edit-v2.mp4
 
 The edit as cut is written to `<name>.project.json` beside the video, which may not be the project it was cut from.
 
+**Measured** on a 60 s 9:16 edit of the [synthetic](../../bench/README.md#synthetic-corpus) conversation chat-b (seed 0) with music, a lower third and two keywords: a fresh agent with only the skill made three versions from what a person would say, twice, the second time after the skill was revised from what the first run found unclear. It cut the 4.1 s segment about clicks at the joins with `--cut 29.14-32.72` and `--retarget`, fixed a misheard caption (能比如說 to 嗯　比如說) and added a title, shortened to end where the first keyword starts. The planned edit rendered in 32 s on 8 cores of an EPYC 9355P; the agents' renders took 39 s to 2.8 min, with other renders running beside them. Two more versions by hand covered the other recipes: a lower third's role, a keyword removed and one added, a chapter, the music 3 dB down, then no music, the `warm` look and the `sweep` captions. `vebench report` on all of them:
+
+| Version | Length | Cuts inside words | Clicks, drift |
+|---|---|---|---|
+| The planned edit | 59.57 s | 0 of 14 | 0 of 6, 0.0 ms |
+| Segment cut, `--retarget` (both runs) | 55.47 s | 0 of 12 | 0 of 5, 0.0 ms; also 0 of 5 rendered without music |
+| Caption fixed, then title added (both runs) | 55.47 s | 0 of 12 | 0 of 5, 0.0 ms |
+| The other recipes, two versions | 59.57 s | 0 of 14 | 0 of 6, 0.0 ms |
+
+On frames from each version the captions showed the words then said and lit the word being said, the keyword added landed on its word, and every frame after the cut matched the planned edit's frame 4.133 s later, captions included.
+
 ## What it renders
 
 | `project.json` | |
