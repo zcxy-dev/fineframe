@@ -4,9 +4,9 @@ import { once } from "node:events";
 import { test } from "node:test";
 
 test("the desktop app's server exits once the app holding its stdin is gone", async () => {
-  const script = `import { register } from ${JSON.stringify(new URL("./instrumentation.ts", import.meta.url).href)};
+  const script = `import { register } from ${JSON.stringify(new URL("../instrumentation.ts", import.meta.url).href)};
 process.on("exit", () => console.log("stopping edits"));
-register();
+await register();
 console.log("ready");
 setInterval(() => {}, 1000);`;
   const server = spawn(process.execPath, ["--input-type=module", "-e", script], {

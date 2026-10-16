@@ -153,8 +153,11 @@ if (actual !== uv.sha256) throw new Error(`${url} has SHA-256 ${actual}, expecte
 const bin = join(build, "bin");
 await mkdir(bin, { recursive: true });
 await writeFile(join(build, `uv.${packed}`), archive);
-// Windows' own tar reads zip files too.
-if (windows) run("tar", ["-xf", "uv.zip", "-C", "bin", "uv.exe"], build);
+// Windows' own tar reads zip files too; Git's, which may come first on PATH, does not.
+if (windows) {
+  const tar = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe");
+  run(tar, ["-xf", "uv.zip", "-C", "bin", "uv.exe"], build);
+}
 else {
   run(
     "tar",

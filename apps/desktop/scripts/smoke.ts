@@ -310,6 +310,65 @@ const origin = new URL(page.url()).origin;
 say(`the page is at ${origin}`);
 const api = async <T>(path: string): Promise<T> => (await fetch(`${origin}${path}`)).json() as T;
 
+/**
+ * Plays the finished video in the window's own player, as its owner would: waits for it to load,
+ * seeks to the middle and reads that frame back, so a build of Chromium that cannot decode H.264
+ * and AAC shows as a frame with no size or an error.
+ */
+async function playInPage(page: Page) {
+  return page.locator("video").evaluate(async (video: HTMLVideoElement) => {
+    const event = (name: string) =>
+      new Promise<void>((resolve, reject) => {
+        video.addEventListener(name, () => resolve(), { once: true });
+        video.addEventListener("error", () => reject(new Error(`code ${video.error?.code}`)), {
+          once: true,
+        });
+        setTimeout(() => reject(new Error(`no ${name} in 30 s`)), 30_000);
+      });
+    try {
+      if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
+        video.preload = "auto";
+        video.load();
+        await event("loadedmetadata");
+      }
+      const seeked = event("seeked");
+      video.currentTime = video.duration / 2;
+      await seeked;
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const context = canvas.getContext("2d") as CanvasRenderingContext2D;
+      context.drawImage(video, 0, 0);
+      const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+      let brightest = 0;
+      for (let i = 0; i < data.length; i += 4 * 97) {
+        brightest = Math.max(
+          brightest,
+          data[i] as number,
+          data[i + 1] as number,
+          data[i + 2] as number,
+        );
+      }
+      return {
+        width: video.videoWidth,
+        height: video.videoHeight,
+        at: video.currentTime,
+        brightest,
+        error: null,
+      };
+    } catch (error) {
+      const width = video.videoWidth;
+      return {
+        width,
+        height: video.videoHeight,
+        at: video.currentTime,
+        brightest: 0,
+        error: (error as Error).message,
+      };
+    }
+  });
+}
+
 /** Makes the edit through the window; what went wrong, if anything. */
 async function makeEdit(): Promise<string[]> {
   // First run: the page asks for the Anthropic key while the analysis sets itself up.
@@ -399,6 +458,12 @@ async function makeEdit(): Promise<string[]> {
   say(
     `the edit is ${seconds.toFixed(2)} s, captions ${job.result?.captions ? "written" : "missing"}`,
   );
+  const playing = await playInPage(page);
+  await shot(page, "6-playing");
+  say(
+    `the window plays it: ${playing.width}x${playing.height} at ${playing.at.toFixed(1)} s, ` +
+      `brightest channel ${playing.brightest}${playing.error ? `, error ${playing.error}` : ""}`,
+  );
   say(`downloaded on first use: ${[...downloads].join(", ")}`);
   say(`asked Claude for: ${asked.join(", ")}; OpenRouter heard ${heard} chunks`);
   return [
@@ -410,6 +475,8 @@ async function makeEdit(): Promise<string[]> {
       "the analysis environment's download was not shown",
     !downloads.has("FFmpeg") && "FFmpeg's download was not shown",
     !downloads.has("Chrome Headless Shell") && "Chrome Headless Shell's download was not shown",
+    (playing.error || playing.width === 0 || playing.brightest < 32) &&
+      "the window's player does not show the video",
   ].filter((problem): problem is string => typeof problem === "string");
 }
 
