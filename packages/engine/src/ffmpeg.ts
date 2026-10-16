@@ -8,25 +8,26 @@ import { cacheDir, pinnedFile } from "./download.ts";
 /** Overrides the pinned build, e.g. with a system FFmpeg; it must pass the same feature check. */
 export const FFMPEG_ENV = "VIDEO_EDITOR_FFMPEG";
 
-// The static builds imageio-ffmpeg 0.6.0 ships to bench/ and worker/ on each platform, from the
-// repository it builds its wheels from, at a fixed commit.
-const BINARIES =
+// The static builds imageio-ffmpeg 0.6.0 ships to bench/ and worker/, from the repository it
+// builds its wheels from, at a fixed commit; on Intel Macs, whose imageio build is nonfree and
+// may not be redistributed, the project's own (scripts/build-ffmpeg-macos-x64.sh).
+const IMAGEIO =
   "https://raw.githubusercontent.com/imageio/imageio-binaries/f8f64710ea88e7e4a352c0f7d8c0deac9f5fd685/ffmpeg";
-const PINNED: Record<string, { file: string; sha256: string }> = {
+const PINNED: Record<string, { url: string; sha256: string }> = {
   "linux-x64": {
-    file: "ffmpeg-linux-x86_64-v7.0.2",
+    url: `${IMAGEIO}/ffmpeg-linux-x86_64-v7.0.2`,
     sha256: "e7e7fb30477f717e6f55f9180a70386c62677ef8a4d4d1a5d948f4098aa3eb99",
   },
   "linux-arm64": {
-    file: "ffmpeg-linux-aarch64-v7.0.2",
+    url: `${IMAGEIO}/ffmpeg-linux-aarch64-v7.0.2`,
     sha256: "6bb182d0d75d23028db82e9e4f723ca69b853d055698486e6984ddb2c06fb8ce",
   },
   "darwin-x64": {
-    file: "ffmpeg-macos-x86_64-v7.1",
-    sha256: "4a4a968b98859588e98500ae25973d80a5ca5eed0724222b9f76360dcb72a001",
+    url: "https://github.com/zcxy-dev/video-editor/releases/download/ffmpeg-7.1.5-macos-x86_64/ffmpeg",
+    sha256: "f26c58ee5500076765baa96f90e378b48925bb34f8961670260542ed5049d6ec",
   },
   "darwin-arm64": {
-    file: "ffmpeg-macos-aarch64-v7.1",
+    url: `${IMAGEIO}/ffmpeg-macos-aarch64-v7.1`,
     sha256: "6d175a4743ca50256e89a8cdd731100f9cee33bd79aeea46894d209410dc6617",
   },
 };
@@ -111,13 +112,7 @@ async function pinned(): Promise<string> {
     );
   }
   const path = join(cacheDir(), `ffmpeg-${build.sha256.slice(0, 12)}`, "ffmpeg");
-  return pinnedFile(
-    `${BINARIES}/${build.file}`,
-    build.sha256,
-    path,
-    "the pinned FFmpeg build",
-    0o755,
-  );
+  return pinnedFile(build.url, build.sha256, path, "the pinned FFmpeg build", 0o755);
 }
 
 /** Names in `ffmpeg -filters` output. */

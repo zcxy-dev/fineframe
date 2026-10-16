@@ -529,7 +529,7 @@ On the real clips, without a hand-checked transcript, the render's transcript wa
 
 ## FFmpeg
 
-On first use the renderer downloads its pinned FFmpeg build ([which one](../../THIRD_PARTY_NOTICES.md#ffmpeg)), checks it against its SHA-256 and keeps it in `~/.cache/video-editor/`. CI tests the Linux x64 and macOS Apple silicon builds, rendering a [synthetic edit](scripts/synthetic-edit.ts) on macOS that vebench scores for clicks and drift; the Linux arm64 and Intel macOS builds have every library the renderer needs but are not tested.
+On first use the renderer downloads its pinned FFmpeg build ([which one](../../THIRD_PARTY_NOTICES.md#ffmpeg)), checks it against its SHA-256 and keeps it in `~/.cache/video-editor/`. The Intel macOS build is built by the project from pinned sources ([how](../../THIRD_PARTY_NOTICES.md#ffmpeg)), since the one imageio-binaries publishes may not be redistributed. CI tests the Linux x64 and both macOS builds, rendering a [synthetic edit](scripts/synthetic-edit.ts) on Apple silicon and on Intel that vebench scores for clicks and drift; the Linux arm64 build has every library the renderer needs but is not tested.
 
 `VIDEO_EDITOR_FFMPEG` points the renderer at another FFmpeg instead. Whichever binary it uses must be FFmpeg 7.0 or later, which reads a filter graph from a file (`-/filter_complex`), and must have every filter, encoder and decoder the renderer needs: libass, libx264, zimg, loudnorm and libvpx's VP9 decoder, which reads the overlays' alpha, among them. If it is older or one is missing, the first render fails before any work and names each one.
 
