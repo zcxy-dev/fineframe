@@ -73,14 +73,15 @@ export async function saveKey(key: string): Promise<void> {
   const partial = `${file}.${randomUUID()}.partial`;
   try {
     await writeFile(partial, next, { mode: 0o600 });
-    // Windows ignores the mode; the file's access list keeps its owner alone instead.
+    await rename(partial, file);
+    // Windows ignores the mode; the file's access list keeps its owner alone instead. Set once
+    // the file is in place, as replacing a file there need not keep the new one's list.
     if (process.platform === "win32") {
       const domain = process.env.USERDOMAIN;
       const owner = `${domain ? `${domain}\\` : ""}${userInfo().username}`;
-      const args = [partial, "/inheritance:r", "/grant:r", `${owner}:F`];
+      const args = [file, "/inheritance:r", "/grant:r", `${owner}:F`];
       await promisify(execFile)("icacls", args, { windowsHide: true });
     }
-    await rename(partial, file);
   } finally {
     await rm(partial, { force: true });
   }
