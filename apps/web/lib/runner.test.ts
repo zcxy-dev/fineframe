@@ -17,6 +17,7 @@ function alive(pid: number): boolean {
 
 test("stopping an edit stops the programs it started too", async () => {
   const dir = await mkdtemp(join(tmpdir(), "runner-"));
+  let pid = 0;
   try {
     // The edit starts a program of its own, as it starts the analysis and FFmpeg, and says its
     // process ID once it runs.
@@ -34,7 +35,6 @@ test("stopping an edit stops the programs it started too", async () => {
       onProgress: () => {},
       onLog: () => {},
     });
-    let pid = 0;
     for (let tries = 0; tries < 100 && !pid; tries++) {
       pid = Number(await readFile(join(dir, "pid"), "utf8").catch(() => "0"));
       if (!pid) await sleep(100);
@@ -45,6 +45,7 @@ test("stopping an edit stops the programs it started too", async () => {
     for (let tries = 0; tries < 50 && alive(pid); tries++) await sleep(100);
     assert.equal(alive(pid), false, "the edit's program outlived it");
   } finally {
+    if (pid && alive(pid)) process.kill(pid);
     await rm(dir, { recursive: true, force: true });
   }
 });

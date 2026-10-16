@@ -25,15 +25,20 @@ test("a program another download put in place first is kept, even while it runs"
   });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
-  t.after(() => server.close());
   const { port } = server.address() as AddressInfo;
   const download = pinnedFile(`http://127.0.0.1:${port}/tool`, sha256, path, "the tool", 0o755);
   // Meanwhile another download finished and its program runs, as concurrent renders run FFmpeg;
   // Windows will not replace a program while it runs.
   await copyFile(process.execPath, path);
   const running = spawn(path, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
-  t.after(() => running.kill());
-  await once(running, "spawn");
-  answer();
-  assert.equal(await download, path);
+  try {
+    await once(running, "spawn");
+    answer();
+    assert.equal(await download, path);
+  } finally {
+    // Stopped before the folder is removed, which Windows refuses while the program runs.
+    running.kill();
+    await once(running, "exit");
+    server.close();
+  }
 });

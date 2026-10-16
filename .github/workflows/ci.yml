@@ -95,7 +95,7 @@ jobs:
             timeout: 30
           - check: windows
             runner: windows-latest
-            timeout: 30
+            timeout: 45
     runs-on: ${{ matrix.runner }}
     timeout-minutes: ${{ matrix.timeout }}
     permissions:
