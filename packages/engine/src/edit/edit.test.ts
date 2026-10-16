@@ -12,13 +12,13 @@ import { fileURLToPath } from "node:url";
 import Anthropic from "@anthropic-ai/sdk";
 import { loadJson, type Progress, validateProject } from "@video-editor/schema";
 import { ffmpeg, run } from "../ffmpeg.ts";
-import { type Claude, ClaudeError, checkClaude } from "../plan/claude.ts";
+import { type Claude, ClaudeError, checkClaude, type Usage } from "../plan/claude.ts";
 import { PlanError } from "../plan/plan.ts";
 import type { CutVerdict, Decisions } from "../plan/prompt.ts";
 import { makeSong, makeTalk } from "../plan/talk.ts";
 import { scratch } from "../testing.ts";
 import { localWorker, type Worker } from "./analyze.ts";
-import { type EditOptions, edit } from "./edit.ts";
+import { costByStage, type EditOptions, edit } from "./edit.ts";
 import { EditError } from "./error.ts";
 import { collectMusic } from "./music.ts";
 
@@ -533,4 +533,21 @@ test("the command reports arguments it cannot use as an error line too", async (
   const { stdout } = await runCli(args, { INIT_CWD: elsewhere, npm_lifecycle_event: "dev" });
   const last = JSON.parse(stdout.trim().split("\n").at(-1) ?? "") as Progress;
   assert.match(last.message, /song\.mp3: audio only/);
+});
+
+test("what Claude cost is summed by stage, the callouts found while planning with the plan", () => {
+  const usage = (purpose: Usage["purpose"], dollars: number): Usage => ({
+    purpose,
+    model: "m",
+    input: 0,
+    cacheWrite: 0,
+    cacheRead: 0,
+    output: 0,
+    dollars,
+  });
+  const spent = [usage("plan", 0.05), usage("locate", 0.0002), usage("check", 0.001), usage("judge", 0.01)]; // biome-ignore format: one line
+  const cost = costByStage(spent);
+  assert.equal(cost.plan.requests, 2);
+  assert.ok(Math.abs((cost.plan.dollars ?? 0) - 0.0502) < 1e-9);
+  assert.equal(cost.check.requests, 2);
 });

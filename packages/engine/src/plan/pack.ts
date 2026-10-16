@@ -83,6 +83,11 @@ export function packSource(
   if (source.video) {
     const { width, height, fps } = source.video;
     out.push(`Picture: ${width}x${height}, ${Math.round(fps * 100) / 100} fps; ${shots(index)}`);
+    const screens = screenSpans(index);
+    if (screens.length > 0) {
+      const listed = screens.map(([a, b]) => `${a.toFixed(1)}-${b.toFixed(1)}`).join(", ");
+      out.push(`Screen recording: ${listed} s`);
+    }
   } else {
     out.push("Picture: none (audio only)");
   }
@@ -127,6 +132,19 @@ export function packSource(
 export function packStill(id: string, name: string, seconds: number): string {
   const named = name === id ? "" : `${name}, `;
   return `## ${id} (${named}a still image: B-roll for up to ${seconds} s)`;
+}
+
+/** Where a file shows a screen recording, with or without a webcam in a corner, by the shots its
+ * framing found, in seconds; next to each other, they are one stretch. */
+export function screenSpans(index: MediaIndex): [number, number][] {
+  const spans: [number, number][] = [];
+  for (const shot of index.framing?.shots ?? []) {
+    if (shot.layout !== "screen" && shot.layout !== "screen_cam") continue;
+    const last = spans.at(-1);
+    if (last && shot.start - last[1] < 1e-6) last[1] = shot.end;
+    else spans.push([shot.start, shot.end]);
+  }
+  return spans;
 }
 
 function shots(index: MediaIndex): string {

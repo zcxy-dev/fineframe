@@ -16,6 +16,7 @@ corpus/<clip>/
   truth/shots.json                {"transitions": [{"start": 12.4}, {"start": 30.0, "end": 30.8}]}
   truth/edit.json                 what a good edit removes and keeps (see below); optional
   truth/speakers.json             who talks when (see below); optional
+  truth/regions.json              things on a screen recording a callout may point at; optional
   runs/<run>/                     one folder per run scored, e.g. one version or setting
     transcript.json|srt|txt
     shots.json                    detected cuts: [12.41, 30.2] or {"cuts": [...]}
@@ -139,7 +140,11 @@ pauses of 2 to 5 s and retakes. The talk clips run at 25 fps, the others at 30 o
   enough for YuNet to find them, so who speaks can be scored here.
 - **Truth:** `transcript.json` (each word also names its `speaker`), `shots.json` (a cut on the
   new shot's first frame; a dissolve from its first blended frame to the first frame of the new
-  shot alone), `edit.json` and `speakers.json`. A speaker is on screen in the wide shot, in their
+  shot alone), `edit.json` and `speakers.json`, and for clips with screens `regions.json`: the
+  things on them that hold still while they show (a settings form's fields and Save button, an
+  editor's file list, a slide's lines), each `{"start", "end", "name", "rect"}` with the rect
+  `{"x", "y", "w", "h"}` in fractions of the picture, from when the screen shows alone until the
+  next shot starts coming in. A terminal's lines and an editor's code move, so they have none. A speaker is on screen in the wide shot, in their
   own close-up and on the phone; during a dissolve, in either shot.
 
 `synthetic/music/` holds drum-and-bass tracks with known beats for beat-synced cuts,
@@ -223,6 +228,11 @@ uv run vebench edit --project runs/video-editor-60s/project.json
     them, against the true beats of the music under them (`<track>.json` beside a synthetic
     track). `near` counts the edges with a beat within 150 ms, which the planner should have
     put on one, and `max_abs_ms` and `mean_abs_ms` are how far those are from it.
+  - `callouts`: each callout's box, taken back through its clip's framing to the source's
+    picture 0.3 s after it starts, when the thing it points at is named, against the truth
+    regions on screen then: `ious` holds each one's best intersection over union, and
+    `on_target` counts those of 0.5 or more. A callout over a source without `regions.json`
+    counts in `count` but is not scored; pooled, `scored` says how many were.
 
 `report` pools each run's counts across clips, by folder name. It also lists, per run:
 - **`missing`:** outputs absent for clips that have truth;

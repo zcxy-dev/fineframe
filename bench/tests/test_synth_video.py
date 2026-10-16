@@ -8,7 +8,7 @@ pytest.importorskip("PIL", reason="needs the synth extra (uv sync --extra synth)
 
 from vebench.synth.layout import RATE, Layout, transitions  # noqa: E402
 from vebench.synth.script import Clip  # noqa: E402
-from vebench.synth.video import render  # noqa: E402
+from vebench.synth.video import Screen, regions, render  # noqa: E402
 
 
 def decode(path, size="64x36"):
@@ -57,3 +57,24 @@ def test_portrait_footage_is_stored_sideways_and_displays_upright(tmp_path):
     frame = decode(tmp_path / "p.mp4", "36x64")[0]
     # Sky at the top of the displayed picture, street at the bottom.
     assert frame[:8].mean() > frame[-8:].mean()
+
+
+def test_screen_regions_are_where_the_screen_draws_them():
+    clip = Clip("s", "s", "screen", 30, ())
+    slide = ("Done", "video + captions")
+    shots = [shot("settings", 0), shot("terminal", 30), shot("slide", 60, dissolve=15, text=slide)]
+    found = regions(clip, Layout(4.0, {}, [], {}, shots))
+    # The settings form from its first frame to the cut; the slide once dissolved in.
+    assert {(r["start"], r["end"]) for r in found} == {(0.0, 1.0), (2.5, 4.0)}
+    picture = Screen("settings", (), np.random.default_rng(0), (1280, 720)).frame(0, 0, {})
+    for region in found[:4]:
+        r = region["rect"]
+        x0, y0 = round(r["x"] * 1280), round(r["y"] * 720)
+        x1, y1 = round((r["x"] + r["w"]) * 1280), round((r["y"] + r["h"]) * 720)
+        if region["name"] == "Save button":
+            assert picture[y0 + 2 : y1 - 2, x0 + 2 : x1 - 2].mean() < 200  # filled, not page
+        else:  # a field's outline runs along its box
+            assert tuple(picture[(y0 + y1) // 2, x0]) == (160, 160, 170)
+            assert tuple(picture[y0, (x0 + x1) // 2]) == (160, 160, 170)
+    lines = [r for r in found if r["start"] == 2.5]
+    assert [r["name"] for r in lines] == ["Done", "video + captions"]

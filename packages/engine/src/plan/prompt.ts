@@ -1,16 +1,20 @@
 // The planner's instructions and the shape of its answer.
 
 import { catalog, type TemplateId } from "@video-editor/effects";
+import type { CalloutWish } from "./locate.ts";
 
 /** The most characters a template's text param takes, as its schema in the catalog allows. */
 const most = (id: TemplateId, param: string) =>
   (catalog[id].params as { properties: Record<string, { maxLength?: number }> }).properties[param]
     ?.maxLength;
 
-/** The planner's instructions, which tell of chapters only when the request may ask for them;
- * the same for every plan of either kind, so it is cached with the transcripts after it. */
-export function planSystem(extras: Pick<PlanExtras, "chapters">): string {
-  return system(extras.chapters ? CHAPTERS_EFFECT : "");
+/** The planner's instructions, which tell of chapters only when the request may ask for them
+ * and of callouts only when a file has a screen recording; the same for every plan of either
+ * kind, so it is cached with the transcripts after it. */
+export function planSystem(extras: Pick<PlanExtras, "chapters" | "callouts">): string {
+  return system(
+    (extras.chapters ? CHAPTERS_EFFECT : "") + (extras.callouts ? CALLOUTS_EFFECT : ""),
+  );
 }
 
 const CHAPTERS_EFFECT = `
@@ -21,7 +25,17 @@ line of a segment, the first chapter opening the video. List them in play order,
 the edit has no distinct sections. Code numbers them, joins a section under 30 s to the one \
 before, and hides the cut into each chapter with a wipe.`;
 
-const system = (chapters: string) => `\
+const CALLOUTS_EFFECT = `
+- callouts, on screen recordings (a file's header says when it shows one): \
+${catalog.callout.purpose} ${catalog.callout.whenToUse} Avoid: ${catalog.callout.avoid} Only \
+where a viewer would otherwise hunt for the thing, at most one every 20 seconds, and none when \
+nothing is pointed at. Give the file, the line, the words that name the thing exactly as they \
+appear in it, what to look for on screen in a few words in English (the Save button, the API \
+key field), and a label of at most ${most("callout", "label")} characters in the speaker's \
+language, or an empty one. Code finds the thing on the frame shown as it is named, and leaves \
+the callout out when it is not there or does not hold still.`;
+
+const system = (effects: string) => `\
 You are the editor in an automatic video editor. You read the transcripts of raw footage and \
 decide what the finished video uses and in what order. Code then does the precise work: it \
 cuts on word boundaries inside pauses, removes the fillers you confirm, shortens dead air, \
@@ -109,7 +123,7 @@ an empty text for none.
 ${catalog["lower-third"].whenToUse} Only for a person on camera whose name is in the list, \
 spelled as there, with their role when the footage says it (at most \
 ${most("lower-third", "role")} characters), and the line where they first speak in the edit. \
-Never guess a name.${chapters}
+Never guess a name.${effects}
 
 ## Music
 
@@ -232,6 +246,23 @@ const CHAPTERS = {
   },
 } as const;
 
+const CALLOUTS = {
+  type: "array",
+  items: {
+    type: "object",
+    additionalProperties: false,
+    required: ["source", "line", "text", "target", "label", "reason"],
+    properties: {
+      source: { type: "string" },
+      line: { type: "integer" },
+      text: { type: "string", description: "The words that name the thing, as in the line." },
+      target: { type: "string", description: "What to look for on screen." },
+      label: { type: "string", description: "A short label beside it, or empty." },
+      reason: { type: "string" },
+    },
+  },
+} as const;
+
 const PEOPLE = {
   type: "array",
   items: {
@@ -248,12 +279,14 @@ const PEOPLE = {
 } as const;
 
 /** What a plan may hold besides the edit itself: a music choice when tracks are offered, a title
- * for a long edit, chapters for one of two minutes or more, and lower thirds when names are given. */
+ * for a long edit, chapters for one of two minutes or more, lower thirds when names are given and
+ * callouts when a file has a screen recording. */
 export interface PlanExtras {
   music: boolean;
   title: boolean;
   chapters: boolean;
   people: boolean;
+  callouts: boolean;
 }
 
 /** The plan's schema, with the extras offered. */
@@ -284,6 +317,10 @@ export function planSchema(extras: PlanExtras): Record<string, unknown> {
   if (extras.people) {
     required.push("people");
     properties.people = PEOPLE;
+  }
+  if (extras.callouts) {
+    required.push("callouts");
+    properties.callouts = CALLOUTS;
   }
   return { ...PLAN_SCHEMA, required, properties };
 }
@@ -319,6 +356,8 @@ export interface Decisions {
   chapters?: { title: string; source: string; line: number }[];
   /** Present when names were given: a lower third for each. */
   people?: { name: string; role: string; source: string; line: number }[];
+  /** Present when a file has a screen recording: what to point at, and where it is named. */
+  callouts?: CalloutWish[];
 }
 
 /** What the request asks for after the cached transcripts; `music` lists the tracks offered. */

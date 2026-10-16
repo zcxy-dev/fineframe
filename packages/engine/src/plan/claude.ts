@@ -3,14 +3,14 @@ import Anthropic from "@anthropic-ai/sdk";
 
 /** Edit planning and the decisions a cut check escalates. */
 export const PLAN_MODEL = "claude-opus-5-5";
-/** Bulk frame checks: one request per cut. */
+/** Bulk frame checks: one request per cut, and one per callout to find what it points at. */
 export const CHECK_MODEL = "claude-haiku-5-5";
 
 /** What one request to Claude asks, independent of the SDK, so tests can replay recorded
  * replies through the same code. */
 export interface ClaudeRequest {
   /** Which step asks; recorded replies are keyed by it. */
-  purpose: "plan" | "check" | "judge";
+  purpose: "plan" | "check" | "judge" | "locate";
   model: string;
   system: string;
   /** In order. A text block marked `cache` ends a prefix that later requests reuse. */

@@ -146,13 +146,14 @@ type Reporter = (
   download?: Download,
 ) => void;
 
-/** Usage summed by the stage that asked: the plan, or the review with what it escalates. */
+/** Usage summed by the stage that asked: the plan with the callouts it finds on screen, or the
+ * review with what it escalates. */
 export function costByStage(usages: readonly Usage[]): ClaudeCost {
   const stage = (purposes: Usage["purpose"][]) => {
     const total = totalUsage(usages.filter((usage) => purposes.includes(usage.purpose)));
     return { dollars: total.dollars, requests: total.calls };
   };
-  return { plan: stage(["plan"]), check: stage(["check", "judge"]) };
+  return { plan: stage(["plan", "locate"]), check: stage(["check", "judge"]) };
 }
 
 async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Promise<EditResult> {
