@@ -4,6 +4,8 @@ Analyzes a source file into a media index: the facts about the footage that the 
 
 Setup and the speech-model choice are in the [README quick start](../README.md#quick-start). `--bench-run DIR` also writes the outputs [vebench](../bench/) scores. `vework draft-truth` drafts a corpus clip's transcript for a person to correct ([workflow](../bench/README.md#ground-truth)). `vework analyze-music` analyses a music track for the edit ([below](#music)).
 
+Each step is a `vework: <step>` line on stderr. A model downloaded on its first use reports its bytes as it arrives, as `vework: downloading <model>: <bytes> of <total> bytes` lines ([`download.py`](src/vework/download.py)); a model already in the cache, or the cache read offline, prints none.
+
 ## Media index
 
 [`media-index.schema.json`](../packages/schema/media-index.schema.json) defines the format, field by field; [an example](../packages/schema/examples/media-index.example.json) shows a whole index. In short: the source's streams, its shot transitions, where someone speaks, the transcript with word timings, the loudness of every second, where laughter, applause and music are heard, the faces in each shot with who of them speaks, and how the speech sounds.

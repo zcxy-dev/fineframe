@@ -63,9 +63,10 @@ A project renders the same video every time from the file and the sources it nam
 `pnpm edit` prints one JSON object per line on stdout. `fraction` never goes down, and the last line is `done` or `error`.
 
 ```json
+{"stage": "analyze", "file": "footage/take-2.mp4", "fraction": 0.12, "message": "Downloading Qwen/Qwen3-ASR-0.6B-hf", "download": {"name": "Qwen/Qwen3-ASR-0.6B-hf", "bytes": 447724386, "total": 1576381331}}
 {"stage": "analyze", "file": "footage/take-2.mp4", "fraction": 0.18, "message": "Transcribing 3/9"}
 {"stage": "render", "fraction": 0.72, "message": "Rendering"}
-{"stage": "done", "fraction": 1, "message": "Finished", "outputs": {"video": "/work/out/edit.mp4", "project": "/work/out/edit.project.json", "captions": "/work/out/edit.srt"}}
+{"stage": "done", "fraction": 1, "message": "Finished", "claude": {"plan": {"dollars": 0.07, "requests": 1}, "check": {"dollars": 0.012, "requests": 9}}, "outputs": {"video": "/work/out/edit.mp4", "project": "/work/out/edit.project.json", "captions": "/work/out/edit.srt"}}
 ```
 
 ## Changing a schema
