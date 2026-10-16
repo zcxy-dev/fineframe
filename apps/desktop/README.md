@@ -26,13 +26,13 @@ pnpm install
 pnpm --filter @video-editor/desktop dist     # dist/Video-Editor-<version>-<os>-<arch>.dmg or .AppImage
 ```
 
-[`scripts/stage.ts`](scripts/stage.ts) builds the page and stages what electron-builder packages into `build/`: the repository's layout with only the packages the server and `pnpm edit` run (pnpm's production install, without symlinks between dependencies), the worker's code and lockfile, and uv pinned by version and SHA-256. Left out: Remotion's compositor, whose FFmpeg is GPL with non-free parts (it downloads on first use; [notes](../../THIRD_PARTY_NOTICES.md#desktop-installers)), and sharp, which the page does not use. [`electron-builder.yml`](electron-builder.yml) makes a DMG on macOS, signed ad hoc as Apple silicon requires but not with a Developer ID, and an AppImage on Linux. Windows comes once the engine and worker run there.
+[`scripts/stage.ts`](scripts/stage.ts) builds the page and stages what electron-builder packages into `build/`: the repository's layout with only the packages the server and `pnpm edit` run (pnpm's production install, without symlinks between dependencies), the worker's code and lockfile, and uv pinned by version and SHA-256. Left out: Remotion's compositor, whose FFmpeg is GPL with non-free parts (it downloads on first use; [notes](../../THIRD_PARTY_NOTICES.md#desktop-installers)), and sharp, which the page does not use. [`electron-builder.yml`](electron-builder.yml) makes a DMG on macOS with Apple silicon (Intel Macs cannot install the analysis: PyTorch and ONNX Runtime publish no builds for them), signed ad hoc as Apple silicon requires but not with a Developer ID, and an AppImage on Linux. Windows comes once the engine and worker run there.
 
 `pnpm --filter @video-editor/desktop start` runs the app from the repository, with uv from PATH, after `pnpm --filter @video-editor/web build`.
 
 ## Releases
 
-[`.github/workflows/desktop.yml`](../../.github/workflows/desktop.yml) builds the installers on GitHub's macOS (Apple silicon and Intel) and Linux runners for every pull request that changes the app or the page, and runs each built app. A tag `v<version>`, matching `version` in [package.json](package.json), also attaches the installers and their `SHA256SUMS` to a draft release of that tag, for the owner to publish.
+[`.github/workflows/desktop.yml`](../../.github/workflows/desktop.yml) builds the installers on GitHub's Apple silicon macOS and Linux runners for every pull request that changes the app or the page, and runs each built app. A tag `v<version>`, matching `version` in [package.json](package.json), also attaches the installers and their `SHA256SUMS` to a draft release of that tag, for the owner to publish.
 
 ## Tests
 
