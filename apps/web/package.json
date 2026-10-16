@@ -1,0 +1,26 @@
+{
+  "name": "@video-editor/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "next build",
+    "start": "next start --hostname ${VIDEO_EDITOR_HOST:-127.0.0.1} --port ${PORT:-3000}",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource/noto-sans-tc": "5.3.0",
+    "@video-editor/engine": "workspace:*",
+    "@video-editor/schema": "workspace:*",
+    "next": "16.4.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0"
+  }
+}

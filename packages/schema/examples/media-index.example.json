@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "source": {
+    "name": "talk.mp4",
+    "duration": 12.0,
+    "start": 0.0,
+    "video": {
+      "width": 1080,
+      "height": 1920,
+      "sample_aspect": 1.0,
+      "fps": 30.0,
+      "rotation": 90,
+      "codec": "h264",
+      "transfer": 1,
+      "matrix": 1
+    },
+    "audio": [{ "index": 0, "channels": 2, "sample_rate": 48000, "language": "und" }]
+  },
+  "transitions": [{ "start": 3.0, "end": 3.0 }, { "start": 8.07, "end": 9.03 }],
+  "speech": [{ "start": 1.0, "end": 4.3 }, { "start": 5.1, "end": 7.25 }],
+  "transcript": {
+    "language": "zh",
+    "text": "我們用 Claude 剪片。\nIt cuts the pauses.",
+    "words": [
+      { "text": "我", "start": 1.0, "end": 1.2 },
+      { "text": "們", "start": 1.2, "end": 1.36 },
+      { "text": "用", "start": 1.44, "end": 1.6 },
+      { "text": "Claude", "start": 1.6, "end": 2.08 },
+      { "text": "剪", "start": 2.16, "end": 2.4 },
+      { "text": "片。", "start": 2.4, "end": 2.7 },
+      { "text": "It", "start": 5.12, "end": 5.28 },
+      { "text": "cuts", "start": 5.28, "end": 5.6 },
+      { "text": "the", "start": 5.6, "end": 5.76 },
+      { "text": "pauses.", "start": 5.76, "end": 6.4 }
+    ]
+  },
+  "corrections": [
+    {
+      "start": 1.0,
+      "end": 4.3,
+      "original": "用 cloud 剪",
+      "corrected": "用 Claude 剪",
+      "reason": "Claude is in the glossary and sounds like cloud.",
+      "rejected": null
+    },
+    {
+      "start": 5.1,
+      "end": 7.25,
+      "original": "cuts the pauses",
+      "corrected": "cuts all the long pauses",
+      "reason": "Clearer sentence.",
+      "rejected": "adds words that were not transcribed"
+    }
+  ],
+  "loudness": {
+    "momentary": [
+      -31.8, -19.6, -18.9, -19.4, -21.7, -19.2, -18.5, -17.9, -14.2, -15.1, -30.9, -31.5
+    ],
+    "short_term": [
+      -23.4, -20.6, -19.8, -20.1, -20.3, -19.9, -18.7, -17.2, -16.4, -18.0, -21.9, -27.6
+    ]
+  },
+  "audio_events": [
+    { "kind": "music", "start": 0.0, "end": 12.0, "confidence": 0.71 },
+    { "kind": "laughter", "start": 7.5, "end": 9.5, "confidence": 0.64 }
+  ],
+  "framing": {
+    "fps": 5,
+    "shots": [
+      {
+        "start": 0.0,
+        "end": 3.0,
+        "layout": "talking_head",
+        "faces": [
+          {
+            "id": 0,
+            "boxes": [
+              { "t": 0.0, "x": 0.38, "y": 0.22, "w": 0.24, "h": 0.135 },
+              { "t": 0.2, "x": 0.381, "y": 0.221, "w": 0.24, "h": 0.135 }
+            ]
+          }
+        ],
+        "speakers": [{ "face": 0, "start": 1.0, "end": 3.0 }]
+      },
+      {
+        "start": 3.0,
+        "end": 8.55,
+        "layout": "two_shot",
+        "faces": [
+          { "id": 1, "boxes": [{ "t": 3.0, "x": 0.12, "y": 0.3, "w": 0.2, "h": 0.11 }] },
+          { "id": 2, "boxes": [{ "t": 3.0, "x": 0.66, "y": 0.31, "w": 0.19, "h": 0.105 }] }
+        ],
+        "speakers": [
+          { "face": 1, "start": 3.0, "end": 4.3 },
+          { "face": 2, "start": 5.1, "end": 7.25 }
+        ]
+      },
+      { "start": 8.55, "end": 12.0, "layout": "screen", "faces": [], "speakers": [] }
+    ]
+  },
+  "voice": {
+    "stem": "talk.voice.wav",
+    "model": "DeepFilterNet3",
+    "recorded": {
+      "noise_floor_db": -46.2,
+      "speech_lufs": -24.8,
+      "loudness_range_lu": 6.3,
+      "clipped_share": 0.0,
+      "rt60": 0.52,
+      "mud_db": 3.1,
+      "presence_db": -15.4
+    },
+    "denoised": {
+      "noise_floor_db": -78.5,
+      "speech_lufs": -25.6,
+      "loudness_range_lu": 6.9,
+      "clipped_share": 0.0,
+      "rt60": 0.24,
+      "mud_db": 2.7,
+      "presence_db": -16.0
+    }
+  }
+}

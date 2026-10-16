@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zcxy-dev/video-editor/blob/main/packages/schema/progress.schema.json",
+  "title": "Progress",
+  "description": "One line of `pnpm edit` progress.",
+  "oneOf": [{ "$ref": "#/$defs/StageProgress" }, { "$ref": "#/$defs/DoneProgress" }],
+  "$defs": {
+    "Fraction": {
+      "description": "How much of the whole run is finished, 0 to 1.",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "StageProgress": {
+      "type": "object",
+      "required": ["stage", "fraction", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "stage": { "enum": ["analyze", "plan", "render", "check", "error"] },
+        "file": {
+          "description": "The source file the stage is working on, as it was given.",
+          "type": "string",
+          "minLength": 1
+        },
+        "fraction": { "$ref": "#/$defs/Fraction" },
+        "message": {
+          "description": "One line for a person to read; on error, what went wrong.",
+          "type": "string"
+        }
+      }
+    },
+    "DoneProgress": {
+      "type": "object",
+      "required": ["stage", "fraction", "message", "outputs"],
+      "additionalProperties": false,
+      "properties": {
+        "stage": { "const": "done" },
+        "fraction": { "const": 1 },
+        "message": { "type": "string" },
+        "outputs": {
+          "description": "Absolute paths of what the run wrote.",
+          "type": "object",
+          "required": ["video", "project"],
+          "additionalProperties": false,
+          "properties": {
+            "video": { "type": "string", "minLength": 1 },
+            "project": { "type": "string", "minLength": 1 },
+            "captions": {
+              "description": "The SubRip file, when the project asks for one.",
+              "type": "string",
+              "minLength": 1
+            },
+            "music": {
+              "description": "The licence of each music track the video plays, when it plays music.",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

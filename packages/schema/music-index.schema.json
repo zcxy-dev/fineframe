@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zcxy-dev/video-editor/blob/main/packages/schema/music-index.schema.json",
+  "title": "MusicIndex",
+  "description": "What `vework analyze-music` found in one music track, and the licence it is used under: the facts the planner picks and fits music from. Times are seconds from the file's time zero, the container's start time, as in the media index.",
+  "type": "object",
+  "required": [
+    "version",
+    "source",
+    "license",
+    "tracker",
+    "tempo",
+    "beats",
+    "downbeats",
+    "sections",
+    "loudness",
+    "end"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "source": {
+      "type": "object",
+      "required": ["name", "duration", "sample_rate", "channels"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "description": "The file name, without its folder.", "type": "string" },
+        "duration": {
+          "description": "Seconds of decoded sound.",
+          "$ref": "#/$defs/Seconds"
+        },
+        "sample_rate": {
+          "description": "The first audio stream's own rate; the analysis decodes it at 48 kHz.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "channels": {
+          "description": "The first audio stream's own.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "license": {
+      "description": "Why this track may be used, as the person who supplied it stated it; the project copies it and the renderer writes it next to every output that plays the track.",
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "e.g. CC BY 4.0, or the library's licence name.",
+          "type": "string",
+          "minLength": 1
+        },
+        "url": { "type": "string", "minLength": 1 },
+        "attribution": {
+          "description": "The credit line the licence asks for.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "tracker": {
+      "description": "The beat tracker and model that found the beats, e.g. beat_this final0.",
+      "type": "string",
+      "minLength": 1
+    },
+    "tempo": {
+      "type": "object",
+      "required": ["bpm", "beats_per_bar"],
+      "additionalProperties": false,
+      "properties": {
+        "bpm": {
+          "description": "Beats per minute from the median time over 8 beats; null with fewer than two beats.",
+          "type": ["number", "null"],
+          "exclusiveMinimum": 0
+        },
+        "beats_per_bar": {
+          "description": "The most common number of beats from one downbeat to the next; null with fewer than two downbeats.",
+          "type": ["integer", "null"],
+          "minimum": 1
+        }
+      }
+    },
+    "beats": {
+      "description": "Every beat while the track sounds, in time order, to the tracker's 20 ms frames.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/Seconds" }
+    },
+    "downbeats": {
+      "description": "The beats that start a bar, in time order.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/Seconds" }
+    },
+    "sections": {
+      "description": "Consecutive stretches that sound alike, covering the track from 0 to `end`. Every boundary but the first is a downbeat where the bars before and after differ most in loudness and timbre, so a section starts a phrase.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/Section" }
+    },
+    "loudness": {
+      "description": "Short-term EBU R128 loudness of every second, as the media index's `short_term`, but measured at the track's own 48 kHz and with its channels weighed apart, as BS.1770 sums them: the track's energy over time.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/Lufs" }
+    },
+    "end": {
+      "description": "Where the track's sound dies away: after this, nothing louder than 50 dB under its peak. An edit that ends on the music's ending ends here.",
+      "$ref": "#/$defs/Seconds"
+    }
+  },
+  "$defs": {
+    "Seconds": { "type": "number", "minimum": 0 },
+    "Lufs": {
+      "description": "Loudness units relative to full scale, to 0.1; -70 for silence.",
+      "type": "number",
+      "minimum": -70
+    },
+    "Section": {
+      "type": "object",
+      "required": ["start", "end", "loudness"],
+      "additionalProperties": false,
+      "properties": {
+        "start": { "$ref": "#/$defs/Seconds" },
+        "end": { "$ref": "#/$defs/Seconds" },
+        "loudness": {
+          "description": "Integrated loudness of the section, gated as BS.1770 gates a programme.",
+          "$ref": "#/$defs/Lufs"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+name: Feature request
+description: Suggest an improvement to the edits it produces or to the tools.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is worse than it should be, ideally with an example edit.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should happen instead, and how we could measure that it did.

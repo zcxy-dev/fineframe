@@ -1,0 +1,71 @@
+[project]
+name = "vebench"
+version = "0.1.0"
+description = "Benchmark for automatic video editing: caption accuracy, word timing, shot detection, clicks, A/V drift and blind review"
+readme = "README.md"
+license = "MIT"
+keywords = ["benchmark", "asr", "subtitles", "shot-detection", "video-editing"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Video",
+]
+authors = [
+    { name = "Jason Chang" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "imageio-ffmpeg>=0.6.0",
+    "numpy>=2.5.4",
+    "rapidfuzz>=3.14.6",
+]
+
+[project.optional-dependencies]
+# Kokoro and its G2P support Python 3.12 at most.
+synth = [
+    "en-core-web-sm>=3.8.0; python_version < '3.13'",
+    "huggingface-hub>=2.2.0; python_version < '3.13'",
+    "jieba>=0.42.1; python_version < '3.13'",
+    "kokoro>=0.9.4; python_version < '3.13'",
+    "misaki[zh]>=0.9.4; python_version < '3.13'",
+    "opencc>=1.4.2; python_version < '3.13'",
+    "pillow>=12.3.0; python_version < '3.13'",
+    "torch>=2.14.1; python_version < '3.13'",
+]
+
+[project.urls]
+Repository = "https://github.com/zcxy-dev/video-editor"
+Issues = "https://github.com/zcxy-dev/video-editor/issues"
+
+[project.scripts]
+vebench = "vebench.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.0,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.0",
+]
+
+# The synthetic corpus runs on a CPU; a CUDA build of torch would only add gigabytes.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["synth: needs the synth extra and downloads the speech model"]

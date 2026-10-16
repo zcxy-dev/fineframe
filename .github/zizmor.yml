@@ -1,0 +1,6 @@
+rules:
+  dependabot-cooldown:
+    config:
+      # Three days: long enough for most malicious releases to be pulled,
+      # short enough to keep monthly updates current.
+      days: 3

@@ -1,0 +1,109 @@
+name: ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+
+permissions: {}
+
+# Only superseded PR checks may be canceled; main runs stay independent.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ci:
+    # Draft PRs are skipped (reported as passing); marking one ready runs CI.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The tested commit and its first parent, for the secret scan.
+          fetch-depth: 2
+          persist-credentials: false
+      # Release binaries pinned by version and SHA-256; Dependabot does not update them.
+      - name: Install actionlint, zizmor and betterleaks
+        run: |
+          mkdir -p "$RUNNER_TEMP/tools"
+          cd "$RUNNER_TEMP/tools"
+          while read -r sha name url; do
+            curl -fsSL --retry 3 -o tool.tar.gz "$url"
+            echo "$sha  tool.tar.gz" | sha256sum --check --quiet
+            tar -xzf tool.tar.gz "$name"
+          done <<'EOF'
+          8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8 actionlint https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          e65324f4430c2717591937edcec90ccbefaf14c174f8ec9415e03ca875b46e1a zizmor https://github.com/zizmorcore/zizmor/releases/download/v1.30.1/zizmor-x86_64-unknown-linux-gnu.tar.gz
+          f8b185a39ffcece2a1ca82bf3a4e7435cd81963ffd16b7a9128daf75f35f6de7 betterleaks https://github.com/betterleaks/betterleaks/releases/download/v1.9.0/betterleaks_1.9.0_linux_x64.tar.gz
+          EOF
+          echo "$RUNNER_TEMP/tools" >> "$GITHUB_PATH"
+      - name: Lint workflows (actionlint)
+        run: actionlint
+      - name: Audit workflows (zizmor)
+        run: zizmor --config .github/zizmor.yml --format github .github/
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Scan the tested change for secrets (betterleaks)
+        # A root commit has no parent, so it is scanned whole.
+        run: |
+          range=HEAD
+          if git rev-parse -q --verify HEAD^1 >/dev/null; then range=HEAD^1..HEAD; fi
+          betterleaks git --no-banner --redact --log-opts="--first-parent $range" .
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        with:
+          cache: false
+      - name: Check each Python package
+        run: |
+          for package in bench worker; do
+            (
+              cd "$package"
+              uv sync --locked
+              uv run ruff format --check .
+              uv run ruff check .
+              uv run pytest -q
+            )
+          done
+      # After the Python packages: check-gen runs the worker's model generator.
+      - name: Check the TypeScript workspace
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm check-gen
+
+  # The renderer on macOS (Apple silicon) with its pinned macOS FFmpeg: the engine tests, then
+  # a synthetic edit scored by vebench.
+  macos:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: macos-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        with:
+          cache: false
+      - name: Test the engine
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter @video-editor/engine test
+      # copy-joined is the `-c copy` join the engine is measured against; every other run must
+      # have no clicks and under 10 ms of drift.
+      - name: Render a synthetic edit and score it (vebench)
+        run: |
+          node packages/engine/scripts/synthetic-edit.ts "$RUNNER_TEMP/edit" --width 320 --height 180
+          cd bench
+          uv sync --locked
+          uv run vebench report "$RUNNER_TEMP/edit" | tee "$RUNNER_TEMP/report.json"
+          jq -e 'del(.["copy-joined"]) | length == 2 and all(.[];
+            .errors == [] and .missing == [] and .render.clicks == 0 and .render.max_abs_drift_ms < 10)' \
+            "$RUNNER_TEMP/report.json"

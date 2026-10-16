@@ -1,0 +1,92 @@
+[project]
+name = "vework"
+version = "0.1.0"
+description = "Analysis worker for automatic video editing: probe, shot transitions, speech, timed transcripts, loudness, audio events, faces and who speaks"
+readme = "README.md"
+license = "MIT"
+keywords = ["video-editing", "asr", "forced-alignment", "shot-detection", "vad"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Video",
+]
+authors = [
+    { name = "Jason Chang" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=1.14.0",
+    "av>=19.0.1",
+    "numpy>=2.5.4",
+    "opencc>=1.4.2",
+    "pydantic>=2.14.1",
+    "scipy>=1.18.1",
+]
+
+[project.urls]
+Repository = "https://github.com/zcxy-dev/video-editor"
+Issues = "https://github.com/zcxy-dev/video-editor/issues"
+
+[project.scripts]
+vework = "vework.cli:main"
+
+[project.optional-dependencies]
+ml = [
+    "beat-this>=1.1.0",
+    "huggingface-hub>=0.36.2",
+    # The forced aligner splits Japanese text into words with nagisa, and Korean with soynlp.
+    "nagisa>=0.2.11",
+    "onnxruntime>=1.31.0",
+    "opencv-python-headless>=5.0.0.93",
+    "silero-vad>=6.2.3",
+    "soynlp>=0.0.493",
+    "torch>=2.14.1",
+    "transformers>=5.20.0",
+    "transnetv2-pytorch>=1.0.5",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.0,<0.14.0"]
+build-backend = "uv_build"
+
+# Development runs on a CPU-only Linux host; the GPU image picks its own torch build.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv]
+# beat_this needs torchaudio only for its file loader and mel front end, which vework replaces
+# (beats.py); no torchaudio release matches torch 2.14, so it is left out.
+override-dependencies = ["torchaudio; sys_platform == 'never'"]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+# Tests only: they check that the correction guard counts words the way vebench scores them.
+vebench = { path = "../bench", editable = true }
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# Generated: their descriptions come from the schemas as single long strings.
+"src/vework/media_index.py" = ["E501"]
+"src/vework/music_index.py" = ["E501"]
+
+[tool.pytest.ini_options]
+markers = [
+    "ml: needs the ml extra and downloads model weights",
+    "claude: calls the Claude API; runs only when ANTHROPIC_API_KEY is set",
+]
+
+[dependency-groups]
+dev = [
+    "datamodel-code-generator>=0.83.0",
+    "imageio-ffmpeg>=0.6.0",
+    "pytest>=9.1.1",
+    "ruff>=0.17.0",
+    "vebench",
+]

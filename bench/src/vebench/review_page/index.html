@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blind review</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="review.css">
+<script type="module" src="review.js"></script>
+</head>
+<body>
+<header class="bar">
+  <h1>Blind review</h1>
+  <p id="progress" aria-live="polite">Loading…</p>
+</header>
+<main>
+  <noscript><p class="note">This page needs JavaScript.</p></noscript>
+  <form id="rating" hidden>
+    <p class="note" id="how"></p>
+    <div class="edits">
+      <section class="edit" id="edit-a" aria-labelledby="title-a">
+        <h2 id="title-a" tabindex="-1">Edit A</h2>
+        <div class="screen">
+          <!-- biome-ignore lint/a11y/useMediaCaption: captions are burned into each edit, where they are scored -->
+          <video id="video-a" controls preload="metadata" playsinline aria-labelledby="title-a"></video>
+          <p class="video-error" hidden>This edit did not play. Reload the page; if it fails again, re-encode it as H.264 MP4.</p>
+        </div>
+        <div class="scales" data-side="a"></div>
+      </section>
+      <section class="edit" id="edit-b" aria-labelledby="title-b">
+        <h2 id="title-b">Edit B</h2>
+        <div class="screen">
+          <!-- biome-ignore lint/a11y/useMediaCaption: captions are burned into each edit, where they are scored -->
+          <video id="video-b" controls preload="metadata" playsinline aria-labelledby="title-b"></video>
+          <p class="video-error" hidden>This edit did not play. Reload the page; if it fails again, re-encode it as H.264 MP4.</p>
+        </div>
+        <div class="scales" data-side="b"></div>
+      </section>
+    </div>
+    <div class="decide">
+      <fieldset class="choice" id="choice">
+        <legend>Which would you rather post?</legend>
+        <div class="options">
+          <label><input type="radio" name="preferred" value="a" required><span>Edit A</span></label>
+          <label><input type="radio" name="preferred" value="b"><span>Edit B</span></label>
+          <label><input type="radio" name="preferred" value="none"><span>No preference</span></label>
+        </div>
+      </fieldset>
+      <div class="send">
+        <button type="submit">Save and continue</button>
+        <p id="error" role="alert"></p>
+      </div>
+    </div>
+  </form>
+  <section id="done" class="done" hidden aria-labelledby="done-title">
+    <h2 id="done-title" tabindex="-1">Every edit is rated</h2>
+    <p>Your ratings are saved. Close this tab, then stop the server with Ctrl+C.</p>
+  </section>
+</main>
+</body>
+</html>

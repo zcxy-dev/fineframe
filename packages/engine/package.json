@@ -1,0 +1,24 @@
+{
+  "name": "@video-editor/engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./length": "./src/edit/length.ts",
+    "./looks": "./src/looks.ts",
+    "./media": "./src/edit/media.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test",
+    "edit": "node src/edit/cli.ts",
+    "render": "node src/cli.ts",
+    "plan": "node src/plan/cli.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.133.0",
+    "@video-editor/effects": "workspace:*",
+    "@video-editor/schema": "workspace:*"
+  }
+}

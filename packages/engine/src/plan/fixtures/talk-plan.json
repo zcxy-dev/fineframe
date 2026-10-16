@@ -1,0 +1,67 @@
+[
+  {
+    "content": "A single-shot talking-head clip in which the speaker introduces three topics: automatic editing with a tool called video editor, subtitles in Traditional Chinese, and length. The edit keeps the whole talk in order. It drops the opening hesitation and the corrected false start so each point is stated once, cleanly.",
+    "segments": [
+      {
+        "source": "talk",
+        "first": 1,
+        "last": 2,
+        "priority": 2,
+        "reason": "Greeting and the promise of three points; sets up the structure."
+      },
+      {
+        "source": "talk",
+        "first": 3,
+        "last": 4,
+        "priority": 1,
+        "reason": "Point one: automatic editing and the tool's name."
+      },
+      {
+        "source": "talk",
+        "first": 5,
+        "last": 5,
+        "priority": 1,
+        "reason": "Point two: subtitles in Traditional Chinese."
+      },
+      {
+        "source": "talk",
+        "first": 6,
+        "last": 6,
+        "priority": 2,
+        "reason": "Point three: length, which completes the promised list."
+      },
+      {
+        "source": "talk",
+        "first": 7,
+        "last": 7,
+        "priority": 3,
+        "reason": "Sign-off closes the video."
+      }
+    ],
+    "removed": [],
+    "fillers": ["f1", "f3"],
+    "cut_words": [
+      {
+        "source": "talk",
+        "line": 3,
+        "text": "第一件事是剪輯，不對，",
+        "kind": "false_start"
+      }
+    ],
+    "broll": [],
+    "emphasis": [
+      {
+        "source": "talk",
+        "line": 2,
+        "text": "今天要講三件事",
+        "reason": "The promise of the video."
+      },
+      {
+        "source": "talk",
+        "line": 3,
+        "text": "自動剪輯",
+        "reason": "Key topic, the main subject of the talk."
+      }
+    ]
+  }
+]

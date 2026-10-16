@@ -1,0 +1,356 @@
+:root {
+  color-scheme: dark;
+  /* A neutral grey surround, as in a grading suite, so no tint skews how either edit's colour reads. */
+  --bg: #171717;
+  --line: #2e2e2e;
+  --line-strong: #4a4a4a;
+  --hover: #6e6e6e;
+  --text: #ededed;
+  --muted: #a3a3a3;
+  --on-text: #121212;
+  --focus: #8ab4f8;
+  --danger: #ff8f87;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans TC", sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+::selection {
+  background: #3d4a5e;
+  color: var(--text);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+h1 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+#progress {
+  margin: 0;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+main {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 20px 24px 48px;
+}
+
+.note {
+  max-width: 70ch;
+  margin: 0 0 24px;
+  color: var(--muted);
+}
+
+.edits {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+}
+
+h2 {
+  margin: 0 0 10px;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+/* Headings take focus only so the next edit starts from the top; they are not controls. */
+h2:focus {
+  outline: none;
+}
+
+.screen {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #000;
+}
+
+video {
+  display: block;
+  width: 100%;
+  height: min(62vh, 640px);
+  background: #000;
+  object-fit: contain;
+}
+
+.video-error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 24px;
+  background: rgb(0 0 0 / 0.85);
+  color: var(--danger);
+  text-align: center;
+}
+
+.video-error[hidden] {
+  display: none;
+}
+
+.scales {
+  margin-top: 16px;
+}
+
+/* Long labels wrap inside their column, so every row's steps line up on the right. */
+.scale {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+/* Floating the legend lets it sit in the row like any other grid item. */
+.scale legend {
+  float: left;
+  padding: 0;
+}
+
+.steps,
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.steps label,
+.options label {
+  position: relative;
+  display: block;
+}
+
+.steps input,
+.options input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.steps span,
+.options span {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--muted);
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out;
+}
+
+.steps span {
+  width: 40px;
+  height: 34px;
+  font-variant-numeric: tabular-nums;
+}
+
+.options span {
+  padding: 8px 18px;
+}
+
+label:hover > span {
+  border-color: var(--hover);
+  color: var(--text);
+}
+
+input:checked + span {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--on-text);
+  font-weight: 600;
+}
+
+input:focus-visible + span {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.decide {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px 32px;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line-strong);
+}
+
+.choice {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.choice legend {
+  margin-bottom: 10px;
+  padding: 0;
+  font-weight: 600;
+}
+
+.send {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+button {
+  padding: 10px 22px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--text);
+  color: var(--on-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #fff;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+#error {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--danger);
+}
+
+.done {
+  max-width: 60ch;
+  padding: 48px 0;
+}
+
+.done p {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* An edit rated alone takes the width of two, with its scales beside the picture where the
+   picture still gets most of the width. */
+.alone .edits {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.alone .decide {
+  justify-content: flex-end;
+}
+
+@media (min-width: 1100px) {
+  .alone .edit:not([hidden]) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+    align-items: start;
+    column-gap: 32px;
+  }
+
+  .alone h2 {
+    grid-column: 1 / -1;
+  }
+
+  .alone .scales {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .bar {
+    padding: 12px 16px;
+  }
+
+  main {
+    padding: 16px 16px 40px;
+  }
+
+  .edits {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+
+  video {
+    height: min(70vh, 560px);
+  }
+
+  .decide,
+  .send {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .scale {
+    grid-template-columns: 1fr;
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .steps span {
+    width: auto;
+    height: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .steps span,
+  .options span {
+    transition: none;
+  }
+}

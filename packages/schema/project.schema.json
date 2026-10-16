@@ -1,0 +1,690 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zcxy-dev/video-editor/blob/main/packages/schema/project.schema.json",
+  "title": "Project",
+  "description": "One edit, complete enough to render the same video again from this file and the source files. Every position or length on a timeline is integer ticks, 120 000 per second; processing parameters carry their unit in their name (attackMs, gainDb). Paths are relative to the project file.",
+  "type": "object",
+  "required": ["version", "output", "sources", "main", "audio"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "output": { "$ref": "#/$defs/Output" },
+    "sources": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Source" } },
+    "main": {
+      "description": "The main track, in play order.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Clip" }
+    },
+    "broll": {
+      "description": "B-roll and picture-in-picture over the main track, drawn in array order. The main track's audio keeps playing under it.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/BrollClip" }
+    },
+    "captions": { "$ref": "#/$defs/Captions" },
+    "overlays": {
+      "description": "Animated effects over the picture and B-roll and under the captions, drawn in array order.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/Overlay" }
+    },
+    "audio": { "$ref": "#/$defs/Audio" },
+    "plan": { "$ref": "#/$defs/Plan" }
+  },
+  "$defs": {
+    "Ticks": {
+      "description": "A time or length in ticks: 120 000 per second, so every common frame rate has a whole number of ticks per frame.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "PositiveTicks": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "FrameRate": {
+      "description": "Frames per second as an exact fraction, e.g. 30000/1001 for 29.97. 120 000 × den must be divisible by num, so a frame lasts a whole number of ticks.",
+      "type": "object",
+      "required": ["num", "den"],
+      "additionalProperties": false,
+      "properties": {
+        "num": { "type": "integer", "minimum": 1 },
+        "den": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "SourceId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+    "RelativePath": {
+      "description": "A path relative to the project file, with forward slashes.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?![/\\\\])(?![A-Za-z]:)"
+    },
+    "Language": {
+      "description": "A BCP 47 language tag, e.g. zh-TW or en.",
+      "type": "string",
+      "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
+    },
+    "Rect": {
+      "description": "A rectangle in normalised coordinates, from the top-left corner: 0..1 of the source's displayed width and height for a crop, of the output frame for a B-roll rect.",
+      "type": "object",
+      "required": ["x", "y", "w", "h"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
+        "y": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
+        "w": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "h": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+      }
+    },
+    "Output": {
+      "type": "object",
+      "required": ["aspect", "width", "height", "fps", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "aspect": { "enum": ["9:16", "1:1", "16:9"] },
+        "width": {
+          "description": "Pixels; even, as 4:2:0 video needs, and in the aspect ratio.",
+          "type": "integer",
+          "minimum": 2,
+          "multipleOf": 2
+        },
+        "height": { "type": "integer", "minimum": 2, "multipleOf": 2 },
+        "fps": { "$ref": "#/$defs/FrameRate" },
+        "target": {
+          "description": "The length that was asked for.",
+          "type": "object",
+          "required": ["duration", "tolerance"],
+          "additionalProperties": false,
+          "properties": {
+            "duration": { "$ref": "#/$defs/PositiveTicks" },
+            "tolerance": {
+              "description": "How far the edit may land from the target, as a fraction of it: 0.05 is ±5 %.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    },
+    "Source": {
+      "type": "object",
+      "required": ["id", "kind", "path", "fingerprint"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Unique in the project; clips and decisions name their source by it.",
+          "$ref": "#/$defs/SourceId"
+        },
+        "kind": { "enum": ["video", "audio", "image"] },
+        "path": { "$ref": "#/$defs/RelativePath" },
+        "index": {
+          "description": "The source's analysis: its media index (media-index.schema.json) for a video, its music index (music-index.schema.json) for music; absent for a source that was not analysed, such as an image.",
+          "$ref": "#/$defs/RelativePath"
+        },
+        "fingerprint": {
+          "description": "Identifies the exact file the edit was planned on, so a render from a changed file fails instead of drifting.",
+          "type": "object",
+          "required": ["bytes", "sha256"],
+          "additionalProperties": false,
+          "properties": {
+            "bytes": { "type": "integer", "minimum": 0 },
+            "sha256": {
+              "description": "SHA-256 of the whole file, lowercase hex.",
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "Clip": {
+      "description": "A range of one source on the main track.",
+      "type": "object",
+      "required": ["source", "in", "out"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "$ref": "#/$defs/SourceId" },
+        "in": { "description": "Source time where the clip starts.", "$ref": "#/$defs/Ticks" },
+        "out": {
+          "description": "Source time where the clip ends, exclusive; after in.",
+          "$ref": "#/$defs/Ticks"
+        },
+        "transition": {
+          "description": "How this clip follows the one before it; absent is a hard cut. The first clip has none.",
+          "$ref": "#/$defs/Transition"
+        },
+        "framing": { "$ref": "#/$defs/Framing" },
+        "grade": { "$ref": "#/$defs/Grade" }
+      }
+    },
+    "Transition": { "oneOf": [{ "$ref": "#/$defs/Dissolve" }, { "$ref": "#/$defs/Dip" }] },
+    "Dissolve": {
+      "description": "Picture and sound cross-fade: the last `duration` ticks of the clip before overlap the first `duration` ticks of this clip.",
+      "type": "object",
+      "required": ["type", "duration"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "dissolve" },
+        "duration": { "$ref": "#/$defs/PositiveTicks" }
+      }
+    },
+    "Dip": {
+      "description": "The clip before fades to `color`, picture and sound, over its last floor(duration / 2) ticks, and this clip fades in from it over the rest of `duration`, so each fade is whole ticks long. The clips do not overlap.",
+      "type": "object",
+      "required": ["type", "duration", "color"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "dip" },
+        "duration": { "$ref": "#/$defs/PositiveTicks" },
+        "color": { "type": "string", "pattern": "^#[0-9a-f]{6}$" }
+      }
+    },
+    "BrollClip": {
+      "description": "A source range over the main track. `rect` places it in the output frame; without one it fills the frame.",
+      "type": "object",
+      "required": ["source", "in", "out", "start"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "$ref": "#/$defs/SourceId" },
+        "in": { "$ref": "#/$defs/Ticks" },
+        "out": { "$ref": "#/$defs/Ticks" },
+        "start": {
+          "description": "Where it appears on the output timeline.",
+          "$ref": "#/$defs/Ticks"
+        },
+        "rect": { "$ref": "#/$defs/Rect" },
+        "fade": {
+          "description": "Fade in and out over this many ticks; absent cuts in and out.",
+          "$ref": "#/$defs/PositiveTicks"
+        },
+        "gainDb": {
+          "description": "Mix the B-roll's own sound at this gain; absent mutes it.",
+          "type": "number"
+        },
+        "framing": { "$ref": "#/$defs/Framing" },
+        "grade": { "$ref": "#/$defs/Grade" }
+      }
+    },
+    "Framing": {
+      "description": "Which part of the source fills the area it is shown in: the output frame, or a B-roll clip's rect. Without framing, the largest centred region with that area's shape is used. A crop of another shape is narrowed around its centre to match.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "crop": { "oneOf": [{ "$ref": "#/$defs/StaticCrop" }, { "$ref": "#/$defs/CropPath" }] },
+        "scale": {
+          "description": "Punch-in: shows 1/scale of the crop, e.g. 1.12 to hide a jump cut; a path pushes in over time.",
+          "oneOf": [{ "type": "number", "minimum": 1 }, { "$ref": "#/$defs/ScalePath" }]
+        },
+        "anchor": {
+          "description": "The point a punch-in zooms about, which stays where it is on screen: the speaker's face, as fractions of the crop's width and height once narrowed to the area's shape. The crop's centre when absent.",
+          "type": "object",
+          "required": ["x", "y"],
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "number", "minimum": 0, "maximum": 1 },
+            "y": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    },
+    "ScalePath": {
+      "description": "A slow push-in: the scale eases between keyframes along half a cosine, so it starts and stops without a jolt, and is held before the first and after the last.",
+      "type": "object",
+      "required": ["type", "keyframes"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "path" },
+        "keyframes": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/ScaleKeyframe" }
+        }
+      }
+    },
+    "ScaleKeyframe": {
+      "type": "object",
+      "required": ["t", "scale"],
+      "additionalProperties": false,
+      "properties": {
+        "t": {
+          "description": "Source time, increasing from one keyframe to the next.",
+          "$ref": "#/$defs/Ticks"
+        },
+        "scale": { "type": "number", "minimum": 1 }
+      }
+    },
+    "StaticCrop": {
+      "type": "object",
+      "required": ["type", "rect"],
+      "additionalProperties": false,
+      "properties": { "type": { "const": "static" }, "rect": { "$ref": "#/$defs/Rect" } }
+    },
+    "CropPath": {
+      "description": "A moving crop: linear between keyframes, held before the first and after the last.",
+      "type": "object",
+      "required": ["type", "keyframes"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "path" },
+        "keyframes": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/CropKeyframe" }
+        }
+      }
+    },
+    "CropKeyframe": {
+      "type": "object",
+      "required": ["t", "rect"],
+      "additionalProperties": false,
+      "properties": {
+        "t": {
+          "description": "Source time, increasing from one keyframe to the next.",
+          "$ref": "#/$defs/Ticks"
+        },
+        "rect": { "$ref": "#/$defs/Rect" }
+      }
+    },
+    "Grade": {
+      "description": "Colour, applied in this order: auto, match, look.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "auto": {
+          "description": "The bounded per-clip correction measured from the clip itself, as FFmpeg's eq filter takes it; 1 leaves a value unchanged.",
+          "type": "object",
+          "required": ["contrast", "gamma", "saturation"],
+          "additionalProperties": false,
+          "properties": {
+            "contrast": { "type": "number", "exclusiveMinimum": 0 },
+            "gamma": { "type": "number", "exclusiveMinimum": 0 },
+            "saturation": { "type": "number", "minimum": 0 }
+          }
+        },
+        "match": {
+          "description": "Brings this source's colour toward a reference source: rgb' = matrix × rgb + offset, on normalised R'G'B', except that skin tones change hue and saturation only within the limits packages/engine/README.md gives.",
+          "type": "object",
+          "required": ["reference", "matrix", "offset"],
+          "additionalProperties": false,
+          "properties": {
+            "reference": { "$ref": "#/$defs/SourceId" },
+            "matrix": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": { "type": "number" }
+              }
+            },
+            "offset": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": { "type": "number" }
+            }
+          }
+        },
+        "look": {
+          "description": "A designed look on top: a preset id from the engine's look catalog, at an intensity from 0 (none) to 1 (as designed).",
+          "type": "object",
+          "required": ["id", "intensity"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "intensity": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    },
+    "Captions": {
+      "type": "object",
+      "required": ["preset", "srt", "lines"],
+      "additionalProperties": false,
+      "properties": {
+        "preset": {
+          "description": "The caption preset that draws the lines, by id, from the presets in packages/engine.",
+          "type": "string",
+          "minLength": 1
+        },
+        "srt": {
+          "description": "Also write the lines as SubRip next to the video.",
+          "type": "boolean"
+        },
+        "lines": {
+          "description": "In time order, on the output timeline.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/CaptionLine" }
+        }
+      }
+    },
+    "CaptionLine": {
+      "type": "object",
+      "required": ["start", "end", "language", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "start": { "$ref": "#/$defs/Ticks" },
+        "end": { "$ref": "#/$defs/Ticks" },
+        "language": { "description": "The line's main language.", "$ref": "#/$defs/Language" },
+        "text": {
+          "description": "The line as shown and as the SubRip export writes it, punctuation included.",
+          "type": "string",
+          "minLength": 1
+        },
+        "words": {
+          "description": "The line's words with their times, for word-by-word animation; their texts appear in `text` in this order.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/CaptionWord" }
+        }
+      }
+    },
+    "CaptionWord": {
+      "type": "object",
+      "required": ["text", "start", "end"],
+      "additionalProperties": false,
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "start": { "$ref": "#/$defs/Ticks" },
+        "end": { "$ref": "#/$defs/Ticks" },
+        "language": {
+          "description": "Set when the word is in another language than its line, e.g. an English word in a Mandarin sentence.",
+          "$ref": "#/$defs/Language"
+        }
+      }
+    },
+    "Overlay": {
+      "type": "object",
+      "required": ["template", "params", "start", "duration"],
+      "additionalProperties": false,
+      "properties": {
+        "template": {
+          "description": "The effect template's id, from the catalog in packages/effects.",
+          "type": "string",
+          "minLength": 1
+        },
+        "params": {
+          "description": "The template's parameters, as its JSON Schema in that catalog defines them.",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "start": { "description": "Output timeline.", "$ref": "#/$defs/Ticks" },
+        "duration": { "$ref": "#/$defs/PositiveTicks" }
+      }
+    },
+    "Audio": {
+      "type": "object",
+      "required": ["loudness"],
+      "additionalProperties": false,
+      "properties": {
+        "loudness": {
+          "description": "The finished mix is normalised to this, within the ranges EBU R128 normalisation (FFmpeg's loudnorm) accepts.",
+          "type": "object",
+          "required": ["integratedLufs", "truePeakDbtp"],
+          "additionalProperties": false,
+          "properties": {
+            "integratedLufs": { "type": "number", "minimum": -70, "maximum": -5 },
+            "truePeakDbtp": { "type": "number", "minimum": -9, "maximum": 0 }
+          }
+        },
+        "voice": {
+          "description": "How each source's speech is processed; a source not listed is used as recorded.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/VoiceDecision" }
+        },
+        "music": {
+          "description": "Background music, mixed under the main track's sound.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/MusicTrack" }
+        }
+      }
+    },
+    "VoiceDecision": {
+      "description": "How one source's speech is processed on the main track, chosen from its measurements. The chain runs on the mono mix of the source's sound, which then plays in both channels.",
+      "type": "object",
+      "required": ["source", "measurements", "chain"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "$ref": "#/$defs/SourceId" },
+        "measurements": {
+          "description": "The source's speech as its media index measured it (`voice`), which the chain was chosen from: as recorded, and denoised when the chain denoises, for the stages after the denoiser.",
+          "type": "object",
+          "required": ["recorded"],
+          "additionalProperties": false,
+          "properties": {
+            "recorded": { "$ref": "#/$defs/VoiceMeasurement" },
+            "denoised": { "$ref": "#/$defs/VoiceMeasurement" }
+          }
+        },
+        "chain": {
+          "description": "Stages run in this order; an absent stage is skipped.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "denoise": {
+              "description": "Plays the denoised speech from the source's media index (`voice.stem`) instead of its sound, with the recording beside it in the stem mixed back in to keep the noise at most `attenuationLimitDb` lower than it was, so breaths and the room stay natural.",
+              "type": "object",
+              "required": ["attenuationLimitDb"],
+              "additionalProperties": false,
+              "properties": {
+                "attenuationLimitDb": { "type": "number", "exclusiveMinimum": 0 }
+              }
+            },
+            "dereverb": {
+              "description": "A gentle downward expander: below `thresholdDb` the room's tail after words is lowered 2:1, by at most 12 dB × `amount`. Speech stays above the threshold.",
+              "type": "object",
+              "required": ["amount", "thresholdDb"],
+              "additionalProperties": false,
+              "properties": {
+                "amount": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+                "thresholdDb": { "type": "number", "maximum": 0 }
+              }
+            },
+            "highpassHz": {
+              "description": "A second-order high-pass.",
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "eq": { "type": "array", "items": { "$ref": "#/$defs/EqBand" } },
+            "level": {
+              "description": "A slow leveller (FFmpeg's dynaudnorm) that evens out a speaker who moves or turns away: over a sliding `windowSeconds`, the level is brought towards `targetDb` RMS and raised by at most `maxGainDb`. Each moment takes the smallest gain around it, so a pause does not lift the end of the phrase before it.",
+              "type": "object",
+              "required": ["targetDb", "windowSeconds", "maxGainDb"],
+              "additionalProperties": false,
+              "properties": {
+                "targetDb": { "type": "number", "maximum": 0 },
+                "windowSeconds": { "type": "number", "minimum": 0.6, "maximum": 60 },
+                "maxGainDb": { "type": "number", "minimum": 0, "maximum": 40 }
+              }
+            },
+            "compressor": {
+              "description": "An RMS compressor, then `makeupDb` of gain, which also brings every source's speech to one level before the mix.",
+              "type": "object",
+              "required": ["thresholdDb", "ratio", "attackMs", "releaseMs", "makeupDb"],
+              "additionalProperties": false,
+              "properties": {
+                "thresholdDb": { "type": "number", "minimum": -60, "maximum": 0 },
+                "ratio": { "type": "number", "minimum": 1, "maximum": 20 },
+                "attackMs": { "type": "number", "exclusiveMinimum": 0, "maximum": 2000 },
+                "releaseMs": { "type": "number", "exclusiveMinimum": 0, "maximum": 9000 },
+                "makeupDb": { "type": "number", "minimum": -36, "maximum": 36 }
+              }
+            },
+            "deesser": {
+              "description": "The sound above `frequencyHz` is compressed on its own where it rises over `thresholdDb`, at a ratio of 1 + 5 × `intensity`; the split sums back flat.",
+              "type": "object",
+              "required": ["frequencyHz", "intensity", "thresholdDb"],
+              "additionalProperties": false,
+              "properties": {
+                "frequencyHz": { "type": "number", "minimum": 1000, "maximum": 20000 },
+                "intensity": { "type": "number", "minimum": 0, "maximum": 1 },
+                "thresholdDb": { "type": "number", "minimum": -60, "maximum": 0 }
+              }
+            },
+            "limiter": {
+              "description": "A peak limiter, last: no sample goes over `ceilingDb`, so the loudness pass can raise the voice with one gain instead of limiting it dynamically itself.",
+              "type": "object",
+              "required": ["ceilingDb"],
+              "additionalProperties": false,
+              "properties": { "ceilingDb": { "type": "number", "minimum": -24, "maximum": 0 } }
+            }
+          }
+        }
+      }
+    },
+    "VoiceMeasurement": {
+      "description": "One measurement of speech, as media-index.schema.json defines it (`VoiceLevels`); a value the index has as null is absent.",
+      "type": "object",
+      "required": ["loudnessLufs", "loudnessRangeLu", "clippedShare"],
+      "additionalProperties": false,
+      "properties": {
+        "noiseFloorDb": { "type": "number", "minimum": -120 },
+        "loudnessLufs": { "type": "number", "minimum": -70 },
+        "loudnessRangeLu": { "type": "number", "minimum": 0 },
+        "clippedShare": { "type": "number", "minimum": 0, "maximum": 1 },
+        "reverbRt60Seconds": { "type": "number", "minimum": 0 },
+        "mudDb": { "type": "number" },
+        "presenceDb": { "type": "number" }
+      }
+    },
+    "EqBand": {
+      "type": "object",
+      "required": ["type", "frequencyHz", "gainDb", "q"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["peak", "lowShelf", "highShelf"] },
+        "frequencyHz": { "type": "number", "exclusiveMinimum": 0 },
+        "gainDb": { "type": "number" },
+        "q": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "MusicTrack": {
+      "type": "object",
+      "required": ["source", "license", "in", "out", "start", "gainDb"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "$ref": "#/$defs/SourceId" },
+        "license": {
+          "description": "Why this track may be used; it is recorded next to the output.",
+          "type": "object",
+          "required": ["name"],
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "description": "e.g. CC BY 4.0, or the library's licence name.",
+              "type": "string",
+              "minLength": 1
+            },
+            "url": { "type": "string", "minLength": 1 },
+            "attribution": {
+              "description": "The credit line the licence asks for.",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "in": { "$ref": "#/$defs/Ticks" },
+        "out": { "$ref": "#/$defs/Ticks" },
+        "start": {
+          "description": "Where the music starts on the output timeline.",
+          "$ref": "#/$defs/Ticks"
+        },
+        "gainDb": { "type": "number" },
+        "fadeIn": { "$ref": "#/$defs/PositiveTicks" },
+        "fadeOut": { "$ref": "#/$defs/PositiveTicks" },
+        "ducking": {
+          "description": "Lowers the music while someone speaks; absent leaves it at gainDb.",
+          "type": "object",
+          "required": ["depthDb", "attackMs", "releaseMs"],
+          "additionalProperties": false,
+          "properties": {
+            "depthDb": {
+              "description": "How far the music drops below gainDb while someone speaks as loud as the edit's speech as a whole; the renderer takes it further down, by up to 12 dB more, under speech quieter than that.",
+              "type": "number",
+              "maximum": 0
+            },
+            "attackMs": { "type": "number", "exclusiveMinimum": 0 },
+            "releaseMs": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        },
+        "beatGrid": {
+          "description": "The beat grid cuts were snapped to, from the track's analysis, so the check can verify them.",
+          "type": "object",
+          "required": ["bpm", "downbeat", "beatsPerBar"],
+          "additionalProperties": false,
+          "properties": {
+            "bpm": { "type": "number", "exclusiveMinimum": 0 },
+            "downbeat": {
+              "description": "Source time of a downbeat the grid runs through.",
+              "$ref": "#/$defs/Ticks"
+            },
+            "beatsPerBar": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "Plan": {
+      "description": "How the planner arrived at this edit, for review; rendering ignores it.",
+      "type": "object",
+      "required": ["model", "rationale", "dropped", "fit"],
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "description": "The model that planned the edit, e.g. claude-opus-5-5.",
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": { "type": "string" },
+        "dropped": {
+          "description": "Source material left out, and why.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/Dropped" }
+        },
+        "fit": {
+          "description": "How the edit was fitted to the target length.",
+          "type": "object",
+          "required": ["duration", "passes"],
+          "additionalProperties": false,
+          "properties": {
+            "duration": { "description": "The planned edit's length.", "$ref": "#/$defs/Ticks" },
+            "passes": {
+              "description": "Rounds of trimming or adding it took to land within the tolerance.",
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "emphasis": {
+          "description": "Moments the planner marks as the edit's strongest beats, in time order, where a punch-in or an effect can land.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/Emphasis" }
+        }
+      }
+    },
+    "Emphasis": {
+      "type": "object",
+      "required": ["start", "end", "text", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "start": { "description": "Output timeline.", "$ref": "#/$defs/Ticks" },
+        "end": { "$ref": "#/$defs/Ticks" },
+        "text": {
+          "description": "The words that carry it, as spoken.",
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "Dropped": {
+      "type": "object",
+      "required": ["source", "in", "out", "kind", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "$ref": "#/$defs/SourceId" },
+        "in": { "$ref": "#/$defs/Ticks" },
+        "out": { "$ref": "#/$defs/Ticks" },
+        "kind": { "enum": ["filler", "pause", "retake", "mistake", "length", "other"] },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

@@ -1,0 +1,334 @@
+{
+  "version": 1,
+  "output": {
+    "aspect": "9:16",
+    "width": 1080,
+    "height": 1920,
+    "fps": { "num": 30, "den": 1 },
+    "target": { "duration": 3600000, "tolerance": 0.05 }
+  },
+  "sources": [
+    {
+      "id": "talk-a",
+      "kind": "video",
+      "path": "footage/talk-a.mp4",
+      "index": "analysis/talk-a.json",
+      "fingerprint": {
+        "bytes": 48213904,
+        "sha256": "3f1c9a5e0b7d4c2a8e6f1b3d5c7a9e0f2b4d6c8a0e1f3b5d7c9a2e4f6b8d0c1a"
+      }
+    },
+    {
+      "id": "talk-b",
+      "kind": "video",
+      "path": "footage/talk-b.mov",
+      "index": "analysis/talk-b.json",
+      "fingerprint": {
+        "bytes": 61377212,
+        "sha256": "a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1"
+      }
+    },
+    {
+      "id": "screen",
+      "kind": "video",
+      "path": "footage/screen.mp4",
+      "index": "analysis/screen.json",
+      "fingerprint": {
+        "bytes": 9120448,
+        "sha256": "5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f"
+      }
+    },
+    {
+      "id": "music",
+      "kind": "audio",
+      "path": "music/calm-loop.flac",
+      "fingerprint": {
+        "bytes": 5402116,
+        "sha256": "c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5"
+      }
+    }
+  ],
+  "main": [
+    {
+      "source": "talk-a",
+      "in": 144000,
+      "out": 1008000,
+      "framing": {
+        "crop": { "type": "static", "rect": { "x": 0.2, "y": 0, "w": 0.31640625, "h": 1 } }
+      },
+      "grade": { "auto": { "contrast": 1.03, "gamma": 1.04, "saturation": 0.98 } }
+    },
+    {
+      "source": "talk-a",
+      "in": 1206000,
+      "out": 1980000,
+      "framing": {
+        "crop": { "type": "static", "rect": { "x": 0.2, "y": 0, "w": 0.31640625, "h": 1 } },
+        "scale": 1.12
+      },
+      "grade": { "auto": { "contrast": 1.03, "gamma": 1.04, "saturation": 0.98 } }
+    },
+    {
+      "source": "talk-b",
+      "in": 360000,
+      "out": 1392000,
+      "transition": { "type": "dissolve", "duration": 60000 },
+      "framing": {
+        "crop": {
+          "type": "path",
+          "keyframes": [
+            { "t": 360000, "rect": { "x": 0.3, "y": 0, "w": 0.31640625, "h": 1 } },
+            { "t": 900000, "rect": { "x": 0.36, "y": 0, "w": 0.31640625, "h": 1 } },
+            { "t": 1392000, "rect": { "x": 0.4, "y": 0, "w": 0.31640625, "h": 1 } }
+          ]
+        }
+      },
+      "grade": {
+        "auto": { "contrast": 1.05, "gamma": 1.0, "saturation": 1.02 },
+        "match": {
+          "reference": "talk-a",
+          "matrix": [[1.04, -0.02, 0.0], [0.01, 0.99, 0.0], [0.0, -0.01, 0.95]],
+          "offset": [0.0, 0.004, -0.006]
+        },
+        "look": { "id": "clean", "intensity": 0.6 }
+      }
+    },
+    {
+      "source": "talk-a",
+      "in": 2400000,
+      "out": 3396000,
+      "transition": { "type": "dip", "duration": 48000, "color": "#000000" },
+      "framing": {
+        "crop": { "type": "static", "rect": { "x": 0.22, "y": 0, "w": 0.31640625, "h": 1 } },
+        "scale": {
+          "type": "path",
+          "keyframes": [{ "t": 2760000, "scale": 1 }, { "t": 3120000, "scale": 1.06 }]
+        }
+      },
+      "grade": { "auto": { "contrast": 1.03, "gamma": 1.04, "saturation": 0.98 } }
+    }
+  ],
+  "broll": [
+    {
+      "source": "screen",
+      "in": 240000,
+      "out": 840000,
+      "start": 1800000,
+      "rect": { "x": 0, "y": 0.1, "w": 1, "h": 0.31640625 },
+      "fade": 12000
+    }
+  ],
+  "captions": {
+    "preset": "bold",
+    "srt": true,
+    "lines": [
+      {
+        "start": 36000,
+        "end": 252000,
+        "language": "zh-TW",
+        "text": "我們今天用 Claude 剪片",
+        "words": [
+          { "text": "我", "start": 36000, "end": 57600 },
+          { "text": "們", "start": 57600, "end": 74400 },
+          { "text": "今", "start": 74400, "end": 96000 },
+          { "text": "天", "start": 96000, "end": 114000 },
+          { "text": "用", "start": 114000, "end": 132000 },
+          { "text": "Claude", "start": 132000, "end": 186000, "language": "en" },
+          { "text": "剪", "start": 186000, "end": 216000 },
+          { "text": "片", "start": 216000, "end": 252000 }
+        ]
+      },
+      {
+        "start": 288000,
+        "end": 504000,
+        "language": "en",
+        "text": "It cuts the pauses for you.",
+        "words": [
+          { "text": "It", "start": 288000, "end": 306000 },
+          { "text": "cuts", "start": 306000, "end": 348000 },
+          { "text": "the", "start": 348000, "end": 366000 },
+          { "text": "pauses", "start": 366000, "end": 432000 },
+          { "text": "for", "start": 432000, "end": 456000 },
+          { "text": "you.", "start": 456000, "end": 504000 }
+        ]
+      },
+      { "start": 1800000, "end": 1992000, "language": "zh-TW", "text": "這段是螢幕錄影。" }
+    ]
+  },
+  "overlays": [
+    {
+      "template": "lower-third",
+      "params": { "title": "王小明", "subtitle": "Video editor" },
+      "start": 60000,
+      "duration": 360000
+    },
+    {
+      "template": "emphasis-word",
+      "params": { "text": "Claude" },
+      "start": 132000,
+      "duration": 54000
+    }
+  ],
+  "audio": {
+    "loudness": { "integratedLufs": -14, "truePeakDbtp": -1 },
+    "voice": [
+      {
+        "source": "talk-a",
+        "measurements": {
+          "recorded": {
+            "noiseFloorDb": -46.2,
+            "loudnessLufs": -24.8,
+            "loudnessRangeLu": 6.3,
+            "clippedShare": 0,
+            "reverbRt60Seconds": 0.52,
+            "mudDb": 3.1,
+            "presenceDb": -15.4
+          },
+          "denoised": {
+            "noiseFloorDb": -78.5,
+            "loudnessLufs": -25.6,
+            "loudnessRangeLu": 6.9,
+            "clippedShare": 0,
+            "reverbRt60Seconds": 0.24,
+            "mudDb": 2.7,
+            "presenceDb": -16
+          }
+        },
+        "chain": {
+          "denoise": {
+            "attenuationLimitDb": 30
+          },
+          "highpassHz": 80,
+          "eq": [
+            {
+              "type": "peak",
+              "frequencyHz": 300,
+              "gainDb": -1.7,
+              "q": 1
+            },
+            {
+              "type": "peak",
+              "frequencyHz": 3500,
+              "gainDb": 4,
+              "q": 0.8
+            }
+          ],
+          "compressor": {
+            "thresholdDb": -23.6,
+            "ratio": 2.7,
+            "attackMs": 10,
+            "releaseMs": 120,
+            "makeupDb": 9.1
+          },
+          "deesser": {
+            "frequencyHz": 6000,
+            "intensity": 0.7,
+            "thresholdDb": -38
+          },
+          "limiter": {
+            "ceilingDb": -9
+          }
+        }
+      },
+      {
+        "source": "talk-b",
+        "measurements": {
+          "recorded": {
+            "noiseFloorDb": -78.2,
+            "loudnessLufs": -19.8,
+            "loudnessRangeLu": 9.4,
+            "clippedShare": 0.0002,
+            "reverbRt60Seconds": 0.18,
+            "mudDb": 0.4,
+            "presenceDb": -9.2
+          }
+        },
+        "chain": {
+          "highpassHz": 80,
+          "eq": [
+            {
+              "type": "peak",
+              "frequencyHz": 3500,
+              "gainDb": -1.8,
+              "q": 0.8
+            }
+          ],
+          "level": {
+            "targetDb": -15.3,
+            "windowSeconds": 3,
+            "maxGainDb": 12
+          },
+          "compressor": {
+            "thresholdDb": -17.8,
+            "ratio": 2,
+            "attackMs": 10,
+            "releaseMs": 120,
+            "makeupDb": 2.6
+          },
+          "deesser": {
+            "frequencyHz": 6000,
+            "intensity": 0.3,
+            "thresholdDb": -38
+          },
+          "limiter": {
+            "ceilingDb": -9
+          }
+        }
+      }
+    ],
+    "music": [
+      {
+        "source": "music",
+        "license": {
+          "name": "CC BY 4.0",
+          "url": "https://creativecommons.org/licenses/by/4.0/",
+          "attribution": "Calm Loop by Example Artist"
+        },
+        "in": 0,
+        "out": 3606000,
+        "start": 0,
+        "gainDb": -6,
+        "fadeIn": 120000,
+        "fadeOut": 240000,
+        "ducking": { "depthDb": -18, "attackMs": 80, "releaseMs": 400 },
+        "beatGrid": { "bpm": 96, "downbeat": 30000, "beatsPerBar": 4 }
+      }
+    ]
+  },
+  "plan": {
+    "model": "claude-opus-5-5",
+    "rationale": "Opens on the clearest statement of the idea, keeps the demo from the second camera, and ends on the call to action; the screen recording covers the part where the speaker describes it.",
+    "dropped": [
+      {
+        "source": "talk-a",
+        "in": 1008000,
+        "out": 1206000,
+        "kind": "filler",
+        "reason": "「嗯，那個」 before the second point."
+      },
+      {
+        "source": "talk-a",
+        "in": 1980000,
+        "out": 2400000,
+        "kind": "length",
+        "reason": "A side story about the camera; cut to fit 30 s."
+      },
+      {
+        "source": "talk-b",
+        "in": 0,
+        "out": 360000,
+        "kind": "pause",
+        "reason": "Silence before the speaker starts."
+      }
+    ],
+    "fit": { "duration": 3606000, "passes": 2 },
+    "emphasis": [
+      {
+        "start": 1260000,
+        "end": 1452000,
+        "text": "五分鐘",
+        "reason": "The promise of the whole video: an hour of footage becomes five minutes."
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+[tools]
+uv = "0.13.0"
+
+[settings]
+# Node and Python come from .node-version and .python-version, the files other tools read too;
+# corepack then provides the pnpm pinned in package.json's packageManager.
+idiomatic_version_file_enable_tools = ["node", "python"]
+node.corepack = true

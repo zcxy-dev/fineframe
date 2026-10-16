@@ -1,0 +1,127 @@
+# video-editor
+
+**A fully automatic video editor, in development.** The goal: drop in your footage, choose a length and an aspect ratio, and get back a finished video, cut, captioned, framed, graded and animated, with no manual steps. It is built for Mandarin, English and speech that switches between them. Captions come out in Taiwan Traditional Chinese.
+
+[![CI](https://github.com/zcxy-dev/video-editor/actions/workflows/ci.yml/badge.svg)](https://github.com/zcxy-dev/video-editor/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+> **Status:** the analysis worker, the planner, the renderer with its captions and effect templates, the `pnpm edit` command that runs them from footage to a finished video, the web page in front of it, and the benchmark work today.
+
+## Design
+
+```text
+footage/ (any number of clips)  +  length (15 s … 1 h)  +  aspect (9:16 · 1:1 · 16:9)
+        │
+        ▼
+analyze     shots · speech and pauses · transcript with word timings · faces · audio events
+plan        pick the best takes, remove fillers and dead air, fit the requested length
+render      cuts · framing · color · voice · music · animated captions · effects · loudness
+check       review every cut, fix what is wrong, at most three passes
+        │
+        ▼
+finished.mp4  +  captions.srt
+```
+
+A single web page drives it: drop the files, pick the length and aspect ratio, press start, and download the result.
+
+## What works today
+
+| Part | Status |
+|---|---|
+| **Probe:** displayed size of rotated phone footage; pixel shape, so anamorphic footage such as HDV's 1440 × 1080 is framed as the 16:9 it shows; HDR transfer and colour matrix; every audio track; cover art ignored | ✅ |
+| **Shot detection:** [TransNetV2](https://github.com/soCzech/TransNetV2) finds hard cuts on the new shot's first frame and dissolves as spans | ✅ |
+| **Speech and pauses:** [Silero VAD](https://github.com/snakers4/silero-vad), with times kept unrounded | ✅ |
+| **Loudness and audio events:** EBU R128 momentary and short-term loudness for every second, at 48 kHz with each channel weighed as BS.1770 does, reading what FFmpeg's meter reads to 0.1 LU on synthetic speech, music and noise; laughter, applause and music as timed events with a confidence, from the [CED](https://github.com/RicherMans/CED) AudioSet tagger. Music is checked on synthetic audio; laughter and applause are not yet measured on real footage | ✅ |
+| **Faces and who speaks:** [YuNet](https://huggingface.co/opencv/face_detection_yunet) faces tracked through each shot; each shot classed as one person, two people, a group, a webcam over a screen, or a screen; and who speaks when, from whose mouth moves while Silero hears speech. Measured on the synthetic corpus ([details and numbers](worker/README.md#faces-and-speakers)); real footage is not scored yet | ✅ |
+| **Long sources:** frames stream through shot detection and the audio is decoded once for the analyses at 16 kHz and once for the voice at 48 kHz, so a 2-hour 1080p60 file peaks at about 1.3 GB through shot detection and about 2.7 GB while its speech is denoised ([voice](worker/README.md#voice)), before transcription adds the speech model's memory (below) | ✅ |
+| **Transcript:** [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) in sentence-sized chunks, so mixed Mandarin and English is not forced into one language. Converted to Taiwan Traditional Chinese with [OpenCC](https://github.com/BYVoid/OpenCC); words and punctuation timed by Qwen3-ForcedAligner, then each word edge placed from the audio below the aligner's grid ([word timings](worker/README.md#word-timings)) | ✅ |
+| **Transcript correction** (opt-in): Claude fixes misheard names, terms and homophones from the neighbouring sentences, the title and a glossary before the words are timed. Edits that would add, drop or re-script a spoken word are rejected, and every proposal is recorded in the index. The glossary can also bias the speech model itself ([details](worker/README.md#transcript-correction)). Neither effect is measured on the corpus yet | ✅ |
+| **Plan:** [Claude plans the edit](packages/engine/README.md#planning) from the media indexes of any number of files and a length from 15 s to 1 h: story order across files, the best take of each line, fillers and false starts cut, B-roll over long talking stretches and the moments to emphasise. Code places every cut between words, in a pause and on the frame grids, fits the length by priority, as near the target as whole lines and pauses allow and within ±5 %, and writes captions for the kept speech. It hides jump cuts with punch-ins and pushes in on the moments to emphasise, enlarging footage without pixels to spare by at most 1.2 times ([framing](packages/engine/README.md#planning)), matches cameras that frame the same scene and puts a designed look over the edit ([colour](packages/engine/README.md#colour)). After each render, Claude checks every cut on a strip of frames and waveform and fixes what it finds, at most three times. Measured on the synthetic corpus ([numbers](packages/engine/README.md#planner-measurements)); take choices are not yet compared with a person's on real footage | ✅ |
+| **Framing:** the planner frames every clip in the edit's shape with a [virtual camera](packages/engine/README.md#framing) that follows whoever speaks, keeps two or more people together when they fit, holds still inside a dead zone, pans with eased, speed-limited moves and cuts at shot changes; screen recordings get a still crop | ✅ |
+| **Render:** [`project.json` to MP4](packages/engine/) with cuts, dissolves, dips, B-roll, framing that holds still or pans frame by frame, punch-ins and push-ins, a bounded auto grade, colour matching, looks and two-pass loudness. Rotated, HDR and variable-frame-rate footage comes out upright, in BT.709 and at one frame rate. Every cut is frame- and sample-exact, with no clicks and no audio drift ([measurements](packages/engine/README.md#measurements)). MP4, Matroska and WebM footage plays on its media index's timeline, to the millisecond. Matched cameras land within the ΔE00 bar on synthetic footage; real multi-camera footage is not matched yet ([colour measurements](packages/engine/README.md#colour-measurements)) | ✅ |
+| **Music:** background music only from tracks you supply, each with the licence you state for it. [`vework analyze-music`](worker/README.md#music) finds tempo, beats and downbeats, sections and loudness. The planner has Claude pick the track and section that fit the content's mood; code fits it to the length on whole phrases, ending on the track's own ending or a fade, and ducks it under speech so the voice stays at least 18 dB over it, quieter speakers included, with B-roll cuts on the beat ([details](packages/engine/README.md#planning)). `pnpm edit --music` takes the tracks, each with its licence in a text file beside it, and writes the licences next to the video. Measured on synthetic music and edits and on a corpus talk show with licensed tracks ([numbers](packages/engine/README.md#music-measurements)); people's ratings are not measured yet | ✅ |
+| **One command:** [`pnpm edit`](packages/engine/README.md#editing-footage) turns a folder of footage, and music if you give it, into the finished video at the length and aspect asked (9:16, 1:1 or 16:9): each file is analysed once and cached, then the edit is planned, rendered with its captions, music and effects, and every cut reviewed. Progress comes out as JSON lines for the web page. Measured on synthetic footage and on openly licensed interviews and talks ([numbers](packages/engine/README.md#edit-measurements)); cuts in the real footage are checked against the analysis's own word timings until its transcripts are corrected | ✅ |
+| **Web page:** [one page](apps/web/README.md) runs `pnpm edit` on footage dropped in as files or folders, with any audio files among them offered as music under one licence you state: a length preset or any length from 15 s to 1 h, the aspect, a style and names and terms; live progress by stage; the video in the page with the track it plays, and MP4 and SRT downloads. One edit at a time; a reload reopens the edit from its address | ✅ |
+| **Effects:** six animated templates for Traditional Chinese and English text: a title, a lower third, a keyword highlight, a chapter marker, a screen-recording callout and a wipe over a cut. They are rendered with [Remotion](https://www.remotion.dev) as transparent video and laid over exactly the frames each covers, cached once rendered ([details](packages/effects/)). Planned edits use five of them sparingly: Claude picks keyword pops for the strongest moments, a title for a long edit, chapters for an edit of two minutes or more, each marked as it starts with a wipe over the cut into it, and lower thirds for people named in `--names`, and code times each on the speech, one at a time. Callouts are not planned: no index holds where on a screen recording the thing named is ([details](packages/engine/README.md#planning)) | ✅ |
+| **Captions:** [burned in word by word](packages/engine/README.md#captions) as the speech was said, in Taiwan Traditional Chinese with English words kept in English. Four presets; rows break at pauses and between words, never inside an English word, with no closing punctuation starting a row; each word lights on the frame it is said; a caption moves off a face under it. A SubRip file beside the video matches the picture. Checked by eye on synthetic footage and one corpus clip; not yet rated in the blind review | ✅ |
+| **Studio voice:** vework measures each source's speech (the room's noise floor, loudness and its range, clipping, reverberation, boom and presence) and removes its noise and much of the room with [DeepFilterNet3](https://github.com/Rikorose/DeepFilterNet). The engine chooses each source's chain from those measurements: denoising only as far as the room needs, a light de-reverb only where the room is still heard, an 80 Hz high-pass, EQ, a leveller where the level wanders, compression to one speech level for every source, de-essing and a peak limiter. Loudness is then -14 LUFS for 9:16 and 1:1 and -16 for 16:9, at -1 dBTP. Music is set under the processed voice. Measured on deliberately degraded synthetic clips and three noisy corpus clips: the room 12 to 25 dB further under the speech, a talk show's loudness range from 13 to 16 LU down to 3.6 and 3.7, no clicks or drift at cuts and word timings unchanged ([numbers](packages/engine/README.md#voice-measurements)); hand-checked transcripts and a blind review are still to judge it | ✅ |
+| **Benchmark:** mixed-script error rate, timing error, shot precision/recall/F1, how often the person talking is named, clicks and A/V drift, the voice's lead over music, beat tracking, and for a planned edit its length, cuts inside words, filler precision/recall, retake choice, dead air and edges near a beat, pooled across a corpus | ✅ |
+| **Blind review:** a local page plays each edit alone, or two versions of it side by side under neutral labels, and records 1–5 ratings in seven categories, plus which of two versions the rater would rather post. The report gives the mean of each category and the preference rates ([details](bench/README.md#blind-review)) | ✅ |
+| **File formats:** [JSON Schemas](packages/schema/) for the media index, `project.json` (the whole edit, timed in exact ticks) and progress lines, with generated TypeScript types and validators. The worker validates every index it writes | ✅ |
+| **Ground truth drafts:** `vework draft-truth` transcribes a corpus clip for a person to correct; the benchmark refuses a draft nobody corrected | ✅ |
+| **Synthetic corpus:** [`vebench synth`](bench/README.md#synthetic-corpus) generates talks, a three-camera conversation, a portrait phone walk and screen recordings, with exact truth for words, shots, fillers, pauses, retakes, story order and who speaks on screen, plus music with known beats and sections | ✅ |
+
+Analysis and rendering run locally. Planning sends Anthropic each file's transcript with its name, length, frame size, shot changes, pauses, loudness peaks and audio events, the names and terms you list, and for music you offer, each track's file name, length, tempo, sections' loudness and licence name. The review after each render sends, for every cut, a picture of eight frames and the waveform of the two seconds around it, with the words on either side. Transcript correction, when you turn it on, sends the transcript, the video's title (by default the file name) and your glossary. No video or audio file is uploaded.
+
+## Quick start
+
+**Requirements:**
+- [mise](https://mise.jdx.dev), which installs the pinned Node, Python and `uv`; Node's corepack then provides the pinned pnpm. Either [activate mise](https://mise.jdx.dev/getting-started.html) in your shell, or prefix the commands below with `mise exec --`.
+- About 2 GB for the Python environment, plus the model weights downloaded on first use.
+
+```bash
+git clone https://github.com/zcxy-dev/video-editor.git
+cd video-editor
+mise install
+pnpm install
+(cd worker && uv sync --extra ml)
+
+# Claude plans the edit and checks its cuts with your Anthropic key, about US$0.10 to 0.13 an edit:
+# copy .env.example to .env (git-ignored) and fill in ANTHROPIC_API_KEY.
+pnpm edit footage/ --length 60s --aspect 9:16 -o out/edit.mp4
+```
+
+Or run the [web page](apps/web/README.md). `pnpm edit --help` lists the options; [`packages/engine`](packages/engine/README.md#editing-footage) says what the command writes and how it reports progress. The analysis on its own writes one file's media index:
+
+```bash
+cd worker
+# Shots, speech, a transcript with word timings, loudness, audio events, faces and who speaks,
+# and voice measurements, with the denoised speech beside the index (talk.voice.wav).
+uv run vework analyze talk.mp4 -o talk.index.json
+```
+
+The [media index format](packages/schema/media-index.schema.json) is defined with the other file formats in [`packages/schema`](packages/schema/).
+
+**Which speech model runs:**
+
+| Model | Weights to download | Speed on an 8-core CPU (EPYC 9355P) | Peak memory |
+|---|---|---|---|
+| Qwen3-ASR-0.6B | 3.4 GB | ~1.3× the clip's length | ~9 GB |
+| Qwen3-ASR-1.7B | 5.9 GB | ~14× the clip's length | ~14 GB |
+
+Weight sizes include the aligner. `vework` uses 1.7B with a CUDA GPU and 0.6B otherwise; `--asr-model` overrides that. On Linux, the lockfile installs a CPU-only PyTorch, so the models run on the CPU there.
+
+To plan or render on its own, see [`packages/engine`](packages/engine/). To score outputs against ground truth, see [`bench/`](bench/).
+
+## Contributing
+
+Setup, checks and the rules every change follows are in [CONTRIBUTING.md](CONTRIBUTING.md). Report security issues as described in [SECURITY.md](SECURITY.md).
+
+## Acknowledgements
+
+- **Models:**
+  - [Qwen3-ASR and Qwen3-ForcedAligner](https://github.com/QwenLM/Qwen3-ASR) (Apache-2.0)
+  - [TransNetV2](https://github.com/soCzech/TransNetV2), through [transnetv2-pytorch](https://github.com/allenday/transnetv2_pytorch) (MIT)
+  - [Silero VAD](https://github.com/snakers4/silero-vad) (MIT)
+  - [CED](https://github.com/RicherMans/CED), through its [ONNX export](https://huggingface.co/mispeech/ced-base) (Apache-2.0)
+  - [YuNet](https://github.com/ShiqiYu/libfacedetection.train), through [OpenCV Zoo's copy](https://huggingface.co/opencv/face_detection_yunet) (MIT)
+  - [Beat This!](https://github.com/CPJKU/beat_this) code and weights (MIT), for beats and downbeats
+  - [DeepFilterNet3](https://github.com/Rikorose/DeepFilterNet), through its ONNX export (MIT or Apache-2.0)
+  - [Kokoro-82M-v1.1-zh](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh) weights and voices (Apache-2.0), through [kokoro](https://github.com/hexgrad/kokoro) (Apache-2.0), for the synthetic corpus
+  - [spaCy](https://github.com/explosion/spaCy) and its `en_core_web_sm` model (MIT), for English pronunciation in the synthetic corpus
+- **Libraries:**
+  - [OpenCC](https://github.com/BYVoid/OpenCC) (Apache-2.0)
+  - [PyAV](https://github.com/PyAV-Org/PyAV) (BSD-3-Clause)
+  - [ONNX Runtime](https://github.com/microsoft/onnxruntime) (MIT)
+  - [OpenCV](https://github.com/opencv/opencv), through [opencv-python-headless](https://github.com/opencv/opencv-python) (Apache-2.0)
+  - [SciPy](https://scipy.org) (BSD-3-Clause)
+  - [misaki](https://github.com/hexgrad/misaki) (Apache-2.0), with [jieba](https://github.com/fxsjy/jieba) (MIT) and [pypinyin](https://github.com/mozillazg/python-pinyin) (MIT), for Kokoro's pronunciation. Its English extra also installs espeak-ng (GPL-3.0), which the generator never calls.
+  - [Pillow](https://github.com/python-pillow/Pillow) (MIT-CMU), which draws the synthetic pictures
+  - [Remotion](https://www.remotion.dev) ([Remotion License](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md)) and [React](https://react.dev) (MIT), which render the effect overlays in Chrome Headless Shell
+  - [Noto Sans TC](https://github.com/notofonts/noto-cjk) (OFL-1.1), through [Fontsource](https://fontsource.org) (MIT), for the effects' type and the web page's Chinese text, and Noto Sans CJK TC (OFL-1.1) for the captions
+  - [Next.js](https://nextjs.org) (MIT) for the web page, set in [Inter](https://github.com/rsms/inter) (OFL-1.1) through Fontsource
+  - [FFmpeg](https://ffmpeg.org). The renderer, the tests and the benchmark run the static GPL builds that [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg) ships (7.0.2 on Linux, 7.1 on macOS), as a separate program.
+
+## License
+
+[MIT](LICENSE). Notices for code adapted from other projects are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The effect templates render with Remotion, which has its own licence: free for individuals and companies of up to 3 people, while larger companies need a [company licence](https://www.remotion.pro/license) ([terms](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md)).

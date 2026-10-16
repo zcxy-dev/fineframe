@@ -1,0 +1,21 @@
+{
+  "name": "@video-editor/schema",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test",
+    "gen": "node scripts/gen.ts",
+    "check-gen": "node scripts/gen.ts --check"
+  },
+  "dependencies": {
+    "ajv": "8.20.0"
+  },
+  "devDependencies": {
+    "json-schema-to-typescript": "16.0.0"
+  }
+}

@@ -1,0 +1,61 @@
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+dist/
+build/
+
+# TypeScript
+node_modules/
+.next/
+*.tsbuildinfo
+
+# Media and analysis outputs stay local, wherever they are created.
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.avi
+*.mts
+*.m4a
+*.mp3
+*.wav
+*.flac
+*.aac
+*.index.json
+# What `pnpm edit` writes beside a video, and its work folder.
+*.project.json
+*.srt
+edit_cuts.json
+.*.edit/
+# .mts is also TypeScript's ES-module extension.
+!apps/**/*.mts
+!packages/**/*.mts
+
+# Corpus footage and run outputs; hand-checked truth files are committed.
+bench/corpus/*/*
+!bench/corpus/*/truth/
+!bench/corpus/*/truth/*.srt
+# `vebench synth` output, truth included: regenerate it from its seed.
+bench/synthetic/
+
+# Blind-review rounds: the edits and the raters' ratings.
+bench/review/
+
+# Credentials never enter git; commit an .example copy instead.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Editor and OS files.
+.DS_Store
+.idea/
+.vscode/
+
+# Next writes it on every build; types.d.ts stands in for it.
+apps/web/next-env.d.ts

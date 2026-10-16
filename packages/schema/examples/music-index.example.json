@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "source": {
+    "name": "calm-loop.flac",
+    "duration": 10.6,
+    "sample_rate": 48000,
+    "channels": 2
+  },
+  "license": {
+    "name": "CC BY 4.0",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution": "Calm Loop by Example Artist"
+  },
+  "tracker": "beat_this final0",
+  "tempo": {
+    "bpm": 96.0,
+    "beats_per_bar": 4
+  },
+  "beats": [
+    0.5, 1.125, 1.75, 2.375, 3.0, 3.625, 4.25, 4.875, 5.5, 6.125, 6.75, 7.375, 8.0, 8.625, 9.25,
+    9.875
+  ],
+  "downbeats": [0.5, 3.0, 5.5, 8.0],
+  "sections": [
+    {
+      "start": 0.0,
+      "end": 5.5,
+      "loudness": -21.4
+    },
+    {
+      "start": 5.5,
+      "end": 10.52,
+      "loudness": -16.2
+    }
+  ],
+  "loudness": [-70.0, -22.1, -21.0, -20.9, -21.3, -18.0, -16.4, -16.1, -16.0, -16.3, -19.8],
+  "end": 10.52
+}

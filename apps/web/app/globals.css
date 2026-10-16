@@ -1,0 +1,121 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b0b0d;
+  --bg-glow: rgb(255 212 59 / 0.06);
+  --surface: #141417;
+  --surface-2: #1b1b1f;
+  --surface-3: #232328;
+  --border: #2a2a31;
+  --border-strong: #3a3a43;
+  --text: #f1f1f3;
+  --text-2: #b4b4bd;
+  --muted: #8a8a95;
+  /* The captions' yellow: the one colour the edit itself uses. */
+  --accent: #ffd43b;
+  --accent-hover: #ffdd63;
+  --accent-ink: #141414;
+  --accent-soft: rgb(255 212 59 / 0.12);
+  --danger: #ff6b6b;
+  --danger-soft: rgb(255 107 107 / 0.1);
+  --success: #5ad19a;
+  --focus: #ffd43b;
+  --shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 20px 40px -24px rgb(0 0 0 / 0.6);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --font:
+    "Inter Variable", "Noto Sans TC", system-ui, -apple-system, "Segoe UI", "PingFang TC",
+    "Microsoft JhengHei", sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #f6f6f4;
+    --bg-glow: rgb(255 196 0 / 0.1);
+    --surface: #ffffff;
+    --surface-2: #f3f3f1;
+    --surface-3: #e9e9e6;
+    --border: #e3e3df;
+    --border-strong: #cfcfca;
+    --text: #17171a;
+    --text-2: #45454c;
+    --muted: #6c6c75;
+    --accent: #ffd43b;
+    --accent-hover: #ffcb12;
+    --accent-ink: #141414;
+    --accent-soft: rgb(255 196 0 / 0.16);
+    --danger: #d23c3c;
+    --danger-soft: rgb(210 60 60 / 0.08);
+    --success: #1f9d63;
+    --focus: #17171a;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 16px 32px -24px rgb(0 0 0 / 0.25);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: radial-gradient(1200px 500px at 70% -10%, var(--bg-glow), transparent 60%), var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.5;
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+/* biome-ignore-start lint/complexity/noImportantStyles: motion is off everywhere, whatever a
+   component sets. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+/* biome-ignore-end lint/complexity/noImportantStyles: see above */
