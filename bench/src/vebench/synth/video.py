@@ -366,6 +366,67 @@ EDITOR = [
 ]
 
 
+SETTINGS = ("Model", "Output folder", "API key")
+FILES = ("index.json", "shots.json", "transcript.json", "edit.json")
+
+
+def _field(i: int, width: int) -> tuple[int, int, int, int]:
+    """The box of the settings form's i-th field."""
+    y = 130 + 90 * i
+    return 340, y - 6, width - 140, y + 40
+
+
+def _save(width: int, height: int) -> tuple[int, int, int, int]:
+    """The settings form's Save button."""
+    x1, y1 = width - 60, height - 50
+    return x1 - 220, y1 - 90, x1 - 80, y1 - 40
+
+
+def _slide_lines(text, width: int, height: int) -> list[tuple[str, tuple[float, float], int]]:
+    """A slide's title and bullet lines: each text, where it is drawn and its font size."""
+    lines = [(text[0], (0.08 * width, 0.14 * height), 64)]
+    for i, line in enumerate(text[1:]):
+        lines.append((line, (0.12 * width, 0.36 * height + i * 0.12 * height), 44))
+    return lines
+
+
+def screen_regions(kind: str, text, size: tuple[int, int]) -> list[dict]:
+    """The things on a screen a speaker may point at that hold still while it shows: a settings
+    form's fields and button, an editor's file list and a slide's lines. Each is a name and its
+    box, as fractions of the picture from its top-left corner."""
+    width, height = size
+    boxes: list[tuple[str, tuple[float, float, float, float]]] = []
+    if kind == "settings":
+        boxes += [(f"{label} field", _field(i, width)) for i, label in enumerate(SETTINGS)]
+        boxes.append(("Save button", _save(width, height)))
+    elif kind == "editor":
+        for i, name in enumerate(FILES):
+            left, top, right, bottom = _font(20).getbbox(name)
+            boxes.append((name, (60 + left, 100 + 34 * i + top, 60 + right, 100 + 34 * i + bottom)))
+    elif kind == "slide":
+        for line, (x, y), font in _slide_lines(text, width, height):
+            left, top, right, bottom = _font(font).getbbox(line)
+            boxes.append((line, (x + left, y + top, x + right, y + bottom)))
+    fraction = lambda x0, y0, x1, y1: {  # noqa: E731
+        "x": round(x0 / width, 4), "y": round(y0 / height, 4),
+        "w": round((x1 - x0) / width, 4), "h": round((y1 - y0) / height, 4),
+    }  # fmt: skip
+    return [{"name": name, "rect": fraction(*box)} for name, box in boxes]
+
+
+def regions(clip: Clip, layout: Layout) -> list[dict]:
+    """Truth for regions.json: the screen_regions of each screen shot, from when it is on screen
+    alone, after any dissolve into it, until the next shot starts coming in."""
+    size = (LANDSCAPE[1], LANDSCAPE[0]) if clip.portrait else LANDSCAPE
+    out = []
+    for shot, after in zip(layout.shots, [*layout.shots[1:], None], strict=True):
+        start = (shot["frame"] + shot["dissolve"]) / clip.fps
+        end = after["frame"] / clip.fps if after else layout.duration
+        for region in screen_regions(shot["view"], shot["text"], size):
+            out.append({"start": round(start, 6), "end": round(end, 6), **region})
+    return out
+
+
 class Screen:
     """A screen recording: a terminal, an editor, a settings form or a slide."""
 
@@ -378,11 +439,11 @@ class Screen:
                 _gradient(width, height, _color(rng, 20, 80), _color(rng, 10, 60))
             )
             draw = ImageDraw.Draw(image)
-            draw.text((0.08 * width, 0.14 * height), text[0], font=_font(64), fill=(255, 255, 255))
-            for i, line in enumerate(text[1:]):
-                y = 0.36 * height + i * 0.12 * height
+            (title, at, font), *lines = _slide_lines(text, width, height)
+            draw.text(at, title, font=_font(font), fill=(255, 255, 255))
+            for line, (x, y), font in lines:
                 draw.ellipse((0.09 * width, y + 14, 0.09 * width + 16, y + 30), fill=(250, 200, 80))
-                draw.text((0.12 * width, y), line, font=_font(44), fill=(235, 235, 235))
+                draw.text((x, y), line, font=_font(font), fill=(235, 235, 235))
             self.base = np.asarray(image)
             return
         image = Image.fromarray(_gradient(width, height, _color(rng, 40, 120), _color(rng, 20, 80)))
@@ -404,7 +465,7 @@ class Screen:
         )
         if kind == "editor":
             draw.rectangle((40, 76, 260, height - 30), fill=(238, 238, 240))
-            for i, name in enumerate(("index.json", "shots.json", "transcript.json", "edit.json")):
+            for i, name in enumerate(FILES):
                 draw.text((60, 100 + 34 * i), name, font=_font(20), fill=(60, 60, 60))
             self.area = (290, 90, width - 60, height - 50)
             page = Image.new(
@@ -415,10 +476,9 @@ class Screen:
                 pd.text((0, 28 * i), f"{i + 1:>3}  {line}", font=_font(20), fill=self.ink)
             self.page = np.asarray(page)
         if kind == "settings":
-            for i, label in enumerate(("Model", "Output folder", "API key")):
-                y = 130 + 90 * i
-                draw.text((100, y), label, font=_font(24), fill=(60, 60, 60))
-                draw.rectangle((340, y - 6, width - 140, y + 40), outline=(160, 160, 170), width=2)
+            for i, label in enumerate(SETTINGS):
+                draw.text((100, 130 + 90 * i), label, font=_font(24), fill=(60, 60, 60))
+                draw.rectangle(_field(i, width), outline=(160, 160, 170), width=2)
             draw.text((356, 130), "claude-opus-5-5", font=_font(24), fill=(30, 30, 30))
             draw.text((356, 220), "~/videos/out", font=_font(24), fill=(30, 30, 30))
             self.dot = (356, 310 + 17)
@@ -469,7 +529,8 @@ class Screen:
                 cx = self.dot[0] + 8 + 18 * i
                 frame[self.dot[1] - 5 : self.dot[1] + 5, cx - 5 : cx + 5] = (30, 30, 30)
             saved = local > 1.5 + 32 / 12 + 1.0
-            frame[y1 - 90 : y1 - 40, x1 - 220 : x1 - 80] = self.buttons[saved]
+            bx0, by0, bx1, by1 = _save(*self.size)
+            frame[by0:by1, bx0:bx1] = self.buttons[saved]
             if saved:
                 frame[y1 - 160 : y1 - 120, x1 - 420 : x1 - 80] = self.toast
         phase, rate = self.pointer

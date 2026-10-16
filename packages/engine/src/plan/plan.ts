@@ -11,6 +11,7 @@ import {
   type MediaIndex,
   type MusicTrack,
   type Project,
+  type Rect,
   secondsToTicks,
   TICKS_PER_SECOND,
   ticksPerFrame,
@@ -27,10 +28,11 @@ import { punchIns, type ShotFacts } from "../punch.ts";
 import { fingerprintOf, gridTicks } from "../sources.ts";
 import { loudnessFor, planVoice } from "../voice.ts";
 import { captionLines, outputWords, type TimedWord } from "./captions.ts";
-import { anthropicClaude, type Claude, PLAN_MODEL, type Usage } from "./claude.ts";
-import { plannedOverlays } from "./effects.ts";
+import { anthropicClaude, type Claude, PLAN_MODEL, totalUsage, type Usage } from "./claude.ts";
+import { calloutSpan, plannedOverlays } from "./effects.ts";
 import { type FillerCandidate, fillerCandidates, findWords } from "./fillers.ts";
 import { BREATH_RANGE, fitLength, type Span } from "./fit.ts";
+import { calloutRect, LOCATE_MODEL, type Located, locate, wishKey } from "./locate.ts";
 import {
   describeMusic,
   fitMusic,
@@ -42,7 +44,14 @@ import {
   snapToBeat,
   speechLoudness,
 } from "./music.ts";
-import { type Line, packSource, packStill, speechSeconds, splitLines } from "./pack.ts";
+import {
+  type Line,
+  packSource,
+  packStill,
+  screenSpans,
+  speechSeconds,
+  splitLines,
+} from "./pack.ts";
 import {
   cutGap,
   cuttableAfter,
@@ -172,6 +181,11 @@ export interface PlanState {
   grades: Map<string, AutoGrade>;
   /** Each clip's colour as measured for matching, by what it depends on (matchColour). */
   colours: Map<string, ColourSample>;
+  /** What each callout points at on its screen recording, by wishKey; a callout whose thing was
+   * not found has none. */
+  regions: Map<string, Located>;
+  /** Whether a found region looks at a time as it did when found, by calloutRect's key. */
+  stills: Map<string, boolean>;
   look: Look | null;
   /** The model that answered the last planning request. */
   model: string;
@@ -255,6 +269,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
       title: !short && options.length >= TITLE_SECONDS,
       chapters: options.length >= CHAPTER_SECONDS,
       people: names.length > 0,
+      callouts: [...sources.values()].some((s) => s.index && screenSpans(s.index).length > 0),
     },
     fps,
     short,
@@ -267,6 +282,8 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
     restored: new Set(),
     grades: new Map(),
     colours: new Map(),
+    regions: new Map(),
+    stills: new Map(),
     look: options.look === undefined ? DEFAULT_LOOK : options.look,
     model: PLAN_MODEL,
     planCalls: 0,
@@ -312,6 +329,27 @@ async function decide(state: PlanState, request: string): Promise<void> {
   state.progress(`${reply.usage.model} planned the edit (${dollars(reply.usage.dollars)})`);
   state.decisions = reply.json as Decisions;
   takeDecisions(state);
+  await locateCallouts(state);
+}
+
+/** Finds on screen what each callout on a line that plays points at, once per plan. */
+async function locateCallouts(state: PlanState): Promise<void> {
+  const playing = new Set(
+    state.segments.flatMap((s) => s.lines.map((line) => `${s.source}:${line.n}`)),
+  );
+  const wishes = (state.decisions.callouts ?? []).filter(
+    (wish) => playing.has(`${wish.source}:${wish.line}`) && !state.regions.has(wishKey(wish)),
+  );
+  if (wishes.length === 0) return;
+  const before = state.usage.length;
+  const found = await locate(wishes, state.sources, state.claude, state.usage);
+  for (const [key, located] of found) state.regions.set(key, located);
+  const asked = state.usage.length - before;
+  const spent = totalUsage(state.usage.slice(before)).dollars;
+  const cost = asked > 0 ? `${asked} requests, ${dollars(spent)}` : "all cached";
+  state.progress(
+    `Found ${found.size} of ${wishes.length} things to point at with ${LOCATE_MODEL} (${cost})`,
+  );
 }
 
 /** Resolves the planner's line numbers and ids against the transcripts, dropping what does not
@@ -554,13 +592,25 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
   const covered = broll.map((clip) => ({ start: clip.start, duration: clip.out - clip.in }));
   let joined = 0;
   const cuts = clips.slice(0, -1).map((clip) => (joined += clip.out - clip.in));
-  const overlays = plannedOverlays(state, words, lengthOf(clips), covered, cuts);
   // Each clip framed for the output's shape on the faces its source's index found.
   const framed = <C extends { source: string; in: number; out: number }>(clip: C): C => {
     const index = state.sources.get(clip.source)?.index;
     const crop = index && cropPath(index, clip, { width, height });
     return crop ? { ...clip, framing: { crop } } : clip;
   };
+  const main = clips.map((clip) => framed({ source: clip.source, in: clip.in, out: clip.out }));
+  // Where each thing found shows in the frame while its callout would play.
+  const placed = new Map<string, Rect>();
+  for (const wish of state.decisions.callouts ?? []) {
+    const located = state.regions.get(wishKey(wish));
+    const source = located && state.sources.get(located.source);
+    const span = located && calloutSpan(state.fps, words, lengthOf(clips), located);
+    if (!located || !source || !span) continue;
+    const size = { width, height, frame: ticksPerFrame(state.fps) };
+    const rect = await calloutRect(source, main, located, span.from, span.duration, size, state.stills); // biome-ignore format: one line
+    if (rect) placed.set(wishKey(wish), rect);
+  }
+  const overlays = plannedOverlays(state, words, lengthOf(clips), covered, cuts, placed);
   let project: Project = {
     version: 1,
     output: {
@@ -571,9 +621,7 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
       target: { duration: secondsToTicks(state.length), tolerance: TOLERANCE },
     },
     sources: sources as Project["sources"],
-    main: clips.map((clip) =>
-      framed({ source: clip.source, in: clip.in, out: clip.out }),
-    ) as Project["main"],
+    main: main as Project["main"],
     ...(broll.length > 0 ? { broll: broll.map(framed) } : {}),
     ...(overlays.length > 0 ? { overlays } : {}),
     captions: {

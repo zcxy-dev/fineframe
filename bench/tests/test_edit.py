@@ -156,3 +156,35 @@ def test_b_roll_edges_are_measured_from_the_beats_of_the_music_under_them(tmp_pa
     beats_score = edit.score(path)["beats"]
     assert beats_score == {"edges": 4, "near": 3, "max_abs_ms": 20.0, "mean_abs_ms": 6.7}
     assert edit.summarize([edit.score(path)])["beats"]["max_abs_ms"] == 20.0
+
+
+def test_callouts_are_scored_through_their_crop_against_the_region_on_screen(tmp_path):
+    path = corpus(tmp_path, [(1.2, 2.0), (5.45, 6.45)], target=1.8)
+    clip = tmp_path / "a1"
+    index = {"source": {"duration": 8.0, "video": {"width": 1280, "height": 720}}}
+    (clip / "index.json").write_text(json.dumps(index))
+    # A field from 0.4 to 0.5 of the picture's width, on screen from 1 s to 2 s of the source.
+    field = {"x": 0.4, "y": 0.2, "w": 0.1, "h": 0.1}
+    regions = [{"start": 1.0, "end": 2.0, "name": "field", "rect": field}]
+    (clip / "truth" / "regions.json").write_text(json.dumps({"regions": regions}))
+    project = json.loads(path.read_text())
+    project["output"] |= {"width": 1080, "height": 1920}
+    # A 9:16 crop from 0.3 of the 16:9 picture: 0.316406 of its width.
+    crop = {"type": "static", "rect": {"x": 0.3, "y": 0.0, "w": 0.316406, "h": 1.0}}
+    for clip in project["main"]:
+        clip["framing"] = {"crop": crop}
+    on = {"x": (0.4 - 0.3) / 0.316406, "y": 0.2, "w": 0.1 / 0.316406, "h": 0.1}
+    off = on | {"y": 0.6}
+
+    def callout(start, rect):
+        return {"template": "callout", "start": round(start * T), "duration": 3 * T,
+                "params": {"rect": rect}}  # fmt: skip
+
+    # Named 0.3 s after each start: at 1.5 s and 1.6 s of the source, then at 5.75 s, where
+    # the truth has no region.
+    project["overlays"] = [callout(0.0, on), callout(0.1, off), callout(0.8, on)]
+    path.write_text(json.dumps(project))
+    scored = edit.score(path)["callouts"]
+    assert scored == {"count": 3, "on_target": 1, "mean_iou": 0.333, "ious": [1.0, 0.0, 0.0]}
+    pooled = edit.summarize([edit.score(path)])["callouts"]
+    assert pooled == {"count": 3, "scored": 3, "on_target": 1, "mean_iou": 0.333}

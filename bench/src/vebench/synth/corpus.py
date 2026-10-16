@@ -41,6 +41,8 @@ def generate(out: Path, seed: int, progress: Callable[[str], None]) -> dict:
         _write(truth / "shots.json", {"transitions": transitions(plan.shots, clip.fps)})
         _write(truth / "edit.json", plan.edit)
         _write(truth / "speakers.json", {"turns": speaker_turns(clip, plan.words, plan.shots)})
+        if found := video.regions(clip, plan):
+            _write(truth / "regions.json", {"regions": found})
         progress(f"{clip.name}: drawing {plan.duration:.0f} s at {clip.fps} fps")
         video.render(clip, plan, out / clip.name / "source.mp4", seed)
         summary["clips"][clip.name] = {

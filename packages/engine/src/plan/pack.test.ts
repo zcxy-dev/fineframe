@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { MediaIndex, Word } from "@video-editor/schema";
+import type { FramedShot, MediaIndex, Word } from "@video-editor/schema";
 import { fillerCandidates, findWords } from "./fillers.ts";
 import { formatTime, packSource, splitLines } from "./pack.ts";
 import { CUT_GAP } from "./place.ts";
@@ -119,4 +119,22 @@ test("words join as subtitles write them, and carry their language", () => {
   assert.equal(wordLanguage("好，"), "zh-TW");
   assert.equal(wordLanguage("API"), "en");
   assert.equal(wordLanguage("，"), null);
+});
+
+test("a file's header says when it shows a screen recording, its shots next to each other as one", () => {
+  const media = index(words(["大", 1.0, 1.2]));
+  const shot = (start: number, end: number, layout: FramedShot["layout"]): FramedShot => ({
+    start,
+    end,
+    layout,
+    faces: [],
+    speakers: [],
+  });
+  const lines = splitLines("talk", media.transcript.words, CUT_GAP);
+  assert.doesNotMatch(packSource("talk", media, lines, []), /Screen recording/);
+  media.framing = {
+    fps: 5,
+    shots: [shot(0, 5, "talking_head"), shot(5, 12.4, "screen"), shot(12.4, 20, "screen_cam"), shot(20, 30, "talking_head")], // biome-ignore format: one line
+  };
+  assert.match(packSource("talk", media, lines, []), /\nScreen recording: 5\.0-20\.0 s\n/);
 });

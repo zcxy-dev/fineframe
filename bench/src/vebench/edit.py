@@ -6,6 +6,7 @@ are ticks, 120 000 per second, on its sources' own clocks.
 """
 
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -25,6 +26,10 @@ DEAD_AIR = 1.0
 KEPT = 0.5
 # An edge this close to a beat of the music under it is one the planner should have put on it.
 NEAR_BEAT = 0.15
+# A callout starts this long before the thing it points at is named (the effect catalog), and is
+# on target when its box and the true region overlap by this much (intersection over union).
+CALLOUT_LEAD = 0.3
+ON_TARGET = 0.5
 
 
 @dataclass(frozen=True)
@@ -57,6 +62,7 @@ def score(project_path: Path) -> dict:
         "retakes": {"scored": 0, "correct": 0, "unused": 0},
         "dead_air": {"count": 0, "seconds": 0.0},
         "beats": _beats(project, base),
+        "callouts": _callouts(project, base),
         "sources": [],
     }
     silences_by_source = {}
@@ -100,6 +106,13 @@ def summarize(results: list[dict]) -> dict:
         "near": sum(r["beats"]["near"] for r in results),
         "max_abs_ms": max(offsets, default=None),
     }
+    ious = [iou for r in results for iou in r["callouts"]["ious"]]
+    pooled["callouts"] = {
+        "count": sum(r["callouts"]["count"] for r in results),
+        "scored": len(ious),
+        "on_target": sum(iou >= ON_TARGET for iou in ious),
+        "mean_iou": round(sum(ious) / len(ious), 3) if ious else None,
+    }
     fillers = pooled["fillers"]
     fillers["recall"] = _rate(fillers["removed"], fillers["total"])
     fillers["precision"] = _rate(fillers["filler_words"], fillers["removed_words"])
@@ -141,6 +154,97 @@ def _beats(project: dict, base: Path) -> dict:
         out["max_abs_ms"] = round(max(near), 1)
         out["mean_abs_ms"] = round(sum(near) / len(near), 1)
     return out
+
+
+def _callouts(project: dict, base: Path) -> dict:
+    """Each callout's box, taken back through its clip's framing to the source's picture at the
+    moment the thing it points at is named, against the regions on screen then
+    (`truth/regions.json`, bench/README.md#synthetic-corpus). `ious` holds each scored callout's
+    best overlap; a callout over a source without region truth counts but is not scored."""
+    out = {"count": 0, "on_target": 0, "mean_iou": None, "ious": []}
+    sources = {s["id"]: s for s in project["sources"]}
+    starts, at = [], 0
+    for k, clip in enumerate(project["main"]):
+        if k > 0 and clip.get("transition", {}).get("type") == "dissolve":
+            at -= clip["transition"]["duration"]
+        starts.append(at)
+        at += clip["out"] - clip["in"]
+    for overlay in project.get("overlays", []):
+        if overlay["template"] != "callout":
+            continue
+        out["count"] += 1
+        t = overlay["start"] + CALLOUT_LEAD * TICKS
+        k = max((i for i, s in enumerate(starts) if s <= t), default=0)
+        clip = project["main"][k]
+        source = sources[clip["source"]]
+        truth = (base / source["path"]).resolve().parent / "truth" / "regions.json"
+        index = source.get("index")
+        if not truth.exists() or not index or not (base / index).exists():
+            continue
+        video = json.loads((base / index).read_text(encoding="utf-8"))["source"]["video"]
+        aspect = video["width"] * video.get("sample_aspect", 1) / video["height"]
+        tick = clip["in"] + t - starts[k]
+        shape = project["output"]["width"] / project["output"]["height"]
+        vx, vy, vw, vh = _visible(clip.get("framing"), tick, aspect, shape)
+        r = overlay["params"]["rect"]
+        box = (vx + r["x"] * vw, vy + r["y"] * vh, r["w"] * vw, r["h"] * vh)
+        seconds = tick / TICKS
+        regions = json.loads(truth.read_text(encoding="utf-8"))["regions"]
+        shown = [g["rect"] for g in regions if g["start"] <= seconds < g["end"]]
+        out["ious"].append(round(max((_iou(box, g) for g in shown), default=0.0), 3))
+    if out["ious"]:
+        out["on_target"] = sum(iou >= ON_TARGET for iou in out["ious"])
+        out["mean_iou"] = round(sum(out["ious"]) / len(out["ious"]), 3)
+    return out
+
+
+def _visible(framing: dict | None, t: float, aspect: float, shape: float) -> tuple:
+    """The part of the source on screen at source tick t, as (x, y, w, h) fractions of its
+    picture: the engine's visible() in packages/engine/src/framing.ts."""
+    framing = framing or {}
+    crop = framing.get("crop")
+    rect = {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0}
+    if crop and crop["type"] == "static":
+        rect = crop["rect"]
+    elif crop:
+        keys = crop["keyframes"]
+        after = next((i for i, key in enumerate(keys) if key["t"] > t), len(keys))
+        if after == 0 or after == len(keys):
+            rect = keys[min(after, len(keys) - 1)]["rect"]
+        else:
+            a, b = keys[after - 1], keys[after]
+            f = (t - a["t"]) / (b["t"] - a["t"])
+            rect = {k: a["rect"][k] + (b["rect"][k] - a["rect"][k]) * f for k in "xywh"}
+    scale = _scale(framing.get("scale"), t)
+    anchor = framing.get("anchor", {"x": 0.5, "y": 0.5})
+    w = min(rect["w"] * aspect, rect["h"] * shape) / scale
+    h = min(rect["h"], rect["w"] * aspect / shape) / scale
+    x = (rect["x"] + rect["w"] / 2) * aspect - w / 2 + (anchor["x"] - 0.5) * w * (scale - 1)
+    y = rect["y"] + rect["h"] / 2 - h / 2 + (anchor["y"] - 0.5) * h * (scale - 1)
+    x, y = min(max(x, 0.0), max(0.0, aspect - w)), min(max(y, 0.0), max(0.0, 1 - h))
+    return x / aspect, y, w / aspect, h
+
+
+def _scale(scale, t: float) -> float:
+    """A framing's scale at tick t, eased along half a cosine between keyframes."""
+    if scale is None or isinstance(scale, int | float):
+        return scale or 1.0
+    keys = scale["keyframes"]
+    if t <= keys[0]["t"]:
+        return keys[0]["scale"]
+    for a, b in zip(keys, keys[1:], strict=False):
+        if t < b["t"]:
+            f = (1 - math.cos(math.pi * (t - a["t"]) / (b["t"] - a["t"]))) / 2
+            return a["scale"] + (b["scale"] - a["scale"]) * f
+    return keys[-1]["scale"]
+
+
+def _iou(a: tuple, b: dict) -> float:
+    x0, y0 = max(a[0], b["x"]), max(a[1], b["y"])
+    x1, y1 = min(a[0] + a[2], b["x"] + b["w"]), min(a[1] + a[3], b["y"] + b["h"])
+    inter = max(0.0, x1 - x0) * max(0.0, y1 - y0)
+    union = a[2] * a[3] + b["w"] * b["h"] - inter
+    return inter / union if union > 0 else 0.0
 
 
 def _units(truth: Path) -> list[transcript.Unit]:

@@ -3,17 +3,25 @@
 // length its template does not allow.
 
 import { catalog, overlayProblems, type TemplateId } from "@video-editor/effects";
-import { type Overlay, secondsToTicks, ticksPerFrame } from "@video-editor/schema";
+import {
+  type FrameRate,
+  type Overlay,
+  type Rect,
+  secondsToTicks,
+  ticksPerFrame,
+} from "@video-editor/schema";
 import type { TimedWord } from "./captions.ts";
 import { findWords } from "./fillers.ts";
+import { CALLOUT_LEAD, type Located, wishKey } from "./locate.ts";
 import type { PlanState } from "./plan.ts";
 import { bare } from "./text.ts";
 
-/** The templates the planner places. A callout needs the region of the screen the speaker refers
- * to, which no index holds: finding it would take reading the screen at the moment it is named. */
-export const PLANNED: readonly TemplateId[] = ["title", "lower-third", "keyword", "chapter", "wipe"]; // biome-ignore format: one line
-/** Keyword pops per minute of edit at most, the top of the catalog's one to three. */
+/** The templates the planner places. */
+export const PLANNED: readonly TemplateId[] = ["title", "lower-third", "keyword", "chapter", "wipe", "callout"]; // biome-ignore format: one line
+/** Keyword pops per minute of edit at most, the top of the catalog's one to three, and callouts:
+ * one every 20 s, as the planner is told. */
 const KEYWORDS_PER_MINUTE = 3;
+const CALLOUTS_PER_MINUTE = 3;
 /** A keyword's swipe lands as its word is said, so it starts this much sooner (catalog). */
 const KEYWORD_LEAD = 0.15;
 /** A lower third waits this long after its person starts speaking (catalog). */
@@ -29,11 +37,14 @@ const CHAPTERS_MAX = 12;
 /**
  * The overlays of an edit `edit` ticks long whose kept words are `words`: a title over the
  * opening when one was asked for, a marker as each chapter starts with a wipe over the cut into
- * it, a lower third the first time each named person speaks, and keyword pops on the emphasised
- * moments, in that order of precedence. One that would overlap another, run shorter than its
- * template allows or break its params is left out; an optional param that breaks them (a
- * subtitle or role too long) is left out alone. `broll` is where B-roll covers the speaker,
- * which a lower third waits for or else is left out; `cuts` are where the clips join.
+ * it, a lower third the first time each named person speaks, a callout on each thing pointed at
+ * on a screen recording that was found there, and keyword pops on the emphasised moments, in
+ * that order of precedence. One that would overlap another, run shorter than its template allows
+ * or break its params is left out; an optional param that breaks them (a subtitle, role or label
+ * too long) is left out alone. `broll` is where B-roll covers the speaker, which a lower third
+ * waits for or else is left out, and which hides a callout's region; `cuts` are where the clips
+ * join. `placed` holds where each found thing shows in the output frame while its callout plays
+ * (calloutSpan), by wishKey; a thing that does not show whole and still has none.
  */
 export function plannedOverlays(
   state: PlanState,
@@ -41,15 +52,16 @@ export function plannedOverlays(
   edit: number,
   broll: readonly { start: number; duration: number }[] = [],
   cuts: readonly number[] = [],
+  placed: ReadonlyMap<string, Rect> = new Map(),
 ): Overlay[] {
   const frame = ticksPerFrame(state.fps);
   const onFrame = (ticks: number) => Math.max(0, Math.round(ticks / frame) * frame);
   const wanted: Overlay[] = [];
   const add = (template: TemplateId, start: number, params: Record<string, unknown>) => {
-    const { min, typical } = catalog[template].seconds;
-    const from = onFrame(start);
-    const duration = Math.min(onFrame(secondsToTicks(typical)), edit - from);
-    if (duration >= secondsToTicks(min)) wanted.push({ template, start: from, duration, params });
+    const { from, duration } = span(state.fps, edit, template, start);
+    if (duration >= secondsToTicks(catalog[template].seconds.min)) {
+      wanted.push({ template, start: from, duration, params });
+    }
   };
   /** The first kept word of a source's line, on the output timeline. */
   const lineStart = (source: string, n: number) => {
@@ -80,6 +92,14 @@ export function plannedOverlays(
     named.add(name);
     add("lower-third", word.start + secondsToTicks(NAME_DELAY), { name, ...optional("role", person.role) }); // biome-ignore format: one line
   }
+  for (const wish of state.decisions.callouts ?? []) {
+    const located = state.regions.get(wishKey(wish));
+    const rect = placed.get(wishKey(wish));
+    const word = located && words.find((w) => w.source === located.source && w.index === located.word); // biome-ignore format: one line
+    if (word && rect) {
+      add("callout", word.start - secondsToTicks(CALLOUT_LEAD), { rect, ...optional("label", wish.label) }); // biome-ignore format: one line
+    }
+  }
   for (const item of emphasis) {
     const keyword = item.keyword?.trim();
     const source = state.sources.get(item.source);
@@ -97,17 +117,23 @@ export function plannedOverlays(
   // upper keyword share the top of the frame, and two effects at once compete for the eye. A
   // wipe covers the cut just before its chapter's marker comes in, so those two may overlap.
   const kept: Overlay[] = [];
-  let keywords = Math.max(1, Math.floor((KEYWORDS_PER_MINUTE * edit) / secondsToTicks(60)));
+  const perMinute = (n: number) => Math.max(1, Math.floor((n * edit) / secondsToTicks(60)));
+  const left: Partial<Record<TemplateId, number>> = {
+    keyword: perMinute(KEYWORDS_PER_MINUTE),
+    callout: perMinute(CALLOUTS_PER_MINUTE),
+  };
   const paired = (a: string, b: string) =>
     (a === "wipe" && b === "chapter") || (a === "chapter" && b === "wipe");
-  // A lower third names someone on camera, so B-roll over them blocks it too.
+  // A lower third names someone on camera, and a callout points at the screen under it, so
+  // B-roll over them blocks them too.
   const clash = ({ template, start, duration }: Overlay) =>
     [
       ...kept.filter((k) => !paired(template, k.template)),
-      ...(template === "lower-third" ? broll : []),
+      ...(template === "lower-third" || template === "callout" ? broll : []),
     ].filter((k) => start < k.start + k.duration && k.start < start + duration);
   for (const wish of wanted) {
-    if (wish.template === "keyword" && keywords === 0) continue;
+    const quota = left[wish.template as TemplateId];
+    if (quota === 0) continue;
     let overlay = wish;
     const blocking = clash(overlay);
     const wait = WAIT[overlay.template as TemplateId];
@@ -119,14 +145,35 @@ export function plannedOverlays(
     }
     if (clash(overlay).length > 0) continue;
     if (overlayProblems([overlay]).length > 0) {
-      const { subtitle, role, ...required } = overlay.params;
+      const { subtitle, role, label, ...required } = overlay.params;
       overlay = { ...overlay, params: required };
       if (overlayProblems([overlay]).length > 0) continue;
     }
     kept.push(overlay);
-    if (overlay.template === "keyword") keywords--;
+    if (quota !== undefined) left[overlay.template as TemplateId] = quota - 1;
   }
   return kept.sort((a, b) => a.start - b.start);
+}
+
+/** Where an overlay of `template` meant to start at output tick `start` is placed, on the
+ * frame grid, and how long it shows in an edit `edit` ticks long. */
+function span(fps: FrameRate, edit: number, template: TemplateId, start: number) {
+  const frame = ticksPerFrame(fps);
+  const onFrame = (ticks: number) => Math.max(0, Math.round(ticks / frame) * frame);
+  const from = onFrame(start);
+  const typical = onFrame(secondsToTicks(catalog[template].seconds.typical));
+  return { from, duration: Math.min(typical, edit - from) };
+}
+
+/** Where a callout on a found thing would play, by the first word naming it, if it plays. */
+export function calloutSpan(
+  fps: FrameRate,
+  words: readonly TimedWord[],
+  edit: number,
+  located: Located,
+): { from: number; duration: number } | undefined {
+  const word = words.find((w) => w.source === located.source && w.index === located.word);
+  return word && span(fps, edit, "callout", word.start - secondsToTicks(CALLOUT_LEAD));
 }
 
 /**

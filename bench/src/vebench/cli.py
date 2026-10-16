@@ -124,7 +124,8 @@ def _parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser(
         "edit",
-        help="length, cuts inside words, fillers, retakes and dead air of one planned edit",
+        help="length, cuts inside words, fillers, retakes, dead air, beats and callouts of one "
+        "planned edit",
         epilog="Each source is scored against <its clip>/truth: bench/README.md#edit-truth",
     )
     p.add_argument("--project", type=Path, required=True, help="the edit's project.json")
