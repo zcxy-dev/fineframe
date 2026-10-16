@@ -10,7 +10,7 @@ import pytest
 from conftest import ffmpeg
 from test_correct import FakeClaude
 
-from vework import correct, denoise, events, framing, shots, speech, transcribe
+from vework import correct, denoise, events, framing, openrouter, shots, speech, transcribe
 from vework.audio import load
 from vework.cli import main
 from vework.media_index import MediaIndex
@@ -140,6 +140,34 @@ def test_a_corrected_index_records_its_corrections(talking_video, monkeypatch, t
     assert written["transcript"]["text"] == "我們再來看"
     assert written["corrections"][0]["rejected"] is None
     assert "<title>talk</title>" in claude.requests[0]["messages"][0]["content"][0]["text"]
+
+
+def test_a_cloud_index_records_the_model_and_what_it_cost(talking_video, monkeypatch, tmp_path):
+    monkeypatch.setattr(shots, "detect", lambda path: [])
+    monkeypatch.setattr(speech, "segments", lambda samples: [{"start": 0.25, "end": 1.5}])
+    monkeypatch.setattr(events, "detect", lambda samples: [])
+    monkeypatch.setattr(framing, "analyze", lambda *args: {"fps": 5.0, "shots": []})
+    monkeypatch.setattr(denoise, "enhance", lambda samples, in_place: samples)
+    monkeypatch.setattr(transcribe, "_models", lambda model: pytest.fail("speech model loaded"))
+    align = lambda wav, text, language: [(c, 0.2 * i, 0.2 * (i + 1)) for i, c in enumerate(text)]  # noqa: E731
+    monkeypatch.setattr(transcribe, "_aligner", lambda half: align)
+    monkeypatch.setattr(openrouter.Client, "check", lambda self: None)
+
+    def recognize(self, wavs, progress):
+        self.cost += 0.0001
+        return [("大家好", None)]
+
+    monkeypatch.setattr(openrouter.Client, "recognize", recognize)
+    out = tmp_path / "index.json"
+    main(["analyze", str(talking_video), "-o", str(out), "--asr", "cloud"])
+
+    written = json.loads(out.read_text())
+    MediaIndex.model_validate(written, strict=True)
+    assert written["transcript"]["text"] == "大家好"
+    minutes = written["source"]["duration"] / 60
+    cloud = written["transcript"]["cloud"]
+    assert cloud["model"] == openrouter.MODEL and cloud["cost"] == 0.0001
+    assert cloud["cost_per_minute"] == pytest.approx(0.0001 / minutes, rel=0.02)
 
 
 def test_an_index_that_breaks_the_schema_fails_and_is_not_written(

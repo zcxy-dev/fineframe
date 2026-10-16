@@ -44,6 +44,39 @@ The index's `framing` says, shot by shot, how the picture is laid out, where eac
 - **Limits:** a head turned more than about 50 degrees, nearly in profile, is not found at all, so the camera stays on whoever faces it. Real footage is not scored yet.
 - **Cost:** frames stream through, and a shot's samples are dropped once it is framed. On 8 cores of an EPYC 9355P, the stage takes 4 to 8 s per source minute from 360p to 1080p and peaks at about 0.4 GB, the same for a 2- and a 12-minute source and for 2 hours. Measured with `/usr/bin/time -v` on a 2-hour 720p30 source, the synthetic talks and conversations looped and re-encoded: 0.41 GB as one unbroken shot, which holds all 36,000 samples until the end, and 0.41 GB again with its 705 shot changes, which give 32,740 face boxes. Over either run the memory stays between 0.29 and 0.41 GB from start to end. Each face on screen adds about 50 KB of boxes to the index per source minute.
 
+## Cloud speech
+
+`--asr cloud` has a speech-to-text model on [OpenRouter](https://openrouter.ai) hear the speech, paid with your own key, for machines without the memory or the time for the local model. Everything else runs on this machine, the aligner that times the words included.
+
+```bash
+uv run --extra ml --env-file ../.env vework analyze talk.mp4 -o talk.index.json --asr cloud
+```
+
+- **Off by default:** the local model is the default. It needs no key, costs nothing per minute and sends nothing anywhere.
+- **Key:** `OPENROUTER_API_KEY`, from the environment or, with `--env-file ../.env`, from the git-ignored `.env` at the repository root. Before the analysis starts, vework stops with a message if the key is missing, malformed or rejected, or if the model is not a speech-to-text model.
+- **What is sent:** each chunk of speech that would go to the local model: at most 30 s of 16 kHz mono audio, compressed as lossless FLAC. Video, the silence between chunks and everything else in the index stay on this machine. OpenRouter passes the audio to the model's provider (DeepInfra for the default model). Requests ask OpenRouter for providers that do not keep or train on it (`data_collection: deny`), and OpenRouter's and the provider's own policies apply.
+- **Model:** `qwen/qwen3-asr-1.7b` by default, the model the local default runs with a GPU. `--asr-model` names any other [OpenRouter speech-to-text model](https://openrouter.ai/models?output_modalities=transcription).
+- **Same rules as the local model:** the same sentence-sized chunks, each heard in one language, so mixed Mandarin and English is not forced into one. Each chunk takes the language the model names or, when it names none, the language its script shows. Then comes the conversion to Taiwan Traditional Chinese, [correction](#transcript-correction) when asked for, and the aligner. The aligner runs in bfloat16, which more than halves its memory. `--asr-context` needs the local model, since OpenRouter takes no context prompt.
+- **Cost:** progress names the dollars spent so far, and the index's `transcript.cloud` records the model, what OpenRouter charged and the cost per source minute.
+- **Failures:** 8 chunks are in flight at once, each with a 120 s timeout. Busy and failing servers (429, 5xx, timeouts, dropped connections) are retried up to 5 times, honouring `Retry-After`. Any other refusal stops the analysis with OpenRouter's reason, such as a key out of credit.
+
+**Measured** with `vebench transcript` on 5 clips of the [synthetic corpus](../bench/README.md#synthetic-corpus): seed 0, `talk-a1` to `a3`, `chat-b1` and `b2`, 11.5 minutes. The runs shared the 8-core host with jobs that loaded it 3 to 8 times over, so neither wall time nor CPU time is comparable between them. Memory and dollars are.
+
+| Speech model | MER | CJK / Latin error | Start and end within 50 / 100 ms | Peak memory while transcribing | Cost per hour of source |
+|---|---|---|---|---|---|
+| Local Qwen3-ASR-0.6B (the CPU default) | 3.71 % | 2.59 / 45.1 % | 66.0 / 92.7 % | 9.7 GB (the whole analysis) | — |
+| `qwen/qwen3-asr-1.7b` (default) | 2.97 % | 2.13 / 33.8 % | 65.8 / 92.8 % | 2.9 GB | US$0.024 |
+| `elevenlabs/scribe-v2` | 2.04 % | 1.49 / 22.5 % | 66.0 / 92.9 % | 2.9 GB | US$0.098 |
+| `elevenlabs/scribe-v2`, its own word timings, no aligner | 2.00 % | 1.45 / 22.5 % | 67.4 / 80.1 % | 0.2 GB | US$0.098 |
+
+The Latin error rates rest on 71 English words. Once the host was quiet, the whole analysis of `talk-a1` (144 s), shots, faces and voice included, took 73 s and 242 s of CPU time with cloud speech and peaked at 3.3 GB. With the local model it took 204 s and 425 s of CPU time and peaked at 9.7 GB. The cost counts only the speech sent, so a source with long silences costs less.
+
+- **Why Qwen3-ASR-1.7B:** it is the cheapest of the models that handle mixed Mandarin and English, more accurate than the local CPU default, and it gives the same text for the same audio every time.
+- **Scribe v2** read more words right, but not reliably. Run again on `talk-a1`, it dropped a 嗯, which the editor cuts by its timings, and heard a chunk of speech as the audio-event tag `[موسيقى]` ("music" in Arabic), for 4.82 % MER against 2.24 % the first time. `--asr-model elevenlabs/scribe-v2` picks it.
+- **Without the aligner:** with Scribe v2's own word timings, transcription needs almost no memory and no CPU, but a fifth of the words have an edge more than 100 ms off, against 7 % with the aligner. Its timings are not used.
+- **Probed and left out:** Deepgram Nova-3 and NVIDIA Parakeet returned no text for a Mandarin chunk. AssemblyAI takes only WAV, and GPT Transcribe does not give the detailed reply vework asks for (`verbose_json`). MAI-Transcribe 2, Grok STT, Gemini 3.5 Transcribe and Whisper large-v3 scored between 4.1 and 5.8 % MER on the three talks, against 3.1 % for Qwen3-ASR-1.7B.
+- **Aligner in bfloat16:** on `talk-a1` it timed 65.8 / 92.1 % of words within 50 / 100 ms, against 66.4 / 92.1 % in float32, and peaked at 2.6 GB instead of 6.0. The aligner has more weights than Qwen3-ASR-0.6B (0.92 billion against 0.78), so it, not the speech model, sets the memory of a cloud analysis.
+
 ## Transcript correction
 
 `--correct` has Claude fix what the speech model misheard (names, terms, homophones) before the aligner times the words, so captions and cuts follow the corrected text. Claude gets one transcribed chunk at a time, with the chunks around it, the video's title (`--title`) and an optional glossary (`--glossary FILE`), and proposes edits with a reason each. `vework analyze --help` names the model.

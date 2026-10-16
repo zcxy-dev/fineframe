@@ -75,6 +75,16 @@ def _han(ch: str) -> bool:
     )
 
 
+def _language_of_script(text: str) -> str:
+    """The language a model that named none spoke, as far as the script tells: Japanese with
+    kana, Korean with Hangul, English otherwise (Han characters then make it Chinese)."""
+    if any("\u3040" <= ch <= "\u30ff" for ch in text):
+        return "Japanese"
+    if any("\uac00" <= ch <= "\ud7af" or "\u1100" <= ch <= "\u11ff" for ch in text):
+        return "Korean"
+    return "English"
+
+
 def _kept(ch: str) -> bool:
     return ch == "'" or unicodedata.category(ch)[0] in "LN"
 
@@ -193,6 +203,10 @@ def default_asr_model() -> str:
     return GPU_ASR_MODEL if torch.cuda.is_available() else CPU_ASR_MODEL
 
 
+# Hears each chunk's audio: its text and the language the model names (None when it names none).
+Recognizer = Callable[[list[np.ndarray], Callable[[str], None]], list[tuple[str, str | None]]]
+
+
 def transcribe(
     samples: np.ndarray,
     speech: list[dict],
@@ -200,13 +214,15 @@ def transcribe(
     progress: Callable[[str], None] = lambda message: None,
     context: str = "",
     correct: Callable[[list[dict]], list[str]] | None = None,
+    recognizer: Recognizer | None = None,
 ) -> dict:
     """Transcribe 16 kHz audio in Taiwan Traditional Chinese and English, with word timings.
 
-    `context` and `correct` are passed to `transcribe_chunks`.
+    `context`, `correct` and `recognizer` are passed to `transcribe_chunks`.
     """
     words, texts, languages = [], [], Counter()
-    for chunk in transcribe_chunks(samples, speech, asr_model, progress, context, correct):
+    chunks = transcribe_chunks(samples, speech, asr_model, progress, context, correct, recognizer)
+    for chunk in chunks:
         words += chunk["words"]
         texts.append(chunk["text"])
         # Weigh by speaking time: English packs more characters into a second than Chinese.
@@ -227,29 +243,44 @@ def transcribe_chunks(
     progress: Callable[[str], None] = lambda message: None,
     context: str = "",
     correct: Callable[[list[dict]], list[str]] | None = None,
+    recognizer: Recognizer | None = None,
 ) -> Iterator[dict]:
     """Yield each chunk the model heard text in: its `start`, `end`, `language`, `text`, `words`.
 
     `context` is Qwen3-ASR's context prompt, which biases it towards the words in it. `correct`
     takes every chunk's "start", "end", "text" and "language" and returns their corrected texts;
     it sees the whole transcript before any chunk is aligned, so the words are timed as corrected.
+    `recognizer` hears the chunks in place of the local speech model (`asr_model` and `context`
+    are then unused), as `openrouter.Client.recognize` does.
     """
     planned = plan_chunks(speech)
     if not planned:
         return  # loading the models takes a minute and gigabytes of memory
-    recognize, align = _models(asr_model)
-    chunks = []
-    for n, (start, end) in enumerate(planned, 1):
-        progress(f"transcribing {n}/{len(planned)}")
-        lo, hi = int(start * RATE), int(end * RATE)
-        wav = samples[lo:hi]
+    wavs = []
+    for start, end in planned:
+        wav = samples[int(start * RATE) : int(end * RATE)]
         if len(wav) < MIN_INPUT * RATE:
             wav = np.pad(wav, (0, int(MIN_INPUT * RATE) - len(wav)))
-        text, language = recognize(wav, context)
+        wavs.append(wav)
+    if recognizer is None:
+        recognize, align = _models(asr_model)
+
+        def recognizer(wavs, progress):
+            heard = []
+            for n, wav in enumerate(wavs, 1):
+                progress(f"transcribing {n}/{len(wavs)}")
+                heard.append(recognize(wav, context))
+            return heard
+    else:
+        align = None  # loaded only once there is text to align, and in half precision
+    chunks = []
+    for (start, end), wav, (text, language) in zip(
+        planned, wavs, recognizer(wavs, progress), strict=True
+    ):
         text = text.strip()
         if not text:
             continue
-        language = language or "English"
+        language = language or _language_of_script(text)
         if language not in ("Japanese", "Korean") and any(map(_han, text)):
             text = to_traditional(text)
             # The aligner splits Han characters and still reads space-separated English words.
@@ -260,6 +291,8 @@ def transcribe_chunks(
         for chunk, text in zip(chunks, correct(chunks), strict=True):
             chunk["text"] = text
 
+    if chunks and align is None:
+        align = _aligner(half=True)
     for n, chunk in enumerate(chunks, 1):
         progress(f"aligning {n}/{len(chunks)}")
         start, end, text, language = chunk["start"], chunk["end"], chunk["text"], chunk["language"]
@@ -274,52 +307,78 @@ def transcribe_chunks(
         yield {"start": start, "end": end, "language": language, "text": text, "words": words}
 
 
-@cache
 def _models(asr_model: str | None):
     """The speech model and the aligner, as two functions.
 
     `recognize(wav, context)` returns the text heard and its language (None when it heard none);
     `align(wav, text, language)` returns each aligner token with its start and end in `wav`.
     """
+    return _recognizer(asr_model), _aligner()
+
+
+@cache
+def _device():
+    """Where the models run, in which precision, after quieting transformers' notices."""
     ml.require()
     import torch
-    from transformers import (
-        AutoModelForMultimodalLM,
-        AutoModelForTokenClassification,
-        AutoProcessor,
-    )
     from transformers.utils import logging as transformers_logging
 
     # Generation notices ("Setting pad_token_id …") and weight-loading progress bars mean nothing
     # to someone editing a video.
     transformers_logging.set_verbosity_error()
     transformers_logging.disable_progress_bar()
-
-    asr_model = asr_model or default_asr_model()
     gpu = torch.cuda.is_available()
-    device, dtype = ("cuda:0", torch.bfloat16) if gpu else ("cpu", torch.float32)
+    return ("cuda:0", torch.bfloat16) if gpu else ("cpu", torch.float32)
 
-    def load(auto, name):
-        # Another model named with --asr-model runs at whatever its repository holds now.
-        revision = REVISIONS.get(name)
-        download.hub(name, revision)
-        model = auto.from_pretrained(name, revision=revision, dtype=dtype).to(device).eval()
-        return model, AutoProcessor.from_pretrained(name, revision=revision)
 
-    asr, asr_processor = load(AutoModelForMultimodalLM, asr_model)
-    aligner, aligner_processor = load(AutoModelForTokenClassification, ALIGNER_MODEL)
+def _load(auto, name: str, half: bool = False):
+    import torch
+    from transformers import AutoProcessor
 
-    def audio(wav: np.ndarray) -> np.ndarray:
-        # Qwen's own inference code scales audio that peaks past full scale back into it.
-        return wav / max(1.0, float(np.abs(wav).max()))
+    device, dtype = _device()
+    dtype = torch.bfloat16 if half else dtype
+    # Another model named with --asr-model runs at whatever its repository holds now.
+    revision = REVISIONS.get(name)
+    download.hub(name, revision)
+    model = auto.from_pretrained(name, revision=revision, dtype=dtype).to(device).eval()
+    return model, AutoProcessor.from_pretrained(name, revision=revision)
+
+
+def _audio(wav: np.ndarray) -> np.ndarray:
+    # Qwen's own inference code scales audio that peaks past full scale back into it.
+    return wav / max(1.0, float(np.abs(wav).max()))
+
+
+@cache
+def _recognizer(asr_model: str | None):
+    device, dtype = _device()
+    import torch
+    from transformers import AutoModelForMultimodalLM
+
+    asr, asr_processor = _load(AutoModelForMultimodalLM, asr_model or default_asr_model())
 
     @torch.inference_mode()
     def recognize(wav: np.ndarray, context: str) -> tuple[str, str | None]:
-        inputs = asr_processor.apply_transcription_request(audio=audio(wav), prompt=context)
+        inputs = asr_processor.apply_transcription_request(audio=_audio(wav), prompt=context)
         inputs = inputs.to(device, dtype)
         ids = asr.generate(**inputs, max_new_tokens=4096)[:, inputs["input_ids"].shape[1] :]
         heard = asr_processor.decode(ids, return_format="parsed")[0]
         return heard["transcription"], heard["language"]
+
+    return recognize
+
+
+@cache
+def _aligner(half: bool = False):
+    """The aligner as a function. `half` runs it in bfloat16 on a CPU too, which more than halves
+    its memory and times words as well on the synthetic corpus ("Cloud speech" in the worker
+    README); runs with the local speech model keep it in float32, as they were measured."""
+    device, dtype = _device()
+    import torch
+    from transformers import AutoModelForTokenClassification
+
+    aligner, aligner_processor = _load(AutoModelForTokenClassification, ALIGNER_MODEL, half)
+    dtype = torch.bfloat16 if half else dtype
 
     @torch.inference_mode()
     def align(wav: np.ndarray, text: str, language: str) -> list[tuple[str, float, float]]:
@@ -330,7 +389,7 @@ def _models(asr_model: str | None):
             # escape sequences that warn as they compile.
             warnings.simplefilter("ignore", SyntaxWarning)
             inputs, tokens = aligner_processor.prepare_forced_aligner_inputs(
-                audio=audio(wav),
+                audio=_audio(wav),
                 transcript=text,
                 language=language if language in ("Japanese", "Korean") else None,
             )
@@ -343,4 +402,4 @@ def _models(asr_model: str | None):
         )[0]
         return [(t["text"], t["start_time"], t["end_time"]) for t in timed]
 
-    return recognize, align
+    return align

@@ -33,6 +33,7 @@ def test_missing_source_is_one_line_not_a_traceback(capsys, tmp_path):
         lambda: shots.predict(np.zeros((1, 27, 48, 3), np.uint8)),
         lambda: speech.segments(np.zeros(16_000, np.float32)),
         lambda: transcribe._models("Qwen/Qwen3-ASR-0.6B-hf"),
+        transcribe._aligner,
         events._classifier,
         lambda: framing._detector((64, 36)),
         denoise._model,
@@ -41,7 +42,8 @@ def test_missing_source_is_one_line_not_a_traceback(capsys, tmp_path):
 @pytest.mark.parametrize("missing", ["torch", "onnxruntime", "huggingface_hub", "cv2"])
 def test_missing_ml_extra_says_how_to_install_it(monkeypatch, call, missing):
     monkeypatch.setitem(sys.modules, missing, None)
-    transcribe._models.cache_clear()
+    for cached in (transcribe._device, transcribe._recognizer, transcribe._aligner):
+        cached.cache_clear()
     denoise._model.cache_clear()
     with pytest.raises(RuntimeError, match="uv sync --extra ml"):
         call()
@@ -80,6 +82,22 @@ def test_correct_without_a_key_fails_before_the_analysis(
     monkeypatch.setattr("vework.index.build", lambda *a, **k: pytest.fail("analysis ran"))
     code, _, err = run(capsys, "analyze", str(source), "-o", str(tmp_path / "i.json"), "--correct")
     assert code == 1 and "ANTHROPIC_API_KEY" in err and "Traceback" not in err
+
+
+def test_cloud_speech_without_a_key_fails_before_the_analysis(capsys, tmp_path, monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    source = tmp_path / "talk.mp4"
+    source.write_bytes(b"")
+    monkeypatch.setattr("vework.index.build", lambda *a, **k: pytest.fail("analysis ran"))
+    code, _, err = run(capsys, "analyze", str(source), "-o", str(tmp_path / "i.json"),
+                       "--asr", "cloud")  # fmt: skip
+    assert code == 1 and "OPENROUTER_API_KEY" in err and "Traceback" not in err
+
+
+def test_the_context_prompt_needs_the_local_speech_model(capsys, tmp_path):
+    code, _, err = run(capsys, "analyze", "talk.mp4", "-o", str(tmp_path / "i.json"),
+                       "--asr", "cloud", "--glossary", "terms.txt", "--asr-context")  # fmt: skip
+    assert code == 2 and "--asr local" in err
 
 
 def test_a_broken_credentials_profile_fails_with_a_message(

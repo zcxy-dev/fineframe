@@ -302,6 +302,19 @@ test("names and correction reach the analysis, and an index made without them is
   assert.match(asked[0] ?? "", /said in the footage: video editor\./);
 });
 
+test("cloud speech reaches the analysis without the context prompt, in an index of its own", async (t) => {
+  const dir = await scratch(t, "edit-cloud-");
+  const { options, analyses } = await footage(dir);
+  await edit(options);
+  const names = join(dir, "terms.txt");
+  await writeFile(names, "video editor\n");
+  const result = await edit({ ...options, names, asr: "cloud" });
+  assert.equal(result.analyzed, 1);
+  const calls = await analyses();
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[1]?.slice(4), ["--asr", "cloud", "--glossary", names]);
+});
+
 test("inputs that cannot make the edit fail before any analysis, saying why", async (t) => {
   const dir = await scratch(t, "edit-bad-");
   const { folder, options, lines, analyses } = await footage(dir);

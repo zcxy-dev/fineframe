@@ -8,6 +8,7 @@ from vework import (
     events,
     framing,
     loudness,
+    openrouter,
     probe,
     shots,
     speech,
@@ -27,11 +28,13 @@ def build(
     context: str = "",
     correction: correct.Settings | None = None,
     stem: Path | None = None,
+    cloud: openrouter.Client | None = None,
 ) -> dict:
     """Analyze one source file into its media index, reporting each stage to `progress`.
 
     `context` biases the speech model; `correction` has Claude fix what it misheard. With `stem`,
-    speech is also measured for voice processing and its denoised copy written there.
+    speech is also measured for voice processing and its denoised copy written there. `cloud`
+    hears the speech on OpenRouter in place of the local speech model.
     """
     corrections = []
 
@@ -69,8 +72,26 @@ def build(
         measured = voice.analyze(path, voiced, stem)
     if voiced:
         transcript = transcribe.transcribe(
-            samples, voiced, asr_model, progress, context, fix if correction else None
+            samples,
+            voiced,
+            asr_model,
+            progress,
+            context,
+            fix if correction else None,
+            cloud.recognize if cloud else None,
         )
+        if cloud:
+            minutes = len(samples) / audio.RATE / 60
+            per_minute = cloud.cost / minutes if minutes else 0.0
+            transcript["cloud"] = {
+                "model": cloud.model,
+                "cost": round(cloud.cost, 6),
+                "cost_per_minute": round(per_minute, 6),
+            }
+            progress(
+                f"transcribed on OpenRouter for US${cloud.cost:.4f} "
+                f"(US${per_minute:.5f} per source minute)"
+            )
     else:
         transcript = {"language": None, "text": "", "words": []}
     result = {
