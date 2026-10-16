@@ -24,19 +24,19 @@ pnpm -s render out/edit.project.json --cut 12.4-17.9 -o out/edit-v2.mp4
 ```
 
 - The range is in seconds (or `m:ss`) of the video the project renders, from the start of the first words to drop to the end of the last: take them from `edit.srt`, or from `captions.lines[].start` and `end` ÷ 120 000. A whole segment of the main track runs between two neighbouring times of `edit_cuts.json` (from 0 for the first). Trimming a segment is cutting its first or last sentences. Give `--cut` once per range; all of them are times in the input video.
-- A word goes when its middle is inside the range. Every new cut lands in the pause beside the words kept, and captions, overlays, B-roll and music move up with the speech. The command writes the cut edit to `out/edit-v2.project.json`.
+- A word goes when its middle is inside the range, and the pauses beside the words cut go with them, so the edit gets shorter by more than the range when a whole segment goes. Every new cut lands in the pause beside the words kept, and captions, overlays, B-roll and music move up with the speech. The command writes the cut edit to `out/edit-v2.project.json`; the render's `seconds` is its new length.
 - Read its stderr: it prints the words it cut from each clip, the overlays it removed because their whole time was cut, and the ones that overlapped the cut. Check the words are exactly the ones meant. A keyword or lower third that overlapped the cut may now stand over other words: remove it from `edit-v2.project.json` if its word went (below), and render again.
-- It refuses a cut that leaves the edit outside ±5 % of its planned length, and prints the new length. If the user wants the shorter video, copy the project, set `output.target.duration` in the copy to the ticks the error gives, and cut from the copy. A much shorter edit is better planned again (`SKILL.md`).
+- It refuses a cut that leaves the edit outside ±5 % of its planned length, and prints the length the cut would leave. Tell the user; if they want the shorter video, run the same command with `--retarget`, which makes that length the planned one. A much shorter edit is better planned again (`SKILL.md`).
 
 ## Fix a caption word
 
-Find the line in `captions.lines` whose `text` holds the word. Change the word in `text` and in the matching entry of `words`, its `text` only; leave every time as it is.
+Find the line in `captions.lines` whose `text` holds the word. Change it in `text` and in the matching entries of `words`, their `text` only; leave every time as it is. In a Chinese line each character is usually its own entry, and an English word is one:
 
 ```json
-{ "text": "我是阿哲", "words": [{ "text": "我", … }, { "text": "是", … }, { "text": "阿哲", … }] }
+{ "text": "能比如說　把一句話…", "words": [{ "text": "能", … }, { "text": "比", … }, …] }
 ```
 
-A word lights as it is said, so a fix that spans two `words` entries puts its first part in the first and the rest in the second; each keeps at least one character. The SubRip file is written again from the lines. A character the caption font cannot draw fails the render with the line's path.
+becomes `"text": "嗯　比如說　把一句話…"` with the first entry's `text` `"嗯"`. Each entry keeps at least one character: a fix with more characters than the entries it replaces puts the extra ones in its last entry, and one with fewer deletes the entries left over. Chinese lines show a pause as a full-width space (`　`) where a comma or full stop was, and keep `？`, `！` and quotes; English lines keep their punctuation. The SubRip file is written again from the lines. A character the caption font cannot draw fails the render with the line's path.
 
 A name the speech model misheard throughout is better fixed at the source next time: list it in the `--names` file of the next `pnpm edit`.
 
@@ -47,12 +47,15 @@ Both are `overlays` entries, by `template`:
 - `title`: `params.text`, at most 24 characters, and an optional `params.subtitle`, at most 40.
 - `lower-third`: `params.name`, at most 16 characters, and an optional `params.role`, at most 28.
 
-Change the params; keep `start` and `duration`. To add a lower third, add an entry `{ "template": "lower-third", "params": { "name": "…", "role": "…" }, "start": …, "duration": 480000 }`, starting about 1 s after the person first speaks on camera, at a time no other overlay covers. To add a title, the same with `"template": "title"`, `start` 0 and `duration` 360000.
+Change the params; keep `start` and `duration`. Overlays show one at a time, so a new one ends before the next overlay's `start`:
+
+- **Add a title:** `{ "template": "title", "params": { "text": "…" }, "start": 0, "duration": 360000 }`, shortened to end where the first other overlay starts, and at least 192000 (1.6 s); when that leaves less, move or remove that overlay.
+- **Add a lower third:** `{ "template": "lower-third", "params": { "name": "…", "role": "…" }, "start": …, "duration": 480000 }`, starting about 1 s after the person first speaks on camera; it lasts 2 to 8 s.
 
 ## Remove or add a keyword or chapter
 
 - **Remove** an overlay by deleting its entry. A `chapter` comes with the `wipe` that covers the cut just before it (the wipe ends shortly after the chapter starts): delete both, then renumber the chapters left, `params.index` from 1 and `params.total` to their number.
-- **Add a keyword:** `{ "template": "keyword", "params": { "text": "…", "position": "upper" }, "start": …, "duration": 180000 }`. `text` is the word or number as spoken, at most 12 characters; `start` is that word's `start` in `captions.lines[].words` less 18 000 (0.15 s), so the swipe lands as it is said. Keep `position` `upper` at 9:16 unless no one is on camera. Overlays show one at a time: pick a moment no other overlay covers, and keep keywords to one to three a minute.
+- **Add a keyword:** `{ "template": "keyword", "params": { "text": "…", "position": "upper" }, "start": …, "duration": 180000 }`. `text` is the word or number as spoken, at most 12 characters; `start` is that word's `start` in `captions.lines[].words` (its first character's, in Chinese) less 18 000 (0.15 s), so the swipe lands as it is said. Keep `position` `upper` at 9:16 unless no one is on camera. Pick a moment no other overlay covers, and keep keywords to one to three a minute.
 - **Add a chapter:** `{ "template": "chapter", "params": { "title": "…", "index": n, "total": m }, "start": …, "duration": 420000 }`, starting with the chapter's first words; `title` at most 20 characters; renumber every chapter. A chapter suits an edit of two minutes or more.
 
 Any overlay can take `params.accent`, a `#rrggbb` colour for its accent instead of the house amber. A changed overlay renders again, in a few seconds; unchanged ones come from the cache.

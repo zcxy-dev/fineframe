@@ -6,7 +6,7 @@ import { loadJson, secondsToTicks, TICKS_PER_SECOND, validateProject } from "@vi
 import { cutEdit, placeSources } from "./cut.ts";
 import { rebase, render } from "./render.ts";
 
-const usage = `Usage: pnpm render <project.json> -o <out.mp4> [--cut <from>-<to>]...
+const usage = `Usage: pnpm render <project.json> -o <out.mp4> [--cut <from>-<to>]... [--retarget]
 
 Renders the edit a project.json describes, without analysing or planning again, and writes
 <name>.project.json, <name>.srt and edit_cuts.json beside the video.
@@ -15,7 +15,9 @@ Renders the edit a project.json describes, without analysing or planning again, 
       --cut      takes a stretch of the edit out, as times in the video it describes: seconds
                  or minutes:seconds, such as 12.5-15 or 1:02-1:04.5. The words said in it go,
                  every cut lands in a pause, and captions, overlays, B-roll and music move up
-                 with the speech. What went is printed; the edit as cut is <name>.project.json`;
+                 with the speech. What went is printed; the edit as cut is <name>.project.json
+      --retarget makes the cut edit's length the one it is planned for, for a cut that takes
+                 it outside 5 % of that, which otherwise fails`;
 
 const parsed = (() => {
   try {
@@ -24,6 +26,7 @@ const parsed = (() => {
       options: {
         output: { type: "string", short: "o" },
         cut: { type: "string", multiple: true },
+        retarget: { type: "boolean" },
         help: { type: "boolean", short: "h" },
       },
     });
@@ -38,7 +41,7 @@ if (values.help) {
   process.exit(0);
 }
 const [input] = positionals;
-if (!input || !values.output || positionals.length > 1) {
+if (!input || !values.output || positionals.length > 1 || (values.retarget && !values.cut)) {
   console.error(usage);
   process.exit(2);
 }
@@ -72,11 +75,13 @@ try {
     const cut = cutEdit(project, ranges, await placeSources(project, projectPath));
     for (const note of cut.notes) process.stderr.write(`render: ${note}\n`);
     const { duration, tolerance } = project.output.target;
-    if (Math.abs(cut.length - duration) > tolerance * duration) {
+    if (values.retarget) {
+      cut.project.output = { ...cut.project.output, target: { duration: cut.length, tolerance } };
+    } else if (Math.abs(cut.length - duration) > tolerance * duration) {
       throw new Error(
         `The cut edit lasts ${seconds(cut.length)} s, outside the ${seconds(duration)} s ± ` +
-          `${tolerance * 100} % it was planned for. To keep it, set /output/target/duration in ` +
-          `the project to ${cut.length} first; for a new length, plan again with pnpm edit`,
+          `${tolerance * 100} % it was planned for. --retarget keeps it at ${seconds(cut.length)} s; ` +
+          "for another length, plan again with pnpm edit",
       );
     }
     process.stderr.write(`render: the edit now lasts ${seconds(cut.length)} s\n`);

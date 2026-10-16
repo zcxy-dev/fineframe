@@ -256,6 +256,24 @@ The `stems` option also writes the mix's parts into a folder, before loudness no
 
 Each video source needs its media index from `vework analyze`: the renderer reads the sound, the colour tags and the frame rate from it, and a voice chain that denoises plays the denoised speech the index names. A source whose size or SHA-256 differs from its fingerprint fails the render.
 
+### Changing an edit
+
+A finished edit changes by changing its `<name>.project.json` and rendering it again, which takes as long as a render, without analysing or planning again. The [agent skill](../../skills/video-editor/SKILL.md) has the recipes an agent follows for each kind of change.
+
+```bash
+pnpm render out/edit.project.json --cut 29-33 -o out/edit-v2.mp4
+```
+
+`--cut <from>-<to>`, in seconds or minutes:seconds of the video the project renders, takes that stretch out ([`cut.ts`](src/cut.ts)), any number of times:
+
+- **Words:** a word goes when its middle falls in a stretch, and a clip goes when a stretch covers it or none of its words is left.
+- **Cuts:** a clip that loses words from inside it splits around them, and each new end is placed in the pause beside the words kept as the planner places cuts: at least 40 ms from a word, on a source frame, with whole output frames between them. The ends a cut does not touch stay where they were.
+- **The rest moves up with the speech:** caption words that went leave their lines, and the rest keep their times against the speech; overlays and B-roll clips start at the first moment left of their time, and go when all of it went; music plays on without a gap and ends where the edit does.
+- **What went:** stderr lists the words cut from each clip, the overlays and B-roll removed, and the ones that overlapped a cut, which may now stand over other words.
+- **Length:** a cut that leaves the edit outside the tolerance of `output.target` fails and prints the new length, as the renderer would; `--retarget` makes that length the target instead, for a shorter edit wanted as it is.
+
+The edit as cut is written to `<name>.project.json` beside the video, which may not be the project it was cut from.
+
 ## What it renders
 
 | `project.json` | |

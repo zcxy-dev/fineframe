@@ -108,7 +108,8 @@ export function cutEdit(
       place(clip, start);
       continue;
     }
-    const said = (list: number[]) => list.map((index) => source.words[index]?.text).join(" ");
+    const said = (list: number[]) =>
+      joinWords(list.map((index) => source.words[index]?.text ?? ""));
     notes.push(`Cut from /main/${i}, ${seconds(start)}–${seconds(end)} s: ${said(gone)}`);
     // Runs of the words left, each played by a clip of its own.
     const runs: number[][] = [];
@@ -201,13 +202,14 @@ export function cutEdit(
     out.captions = { ...project.captions, lines };
   }
   // Placed by its start: it goes when its whole time went, and moves to the first moment left.
-  const span = (start: number, length: number, path: string) => {
+  // Music plays on under a cut, so only what is seen is worth a second look.
+  const span = (start: number, length: number, path: string, seen = true) => {
     const moved = after(start);
     if (!moved || moved.from >= start + length) {
       notes.push(`Removed ${path}, all of it in the cut`);
       return null;
     }
-    if (touched(start, start + length))
+    if (seen && touched(start, start + length))
       notes.push(`${path} overlapped the cut; check it still fits`);
     return moved;
   };
@@ -228,7 +230,7 @@ export function cutEdit(
   }
   if (project.audio.music) {
     const music = project.audio.music.flatMap((track, i) => {
-      const moved = span(track.start, track.out - track.in, `/audio/music/${i}`);
+      const moved = span(track.start, track.out - track.in, `/audio/music/${i}`, false);
       if (!moved) return [];
       const trackIn = track.in + moved.from - track.start;
       const length = keptOf(moved.from, track.start + track.out - track.in);

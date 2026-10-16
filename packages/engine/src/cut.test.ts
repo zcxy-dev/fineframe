@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { copyFile, writeFile } from "node:fs/promises";
+import { copyFile, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
@@ -191,6 +191,20 @@ test("pnpm render --cut says when the cut leaves the planned length", async (t) 
     failed.stderr,
     /render: error: The cut edit lasts 5\.00 s, outside the 8\.00 s ± 5 %/,
   );
+  // --retarget keeps the shorter edit: the cut project is written, then the render reads the
+  // footage, which these fakes are not.
+  const kept = await run("node", [
+    cli,
+    path,
+    "--cut",
+    "5-8",
+    "--retarget",
+    "-o",
+    join(dir, "v2.mp4"),
+  ]).catch((e) => e);
+  assert.doesNotMatch(kept.stderr, /outside the/);
+  const cut = validateProject(JSON.parse(await readFile(join(dir, "v2.project.json"), "utf8")));
+  assert.deepEqual(cut.output.target, { duration: s(5), tolerance: 0.05 });
   const bad = await run("node", [cli, path, "--cut", "8-5", "-o", join(dir, "v2.mp4")]).catch(
     (e) => e,
   );

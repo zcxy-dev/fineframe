@@ -28,13 +28,13 @@ pnpm -s edit footage/ --length 60s --aspect 9:16 -o out/edit.mp4 > out/progress.
 - The first edit of new footage analyses it, about twice the footage's length on a CPU: run it in the background and follow its stderr. Later edits of the same footage start at the plan and take a minute or two. Claude costs about US$0.05 to 0.15 an edit.
 - Done when the last line of `out/progress.jsonl` has `"stage": "done"`. An `"error"` line carries the reason; the stderr says what to change.
 
-Beside the video: `edit.project.json` (the whole edit), `edit.srt` (the captions), `edit_cuts.json` (where each cut falls, in seconds) and, with music, `edit.music.txt` (the licences to credit). Tell the user what was made: its length, and what the captions and overlays say.
+Beside the video: `edit.project.json` (the whole edit), `edit.srt` (the captions), `edit_cuts.json` (where each cut of the newest render in the folder falls, in seconds) and, with music, `edit.music.txt` (the licences to credit). Tell the user what was made: its length, and what the captions and overlays say.
 
 ## 3. Change the edit
 
 Each change makes a new version beside the last, so the user can compare them and go back:
 
-1. Read the project. Times are integer ticks, 120 000 per second, on the output timeline for captions, overlays, B-roll and music `start`. Find what the user means: their words in `captions.lines[].text`, or in `edit.srt`, whose times are the same in seconds; segment *k* of the main track runs between cuts *k* − 1 and *k* of `edit_cuts.json`.
+1. Read the project. Times are integer ticks, 120 000 per second, on the output timeline for captions, overlays, B-roll and music `start`. Find what the user means: their words in `captions.lines[].text`, or in `edit.srt`, whose times are the same in seconds; segment *k* of the main track runs between cuts *k* − 1 and *k* of `edit_cuts.json` (from 0 for the first), which every render rewrites for the version it made.
 2. Find the recipe in [references/recipes.md](references/recipes.md) and follow it. Each recipe either renders with `--cut`, or edits a copy, `edit-v2.project.json` in the same folder (paths in it are relative to its folder), and renders that.
 3. Render: `pnpm -s render out/edit-v2.project.json -o out/edit-v2.mp4`. It validates the project first and names every problem by its JSON path; fix them and render again. A re-render takes about as long as the video plays, plus a few seconds for each new or changed overlay.
 4. Check the result before reporting it: the length the render prints (`seconds` in its JSON), a frame from where the change is (`ffmpeg -ss <seconds> -i out/edit-v2.mp4 -frames:v 1 frame.png`, then look at the image), and the captions near it in `edit-v2.srt`. Without `ffmpeg` on the PATH, use the renderer's own, which `node -e 'import("./packages/engine/src/ffmpeg.ts").then(async (m) => console.log(await m.ffmpeg()))'` prints. Tell the user what changed and where, and the new length.
@@ -49,4 +49,4 @@ These change what the planner chose, so say so to the user and run `pnpm edit` a
 - Putting back something the plan left out, reordering the story, or other footage.
 - A different music track than the one chosen (its level and removal are recipes).
 
-`pnpm render --cut` refuses a cut that leaves the edit outside ±5 % of its planned length, and says so. When the user wants the shorter video anyway, set `output.target.duration` to the length it prints, then cut.
+`pnpm render --cut` refuses a cut that leaves the edit outside ±5 % of its planned length, and prints the length it would have. Tell the user; when they want the shorter video, run the same command with `--retarget`.
