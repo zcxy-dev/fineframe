@@ -368,7 +368,8 @@ export class Jobs {
     if (job.status === "cancelled") {
       // Nothing of a cancelled edit is worth keeping.
     } else if (code === 0 && job.result && existsSync(join(dir, VIDEO))) {
-      job.status = "done";
+      // The result is settled before the job reads as done, so the page never offers what is
+      // not there.
       // Captions with no lines, when no speech is kept, are not worth a download.
       const captions = await stat(join(dir, CAPTIONS)).catch(() => null);
       job.result.captions = (captions?.size ?? 0) > 0;
@@ -377,6 +378,7 @@ export class Jobs {
         const played = await playedMusic(dir).catch(() => null);
         if (played) job.result.music = played;
       }
+      job.status = "done";
     } else {
       job.status = "error";
       job.error ??= `The edit stopped unexpectedly${code === null ? "" : ` (exit code ${code})`}`;
