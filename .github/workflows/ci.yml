@@ -153,28 +153,3 @@ jobs:
           jq -e 'del(.["copy-joined"]) | length == 2 and all(.[];
             .errors == [] and .missing == [] and .render.clicks == 0 and .render.max_abs_drift_ms < 10)' \
             "$RUNNER_TEMP/report.json"
-
-  # WIP: the new runner test against main's runner.ts must fail on Windows; removed before merging.
-  windows-runner:
-    if: github.event_name == 'pull_request'
-    runs-on: windows-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
-        with:
-          cache: false
-      - name: The runner test fails without the fix
-        run: |
-          pnpm install --frozen-lockfile
-          git show origin/main:apps/web/lib/runner.ts > apps/web/lib/runner.ts
-          cd apps/web
-          if node --test lib/runner.test.ts; then exit 1; fi
