@@ -185,7 +185,7 @@ test("a footage folder becomes the video, its project, its captions and progress
   assert.ok(thirdProject.main.every((clip) => clip.grade?.look?.id === "warm"));
 });
 
-test("an economy edit plans with Sonnet, and what Claude cost is told per stage", async (t) => {
+test("an economy edit plans with Sonnet, and each review pass says what its checks cost", async (t) => {
   const dir = await scratch(t, "edit-economy-");
   const { options, lines } = await footage(dir);
   const { claude } = await recordedClaude();
@@ -199,11 +199,6 @@ test("an economy edit plans with Sonnet, and what Claude cost is told per stage"
   };
   const result = await edit({ ...options, claude: priced, quality: "economy" });
   assert.equal(models[0], "claude-sonnet-5-5");
-  const checks = models.length - 1;
-  assert.deepEqual(
-    [result.stages.plan.dollars, result.stages.check.dollars?.toFixed(4)],
-    [0.05, (checks * 0.001).toFixed(4)],
-  );
   assert.equal(result.usage.calls, models.length);
   const messages = lines.map((line) => line.message);
   assert.ok(messages.includes("claude-sonnet-5-5 planned the edit ($0.0500)"), messages.join("\n"));

@@ -1,7 +1,7 @@
 // `pnpm edit`: footage in, a finished video out.
 import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { type Progress, validateProgress } from "@video-editor/schema";
+import { type ClaudeCost, type Progress, validateProgress } from "@video-editor/schema";
 import { isLookId, type LookId, lookIds } from "../looks.ts";
 import { ClaudeError, QUALITIES, type Quality } from "../plan/claude.ts";
 import { type Aspect, dollars, LENGTH_RANGE, PlanError } from "../plan/plan.ts";
@@ -101,6 +101,7 @@ if (process.env.npm_lifecycle_event === "edit" && process.env.INIT_CWD) {
 }
 
 const say = (line: string) => process.stderr.write(`${line}\n`);
+let cost: ClaudeCost | undefined;
 try {
   const result = await edit({
     inputs: positionals,
@@ -117,16 +118,17 @@ try {
       process.stdout.write(`${JSON.stringify(line)}\n`);
       const file = "file" in line && line.file ? `${line.file}: ` : "";
       say(`edit: ${line.stage} ${Math.round(line.fraction * 100)}% ${file}${line.message}`);
+      if (line.stage === "done") cost = line.claude;
     },
     onLog: say,
   });
-  const { timings: t, usage: u, stages } = result;
+  const { timings: t, usage: u } = result;
   const seconds = (value: number) => `${value.toFixed(1)} s`;
   say(
     `edit: analyze ${seconds(t.analyze)} (analysed ${result.analyzed}, from the cache ` +
       `${result.cached}), plan ${seconds(t.plan)}, render ${seconds(t.render)}, check ` +
       `${seconds(t.check)} (reviews: ${result.reviews}); Claude ${dollars(u.dollars)}: plan ` +
-      `${dollars(stages.plan.dollars)}, check ${dollars(stages.check.dollars)} ` +
+      `${dollars(cost?.plan.dollars ?? null)}, check ${dollars(cost?.check.dollars ?? null)} ` +
       `(requests: ${u.calls})`,
   );
 } catch (error) {
