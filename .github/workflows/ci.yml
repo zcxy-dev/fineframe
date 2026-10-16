@@ -77,12 +77,23 @@ jobs:
           pnpm test
           pnpm check-gen
 
-  # The renderer on macOS (Apple silicon) with its pinned macOS FFmpeg: the engine tests, then
-  # a synthetic edit scored by vebench.
+  # The renderer on macOS, Apple silicon and Intel, with each one's pinned FFmpeg: the engine
+  # tests, then a synthetic edit scored by vebench.
   macos:
+    name: ${{ matrix.check }}
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: macos-latest
-    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check: macos
+            runner: macos-latest
+            timeout: 15
+          - check: macos-intel
+            runner: macos-15-intel
+            timeout: 30
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout }}
     permissions:
       contents: read
     steps:
