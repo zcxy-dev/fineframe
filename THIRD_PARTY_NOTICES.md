@@ -52,7 +52,7 @@ Models that come inside a package: the TransNetV2 weights in transnetv2-pytorch,
 
 | Package | Licence | Used by |
 |---|---|---|
-| [@anthropic-ai/sdk](https://github.com/anthropics/anthropic-sdk-typescript) | MIT | engine |
+| [@anthropic-ai/sdk](https://github.com/anthropics/anthropic-sdk-typescript) | MIT | engine, web page |
 | [remotion](https://www.remotion.dev), @remotion/bundler, @remotion/renderer | [Remotion License](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md), source-available (see [notes](#remotion)) | effects |
 | [react](https://react.dev), react-dom | MIT | effects, web page |
 | [ajv](https://github.com/ajv-validator/ajv) | MIT | schema, effects |

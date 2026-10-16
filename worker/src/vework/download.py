@@ -73,9 +73,10 @@ def hub(repo: str, revision: str | None, files: list[str] | None = None) -> None
     total = sum(file.file_size for file in missing)
     if not total:
         return
-    # A file is written to <name>.incomplete in the repository's folder, then moved into the
-    # cache once whole. A part an earlier run left is resumed, so it counts as downloaded.
+    # A file is written to <name>.<run>.incomplete in the repository's folder, then moved into the
+    # cache once whole. A part a stopped run left is never resumed, so it does not count.
     parts = Path(constants.HF_HUB_CACHE) / f"models--{repo.replace('/', '--')}" / "blobs"
+    stale = set(parts.glob("*.incomplete"))
 
     def done() -> int:
         whole = sum(
@@ -85,7 +86,7 @@ def hub(repo: str, revision: str | None, files: list[str] | None = None) -> None
                 huggingface_hub.try_to_load_from_cache(repo, file.filename, revision=revision), str
             )
         )
-        return whole + sum(_size(part) for part in parts.glob("*.incomplete"))
+        return whole + sum(_size(part) for part in parts.glob("*.incomplete") if part not in stale)
 
     reporter = _Reporter(repo, total)
     stop = threading.Event()

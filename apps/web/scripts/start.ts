@@ -43,6 +43,41 @@ if (Number(process.versions.node.split(".")[0]) < wanted) {
 if (!has("pnpm")) fail("pnpm is not installed.", `Run \`corepack enable\`, or: ${MISE}`);
 if (!has("uv")) fail("uv, which runs the analysis, is not installed.", MISE);
 
+/** Whether the page answers at `url`; null when nothing listens there. */
+async function answers(): Promise<boolean | null> {
+  try {
+    const response = await fetch(`${url}/api/key`, { signal: AbortSignal.timeout(2000) });
+    return response.ok && "set" in ((await response.json()) as object);
+  } catch (error) {
+    // Something answered, but not with the page's JSON.
+    return error instanceof SyntaxError ? false : null;
+  }
+}
+
+function openPage(): void {
+  if (process.argv.includes("--no-open")) return;
+  const [program, ...args] =
+    process.platform === "darwin"
+      ? ["open", url]
+      : process.platform === "win32"
+        ? ["cmd", "/c", "start", "", url]
+        : ["xdg-open", url];
+  const child = spawn(program as string, args, { stdio: "ignore", detached: true });
+  child.on("error", () => {});
+  child.unref();
+}
+
+// Before building: a build would rewrite the files a running page serves.
+const already = await answers();
+if (already) {
+  say(`the page is already running at ${url}`);
+  openPage();
+  process.exit(0);
+}
+if (already === false) {
+  fail(`Another program is using port ${port}.`, "Start on another port: PORT=3001 pnpm start");
+}
+
 // The first edit downloads the speech model and the analysis environment takes about 2 GB.
 const cache = process.env.XDG_CACHE_HOME || join(homedir(), ".cache");
 const { bavail, bsize } = await statfs(existsSync(cache) ? cache : homedir());
@@ -78,40 +113,6 @@ if (Math.max(...sources.map(newest)) > built) {
   run("pnpm", ["build"], { cwd: web });
 }
 
-/** Whether the page answers at `url`; null when nothing listens there. */
-async function answers(): Promise<boolean | null> {
-  try {
-    const response = await fetch(`${url}/api/key`, { signal: AbortSignal.timeout(2000) });
-    return response.ok && "set" in ((await response.json()) as object);
-  } catch (error) {
-    // Something answered, but not with the page's JSON.
-    return error instanceof SyntaxError ? false : null;
-  }
-}
-
-function openPage(): void {
-  if (process.argv.includes("--no-open")) return;
-  const [program, ...args] =
-    process.platform === "darwin"
-      ? ["open", url]
-      : process.platform === "win32"
-        ? ["cmd", "/c", "start", "", url]
-        : ["xdg-open", url];
-  const child = spawn(program as string, args, { stdio: "ignore", detached: true });
-  child.on("error", () => {});
-  child.unref();
-}
-
-const already = await answers();
-if (already) {
-  say(`the page is already running at ${url}`);
-  openPage();
-  process.exit(0);
-}
-if (already === false) {
-  fail(`Another program is using port ${port}.`, "Start on another port: PORT=3001 pnpm start");
-}
-
 // In a process group of its own, stopped whole: pnpm does not pass a signal on to the server.
 const server = spawn("pnpm", ["start"], {
   cwd: web,
@@ -127,9 +128,17 @@ const stop = () => {
     // Already stopped.
   }
 };
-process.on("SIGINT", stop);
-process.on("SIGTERM", stop);
+// SIGHUP too: closing the terminal would otherwise leave the server holding the port.
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, stop);
 server.on("exit", (code) => process.exit(code ?? 0));
-for (let tries = 0; tries < 300 && !(await answers()); tries++) await sleep(200);
+let up = false;
+for (let tries = 0; tries < 300 && !up; tries++) {
+  up = (await answers()) === true;
+  if (!up) await sleep(200);
+}
+if (!up) {
+  stop();
+  fail(`The page did not answer at ${url} within a minute.`, "The server's output above says why.");
+}
 say(`the page is at ${url}; Ctrl+C stops it`);
 openPage();

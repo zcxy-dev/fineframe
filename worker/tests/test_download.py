@@ -55,7 +55,7 @@ def fake_hub(monkeypatch, tmp_path, planned, write):
     monkeypatch.setattr(constants, "HF_HUB_CACHE", str(tmp_path))
     monkeypatch.setattr(constants, "HF_HUB_OFFLINE", False)
     parts = tmp_path / "models--org--model" / "blobs"
-    parts.mkdir(parents=True)
+    parts.mkdir(parents=True, exist_ok=True)
     calls, cached = [], set()
 
     def snapshot_download(repo, revision=None, allow_patterns=None, dry_run=False):
@@ -81,14 +81,16 @@ def fake_hub(monkeypatch, tmp_path, planned, write):
 
 def test_a_model_reports_the_bytes_it_still_needs(monkeypatch, tmp_path, capsys):
     def write(parts, cached):
-        # Part of a download an earlier run left counts as downloaded.
-        (parts / "aaa.incomplete").write_bytes(b"x" * 500)
+        (parts / "aaa.1234abcd.incomplete").write_bytes(b"x" * 500)
         threading.Event().wait(0.05)
-        (parts / "aaa.incomplete").unlink()
+        (parts / "aaa.1234abcd.incomplete").unlink()
         cached.add("a.safetensors")
         threading.Event().wait(0.05)
-        (parts / "bbb.incomplete").write_bytes(b"x" * 1000)
+        (parts / "bbb.5678abcd.incomplete").write_bytes(b"x" * 1000)
 
+    # A part a run that was stopped left is never resumed, so it does not count.
+    (tmp_path / "models--org--model" / "blobs").mkdir(parents=True)
+    (tmp_path / "models--org--model" / "blobs" / "bbb.0000dead.incomplete").write_bytes(b"x" * 900)
     planned = [("config.json", 10, False), ("a.safetensors", 1000, True), ("b.bin", 2000, True)]
     files = ["config.json", "a.safetensors", "b.bin"]
     calls = fake_hub(monkeypatch, tmp_path, planned, write)
