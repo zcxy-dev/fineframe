@@ -7,6 +7,10 @@
 
 > **Status:** the analysis worker, the planner, the renderer with its captions and effect templates, the `pnpm edit` command that runs them from footage to a finished video, the web page in front of it, and the benchmark work today.
 
+![Seven frames from a five-minute 9:16 edit: a title, chapter markers, a lower third, a keyword highlight, a wipe over a cut and word-by-word captions](docs/example-edit.png)
+
+*Frames from a five-minute 9:16 edit of a synthetic two-person podcast, made with `pnpm edit` and no manual steps: a title, chapter markers, a lower third for the guest, a keyword highlight, a wipe into a chapter and captions lit word by word.*
+
 ## Design
 
 ```text
