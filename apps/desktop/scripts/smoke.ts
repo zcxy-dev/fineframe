@@ -221,7 +221,7 @@ async function listen(server: ReturnType<typeof createServer>): Promise<string> 
 async function shot(page: Page, name: string): Promise<void> {
   if (!shots) return;
   await mkdir(shots, { recursive: true });
-  await page.screenshot({ path: join(shots, `${name}.png`) });
+  await page.screenshot({ path: join(shots, `${name}.png`), fullPage: true });
   say(`saved ${name}.png`);
 }
 
