@@ -1,6 +1,6 @@
 // Burned-in captions and their SubRip copy, from project.json's `captions`.
 
-import { mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { type Project, secondsToTicks } from "@video-editor/schema";
 import type { Timeline } from "../timeline.ts";
@@ -114,7 +114,14 @@ export async function stageFonts(folder: string, faces: string[]): Promise<NodeJ
   const dir = join(folder, FONTS);
   await rm(dir, { recursive: true, force: true });
   await mkdir(dir, { recursive: true });
-  for (const face of faces) await symlink(face, join(dir, basename(face)));
+  for (const face of faces) {
+    const staged = join(dir, basename(face));
+    // Windows lets only administrators and developer mode make symbolic links.
+    await symlink(face, staged).catch(async (error: NodeJS.ErrnoException) => {
+      if (error.code !== "EPERM") throw error;
+      await copyFile(face, staged);
+    });
+  }
   const config = join(folder, "fonts.conf");
   await writeFile(
     config,

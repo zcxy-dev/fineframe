@@ -12,11 +12,11 @@ uv sync
 uv run vebench --help
 ```
 
-CI installs neither the worker's `ml` extra nor the benchmark's `synth` extra, so it skips the tests that need them. Run them locally when you change those parts: `uv sync --extra ml` in `worker/`, `uv sync --extra synth` in `bench/`, then `uv run pytest`. CI also skips the [engine test that renders the effect templates with Remotion](packages/engine/README.md#tests). Tests that call the Claude API run only with your own key: `uv run --env-file ../.env pytest -m claude` in `worker/` ([details](worker/README.md#transcript-correction)), and `CLAUDE_TESTS=1 node --env-file=../../.env --test src/plan/plan.test.ts` in `packages/engine/`.
+CI runs none of the tests that need the worker's `ml` extra or the benchmark's `synth` extra (the `windows` job installs the `ml` extra only to start the page). Run them locally when you change those parts: `uv sync --extra ml` in `worker/`, `uv sync --extra synth` in `bench/`, then `uv run pytest`. CI also skips the [engine test that renders the effect templates with Remotion](packages/engine/README.md#tests). Tests that call the Claude API run only with your own key: `uv run --env-file ../.env pytest -m claude` in `worker/` ([details](worker/README.md#transcript-correction)), and `CLAUDE_TESTS=1 node --env-file=../../.env --test src/plan/plan.test.ts` in `packages/engine/`.
 
 ## Checks
 
-A change passes the steps in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Run the same commands locally before opening a pull request. Its `macos` and `macos-intel` jobs run the engine tests on Apple silicon and on Intel and score a [synthetic edit](packages/engine/scripts/synthetic-edit.ts), one run of it with effect overlays rendered by Remotion, with `vebench report`: every run except `copy-joined`, a deliberately naive baseline joined with `-c copy`, must have no clicks and under 10 ms of drift. `pnpm exec biome check --write` fixes TypeScript and JSON formatting.
+A change passes the steps in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Run the same commands locally before opening a pull request. Its `macos`, `macos-intel` and `windows` jobs run the engine tests on Apple silicon, on Intel and on Windows x64 and score a [synthetic edit](packages/engine/scripts/synthetic-edit.ts), one run of it with effect overlays rendered by Remotion, with `vebench report`: every run except `copy-joined`, a deliberately naive baseline joined with `-c copy`, must have no clicks and under 10 ms of drift. The `windows` job also runs the rest of the workspace's tests and the worker's checks, and starts the page with `mise run start`. `pnpm exec biome check --write` fixes TypeScript and JSON formatting.
 
 ## Where code goes
 

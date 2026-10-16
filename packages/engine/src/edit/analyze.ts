@@ -224,8 +224,9 @@ async function vework(
     lines(child.stdout);
     lines(child.stderr);
     child.on("error", (spawnError: NodeJS.ErrnoException) => {
-      // Not awaited: "close" can follow at once and would report the exit instead of the cause.
-      void rm(partial, { recursive: true, force: true });
+      // "close" follows and removes the folder, but reports nothing: the cause is this. Removing
+      // it here too would race that, which Windows refuses.
+      failed = true;
       fail(
         spawnError.code === "ENOENT"
           ? new EditError(

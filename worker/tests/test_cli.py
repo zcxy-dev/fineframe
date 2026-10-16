@@ -1,3 +1,5 @@
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -18,6 +20,20 @@ def run(capsys, *args):
 def test_version(capsys):
     code, out, _ = run(capsys, "--version")
     assert code == 0 and out.startswith("vework ")
+
+
+def test_messages_are_utf8_whatever_the_system_encoding(tmp_path):
+    # Windows writes to a pipe in its ANSI code page, which has no CJK; the engine reads UTF-8.
+    source = tmp_path / "訪談.mp4"
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252"}
+    env.pop("PYTHONUTF8", None)
+    done = subprocess.run(
+        [sys.executable, "-c", "from vework.cli import main; main()", "analyze", str(source),
+         "-o", str(tmp_path / "i.json")],
+        capture_output=True, env=env,
+    )  # fmt: skip
+    assert done.returncode == 1
+    assert "訪談.mp4" in done.stderr.decode("utf-8")
 
 
 def test_missing_source_is_one_line_not_a_traceback(capsys, tmp_path):

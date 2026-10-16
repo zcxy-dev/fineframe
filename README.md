@@ -54,6 +54,7 @@ A single web page drives it: drop the files, pick the length and aspect ratio, p
 | **Blind review:** a local page plays each edit alone, or two versions of it side by side under neutral labels, and records 1–5 ratings in seven categories, plus which of two versions the rater would rather post. The report gives the mean of each category and the preference rates ([details](bench/README.md#blind-review)) | ✅ |
 | **File formats:** [JSON Schemas](packages/schema/) for the media index, `project.json` (the whole edit, timed in exact ticks) and progress lines, with generated TypeScript types and validators. The worker validates every index it writes | ✅ |
 | **Ground truth drafts:** `vework draft-truth` transcribes a corpus clip for a person to correct; the benchmark refuses a draft nobody corrected | ✅ |
+| **Platforms:** macOS on Apple silicon and Intel, Windows x64 and Linux x64. CI tests each on every change: the engine on all four, with a [synthetic edit](packages/engine/scripts/synthetic-edit.ts) rendered and scored for clicks and drift on both Macs and on Windows; on Windows also the page, started with `mise run start`, the worker and the rest of the workspace | ✅ |
 | **Synthetic corpus:** [`vebench synth`](bench/README.md#synthetic-corpus) generates talks, a three-camera conversation, a portrait phone walk and screen recordings, with exact truth for words, shots, fillers, pauses, retakes, story order and who speaks on screen, plus music with known beats and sections | ✅ |
 
 Analysis and rendering run locally. Planning sends Anthropic each file's transcript with its name, length, frame size, shot changes, pauses, loudness peaks and audio events, the names and terms you list, and for music you offer, each track's file name, length, tempo, sections' loudness and licence name. The review after each render sends, for every cut, a picture of eight frames and the waveform of the two seconds around it, with the words on either side. For each callout planned on a screen recording, one frame of it is sent with the line said over it. Transcript correction, when you turn it on, sends the transcript, the video's title (by default the file name) and your glossary. Cloud speech, when you turn it on, sends OpenRouter the speech itself, as audio in chunks of at most 30 s, for the model's provider to transcribe. No video file is uploaded, and no audio without cloud speech.
@@ -61,7 +62,8 @@ Analysis and rendering run locally. Planning sends Anthropic each file's transcr
 ## Quick start
 
 **Requirements:**
-- [mise](https://mise.jdx.dev), which installs the pinned Node, Python and `uv`; Node's corepack then provides the pinned pnpm.
+- macOS, Windows 10 or 11 on x64, or Linux.
+- [mise](https://mise.jdx.dev), which installs the pinned Node, Python and `uv`; Node's corepack then provides the pinned pnpm. On Windows, install it with `winget install jdx.mise` and run the commands below in PowerShell, with [Git](https://git-scm.com/download/win) installed.
 - About 2 GB for the Python environment, plus the model weights downloaded on first use (3.4 GB for the speech model on a CPU).
 - An [Anthropic API key](https://console.anthropic.com/settings/keys): Claude plans the edit and checks its cuts, about US$0.05 to 0.15 an edit.
 
@@ -73,7 +75,7 @@ mise run start
 
 `mise run start` installs the tools, the packages and the Python environment, builds the [web page](apps/web/README.md), starts it on 127.0.0.1 and opens it in the browser. mise asks once to trust the repository's `mise.toml`. The first time, the page asks for the API key, checks it with Anthropic and keeps it in the git-ignored `.env`. Run it again the same way; with mise [activated](https://mise.jdx.dev/getting-started.html) in your shell, `pnpm start` does the same.
 
-From the command line, once `mise run start` has set things up (or after `mise install`, `pnpm install` and `uv sync --extra ml` in `worker/`), with the key in `.env` (copy `.env.example`):
+From the command line, once `mise run start` has set things up (or after `mise install`, `pnpm install` and `uv sync --extra ml` in `worker/`), with the key in `.env` (copy `.env.example`; `copy .env.example .env` on Windows):
 
 ```bash
 pnpm edit footage/ --length 60s --aspect 9:16 -o out/edit.mp4
@@ -99,7 +101,7 @@ The [media index format](packages/schema/media-index.schema.json) is defined wit
 
 | `--asr cloud` | 1.8 GB (the aligner) | ~0.5× the clip's length, with OpenRouter responding quickly | ~3.3 GB |
 
-Weight sizes include the aligner. `vework` uses 1.7B with a CUDA GPU and 0.6B otherwise; `--asr-model` overrides that. With `--asr cloud` (`pnpm edit --asr cloud`), OpenRouter hears the speech and only the aligner runs here. The key goes in `.env` as `OPENROUTER_API_KEY` ([cloud speech](worker/README.md#cloud-speech)). On Linux, the lockfile installs a CPU-only PyTorch, so the models run on the CPU there.
+Weight sizes include the aligner. `vework` uses 1.7B with a CUDA GPU and 0.6B otherwise; `--asr-model` overrides that. With `--asr cloud` (`pnpm edit --asr cloud`), OpenRouter hears the speech and only the aligner runs here. The key goes in `.env` as `OPENROUTER_API_KEY` ([cloud speech](worker/README.md#cloud-speech)). On Linux and Windows, the lockfile installs a CPU-only PyTorch, so the models run on the CPU there.
 
 To plan or render on its own, see [`packages/engine`](packages/engine/). To score outputs against ground truth, see [`bench/`](bench/).
 

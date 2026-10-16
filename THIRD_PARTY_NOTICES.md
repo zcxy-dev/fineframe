@@ -14,7 +14,7 @@ The project's own code is under the [MIT License](LICENSE). It uses the componen
 | [Beat This!](https://github.com/CPJKU/beat_this) `final0` checkpoint | MIT | JKU Linz's file server, SHA-256 checked; worker `ml` extra |
 | [DeepFilterNet3](https://github.com/Rikorose/DeepFilterNet) ONNX export | MIT OR Apache-2.0 | GitHub, pinned commit and SHA-256; worker `ml` extra |
 | [Noto Sans CJK TC](https://github.com/notofonts/noto-cjk) Bold and Black | OFL-1.1 | GitHub, pinned commit and SHA-256; renderer, for captions |
-| [FFmpeg](https://ffmpeg.org) static builds: from [imageio-binaries](https://github.com/imageio/imageio-binaries), 7.0.2 on Linux and 7.1 on Apple silicon; on Intel macOS, 7.1.5 built by this project | GPL-3.0-or-later (Linux), GPL-2.0-or-later (macOS) | GitHub, pinned commit or this repository's release, and SHA-256; renderer, run as a separate program (see [notes](#ffmpeg)) |
+| [FFmpeg](https://ffmpeg.org) static builds: from [imageio-binaries](https://github.com/imageio/imageio-binaries), 7.0.2 on Linux, 7.1 on Apple silicon and on Windows ([gyan.dev](https://www.gyan.dev/ffmpeg/builds/)'s essentials build); on Intel macOS, 7.1.5 built by this project | GPL-3.0-or-later (Linux, Windows), GPL-2.0-or-later (macOS) | GitHub, pinned commit or this repository's release, and SHA-256; renderer, run as a separate program (see [notes](#ffmpeg)) |
 | Chrome Headless Shell ([Chromium](https://www.chromium.org)) | Chromium's BSD-3-Clause licence and the third-party licences it lists; Google's build also refers to the Chrome terms of service | Downloaded by Remotion on the first effect render: from Google's [Chrome for Testing](https://github.com/GoogleChromeLabs/chrome-for-testing), on Linux with glibc 2.35 or later from Remotion's own build, and on older Linux arm64 from Playwright's Chromium build |
 | [Kokoro-82M-v1.1-zh](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh) weights and voices | Apache-2.0 | Hugging Face, pinned revision; benchmark `synth` extra only |
 
@@ -72,6 +72,8 @@ Remotion is source-available, not open source. Its licence is free for individua
 ### FFmpeg
 
 The renderer runs FFmpeg as a separate program and needs libx264, which is GPL; the builds it downloads are therefore GPL builds, and the [Remotion compositor](https://www.remotion.dev/docs/miscellaneous/ffmpeg-license) and the PyAV wheels carry GPL-licensed FFmpeg code as well. The project's own code stays MIT: it only runs FFmpeg, which is downloaded or installed separately.
+
+The Windows build is gyan.dev's 7.1 essentials build, which imageio-binaries republishes; it is configured with `--enable-gpl --enable-version3` and nothing nonfree, so the binary is GPL-3.0-or-later and may be redistributed.
 
 The Intel macOS build is the project's own, because imageio-binaries' (`ffmpeg-macos-x86_64-v7.1`) is configured with `--enable-nonfree` and declares itself not redistributable. [build-ffmpeg-macos-x64.sh](packages/engine/scripts/build-ffmpeg-macos-x64.sh) builds FFmpeg 7.1.5 statically with x264, libvpx, zimg, Opus, libass, FreeType, FriBidi and HarfBuzz, each pinned by SHA-256 or commit, and nothing nonfree, so the binary is GPL-2.0-or-later. A [workflow](.github/workflows/ffmpeg-macos-x64.yml) runs it on GitHub's Intel macOS runner and publishes the binary as a release, with `sources.tar.gz`: every source it was built from and the script. imageio-ffmpeg, which the benchmark and the worker's tests run, still installs imageio-binaries' nonfree build on Intel Macs; nothing ships it.
 

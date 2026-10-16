@@ -1,10 +1,12 @@
 // The Anthropic API key the edits use. The page saves it in the git-ignored .env at the
 // repository root, readable by its owner alone, where `pnpm edit` reads it too. The key goes to
 // Anthropic and to the edit's process, and nowhere else: never to a log, never back to the page.
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { userInfo } from "node:os";
 import { resolve } from "node:path";
-import { parseEnv } from "node:util";
+import { parseEnv, promisify } from "node:util";
 import Anthropic from "@anthropic-ai/sdk";
 import { PLAN_MODELS } from "@video-editor/engine/claude";
 
@@ -71,6 +73,14 @@ export async function saveKey(key: string): Promise<void> {
   const partial = `${file}.${randomUUID()}.partial`;
   try {
     await writeFile(partial, next, { mode: 0o600 });
+    // Windows ignores the mode: the access list drops what it takes from the folder, which may
+    // let every user of the machine read. The rename keeps the list.
+    if (process.platform === "win32") {
+      const domain = process.env.USERDOMAIN;
+      const owner = `${domain ? `${domain}\\` : ""}${userInfo().username}`;
+      const args = [partial, "/inheritance:r", "/grant:r", `${owner}:F`];
+      await promisify(execFile)("icacls", args, { windowsHide: true });
+    }
     await rename(partial, file);
   } finally {
     await rm(partial, { force: true });

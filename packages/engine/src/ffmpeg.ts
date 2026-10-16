@@ -30,6 +30,10 @@ const PINNED: Record<string, { url: string; sha256: string }> = {
     url: `${IMAGEIO}/ffmpeg-macos-aarch64-v7.1`,
     sha256: "6d175a4743ca50256e89a8cdd731100f9cee33bd79aeea46894d209410dc6617",
   },
+  "win32-x64": {
+    url: `${IMAGEIO}/ffmpeg-win-x86_64-v7.1.exe`,
+    sha256: "2ce797a0f88d7f067180338fb227f7b1928ea727bd9a4d7a1d022f7c52af71a3",
+  },
 };
 
 /** Every filter the render graphs and the colour measurements use, plus libass for captions. */
@@ -111,7 +115,8 @@ async function pinned(): Promise<string> {
         `libass, libx264, libvpx and zimg (zscale).`,
     );
   }
-  const path = join(cacheDir(), `ffmpeg-${build.sha256.slice(0, 12)}`, "ffmpeg");
+  const name = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
+  const path = join(cacheDir(), `ffmpeg-${build.sha256.slice(0, 12)}`, name);
   return pinnedFile(build.url, build.sha256, path, "the pinned FFmpeg build", 0o755);
 }
 

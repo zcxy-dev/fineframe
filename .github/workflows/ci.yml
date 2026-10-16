@@ -77,9 +77,10 @@ jobs:
           pnpm test
           pnpm check-gen
 
-  # The renderer on macOS, Apple silicon and Intel, with each one's pinned FFmpeg: the engine
-  # tests, then a synthetic edit scored by vebench.
-  macos:
+  # The renderer on macOS, Apple silicon and Intel, and on Windows, with each one's pinned
+  # FFmpeg: the engine tests, then a synthetic edit scored by vebench. On Windows also the rest of
+  # the workspace, the worker and the page as `mise run start` starts it.
+  platforms:
     name: ${{ matrix.check }}
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     strategy:
@@ -92,10 +93,16 @@ jobs:
           - check: macos-intel
             runner: macos-15-intel
             timeout: 30
+          - check: windows
+            runner: windows-latest
+            timeout: 20
     runs-on: ${{ matrix.runner }}
     timeout-minutes: ${{ matrix.timeout }}
     permissions:
       contents: read
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -107,6 +114,34 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm --filter @video-editor/engine test
+      # Paths, processes and the start script differ on Windows, so the rest of the workspace is
+      # tested there too.
+      - name: Test the other packages
+        if: runner.os == 'Windows'
+        run: pnpm --filter '!@video-editor/engine' -r test
+      - name: Check the worker
+        if: runner.os == 'Windows'
+        working-directory: worker
+        run: |
+          uv sync --locked
+          uv run ruff format --check .
+          uv run ruff check .
+          uv run pytest -q
+      # From the checkout to the page answering, as `mise run start` does it for a new user: the
+      # packages, the analysis environment with its CPU PyTorch, the build and the server.
+      - name: Start the page
+        if: runner.os == 'Windows'
+        run: |
+          mise run start --no-open > "$RUNNER_TEMP/start.log" 2>&1 &
+          start=$!
+          until grep -q "the page is at" "$RUNNER_TEMP/start.log"; do
+            kill -0 "$start" 2>/dev/null || { cat "$RUNNER_TEMP/start.log"; exit 1; }
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/start.log"
+          curl -fsS http://127.0.0.1:3000/api/key
+          uv run --project worker --extra ml python -c \
+            "import torch; assert torch.version.cuda is None, torch.version.cuda; print(torch.__version__)"
       # copy-joined is the `-c copy` join the engine is measured against; every other run must
       # have no clicks and under 10 ms of drift.
       - name: Render a synthetic edit and score it (vebench)
