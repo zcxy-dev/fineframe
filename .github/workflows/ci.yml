@@ -77,9 +77,10 @@ jobs:
           pnpm test
           pnpm check-gen
 
-  # The renderer on macOS, Apple silicon and Intel, with each one's pinned FFmpeg: the engine
-  # tests, then a synthetic edit scored by vebench.
-  macos:
+  # The renderer on macOS, Apple silicon and Intel, and on Windows, with each one's pinned
+  # FFmpeg: the engine tests, then a synthetic edit scored by vebench; on Windows the worker's
+  # checks too.
+  platforms:
     name: ${{ matrix.check }}
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     strategy:
@@ -92,10 +93,16 @@ jobs:
           - check: macos-intel
             runner: macos-15-intel
             timeout: 30
+          - check: windows
+            runner: windows-latest
+            timeout: 30
     runs-on: ${{ matrix.runner }}
     timeout-minutes: ${{ matrix.timeout }}
     permissions:
       contents: read
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -107,9 +114,23 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm --filter @video-editor/engine test
+      # Paths, processes and the start script differ on Windows, so the rest of the workspace is
+      # tested there too.
+      - name: Test the other packages
+        if: runner.os == 'Windows' && !cancelled() # WIP
+        run: pnpm --filter '!@video-editor/engine' -r test
+      - name: Check the worker
+        if: runner.os == 'Windows' && !cancelled() # WIP
+        working-directory: worker
+        run: |
+          uv sync --locked
+          uv run ruff format --check .
+          uv run ruff check .
+          uv run pytest -q
       # copy-joined is the `-c copy` join the engine is measured against; every other run must
       # have no clicks and under 10 ms of drift.
       - name: Render a synthetic edit and score it (vebench)
+        if: ${{ !cancelled() }} # WIP
         run: |
           node packages/engine/scripts/synthetic-edit.ts "$RUNNER_TEMP/edit" --width 320 --height 180
           cd bench
