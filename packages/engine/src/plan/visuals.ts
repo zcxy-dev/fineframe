@@ -402,12 +402,12 @@ export interface PlacedVisual {
 }
 
 /**
- * Places the sourced visuals on the speech: each from the first of its words as said, for its
- * card's typical length, a capture's CAPTURE_SECONDS or its footage's, cut back to its line's end
- * and to FULL_MAX full frame or PANEL_MAX split, on the frame grid. One that would overlap the one
- * before or come within SPEAKER_GAP of it, start inside `blocked` (a title, a chapter marker, a
- * name), run shorter than it may or come more often than one every VISUAL_EVERY seconds is left
- * out, earliest first.
+ * Places the sourced visuals on the speech: each from the first of its words as said, or after a
+ * title, chapter marker or name in `blocked` it would start under while its line is still said,
+ * for its card's typical length, a capture's CAPTURE_SECONDS or its footage's, running on over
+ * the words after it, up to FULL_MAX full frame or PANEL_MAX split, on the frame grid. One that
+ * would come within SPEAKER_GAP of the one before, run shorter than it may or come more often
+ * than one every VISUAL_EVERY seconds is left out, earliest first, with its reason.
  */
 export function placeVisuals(
   wishes: readonly VisualWish[],
@@ -460,14 +460,17 @@ export function placeVisuals(
       leftOut(item.wish, `more than one every ${VISUAL_EVERY} s`);
       continue;
     }
-    const { asset, start } = item;
+    const { asset } = item;
     const before = placed.at(-1);
-    if (before && start < before.end + s(SPEAKER_GAP)) {
-      leftOut(item.wish, "too close to the visual before");
+    // Under a title, chapter or name, a visual waits for it to end while its line is said.
+    const under = (context.blocked ?? []).find((b) => item.start < b.end && b.start < item.start + s(VISUAL_MIN)); // biome-ignore format: one line
+    const start = under ? onFrame(Math.ceil(under.end / frame) * frame) : item.start;
+    if (under && start > item.lineEnd - s(LINE_TAIL)) {
+      leftOut(item.wish, "it would start under a title, chapter or name");
       continue;
     }
-    if ((context.blocked ?? []).some((b) => start < b.end && b.start < start + s(VISUAL_MIN))) {
-      leftOut(item.wish, "it would start under a title, chapter or name");
+    if (before && start < before.end + s(SPEAKER_GAP)) {
+      leftOut(item.wish, "too close to the visual before");
       continue;
     }
     const [least, wantedSeconds] =
@@ -481,7 +484,6 @@ export function placeVisuals(
     const blockedAfter = (context.blocked ?? []).filter((b) => b.start >= start).map((b) => b.start); // biome-ignore format: one line
     let end = Math.min(
       start + s(Math.min(wantedSeconds, cap)),
-      Math.max(item.lineEnd, start + s(least)),
       edit,
       ...blockedAfter,
     );

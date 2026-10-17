@@ -87,8 +87,9 @@ ${JSON.stringify(cards[id].example)}${limits(cards[id].params)}`,
 
 ## Visuals
 
-The edit cuts away from the speaker to show what they talk about, at a creator's pace: about \
-one visual every 6 to 10 seconds of the edit, on the points that carry it (a tool, product or \
+The edit cuts away from the speaker to show what they talk about, at a creator's pace. Offer \
+about one visual every 4 to 6 seconds of the edit: code keeps those on lines the length keeps, \
+at most one every 5 seconds. Put them on the points that carry it (a tool, product or \
 organisation named, a number, a list, a comparison, a process), never on every sentence, and \
 never two in a row on one point. Give each on the line and the words it lands on, exactly as \
 they appear in the line: code cuts to it as the first of those words is said and back to the \

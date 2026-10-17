@@ -236,11 +236,10 @@ test("visuals land on their words, a creator's pace apart, clear of what they ma
     { ...context, blocked: [{ start: 14 * SECOND, end: 17 * SECOND }] },
   );
   const at = (v: PlacedVisual) => [v.wish.line, v.start / SECOND, v.end / SECOND, v.layout];
-  // On w1, said at 0.6 s; a stat card's typical 3 s is cut to its line's end (2.0 s + 0.4 s)
-  // only down to its minimum of 1.8 s.
-  assert.deepEqual(at(placed[0] as PlacedVisual), [1, 0.6, 2.4, "full"]);
-  // A capture splits the screen for 4 s, cut back to its line's end.
-  assert.deepEqual(at(placed[1] as PlacedVisual), [4, 6, 8.1, "panel"]);
+  // On w1, said at 0.6 s, a stat card runs its typical 3 s, on over the next line's words.
+  assert.deepEqual(at(placed[0] as PlacedVisual), [1, 0.6, 3.6, "full"]);
+  // A capture splits the screen for its 4 s.
+  assert.deepEqual(at(placed[1] as PlacedVisual), [4, 6, 10, "panel"]);
   assert.deepEqual(
     placed.map((v) => v.wish.line),
     [1, 4, 12, 14, 16, 18],
@@ -248,6 +247,9 @@ test("visuals land on their words, a creator's pace apart, clear of what they ma
   // At most one every 5 s of the edit.
   const few = placeVisuals([card(1), card(5), card(9), card(13)], assets, { ...context, edit: 10 * SECOND }); // biome-ignore format: one line
   assert.equal(few.length, 2);
+  // Under a name, it waits for the name to end while its line is said.
+  const waits = placeVisuals([card(1, "w1")], assets, { ...context, blocked: [{ start: 0.5 * SECOND, end: 0.8 * SECOND }] }); // biome-ignore format: one line
+  assert.deepEqual(waits.map(at), [[1, 0.8, 3.8, "full"]]);
   // Ends where something it may not cover starts.
   const cut = placeVisuals([card(1)], assets, { ...context, blocked: [{ start: 1.9 * SECOND, end: 5 * SECOND }] }); // biome-ignore format: one line
   const why: string[] = [];
@@ -258,7 +260,7 @@ test("visuals land on their words, a creator's pace apart, clear of what they ma
   const footage = wish({ kind: "stock", query: "the sun", line: 6 });
   assets.set(visualKey(footage), { kind: "video", path: "/sun.mp4", seconds: 12, id: "pexels:1", credit: image.credit }); // biome-ignore format: one line
   const [sun] = placeVisuals([footage], assets, context);
-  assert.deepEqual(sun && at(sun), [6, 10, 12.1, "full"]);
+  assert.deepEqual(sun && at(sun), [6, 10, 13.5, "full"]);
   // Other aspects have no split; every visual fills the frame.
   const wide = placeVisuals([web(4)], assets, { ...context, aspect: "16:9" });
   assert.equal(wide[0]?.layout, "full");
