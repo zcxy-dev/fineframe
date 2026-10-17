@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  --bg: #0b0b0d;
+  /* --bg comes from lib/theme.ts, through the root layout. */
   --bg-glow: rgb(255 212 59 / 0.06);
   --surface: #141417;
   --surface-2: #1b1b1f;
@@ -22,6 +22,27 @@
   --shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 20px 40px -24px rgb(0 0 0 / 0.6);
   --radius: 16px;
   --radius-sm: 10px;
+  /* Five text steps; only the title and the run's percentage are larger. */
+  --text-xs: 12.5px;
+  --text-sm: 14px;
+  --text-md: 15px;
+  --text-lg: 18px;
+  --text-xl: 24px;
+  /* A 4px scale, with half steps for tight groups. */
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-2-5: 10px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-14: 56px;
   --font:
     "Inter Variable", "Noto Sans TC", system-ui, -apple-system, "Segoe UI", "PingFang TC",
     "Microsoft JhengHei", sans-serif;
@@ -30,7 +51,6 @@
 @media (prefers-color-scheme: light) {
   :root {
     color-scheme: light;
-    --bg: #f6f6f4;
     --bg-glow: rgb(255 196 0 / 0.1);
     --surface: #ffffff;
     --surface-2: #f3f3f1;
@@ -68,7 +88,7 @@ body {
   background: radial-gradient(1200px 500px at 70% -10%, var(--bg-glow), transparent 60%), var(--bg);
   color: var(--text);
   font-family: var(--font);
-  font-size: 15px;
+  font-size: var(--text-md);
   line-height: 1.5;
   font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
