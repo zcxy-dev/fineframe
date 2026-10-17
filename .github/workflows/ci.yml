@@ -68,6 +68,8 @@ jobs:
           for package in bench worker; do
             (
               cd "$package"
+              # The quick checks leave the worker's models out.
+              if [ "$package" = worker ]; then export UV_NO_GROUP=ml; fi
               uv sync --locked
               uv run ruff format --check .
               uv run ruff check .
@@ -99,7 +101,7 @@ jobs:
             timeout: 15
           - check: windows
             runner: windows-latest
-            timeout: 20
+            timeout: 35
     runs-on: ${{ matrix.runner }}
     timeout-minutes: ${{ matrix.timeout }}
     permissions:
@@ -126,6 +128,8 @@ jobs:
       - name: Check the worker
         if: runner.os == 'Windows'
         working-directory: worker
+        env:
+          UV_NO_GROUP: ml
         run: |
           uv sync --locked
           uv run ruff format --check .
@@ -144,8 +148,25 @@ jobs:
           done
           cat "$RUNNER_TEMP/start.log"
           curl -fsS http://127.0.0.1:3000/api/key
-          uv run --project worker --extra ml python -c \
+          uv run --project worker python -c \
             "import torch; assert torch.version.cuda is None, torch.version.cuda; print(torch.__version__)"
+      # The model weights the ml tests download, kept between runs; a change to the worker's code
+      # starts from the last cache and adds what changed.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: runner.os == 'Windows'
+        with:
+          path: |
+            ~/.cache/huggingface
+            ~/.cache/torch
+            ~/.cache/video-editor/deepfilternet3-*
+          key: ml-models-${{ runner.os }}-${{ hashFiles('worker/src/vework/**/*.py') }}
+          restore-keys: ml-models-${{ runner.os }}-
+      # The tests with real model weights, in the environment the page just set up; the speech
+      # model's (3.6 GB with its aligner) are left to local runs.
+      - name: Test the worker's models
+        if: runner.os == 'Windows'
+        working-directory: worker
+        run: uv run pytest -q -m "ml and not big"
       # copy-joined is the `-c copy` join the engine is measured against; every other run must
       # have no clicks and under 10 ms of drift.
       - name: Render a synthetic edit and score it (vebench)

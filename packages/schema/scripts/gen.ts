@@ -25,6 +25,8 @@ for (const name of ["media-index", "music-index"]) {
     [
       "run",
       "--frozen",
+      "--no-group",
+      "ml",
       "datamodel-codegen",
       "--input",
       fileURLToPath(new URL(`${name}.schema.json`, here)),

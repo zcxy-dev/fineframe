@@ -13,7 +13,7 @@ Run every command from the repository root: the folder two levels above this ski
 
 Done when each of these holds:
 
-- `mise --version`, `pnpm --version` and `uv --version` work. If `mise` is missing, ask the user to install it (https://mise.jdx.dev). Then run `mise install`, `pnpm install`, and `uv sync --extra ml` in `worker/`.
+- `mise --version`, `pnpm --version` and `uv --version` work. If `mise` is missing, ask the user to install it (https://mise.jdx.dev). Then run `mise install`, `pnpm install`, and `uv sync` in `worker/`.
 - The key is checked by the edit itself, which fails at once without it. Never read or print `.env`. On that error, ask the user to copy `.env.example` to `.env` and paste their key, or to run `mise run start`.
 - `pnpm edit --help` prints the options.
 

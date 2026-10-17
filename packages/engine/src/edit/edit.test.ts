@@ -282,13 +282,13 @@ test("each track needs a licence: its own <name>.txt, or one given for all", asy
   await assert.rejects(collectMusic([join(dir, "nope")]), /nope: no such file or folder/);
 });
 
-test("vework runs on the repository's Python with the ml extra, from any folder", async () => {
+test("vework runs on the repository's Python, from any folder", async () => {
   // An edit after a Python upgrade had uv rebuild the worker's environment on the Python first on
   // PATH, without the models, and the analysis failed.
   const root = new URL("../../../../", import.meta.url);
   const python = (await readFile(new URL(".python-version", root), "utf8")).trim();
   const worker = fileURLToPath(new URL("worker/", root));
-  const expected = ["uv", "run", "--project", worker, "--python", python, "--extra", "ml"];
+  const expected = ["uv", "run", "--project", worker, "--python", python];
   assert.deepEqual((await localWorker()).command, [...expected, "vework"]);
 });
 

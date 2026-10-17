@@ -274,6 +274,7 @@ def test_short_speech_is_padded_to_the_model_minimum(monkeypatch):
 
 
 @pytest.mark.ml
+@pytest.mark.big
 def test_models_load_and_handle_silence():
     # Real weights: silence must not produce invented words.
     result = transcribe.transcribe(

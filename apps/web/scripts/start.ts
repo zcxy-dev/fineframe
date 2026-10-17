@@ -97,7 +97,7 @@ if (free < 10) {
 say("installing the page's packages");
 run("pnpm", ["install", "--frozen-lockfile"], { cwd: root });
 say("setting up the analysis environment (about 2 GB the first time)");
-run("uv", ["sync", "--extra", "ml"], { cwd: join(root, "worker") });
+run("uv", ["sync"], { cwd: join(root, "worker") });
 
 /** The newest modification time of the files under `path`, leaving out what builds write. */
 function newest(path: string): number {

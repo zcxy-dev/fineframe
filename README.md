@@ -100,7 +100,7 @@ mise run start
 
 `mise run start` installs the tools, the packages and the Python environment, builds the [web page](apps/web/README.md), starts it on 127.0.0.1 and opens it in the browser. mise asks once to trust the repository's `mise.toml`. The first time, the page asks for the API key, checks it with Anthropic and keeps it in the git-ignored `.env`. Run it again the same way; with mise [activated](https://mise.jdx.dev/getting-started.html) in your shell, `pnpm start` does the same.
 
-From the command line, once `mise run start` has set things up (or after `mise install`, `pnpm install` and `uv sync --extra ml` in `worker/`), with the key in `.env` (copy `.env.example`; `copy .env.example .env` on Windows):
+From the command line, once `mise run start` has set things up (or after `mise install`, `pnpm install` and `uv sync` in `worker/`), with the key in `.env` (copy `.env.example`; `copy .env.example .env` on Windows):
 
 ```bash
 pnpm edit footage/ --length 60s --aspect 9:16 -o out/edit.mp4

@@ -8,11 +8,11 @@ The project's own code is under the [MIT License](LICENSE). It uses the componen
 
 | Component | Licence | How it reaches you |
 |---|---|---|
-| [Qwen3-ASR-0.6B-hf, Qwen3-ASR-1.7B-hf](https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf) and [Qwen3-ForcedAligner-0.6B-hf](https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B-hf) | Apache-2.0 | Hugging Face, pinned revision; worker `ml` extra |
-| [CED-Base](https://huggingface.co/mispeech/ced-base), ONNX export | Apache-2.0 on its model card (see [notes](#ced-base)) | Hugging Face, pinned revision; worker `ml` extra |
-| [YuNet](https://huggingface.co/opencv/face_detection_yunet) (`face_detection_yunet_2023mar.onnx`) | MIT | Hugging Face, pinned revision and SHA-256; worker `ml` extra |
-| [Beat This!](https://github.com/CPJKU/beat_this) `final0` checkpoint | MIT | JKU Linz's file server, SHA-256 checked; worker `ml` extra |
-| [DeepFilterNet3](https://github.com/Rikorose/DeepFilterNet) ONNX export | MIT OR Apache-2.0 | GitHub, pinned commit and SHA-256; worker `ml` extra |
+| [Qwen3-ASR-0.6B-hf, Qwen3-ASR-1.7B-hf](https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf) and [Qwen3-ForcedAligner-0.6B-hf](https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B-hf) | Apache-2.0 | Hugging Face, pinned revision; worker `ml` group |
+| [CED-Base](https://huggingface.co/mispeech/ced-base), ONNX export | Apache-2.0 on its model card (see [notes](#ced-base)) | Hugging Face, pinned revision; worker `ml` group |
+| [YuNet](https://huggingface.co/opencv/face_detection_yunet) (`face_detection_yunet_2023mar.onnx`) | MIT | Hugging Face, pinned revision and SHA-256; worker `ml` group |
+| [Beat This!](https://github.com/CPJKU/beat_this) `final0` checkpoint | MIT | JKU Linz's file server, SHA-256 checked; worker `ml` group |
+| [DeepFilterNet3](https://github.com/Rikorose/DeepFilterNet) ONNX export | MIT OR Apache-2.0 | GitHub, pinned commit and SHA-256; worker `ml` group |
 | [Noto Sans CJK TC](https://github.com/notofonts/noto-cjk) Bold and Black | OFL-1.1 | GitHub, pinned commit and SHA-256; renderer, for captions |
 | [FFmpeg](https://ffmpeg.org) static builds: from [imageio-binaries](https://github.com/imageio/imageio-binaries), 7.0.2 on Linux, 7.1 on Apple silicon and on Windows ([gyan.dev](https://www.gyan.dev/ffmpeg/builds/)'s essentials build) | GPL-3.0-or-later (Linux, Windows), GPL-2.0-or-later (macOS) | GitHub, pinned commit and SHA-256; renderer, run as a separate program (see [notes](#ffmpeg)) |
 | Remotion's compositor (`@remotion/compositor-*`), with its own FFmpeg | [Remotion License](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md); its FFmpeg is configured with `--enable-gpl`, libx264, libx265 and libfdk-aac | Installed with @remotion/renderer by pnpm; for the desktop app, downloaded from npm on the first effect render, checked against `pnpm-lock.yaml` (see [notes](#desktop-installers)) |
@@ -111,7 +111,7 @@ Anyone who redistributes these builds, for example in a desktop app or a contain
 
 ### Copyleft dependencies
 
-- **soxr** (LGPL-2.1-or-later) comes with beat-this in the worker's `ml` extra.
+- **soxr** (LGPL-2.1-or-later) comes with beat-this in the worker's `ml` group.
 - The benchmark's `synth` extra installs **phonemizer-fork** (GPL-3.0-or-later), **espeakng-loader**, whose wheel bundles espeak-ng (GPL-3.0), and **num2words** (LGPL-2.1), through kokoro's English support. The corpus generator never calls them.
 - **sharp**'s libvips (LGPL-3.0-or-later) is installed as an optional dependency of Next.js; the web page does not use it, and the desktop app's installers leave it out.
 - **mediabunny** (MPL-2.0), which Remotion depends on, is in the desktop app's installers as its published source, unchanged.

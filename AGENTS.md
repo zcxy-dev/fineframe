@@ -13,6 +13,5 @@
 - A change to `pnpm edit`/`pnpm render` options or the effects catalogs' limits updates `skills/video-editor` in the same pull request; `packages/effects/src/recipes.test.ts` checks the `project.json` paths it names.
 
 ## Pitfalls
-- In `worker/`, `uv sync` without `--extra ml` removes the `ml` extra from the environment; use `uv sync --extra ml` (`uv run` keeps it).
-- Keep one language mode per ASR chunk. The aligner strips non-letters, so `attach_punctuation` in `worker/src/vework/transcribe.py` must stay in step with `split_words_for_alignment` in transformers' Qwen3-ASR processor.
+- Keep one language mode per ASR chunk.
 - README.md, `packages/engine/README.md`, `packages/engine/MEASUREMENTS.md` and `packages/engine/src/plan/plan.ts` conflict between parallel pull requests; rebase right before merging.
