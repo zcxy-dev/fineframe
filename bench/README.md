@@ -111,13 +111,18 @@ beat in it was placed by the generator. It needs no footage or permission to pub
 stands in until the hand-checked corpus exists.
 
 ```bash
-uv sync --extra synth          # Kokoro TTS, its G2P and Pillow; Python 3.12
+uv run vebench synthetic synthetic/    # the published seed-0 corpus, 64 MB
+uv sync --extra synth                  # or generate it: Kokoro TTS, its G2P and Pillow
 uv run vebench synth synthetic/ --seed 0
 ```
 
-It writes 16 minutes of clips and 85 MB to `bench/synthetic/`, which git ignores, in 5 to
-7 minutes on the [reference machine](#reference-machine); the first run also downloads 330 MB
-of speech model. The same seed gives the same files with the same lockfile on the same machine.
+`vebench synthetic` downloads seed 0 as the
+[`corpus-synthetic-seed0-v1`](https://github.com/zcxy-dev/video-editor/releases/tag/corpus-synthetic-seed0-v1)
+release publishes it, checks its SHA-256 and unpacks it, so every machine measures on the same
+files; measurements use it. `vebench synth` writes 16 minutes of clips and 85 MB to
+`bench/synthetic/`, which git ignores, in 5 to 7 minutes on the
+[reference machine](#reference-machine); the first run also downloads 330 MB of speech model.
+The same seed gives the same files with the same lockfile on the same machine, not on another.
 
 | Clips | Content |
 |---|---|
@@ -165,6 +170,7 @@ what plays in each: `k`ick, `s`nare, `h`i-hats and `b`ass.
 
 ```bash
 uv run vebench report corpus/
+uv run vebench synthetic synthetic/
 uv run vebench synth synthetic/ --seed 0
 uv run vebench transcript --ref truth.json --hyp hyp.json
 uv run vebench shots --ref truth/shots.json --hyp shots.json --tolerance 0.1
