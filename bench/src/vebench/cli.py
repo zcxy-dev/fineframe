@@ -6,7 +6,7 @@ from importlib.metadata import version
 from pathlib import Path
 
 from vebench import beats, edit, mix, render, review, shots, speakers, transcript
-from vebench.synth import corpus
+from vebench.synth import corpus, published
 
 TRANSCRIPT_NAMES = ("transcript.json", "transcript.srt", "transcript.txt")
 MEDIA_NAMES = ("output.mp4", "output.mov", "output.mkv", "output.wav")
@@ -56,6 +56,9 @@ def main(argv: list[str] | None = None) -> None:
             result = beats.score(args.ref, args.hyp)
         elif args.command == "edit":
             result = edit.score(args.project)
+        elif args.command == "synthetic":
+            published.download(args.out)
+            result = {"corpus": str(args.out), "sha256": published.SHA256}
         elif args.command == "synth":
             result = corpus.generate(
                 args.out, args.seed, lambda message: print(f"vebench: {message}", file=sys.stderr)
@@ -129,6 +132,13 @@ def _parser() -> argparse.ArgumentParser:
         epilog="Each source is scored against <its clip>/truth: bench/README.md#edit-truth",
     )
     p.add_argument("--project", type=Path, required=True, help="the edit's project.json")
+
+    p = sub.add_parser(
+        "synthetic",
+        help="download the published seed-0 synthetic corpus instead of generating it",
+        epilog="What it holds: bench/README.md#synthetic-corpus",
+    )
+    p.add_argument("out", type=Path, help="folder to write, such as bench/synthetic/")
 
     p = sub.add_parser(
         "synth",
