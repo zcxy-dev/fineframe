@@ -5,6 +5,7 @@ import { type ClaudeCost, type Progress, validateProgress } from "@video-editor/
 import { isLookId, type LookId, lookIds } from "../looks.ts";
 import { ClaudeError, QUALITIES, type Quality } from "../plan/claude.ts";
 import { type Aspect, dollars, LENGTH_RANGE, PlanError } from "../plan/plan.ts";
+import { VISUALS, type Visuals } from "../plan/visuals.ts";
 import { edit } from "./edit.ts";
 import { EditError } from "./error.ts";
 import { parseLength } from "./length.ts";
@@ -13,7 +14,7 @@ const [shortest, longest] = LENGTH_RANGE;
 const usage = `Usage: pnpm edit <footage folder or file>... --length <length> \\
     --aspect <9:16 | 1:1 | 16:9> -o <out.mp4> [--names <terms.txt>] [--correct] \\
     [--asr <local | cloud>] [--look <${[...lookIds, "none"].join(" | ")}>] \\
-    [--quality <best | economy>] \\
+    [--quality <best | economy>] [--visuals <rich | minimal>] \\
     [--music <track or folder>]... [--music-license <licence>]
 
 Edits footage into a finished video within 5 % of the length asked. A folder stands for the
@@ -32,6 +33,11 @@ files directly in it: videos to cut, and still images to show as B-roll.
       --look     the look over the edit: clean unless another is named, or none
       --quality  best plans with Claude Opus; economy with Claude Sonnet, for about half
                  the cost. best unless given
+      --visuals  rich (the default) cuts to B-roll on the edit's points: motion-graphics
+                 cards, captures of the web pages named and, with PEXELS_API_KEY or
+                 PIXABAY_API_KEY (free), stock footage, in full frame or a split screen,
+                 with a soft sound on a visible action; their credits go to
+                 <name>.broll.txt beside the video. minimal shows none
   -m, --music    background music Claude may choose from: an audio file, or a folder of them.
                  Use only music you have the right to use. Each track's licence is the first
                  line of <name>.txt beside it (a web address and a credit line may follow);
@@ -42,8 +48,8 @@ files directly in it: videos to cut, and still images to show as B-roll.
 Progress goes to stdout as JSON lines (packages/schema/progress.schema.json), and everything
 for a person to stderr. Each file's analysis is kept in ~/.cache/video-editor/indexes, so
 editing the same footage again starts at the plan. Claude plans the edit and checks its cuts:
-ANTHROPIC_API_KEY, and OPENROUTER_API_KEY for --asr cloud, come from the environment or the
-git-ignored .env at the repository root.`;
+ANTHROPIC_API_KEY, OPENROUTER_API_KEY for --asr cloud and the stock footage keys come from the
+environment or the git-ignored .env at the repository root.`;
 
 // A caller reading stdout, such as the web page, gets the reason as the last progress line.
 const fail = (message: string): never => {
@@ -65,6 +71,7 @@ const parsed = (() => {
         asr: { type: "string" },
         look: { type: "string" },
         quality: { type: "string" },
+        visuals: { type: "string" },
         music: { type: "string", short: "m", multiple: true },
         "music-license": { type: "string" },
         help: { type: "boolean", short: "h" },
@@ -99,6 +106,9 @@ if (!QUALITIES.includes(quality as Quality)) {
   fail(`the quality is best or economy, not ${quality}`);
 }
 
+const visuals = values.visuals ?? "rich";
+if (!VISUALS.includes(visuals as Visuals)) fail(`--visuals is rich or minimal, not ${visuals}`);
+
 const env = new URL("../../../../.env", import.meta.url);
 if (existsSync(env)) process.loadEnvFile(env);
 // pnpm runs scripts in the package's folder; the paths, and the files progress names, are the
@@ -121,6 +131,7 @@ try {
     asr: asr as "local" | "cloud",
     look: look as LookId | "none",
     quality: quality as Quality,
+    visuals: visuals as Visuals,
     music: values.music ?? [],
     ...(values["music-license"] ? { musicLicense: values["music-license"] } : {}),
     onProgress: (line) => {

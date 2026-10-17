@@ -72,5 +72,9 @@ export interface DoneProgress {
      * The licence of each music track the video plays, when it plays music.
      */
     music?: string;
+    /**
+     * Where each piece of B-roll and each sound effect the video plays came from, when it plays any with a credit.
+     */
+    broll?: string;
   };
 }

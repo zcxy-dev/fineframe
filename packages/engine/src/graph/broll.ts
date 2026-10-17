@@ -1,5 +1,6 @@
 // B-roll over the main track: where it sits, how it fades and how its sound mixes in.
 
+import { panelShare } from "@video-editor/effects";
 import type { FrameRate, Project, Rect } from "@video-editor/schema";
 import type { BrollLayer } from "../pieces.ts";
 import { fades } from "./audio.ts";
@@ -12,7 +13,10 @@ export interface Placement extends Box {
 }
 
 /** The B-roll's rect in output pixels, with even sizes for 4:2:0; the whole frame without one. */
-export function placement(rect: Rect | undefined, output: Project["output"]): Placement {
+export function placement(
+  rect: Rect | undefined,
+  output: Pick<Project["output"], "width" | "height">,
+): Placement {
   if (!rect) return { x: 0, y: 0, width: output.width, height: output.height };
   const even = (value: number) => Math.max(2, Math.round(value / 2) * 2);
   return {
@@ -21,6 +25,11 @@ export function placement(rect: Rect | undefined, output: Project["output"]): Pl
     width: Math.min(even(rect.w * output.width), output.width),
     height: Math.min(even(rect.h * output.height), output.height),
   };
+}
+
+/** The upper panel of a split screen, where a panel card and the B-roll beside a speaker go. */
+export function panelRect(aspect: Project["output"]["aspect"]): Rect {
+  return { x: 0, y: 0, w: 1, h: panelShare(aspect) };
 }
 
 /**

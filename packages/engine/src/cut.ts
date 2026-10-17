@@ -60,9 +60,10 @@ export async function placeSources(
  * in a range, and a clip goes when a range covers it or none of its words is left. Where words
  * go from inside a clip, the clip splits around them, and each new end is placed in the pause
  * beside the words kept, as the planner places cuts, so no cut falls inside a word. Captions,
- * overlays, B-roll, music and the planner's emphasis move with the speech they were on; a caption
- * word that went is taken out of its line, and an overlay or B-roll clip whose whole time went
- * goes too.
+ * overlays, B-roll, cards, music, sound effects and the planner's emphasis move with the speech
+ * they were on; a caption word that went is taken out of its line, and an overlay, B-roll clip or
+ * card whose whole time went goes too. B-roll of a source the main track plays, the speaker beside
+ * a split screen, splits where the main track does, so it stays in step.
  */
 export function cutEdit(
   project: Project,
@@ -94,9 +95,12 @@ export function cutEdit(
     next = to + clip.out - clip.in;
   };
 
+  // Where each main clip started before the cut.
+  const placed: { clip: Clip; start: number }[] = [];
   for (const [i, clip] of project.main.entries()) {
     const dissolve = i > 0 && clip.transition?.type === "dissolve";
     const start = dissolve ? position - (clip.transition?.duration ?? 0) : position;
+    placed.push({ clip, start });
     position = start + clip.out - clip.in;
     const end = position;
     const at = (ticks: number) => start + ticks - clip.in;
@@ -236,13 +240,41 @@ export function cutEdit(
       return moved ? [{ ...overlay, start: moved.to }] : [];
     });
   }
+  // The speaker beside a split screen plays the main clip under it in step with it, so it
+  // splits wherever the main track does.
+  const inStep = (clip: NonNullable<Project["broll"]>[number]) =>
+    placed.some(
+      ({ clip: main, start }) =>
+        main.source === clip.source &&
+        clip.start >= start &&
+        clip.start < start + main.out - main.in &&
+        clip.in === main.in + clip.start - start,
+    );
   if (project.broll) {
     out.broll = project.broll.flatMap((clip, i) => {
-      const moved = span(clip.start, clip.out - clip.in, `/broll/${i}`);
+      const step = inStep(clip);
+      const moved = span(clip.start, clip.out - clip.in, `/broll/${i}`, !step);
       if (!moved) return [];
+      const end = clip.start + clip.out - clip.in;
+      if (step) {
+        return kept.flatMap((k) => {
+          const from = Math.max(clip.start, k.from);
+          const to = Math.min(end, k.from + k.length);
+          if (to <= from) return [];
+          const clipIn = clip.in + from - clip.start;
+          return [{ ...clip, start: k.to + from - k.from, in: clipIn, out: clipIn + to - from }];
+        });
+      }
       const clipIn = clip.in + moved.from - clip.start;
-      const length = keptOf(moved.from, clip.start + clip.out - clip.in);
+      const length = keptOf(moved.from, end);
       return [{ ...clip, start: moved.to, in: clipIn, out: clipIn + length }];
+    });
+  }
+  if (project.cards) {
+    out.cards = project.cards.flatMap((card, i) => {
+      const moved = span(card.start, card.duration, `/cards/${i} (${card.card})`);
+      if (!moved) return [];
+      return [{ ...card, start: moved.to, duration: keptOf(moved.from, card.start + card.duration) }]; // biome-ignore format: one line
     });
   }
   if (project.audio.music) {
@@ -254,6 +286,15 @@ export function cutEdit(
       return [{ ...track, start: moved.to, in: trackIn, out: trackIn + length }];
     });
     out.audio = { ...project.audio, music };
+  }
+  if (project.audio.sfx) {
+    // A sound effect goes with the moment it marks.
+    const sfx = project.audio.sfx.flatMap((effect, i) => {
+      const to = map(effect.start);
+      if (to === null) notes.push(`Removed /audio/sfx/${i}, its moment in the cut`);
+      return to === null ? [] : [{ ...effect, start: to }];
+    });
+    out.audio = { ...(out.audio ?? project.audio), sfx };
   }
   const length = next;
   if (project.plan) {

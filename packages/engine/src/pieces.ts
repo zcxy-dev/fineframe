@@ -2,6 +2,7 @@ import {
   type Dip,
   type Timeline,
   type TimelineBroll,
+  type TimelineCard,
   type TimelineClip,
   type TimelineOverlay,
   ticksToSamples,
@@ -46,8 +47,17 @@ export interface OverlayLayer {
   atFrame: number;
 }
 
+/** Frames of a rendered card, taken by count as an overlay's are. */
+export interface CardLayer {
+  clip: TimelineCard;
+  fromFrame: number;
+  frames: number;
+  atFrame: number;
+}
+
 /** A stretch of the edit rendered by one FFmpeg process: one main clip, or the two a dissolve
- * blends, with the B-roll and overlays over it. Pieces join back to back in output order. */
+ * blends, with the B-roll, cards and overlays over it. Pieces join back to back in output
+ * order. */
 export interface Piece {
   /** Output frames [start, end). */
   start: number;
@@ -55,6 +65,7 @@ export interface Piece {
   samples: number;
   main: [MainLayer] | [MainLayer, MainLayer];
   broll: BrollLayer[];
+  cards: CardLayer[];
   overlays: OverlayLayer[];
 }
 
@@ -82,6 +93,12 @@ export function cutPieces(timeline: Timeline): Piece[] {
       if (to <= from) return [];
       const atSample = samplesAt(from) - samplesAt(start);
       return [{ ...span(clip.start, from, to), clip, atFrame: from - start, atSample }];
+    }),
+    cards: timeline.cards.flatMap((clip) => {
+      const from = Math.max(start, clip.start);
+      const to = Math.min(end, clip.end);
+      if (to <= from) return [];
+      return [{ clip, fromFrame: from - clip.start, frames: to - from, atFrame: from - start }];
     }),
     overlays: timeline.overlays.flatMap((clip) => {
       const from = Math.max(start, clip.start);

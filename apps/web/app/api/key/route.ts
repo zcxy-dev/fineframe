@@ -11,11 +11,14 @@ import {
 
 export const dynamic = "force-dynamic";
 
-/** Whether there is an Anthropic key (`set`) and an OpenRouter one; never the keys themselves. */
+/** Whether there is an Anthropic key (`set`), an OpenRouter one, and Pexels and Pixabay ones;
+ * never the keys themselves. */
 export async function GET(): Promise<Response> {
   return Response.json({
     set: (await readKey("anthropic")) !== undefined,
     openrouter: (await readKey("openrouter")) !== undefined,
+    pexels: (await readKey("pexels")) !== undefined,
+    pixabay: (await readKey("pixabay")) !== undefined,
   });
 }
 

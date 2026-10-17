@@ -12,7 +12,7 @@ import { parseArgs } from "node:util";
 import { bundle } from "@remotion/bundler";
 import { openBrowser, renderMedia, renderStill, selectComposition } from "@remotion/renderer";
 import { type CardId, cardIds, cards } from "../src/cards.ts";
-import type { Aspect, Placement } from "../src/layout.ts";
+import { type Aspect, cardSize, type Placement } from "../src/layout.ts";
 import { CARD_COMPOSITION, type CardProps } from "../src/remotion/props.ts";
 
 const { values, positionals } = parseArgs({
@@ -33,17 +33,14 @@ if (!folderArg) {
 }
 const folder = resolve(process.env.INIT_CWD ?? process.cwd(), folderArg);
 
-/** The card's size in a 1080p output: the frame, or the upper panel of a split screen, which
- * at 9:16 is 880 of the frame's 1920 rows and elsewhere the upper half. */
+/** The card's size in a 1080p output: the frame, or the upper panel of a split screen. */
 function size(aspect: Aspect, placement: Placement): [number, number] {
   const sizes: Record<Aspect, [number, number]> = {
     "16:9": [1920, 1080],
     "1:1": [1080, 1080],
     "9:16": [1080, 1920],
   };
-  const [w, h] = sizes[aspect];
-  if (placement === "full") return [w, h];
-  return [w, aspect === "9:16" ? 880 : h / 2];
+  return cardSize(aspect, placement, ...sizes[aspect]);
 }
 
 const ids = (values.only?.split(",") ?? cardIds) as CardId[];

@@ -1,8 +1,15 @@
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, open, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
-import { renderOverlays, validateOverlays } from "@video-editor/effects";
+import {
+  cardSize,
+  renderCards,
+  renderOverlays,
+  validateCards,
+  validateOverlays,
+} from "@video-editor/effects";
 import { loadJson, type Project, TICKS_PER_SECOND, validateProject } from "@video-editor/schema";
+import { type Credit, cardCredits, creditText } from "./broll/credits.ts";
 import { buildCaptions, stageFonts } from "./captions/index.ts";
 import { ffmpeg, run } from "./ffmpeg.ts";
 import { AAC, alignToAacFrames, encoderArgs, QUIET, RAW_AUDIO } from "./graph/encode.ts";
@@ -38,6 +45,8 @@ export interface RenderOptions {
   /** Renders the effect overlays; @video-editor/effects' Remotion renderer unless replaced,
    * as the tests replace it with files FFmpeg draws. */
   renderOverlays?: typeof renderOverlays;
+  /** Renders the cards; @video-editor/effects' Remotion renderer unless replaced. */
+  renderCards?: typeof renderCards;
   /** A folder to also write the mix's parts into, before loudness normalisation scales them
    * alike: `voice.wav`, the main track and B-roll, and with music `music.wav`, the bed as ducked.
    * vebench measures the voice's lead over the music from them, and a cut check can read the
@@ -62,6 +71,9 @@ export interface RenderResult {
   captions: string | null;
   /** `<name>.music.txt`, the licence of each music track the video plays; null without music. */
   music: string | null;
+  /** `<name>.broll.txt`, where the B-roll and sound effects the video plays came from; null when
+   * none carries a credit. */
+  broll: string | null;
   frames: number;
   seconds: number;
   /** The first pass's measurement, whether one linear gain reached the target, and the true peak
@@ -124,6 +136,10 @@ export async function render(
 ): Promise<RenderResult> {
   const project = await loadJson(projectPath, validateProject);
   validateOverlays(project.overlays ?? []);
+  validateCards(
+    (project.cards ?? []).map(({ card, params }) => ({ card, params })),
+    "/cards",
+  );
   const problems = unrendered(project);
   if (problems.length > 0) {
     throw new Error(`The renderer does not draw these yet:\n${problems.join("\n")}`);
@@ -139,8 +155,12 @@ export async function render(
   const captions = await buildCaptions(project, timeline);
   const bin = await ffmpeg();
 
-  const share = timeline.overlays.length > 0 ? OVERLAY_SHARE : 0;
+  const effects = timeline.overlays.length + timeline.cards.length;
+  const share = effects > 0 ? OVERLAY_SHARE : 0;
   const { aspect, width, height, fps } = project.output;
+  // Shared between the overlays and the cards by how many each has.
+  const part = timeline.overlays.length / Math.max(1, effects);
+  const download = options.onDownload ? { onDownload: options.onDownload } : {};
   const overlays = await (options.renderOverlays ?? renderOverlays)(
     timeline.overlays.map(({ overlay, start, end }) => ({
       template: overlay.template,
@@ -151,11 +171,23 @@ export async function render(
       fps,
       frames: end - start,
     })),
-    {
-      onProgress: (fraction, message) => report(fraction * share, message),
-      ...(options.onDownload ? { onDownload: options.onDownload } : {}),
-    },
+    { onProgress: (fraction, message) => report(fraction * share * part, message), ...download },
   );
+  const cards =
+    timeline.cards.length === 0
+      ? []
+      : await (options.renderCards ?? renderCards)(
+          timeline.cards.map(({ card, start, end }) => {
+            const [w, h] = cardSize(aspect, card.placement, width, height);
+            const { placement } = card;
+            return { card: card.card, params: card.params, placement, aspect, width: w, height: h, fps, frames: end - start }; // biome-ignore format: one line
+          }),
+          {
+            onProgress: (fraction, message) =>
+              report(share * (part + fraction * (1 - part)), message),
+            ...download,
+          },
+        );
   const progress = (fraction: number, message: string) =>
     report(share + fraction * (1 - share), message);
 
@@ -189,7 +221,7 @@ export async function render(
     await checkSamples(voice, timeline.samples, "The mix");
     let pcm = voice;
     let bed: string | null = null;
-    if (timeline.music.length > 0) {
+    if (timeline.music.length + timeline.sfx.length > 0) {
       progress(pieces.length / steps, "Mixing music");
       // Ducking follows the speech as the sound under the music actually plays it.
       const ducked = timeline.music.some((track) => track.music.ducking);
@@ -277,7 +309,7 @@ export async function render(
           progress((pieces.length + 1 + i) / steps, `Rendering ${i + 1}/${pieces.length}`);
           // A crop path's expression can outgrow one command-line argument (128 KiB on Linux),
           // so FFmpeg reads the graph from a file.
-          const args = pieceVideo(piece, timeline, overlays, luts);
+          const args = pieceVideo(piece, timeline, overlays, luts, cards);
           const at = args.indexOf("-filter_complex");
           const graph = join(work, "graph.txt");
           await writeFile(graph, args[at + 1] ?? "");
@@ -305,6 +337,9 @@ export async function render(
     }
     const music = timeline.music.length > 0 ? join(folder, `${stem}.music.txt`) : null;
     if (music) await writeFile(music, credits(project, basename(video)));
+    const shown = brollCredits(project, timeline);
+    const broll = shown.length > 0 ? join(folder, `${stem}.broll.txt`) : null;
+    if (broll) await writeFile(broll, creditText(basename(video), shown));
     report(1, "Finished");
     return {
       video,
@@ -312,6 +347,7 @@ export async function render(
       cuts,
       captions: srt,
       music,
+      broll,
       frames: timeline.frames,
       seconds: (timeline.frames * timeline.frameTicks) / TICKS_PER_SECOND,
       loudness: audible
@@ -391,6 +427,25 @@ function credits(project: Project, video: string): string {
     if (attribution) lines.push(`  Credit: ${attribution}`);
   }
   return `${lines.join("\n")}\n`;
+}
+
+/** The credits of the sources the video shows as B-roll or plays as sound effects, and of the
+ * logos and icons its cards draw, in the order they first play. */
+function brollCredits(project: Project, timeline: ReturnType<typeof buildTimeline>): Credit[] {
+  const ticks = timeline.frameTicks;
+  const byId = new Map(project.sources.map((source) => [source.id, source]));
+  const of = (id: string): Credit[] => {
+    const credit = byId.get(id)?.credit;
+    if (!credit) return [];
+    const { license, by, ...rest } = credit;
+    return [{ ...rest, license: license ?? null, by: by ? { name: by.name, url: by.url ?? null } : null }]; // biome-ignore format: one line
+  };
+  const played: [number, Credit[]][] = [
+    ...timeline.broll.map((clip): [number, Credit[]] => [clip.start * ticks, of(clip.clip.source)]),
+    ...timeline.cards.map((clip): [number, Credit[]] => [clip.start * ticks, cardCredits(clip.card.params)]), // biome-ignore format: one line
+    ...(project.audio.sfx ?? []).map((sfx): [number, Credit[]] => [sfx.start, of(sfx.source)]),
+  ];
+  return played.sort((a, b) => a[0] - b[0]).flatMap(([, credits]) => credits);
 }
 
 /** Runs the encoder, in the folder and environment given, while `feed` writes frames into its

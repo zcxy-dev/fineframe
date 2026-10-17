@@ -21,6 +21,11 @@
       "type": "array",
       "items": { "$ref": "#/$defs/BrollClip" }
     },
+    "cards": {
+      "description": "Motion-graphics cards from packages/effects, cut to as B-roll: opaque, over the main track and B-roll and under the overlays, drawn in array order.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/CardClip" }
+    },
     "captions": { "$ref": "#/$defs/Captions" },
     "overlays": {
       "description": "Animated effects over the picture and B-roll and under the captions, drawn in array order.",
@@ -131,6 +136,48 @@
               "pattern": "^[0-9a-f]{64}$"
             }
           }
+        },
+        "credit": {
+          "description": "Where B-roll or a sound effect came from and the credit it asks for; the renderer lists those the video plays in <name>.broll.txt beside it.",
+          "$ref": "#/$defs/Credit"
+        }
+      }
+    },
+    "Credit": {
+      "type": "object",
+      "required": ["what", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "what": {
+          "description": "What it is, such as \"Video by Jane Doe on Pexels\" or \"Screenshot of example.com\".",
+          "type": "string",
+          "minLength": 1
+        },
+        "source": { "description": "The page it came from.", "type": "string", "minLength": 1 },
+        "license": {
+          "description": "The licence it is used under; absent for a screenshot, whose page keeps its owner's rights.",
+          "type": "object",
+          "required": ["name", "url"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "url": { "type": "string", "minLength": 1 }
+          }
+        },
+        "by": {
+          "description": "Who made it, when the source names them.",
+          "type": "object",
+          "required": ["name"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "url": { "type": "string", "minLength": 1 }
+          }
+        },
+        "note": {
+          "description": "A note the credit must carry, such as a trademark's.",
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -391,6 +438,29 @@
         }
       }
     },
+    "CardClip": {
+      "type": "object",
+      "required": ["card", "params", "start", "duration", "placement"],
+      "additionalProperties": false,
+      "properties": {
+        "card": {
+          "description": "The card's id, from the cards in packages/effects.",
+          "type": "string",
+          "minLength": 1
+        },
+        "params": {
+          "description": "The card's parameters, as its JSON Schema in packages/effects defines them.",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "start": { "description": "Output timeline.", "$ref": "#/$defs/Ticks" },
+        "duration": { "$ref": "#/$defs/PositiveTicks" },
+        "placement": {
+          "description": "full fills the frame; panel fills the upper panel of a split screen, the top 880 of every 1920 rows at 9:16 and the upper half otherwise.",
+          "enum": ["full", "panel"]
+        }
+      }
+    },
     "Overlay": {
       "type": "object",
       "required": ["template", "params", "start", "duration"],
@@ -434,7 +504,23 @@
           "description": "Background music, mixed under the main track's sound.",
           "type": "array",
           "items": { "$ref": "#/$defs/MusicTrack" }
+        },
+        "sfx": {
+          "description": "Sound effects on visible actions, mixed under the voice with the music and not ducked.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/SoundEffect" }
         }
+      }
+    },
+    "SoundEffect": {
+      "description": "A short sound, played whole from its start, for at most 2 s.",
+      "type": "object",
+      "required": ["source", "start", "gainDb"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "$ref": "#/$defs/SourceId" },
+        "start": { "description": "Output timeline.", "$ref": "#/$defs/Ticks" },
+        "gainDb": { "type": "number" }
       }
     },
     "VoiceDecision": {

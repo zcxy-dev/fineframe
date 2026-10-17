@@ -21,8 +21,16 @@ export {
   templateIds,
   type WipeParams,
 } from "./catalog.ts";
-export { type IconName, iconNames, type LogoName, logoNames } from "./icons.ts";
-export { type Aspect, COLORS, cardLayout, layoutFor, type Placement } from "./layout.ts";
+export { type IconName, iconNames, LOGOS, type LogoName, logoNames } from "./icons.ts";
+export {
+  type Aspect,
+  COLORS,
+  cardLayout,
+  cardSize,
+  layoutFor,
+  type Placement,
+  panelShare,
+} from "./layout.ts";
 export {
   type CardJob,
   cacheDir,

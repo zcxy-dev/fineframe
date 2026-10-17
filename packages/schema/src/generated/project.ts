@@ -31,6 +31,10 @@ export interface Project {
    * B-roll and picture-in-picture over the main track, drawn in array order. The main track's audio keeps playing under it.
    */
   broll?: BrollClip[];
+  /**
+   * Motion-graphics cards from packages/effects, cut to as B-roll: opaque, over the main track and B-roll and under the overlays, drawn in array order.
+   */
+  cards?: CardClip[];
   captions?: Captions;
   /**
    * Animated effects over the picture and B-roll and under the captions, drawn in array order.
@@ -86,6 +90,38 @@ export interface Source {
      */
     sha256: string;
   };
+  credit?: Credit;
+}
+/**
+ * Where B-roll or a sound effect came from and the credit it asks for; the renderer lists those the video plays in <name>.broll.txt beside it.
+ */
+export interface Credit {
+  /**
+   * What it is, such as "Video by Jane Doe on Pexels" or "Screenshot of example.com".
+   */
+  what: string;
+  /**
+   * The page it came from.
+   */
+  source: string;
+  /**
+   * The licence it is used under; absent for a screenshot, whose page keeps its owner's rights.
+   */
+  license?: {
+    name: string;
+    url: string;
+  };
+  /**
+   * Who made it, when the source names them.
+   */
+  by?: {
+    name: string;
+    url?: string;
+  };
+  /**
+   * A note the credit must carry, such as a trademark's.
+   */
+  note?: string;
 }
 /**
  * A range of one source on the main track.
@@ -245,6 +281,27 @@ export interface BrollClip {
   framing?: Framing;
   grade?: Grade;
 }
+export interface CardClip {
+  /**
+   * The card's id, from the cards in packages/effects.
+   */
+  card: string;
+  /**
+   * The card's parameters, as its JSON Schema in packages/effects defines them.
+   */
+  params: {
+    [k: string]: unknown;
+  };
+  /**
+   * A time or length in ticks: 120 000 per second, so every common frame rate has a whole number of ticks per frame.
+   */
+  start: number;
+  duration: PositiveTicks;
+  /**
+   * full fills the frame; panel fills the upper panel of a split screen, the top 880 of every 1920 rows at 9:16 and the upper half otherwise.
+   */
+  placement: "full" | "panel";
+}
 export interface Captions {
   /**
    * The caption preset that draws the lines, by id, from the presets in packages/engine.
@@ -317,6 +374,10 @@ export interface Audio {
    * Background music, mixed under the main track's sound.
    */
   music?: MusicTrack[];
+  /**
+   * Sound effects on visible actions, mixed under the voice with the music and not ducked.
+   */
+  sfx?: SoundEffect[];
 }
 /**
  * How one source's speech is processed on the main track, chosen from its measurements. The chain runs on the mono mix of the source's sound, which then plays in both channels.
@@ -451,6 +512,17 @@ export interface MusicTrack {
     downbeat: number;
     beatsPerBar: number;
   };
+}
+/**
+ * A short sound, played whole from its start, for at most 2 s.
+ */
+export interface SoundEffect {
+  source: SourceId;
+  /**
+   * A time or length in ticks: 120 000 per second, so every common frame rate has a whole number of ticks per frame.
+   */
+  start: number;
+  gainDb: number;
 }
 /**
  * How the planner arrived at this edit, for review; rendering ignores it.

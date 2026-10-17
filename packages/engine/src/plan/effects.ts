@@ -50,7 +50,8 @@ const CHAPTERS_MAX = 12;
  * person's line is said, where someone on screen talks for as long as its template needs, and
  * ends before that shot does or the talking stops, coming in sooner than usual, but not before
  * they speak, to fit; with no such shot it is left out. A keyword pop ends before the shot
- * changes after its word.
+ * changes after its word. `visuals` are where the edit cuts to a card, a capture or footage on
+ * its points, which no effect may overlap.
  */
 export function plannedOverlays(
   state: PlanState,
@@ -61,6 +62,7 @@ export function plannedOverlays(
   placed: ReadonlyMap<string, Rect> = new Map(),
   changes: readonly number[] = cuts,
   speaking: readonly { start: number; end: number }[] = [{ start: 0, end: edit }],
+  visuals: readonly { start: number; duration: number }[] = [],
 ): Overlay[] {
   const frame = ticksPerFrame(state.fps);
   const onFrame = (ticks: number) => Math.max(0, Math.round(ticks / frame) * frame);
@@ -160,6 +162,7 @@ export function plannedOverlays(
     [
       ...kept.filter((k) => !paired(template, k.template)),
       ...(template === "lower-third" || template === "callout" ? broll : []),
+      ...visuals,
     ].filter((k) => start < k.start + k.duration && k.start < start + duration);
   for (const wish of wanted) {
     const quota = left[wish.template as TemplateId];

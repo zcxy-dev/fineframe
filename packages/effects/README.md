@@ -83,6 +83,8 @@ const [file] = await renderCards([
 ]);
 ```
 
+The panel is the top 880 of every 1920 rows at 9:16 and the upper half elsewhere (`panelShare`); `cardSize` gives a card's size in pixels for an output. A rich edit's planner proposes cards from this list and the renderer draws `project.json`'s `cards` with `renderCards` ([visuals](../engine/README.md#visuals)).
+
 A card lays out in the content box [`cardLayout`](src/layout.ts) gives it: inside the overlays' safe area for a full card, so a full 9:16 card ends above the captions; across a panel, clear of the apps' header at 9:16 and of the captions on the seam. Its sizes are in units of the box's short side, growing to 1.3 times that in a long box such as a 16:9 panel, and each card lays out in a row or a column by the box's shape. Cards render like overlays, as VP9 in WebM without alpha, cached by the same key plus their placement.
 
 ## Rendering

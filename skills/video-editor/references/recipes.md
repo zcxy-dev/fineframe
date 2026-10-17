@@ -1,8 +1,8 @@
 # Recipes for changing an edit
 
-Each recipe starts from the newest version, here `out/edit.project.json`, and makes the next one, here `edit-v2`. For a field no recipe covers, the schema says what each one means (`packages/schema/project.schema.json`), and the effect templates' catalog gives their params and limits (`packages/effects/src/catalog.ts`).
+Each recipe starts from the newest version, here `out/edit.project.json`, and makes the next one, here `edit-v2`. For a field no recipe covers, the schema says what each one means (`packages/schema/project.schema.json`), the effect templates' catalog gives their params and limits (`packages/effects/src/catalog.ts`), and the cards' theirs (`packages/effects/src/cards.ts`).
 
-**Ticks.** Every time and length is an integer: 120 000 ticks a second. Seconds × 120 000, rounded, gives ticks; `start` of captions, overlays, B-roll and music is on the output timeline, from the video's first frame.
+**Ticks.** Every time and length is an integer: 120 000 ticks a second. Seconds × 120 000, rounded, gives ticks; `start` of captions, overlays, cards, B-roll, music and sound effects is on the output timeline, from the video's first frame.
 
 **Editing a copy.** Recipes other than cutting change a copy of the project in the same folder, so its relative paths still resolve. Use your own file tools on the copy, or for a change across many entries:
 
@@ -61,17 +61,28 @@ Change the params; keep `start` and `duration`. Overlays show one at a time, so 
 
 Any overlay can take `params.accent`, a `#rrggbb` colour for its accent instead of the house amber. A changed overlay renders again, in a few seconds; unchanged ones come from the cache.
 
+## Remove or add a card or B-roll
+
+A rich edit (`pnpm edit --visuals rich`, the default) cuts away from the speaker on its points: to a motion-graphics card (`cards`), or to a web capture or stock footage (`broll` entries whose source id starts with `visual-`), full frame or as the upper panel of a split screen. In a split, the speaker plays below as `broll` entries of the main track's own source with `rect` `{ "x": 0, "y": 0.458…, "w": 1, "h": 0.541… }` at 9:16 (the lower half elsewhere), in step with it. A visual lasts at most 3.5 s full frame and 6 s split, and the speaker shows between two for at least a second.
+
+- **Remove a card:** delete its entry in `cards`. When its `placement` is `panel`, also delete the speaker entries in `broll` with the same `start` range (their `start` within the card's `start` to `start + duration`), so the full-frame speaker shows again. A sound effect in `audio.sfx` at the card's `start` belongs to it: delete it too.
+- **Remove a capture or footage:** delete its `broll` entry, and for a split the speaker entries beside it, as above; and its sound effect.
+- **Change a card's text or numbers:** edit its `params`, as its JSON Schema in `packages/effects/src/cards.ts` allows; the render names any param that breaks it. Never put a number on a card that the speaker does not say.
+- **Add a card:** `{ "card": "stat", "params": { "value": 3, "suffix": "倍", "label": "…" }, "start": …, "duration": 360000, "placement": "full" }`, `start` at the first word it illustrates (its `start` in `captions.lines[].words`), `duration` within the card's `seconds` (`min` to `max`), and clear of other cards, B-roll and overlays. `"placement": "panel"` splits the screen: then add the speaker below as one `broll` entry per main clip the card spans, `{ "source": <the main clip's source>, "in": <the main clip's in + (start − where that clip starts in the edit)>, "out": in + the length, "start": …, "rect": <the speaker rect above> }`, which plays in step with the main track. A card renders in a few seconds a second of it, and once rendered comes from the cache.
+- **Credits:** the render writes `edit-v2.broll.txt` again from what the new version shows: each source's `credit`, and the logos and icons its cards draw.
+
 ## Change the music level, or remove the music
 
 - **Level:** `audio.music[i].gainDb` is the music's level in dB; −3 more is about a third quieter. The music still ducks under speech by `ducking.depthDb`. The finished mix is normalised to `audio.loudness`, so the voice stays at the same loudness.
 - **Remove:** delete `audio.music`. The video then has no `edit-v2.music.txt`.
+- **Sound effects** are `audio.sfx`, each `{ "source", "start", "gainDb" }`: lower `gainDb` to make one quieter, or delete the entry.
 
 ## Change the look or the caption style
 
-- **Look:** each clip of `main` and `broll` has `grade.look`, `{ "id": "clean", "intensity": 1 }`. The looks are `clean` (a gentle contrast lift), `warm` (soft, golden highlights, for people and vlogs), `cool` (firmer contrast, blue shadows, for tech and screens) and `film` (matte blacks, teal shadows, warm light). Set the same `id` on every clip; `intensity` from 0 to 1 blends it in. Delete `grade.look` for no look. Leave `grade.auto` and `grade.match` as they are: they correct and match the cameras.
+- **Look:** each clip of `main` and each `broll` entry of the speaker beside a split screen has `grade.look`, `{ "id": "clean", "intensity": 1 }`. The looks are `clean` (a gentle contrast lift), `warm` (soft, golden highlights, for people and vlogs), `cool` (firmer contrast, blue shadows, for tech and screens) and `film` (matte blacks, teal shadows, warm light). Set the same `id` on every clip; `intensity` from 0 to 1 blends it in. Delete `grade.look` for no look. Leave `grade.auto` and `grade.match` as they are: they correct and match the cameras.
 
   ```js
-  for (const clip of [...p.main, ...(p.broll ?? [])]) clip.grade = { ...clip.grade, look: { id: "warm", intensity: 1 } };
+  for (const clip of [...p.main, ...(p.broll ?? []).filter((b) => b.grade)]) clip.grade = { ...clip.grade, look: { id: "warm", intensity: 1 } };
   ```
 
 - **Caption style:** `captions.preset` is `bold`, `spotlight`, `sweep` (karaoke) or `boxed`.

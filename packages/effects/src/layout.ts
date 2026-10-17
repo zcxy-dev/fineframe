@@ -121,6 +121,38 @@ export function ems(text: string): number {
   return total;
 }
 
+/**
+ * The type size, at most `max`, at which `text`, broken only between `runs` (words, and CJK after
+ * punctuation) the way a browser wraps it, fits `width` by `height` pixels. Each run is set in
+ * heavy type a little wider than `ems` counts.
+ */
+export function fitRuns(
+  runs: readonly string[],
+  max: number,
+  width: number,
+  height: number,
+  lineHeight: number,
+): number {
+  const heavy = 1.08;
+  const space = ems(" ");
+  const widths = runs.filter((run) => run !== "").map((run) => ems(run) * heavy);
+  const lines = (size: number) => {
+    let count = 1;
+    let used = 0;
+    for (const w of widths) {
+      const next = used === 0 ? w * size : used + (space + w) * size;
+      if (next > width && used > 0) {
+        count += 1;
+        used = w * size;
+      } else used = next;
+    }
+    return count;
+  };
+  let size = Math.min(max, (width * 0.98) / Math.max(...widths, 1));
+  while (size > 6 && lines(size) * lineHeight * size > height) size *= 0.95;
+  return size;
+}
+
 /** The type size, at most `size`, at which `text` fits on one line `available` pixels wide. */
 export function fit(text: string, size: number, available: number): number {
   const width = ems(text) * size;
@@ -130,6 +162,24 @@ export function fit(text: string, size: number, available: number): number {
 /** Where a card fills: the whole frame, or the upper panel of a split screen with the speaker
  * below it. */
 export type Placement = "full" | "panel";
+
+/** The upper panel of a split screen, as a share of the frame's height: at 9:16 the top 880 of
+ * every 1920 rows, the split short-form edits use, and the upper half otherwise. */
+export function panelShare(aspect: Aspect): number {
+  return aspect === "9:16" ? 880 / 1920 : 0.5;
+}
+
+/** A card's size in pixels in an output of `width` by `height`: the frame, or the panel in even
+ * rows. */
+export function cardSize(
+  aspect: Aspect,
+  placement: Placement,
+  width: number,
+  height: number,
+): [number, number] {
+  if (placement === "full") return [width, height];
+  return [width, Math.round((panelShare(aspect) * height) / 2) * 2];
+}
 
 /** The colours cards add to the overlays' ink, paper and accent: one for what works or is
  * gained, one for what fails or is lost. */

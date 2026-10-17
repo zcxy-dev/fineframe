@@ -36,6 +36,11 @@ export function styleName(style: Style): string {
 export const ASRS = ["local", "cloud"] as const;
 export type Asr = (typeof ASRS)[number];
 
+/** What Claude adds over the footage (`--visuals`): B-roll, layouts and sound effects, or none. */
+export const VISUALS = ["rich", "minimal"] as const;
+export type Visuals = (typeof VISUALS)[number];
+export const DEFAULT_VISUALS: Visuals = "rich";
+
 export interface Settings {
   /** Seconds, LENGTH_RANGE inclusive. */
   length: number;
@@ -46,6 +51,7 @@ export interface Settings {
   /** The licence the music is used under, such as "CC0 1.0"; needed when there is music. */
   musicLicense?: string;
   asr: Asr;
+  visuals: Visuals;
 }
 
 /** A file as the page offers it: its path inside what was dropped, and its size in bytes. */
@@ -75,7 +81,7 @@ export function namesFrom(text: string): string[] {
 /** The settings in `input`, or why they cannot make an edit; `asr` unless it says otherwise. */
 export function checkSettings(input: unknown, asr: Asr = "local"): Settings | string {
   if (typeof input !== "object" || input === null) return "No settings";
-  const { length, aspect, style, names, musicLicense } = input as Record<string, unknown>;
+  const { length, aspect, style, names, musicLicense, visuals } = input as Record<string, unknown>;
   const heard = (input as Record<string, unknown>).asr ?? asr;
   if (!ASRS.includes(heard as Asr)) return `Speech is heard ${ASRS.join(" or ")}`;
   if (typeof length !== "number") return "No length";
@@ -84,6 +90,8 @@ export function checkSettings(input: unknown, asr: Asr = "local"): Settings | st
   if (!ASPECTS.includes(aspect as Aspect)) return `The aspect is ${ASPECTS.join(", ")}`;
   const chosen = style ?? DEFAULT_STYLE;
   if (!STYLES.includes(chosen as Style)) return `The style is ${STYLES.join(", ")}`;
+  const shown = visuals ?? DEFAULT_VISUALS;
+  if (!VISUALS.includes(shown as Visuals)) return `Visuals are ${VISUALS.join(" or ")}`;
   const list = names ?? [];
   if (!Array.isArray(list) || list.some((name) => typeof name !== "string")) {
     return "Names are a list of text";
@@ -104,6 +112,7 @@ export function checkSettings(input: unknown, asr: Asr = "local"): Settings | st
     names: list as string[],
     ...(license.trim() ? { musicLicense: license.trim() } : {}),
     asr: heard as Asr,
+    visuals: shown as Visuals,
   };
 }
 
