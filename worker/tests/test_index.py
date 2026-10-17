@@ -121,7 +121,7 @@ def test_a_corrected_index_records_its_corrections(talking_video, monkeypatch, t
         contexts.append(context)
         return "我們在來看", "Chinese"
 
-    def align(wav, text, language):
+    def align(wav, text):
         aligned.append(text)
         return [(c, 0.2 * i, 0.2 * (i + 1)) for i, c in enumerate(text)]
 
@@ -149,7 +149,7 @@ def test_a_cloud_index_records_the_model_and_what_it_cost(talking_video, monkeyp
     monkeypatch.setattr(framing, "analyze", lambda *args: {"fps": 5.0, "shots": []})
     monkeypatch.setattr(denoise, "enhance", lambda samples, in_place: samples)
     monkeypatch.setattr(transcribe, "_models", lambda model: pytest.fail("speech model loaded"))
-    align = lambda wav, text, language: [(c, 0.2 * i, 0.2 * (i + 1)) for i, c in enumerate(text)]  # noqa: E731
+    align = lambda wav, text: [(c, 0.2 * i, 0.2 * (i + 1)) for i, c in enumerate(text)]  # noqa: E731
     monkeypatch.setattr(transcribe, "_aligner", lambda half: align)
     monkeypatch.setattr(openrouter.Client, "check", lambda self: None)
 

@@ -33,7 +33,7 @@ def fake_asr(monkeypatch, heard):
     """Two chunks of speech, each heard as `heard`; records the model asked for."""
     models = []
 
-    def align(wav, text, language):
+    def align(wav, text):
         # The aligner's tokens: each Han character, each English word without punctuation.
         tokens = re.findall(r"[\u4e00-\u9fff]|[A-Za-z]+", text)
         return [(c, 0.05 + i * 0.1, 0.15 + i * 0.1) for i, c in enumerate(tokens)]

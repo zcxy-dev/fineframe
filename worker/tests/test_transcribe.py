@@ -29,19 +29,19 @@ def test_speech_longer_than_a_chunk_is_split_at_fixed_points():
     assert plan_chunks([seg(0, 70)], max_len=30) == [(0, 30), (30, 60), (60, 70)]
 
 
-def aligned(text, language="Chinese"):
+def aligned(text):
     """The tokens the aligner times for `text`, with made-up one-second timings."""
     from transformers import AutoProcessor
 
     processor = AutoProcessor.from_pretrained(
         transcribe.ALIGNER_MODEL, revision=transcribe.REVISIONS[transcribe.ALIGNER_MODEL]
     )
-    tokens = processor.split_words_for_alignment(text, language)
+    tokens = processor.split_words_for_alignment(text)
     return [(t, float(i), float(i + 1)) for i, t in enumerate(tokens)]
 
 
-def display(text, language="Chinese"):
-    return [w["text"] for w in attach_punctuation(text, aligned(text, language), language)]
+def display(text):
+    return [w["text"] for w in attach_punctuation(text, aligned(text))]
 
 
 @pytest.mark.ml
@@ -54,10 +54,10 @@ def test_punctuation_follows_the_words_it_belongs_to():
 
 @pytest.mark.ml
 def test_words_the_aligner_normalizes_appear_once_as_written():
-    assert display("It costs 3.5 dollars, about 1,000 yen.", "English") == [
+    assert display("It costs 3.5 dollars, about 1,000 yen.") == [
         "It", "costs", "3.5", "dollars,", "about", "1,000", "yen."
     ]  # fmt: skip
-    assert display("We use a state-of-the-art model from the U.S. — I don’t know.", "English") == [
+    assert display("We use a state-of-the-art model from the U.S. — I don’t know.") == [
         "We", "use", "a", "state-of-the-art", "model", "from", "the", "U.S. —", "I", "don’t",
         "know.",
     ]  # fmt: skip
@@ -129,7 +129,7 @@ def test_traditional_uses_taiwan_vocabulary_and_leaves_english():
 def fake_models(monkeypatch, text, language, item_times=None):
     calls = []
 
-    def align(wav, text, language):
+    def align(wav, text):
         calls.append((text, language, len(wav)))
         chars = [c for c in text if c.strip() and c not in "。，"]
         times = item_times or [(i * 0.2, (i + 1) * 0.2) for i in range(len(chars))]
@@ -187,6 +187,12 @@ def test_word_edges_never_cross_into_the_next_chunk(monkeypatch):
     assert all(w["end"] <= nxt["start"] for w, nxt in pairwise(words))
 
 
+def test_japanese_keeps_its_punctuation(monkeypatch):
+    fake_models(monkeypatch, "会社に行く。", "Japanese")
+    words = transcribe.transcribe(np.zeros(16_000 * 3, np.float32), [seg(0.5, 2.5)])["words"]
+    assert [w["text"] for w in words] == ["会", "社", "に", "行", "く。"]
+
+
 def test_japanese_is_not_converted_to_chinese(monkeypatch):
     calls = fake_models(monkeypatch, "会社に行く", "Japanese")
     transcribe.transcribe(np.zeros(16_000 * 3, np.float32), [seg(0.5, 2.5)])
@@ -209,8 +215,8 @@ def test_main_language_is_weighted_by_speaking_time(monkeypatch):
 def test_transcribe_converts_aligns_and_offsets_each_chunk(monkeypatch):
     calls = []
 
-    def align(wav, text, language):
-        calls.append((text, language, len(wav)))
+    def align(wav, text):
+        calls.append((text, len(wav)))
         chars = [c for c in text if c != "。"]
         return [(c, i * 0.2, (i + 1) * 0.2) for i, c in enumerate(chars)]
 
@@ -219,7 +225,7 @@ def test_transcribe_converts_aligns_and_offsets_each_chunk(monkeypatch):
     )
     result = transcribe.transcribe(np.zeros(16_000 * 300, np.float32), [seg(10, 12), seg(250, 251)])
 
-    assert calls == [("處理影片。", "Chinese", 32_000), ("處理影片。", "Chinese", 16_000)]
+    assert calls == [("處理影片。", 32_000), ("處理影片。", 16_000)]
     assert result["language"] == "zh"
     assert result["words"][0] == {"text": "處", "start": 10.0, "end": 10.2}
     assert result["words"][4] == {"text": "處", "start": 250.0, "end": 250.2}
@@ -290,8 +296,8 @@ def test_a_cloud_recognizer_hears_every_chunk_at_once_and_only_the_aligner_loads
     monkeypatch.setattr(transcribe, "_models", lambda model: pytest.fail("speech model loaded"))
     aligned = []
 
-    def align(wav, text, language):
-        aligned.append((text, language, len(wav)))
+    def align(wav, text):
+        aligned.append((text, len(wav)))
         return [(c, i * 0.2, (i + 1) * 0.2) for i, c in enumerate(c for c in text if c != "。")]
 
     monkeypatch.setattr(transcribe, "_aligner", lambda half: half and align)
@@ -307,7 +313,7 @@ def test_a_cloud_recognizer_hears_every_chunk_at_once_and_only_the_aligner_loads
     # Chunks are padded as for the local model; a language the cloud did not name is read from
     # the script, so the one-language-per-chunk rule and the Taiwan conversion still hold.
     assert sent == [32_000, 8_000]
-    assert aligned == [("處理影片。", "Chinese", 32_000)]
+    assert aligned == [("處理影片。", 32_000)]
     assert result["language"] == "zh" and result["words"][0]["start"] == 10.0
 
 
@@ -324,6 +330,6 @@ def test_the_aligner_does_not_load_when_the_cloud_heard_nothing(monkeypatch):
     [("会社に行く", "Japanese"), ("안녕하세요", "Korean"), ("hello there", "English")],
 )
 def test_a_language_the_model_did_not_name_is_read_from_the_script(monkeypatch, text, language):
-    calls = fake_models(monkeypatch, text, None)
-    transcribe.transcribe(np.zeros(16_000 * 3, np.float32), [seg(0.5, 2.5)])
-    assert calls[0][:2] == (text, language)
+    fake_models(monkeypatch, text, None)
+    result = transcribe.transcribe(np.zeros(16_000 * 3, np.float32), [seg(0.5, 2.5)])
+    assert result["language"] == transcribe.LANGUAGE_CODES[language]
