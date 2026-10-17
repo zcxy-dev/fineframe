@@ -126,3 +126,91 @@ export function fit(text: string, size: number, available: number): number {
   const width = ems(text) * size;
   return width <= available ? size : Math.floor((available / ems(text)) * 100) / 100;
 }
+
+/** Where a card fills: the whole frame, or the upper panel of a split screen with the speaker
+ * below it. */
+export type Placement = "full" | "panel";
+
+/** The colours cards add to the overlays' ink, paper and accent: one for what works or is
+ * gained, one for what fails or is lost. */
+export const CARD_COLORS = {
+  good: "#4ade80",
+  bad: "#ff5f57",
+} as const;
+
+/** Card type sizes, in units of the card layout's `u`, on a scale of 1.25 like the
+ * overlays' from 4 units: small print, body text, a list item, a card's heading, a section's
+ * name and a hero number, at 4, 5, 6.25, 9.8, 15.3 and 23.8 units. */
+const cardStep = (n: number) => 4 * 1.25 ** n;
+export const CARD_TYPE = {
+  hero: cardStep(8),
+  display: cardStep(6),
+  heading: cardStep(4),
+  item: cardStep(2),
+  body: cardStep(1),
+  small: cardStep(0),
+} as const;
+
+export interface CardLayout {
+  aspect: Aspect;
+  placement: Placement;
+  width: number;
+  height: number;
+  /** The content box, in pixels: inside the frame's safe area for a full card, and clear of the
+   * app header and of the captions on the seam for a panel. */
+  box: { left: number; top: number; width: number; height: number };
+  /** The unit every card size is given in, in pixels: 1 % of the content box's short side, or up
+   * to 1.3 % of it in a long box. */
+  u: number;
+  /** The content box's width over its height: cards lay out in a row above about 1.5. */
+  ratio: number;
+  /** A size from CARD_TYPE, in pixels. */
+  type: (role: keyof typeof CARD_TYPE) => number;
+}
+
+/**
+ * The content box of a card `width` by `height` pixels in an output of `aspect`. A full card keeps
+ * to the overlays' safe area. A panel spans the frame's width, so at 9:16 its top clears the
+ * app header, measured on the frame's height, and its bottom leaves the seam to the captions.
+ */
+export function cardLayout(
+  aspect: Aspect,
+  placement: Placement,
+  width: number,
+  height: number,
+): CardLayout {
+  let margins: { left: number; right: number; top: number; bottom: number };
+  if (placement === "full") {
+    const safe = SAFE[aspect];
+    margins = {
+      left: safe.left * width,
+      right: safe.right * width,
+      top: safe.top * height,
+      bottom: safe.bottom * height,
+    };
+  } else {
+    const side = 0.06 * width;
+    const top = aspect === "9:16" ? SAFE["9:16"].top * ((width * 16) / 9) : 0.08 * height;
+    margins = { left: side, right: side, top, bottom: 0.12 * height };
+  }
+  const box = {
+    left: margins.left,
+    top: margins.top,
+    width: width - margins.left - margins.right,
+    height: height - margins.top - margins.bottom,
+  };
+  // A long box has room for larger type than its short side alone allows: the unit grows with
+  // the box's area, up to 1.3 times the short side's.
+  const short = Math.min(box.width, box.height) / 100;
+  const u = Math.min(short * 1.3, Math.sqrt(box.width * box.height) / 100);
+  return {
+    aspect,
+    placement,
+    width,
+    height,
+    box,
+    u,
+    ratio: box.width / box.height,
+    type: (role) => CARD_TYPE[role] * u,
+  };
+}

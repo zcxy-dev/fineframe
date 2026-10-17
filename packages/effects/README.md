@@ -1,6 +1,6 @@
 # @video-editor/effects
 
-Animated effect overlays for the edit, as [Remotion](https://www.remotion.dev) templates: titles, lower thirds, keyword highlights, chapter markers, callouts and wipes. Each entry in a [`project.json`](../schema/README.md#projectjson)'s `overlays` names a template and its params; the renderer draws it as transparent video and lays it over exactly the output frames it covers ([engine](../engine/README.md#how-it-renders)). Remotion is source-available, not MIT: see [who needs its company licence](../../THIRD_PARTY_NOTICES.md#remotion).
+Animated effect overlays for the edit, as [Remotion](https://www.remotion.dev) templates: titles, lower thirds, keyword highlights, chapter markers, callouts and wipes; and motion-graphics [cards](#cards) to cut to as B-roll. Each entry in a [`project.json`](../schema/README.md#projectjson)'s `overlays` names a template and its params; the renderer draws it as transparent video and lays it over exactly the output frames it covers ([engine](../engine/README.md#how-it-renders)). Remotion is source-available, not MIT: see [who needs its company licence](../../THIRD_PARTY_NOTICES.md#remotion).
 
 ## Templates
 
@@ -38,6 +38,53 @@ Overlays keep to a safe area inside the frame's edges. The bottom margin leaves 
 
 The timings, curves, colours, type sizes and margins live in [`src/layout.ts`](src/layout.ts).
 
+## Cards
+
+Cards are opaque motion graphics the edit cuts to, like B-roll: full frame, or the upper panel of a split screen with the speaker below. Each builds in over its first second or two and then holds, slowly pushing in, until a hard cut takes it away; it has no exit. They share the overlays' colours, Noto Sans TC, curves and type scale, on a dark canvas lit by a bloom of the accent, with frosted panels.
+
+| Card | What it shows | Params |
+|---|---|---|
+| `stat` | One number counting up, with what it measures | `value`, `prefix`, `suffix`, `decimals`, `label`, `context`, `trend` |
+| `kpis` | Two to four numbers side by side | `title`, `items` |
+| `list` | A numbered list; `active` lights one item and dims the rest | `title`, `items`, `active` |
+| `checklist` | Boxes that tick one after another | `title`, `items`, `checked` |
+| `versus` | Two things across a VS badge, one lit as the winner | `left`, `right`, `winner` |
+| `before-after` | A before state that turns into an after state | `title`, `before`, `after` |
+| `quote` | A quotation revealed word by word, with its author | `text`, `author`, `role`, `icon`, `logo` |
+| `steps` | A process as icons joined by a drawing line | `title`, `steps` |
+| `timeline` | Dated events on a line that draws through them | `title`, `events`, `active` |
+| `bar-chart` | Columns growing to their values | `title`, `unit`, `bars`, `highlight` |
+| `line-chart` | A line drawing through a series | `title`, `unit`, `points` |
+| `ring` | A ring filling to a percentage | `value`, `label`, `context` |
+| `progress` | Bars filling to their percentages | `title`, `items` |
+| `chat` | A chat window, the reply streaming in | `app`, `icon`, `logo`, `messages` |
+| `terminal` | Commands typing out, with their output | `title`, `lines` |
+| `code` | Code writing in line by line, some lines lit | `filename`, `lines`, `highlight` |
+| `app` | A product card: logo, name, tagline, tags, address | `name`, `tagline`, `icon`, `logo`, `tags`, `url` |
+| `logo` | A brand's logo landing, with its name | `name`, `tagline`, `icon`, `logo` |
+| `icon-grid` | Icons with labels popping in | `title`, `items` |
+| `definition` | A term, its kind and a definition | `term`, `kind`, `text` |
+| `highlight` | A statement with key phrases highlighted | `text`, `highlights`, `source` |
+| `search` | A query typing into a search box, results under it | `query`, `results` |
+| `notifications` | Phone notifications stacking in | `items` |
+| `pros-cons` | Upsides with ticks, downsides with crosses | `title`, `pros`, `cons`, `prosLabel`, `consLabel` |
+| `ranking` | Ranked rows with bars proportional to their values | `title`, `unit`, `items` |
+| `section` | A big number and a section's name | `title`, `index`, `kicker` |
+| `table` | Products across, features down, ticks and values | `columns`, `rows`, `highlight` |
+
+Every card also takes `accent`. Icons are Lucide's names and logos Simple Icons' slugs, from the subset in [`src/icons.ts`](src/icons.ts); a logo appears only where the video names that brand ([licences and trademarks](../../THIRD_PARTY_NOTICES.md#icons-copied-into-the-source)). Each card's purpose, lengths, params as a JSON Schema and an example are in [`src/cards.ts`](src/cards.ts):
+
+```ts
+import { cardProblems, cards, renderCards } from "@video-editor/effects";
+
+const problems = cardProblems([{ card: "stat", params, seconds: 3 }]); // [] when valid
+const [file] = await renderCards([
+  { card: "stat", params, placement: "panel", aspect: "9:16", width: 1080, height: 880, fps, frames: 90 },
+]);
+```
+
+A card lays out in the content box [`cardLayout`](src/layout.ts) gives it: inside the overlays' safe area for a full card, so a full 9:16 card ends above the captions; across a panel, clear of the apps' header at 9:16 and of the captions on the seam. Its sizes are in units of the box's short side, growing to 1.3 times that in a long box such as a 16:9 panel, and each card lays out in a row or a column by the box's shape. Cards render like overlays, as VP9 in WebM without alpha, cached by the same key plus their placement.
+
 ## Rendering
 
 `renderOverlays(jobs)` renders each overlay at the output's size and frame rate, for exactly the frames it covers, and returns one file per job. The renderer calls it; nothing else needs to.
@@ -72,6 +119,8 @@ cd packages/engine
 node scripts/effects-preview.ts ../../bench/synthetic /tmp/effects-preview
 ```
 
+In `packages/effects`, `node scripts/cards-preview.ts <folder>` renders each card's example as a still at 3 s; `--at 9:16/full,16:9/panel` picks the aspects and placements, `--only` some cards and `--mp4` an MP4 of each card named.
+
 ## Tests
 
-`pnpm --filter @video-editor/effects test` checks the catalog, the params validation, the cache keys and the layout. Rendering every template through Remotion is tested in the engine ([Tests](../engine/README.md#tests)).
+`pnpm --filter @video-editor/effects test` checks the catalog, the params validation of templates and cards, the cache keys and the layout. Rendering every template through Remotion is tested in the engine ([Tests](../engine/README.md#tests)). One test renders every card's example through Remotion, full frame at 9:16 and as a 16:9 panel, at five frames a second so a few frames span its build; it is skipped where `CI` is set.

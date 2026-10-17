@@ -1,10 +1,11 @@
 import "@fontsource/noto-sans-tc/500.css";
 import "@fontsource/noto-sans-tc/700.css";
 import "@fontsource/noto-sans-tc/900.css";
-import { type ComponentType, useEffect, useState } from "react";
-import { AbsoluteFill, cancelRender, continueRender, delayRender } from "remotion";
+import type { ComponentType } from "react";
+import { AbsoluteFill } from "remotion";
 import type { TemplateId, TemplateParams } from "../catalog.ts";
 import { COLORS, type Layout, layoutFor } from "../layout.ts";
+import { useFonts } from "./fonts.ts";
 import type { OverlayProps } from "./props.ts";
 import { Callout } from "./templates/callout.tsx";
 import { Chapter } from "./templates/chapter.tsx";
@@ -24,19 +25,11 @@ const TEMPLATES: {
   wipe: Wipe,
 };
 
-const FAMILY = "Noto Sans TC";
-const WEIGHTS = [500, 700, 900];
+export const FAMILY = "Noto Sans TC";
+export const FACES = [500, 700, 900].map((weight) => `${weight} 16px "${FAMILY}"`);
 
 export function Overlay({ template, params, aspect, width, height }: OverlayProps) {
-  // Noto Sans TC comes in slices by Unicode range; the frame waits until every slice the text
-  // needs has loaded, so no frame is captured in a fallback font.
-  const [handle] = useState(() => delayRender(`Loading ${FAMILY}`));
-  useEffect(() => {
-    const text = JSON.stringify(params);
-    Promise.all(WEIGHTS.map((weight) => document.fonts.load(`${weight} 16px "${FAMILY}"`, text)))
-      .then(() => continueRender(handle))
-      .catch(cancelRender);
-  }, [handle, params]);
+  useFonts(FACES, JSON.stringify(params));
 
   const Template = TEMPLATES[template] as ComponentType<{
     params: TemplateParams[TemplateId];

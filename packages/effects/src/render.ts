@@ -1,5 +1,5 @@
-// Renders overlays to transparent video with Remotion, and keeps each render in a cache keyed by
-// everything that shapes it, so an unchanged overlay renders once.
+// Renders overlays to transparent video and cards to opaque video with Remotion, and keeps each
+// render in a cache keyed by everything that shapes it, so an unchanged one renders once.
 
 import { fork } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -9,8 +9,8 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FrameRate } from "@video-editor/schema";
 import { compositorDir } from "./compositor.ts";
-import type { Aspect } from "./layout.ts";
-import type { OverlayProps } from "./remotion/props.ts";
+import type { Aspect, Placement } from "./layout.ts";
+import type { CardProps, OverlayProps } from "./remotion/props.ts";
 import type { Task, WorkerMessage } from "./worker.ts";
 
 const PACKAGE = fileURLToPath(new URL("..", import.meta.url));
@@ -20,6 +20,19 @@ const PACKAGE = fileURLToPath(new URL("..", import.meta.url));
 export interface OverlayJob {
   template: string;
   params: object;
+  aspect: Aspect;
+  width: number;
+  height: number;
+  fps: FrameRate;
+  frames: number;
+}
+
+/** One card to render: a card with params validateCards accepts, at the size of the area it fills
+ * (the output frame, or the panel of a split screen), for a whole number of output frames. */
+export interface CardJob {
+  card: string;
+  params: object;
+  placement: Placement;
   aspect: Aspect;
   width: number;
   height: number;
@@ -72,6 +85,25 @@ export function overlayKey(job: OverlayJob, code: string): string {
   return createHash("sha256").update(JSON.stringify(shape)).digest("hex").slice(0, 32);
 }
 
+/** The cache key of one card, as overlayKey's. */
+export function cardKey(job: CardJob, code: string): string {
+  const { card, params, placement, aspect, width, height, fps, frames } = job;
+  const shape = [
+    "card",
+    code,
+    card,
+    sorted(params),
+    placement,
+    aspect,
+    width,
+    height,
+    fps.num,
+    fps.den,
+    frames,
+  ];
+  return createHash("sha256").update(JSON.stringify(shape)).digest("hex").slice(0, 32);
+}
+
 function sorted(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sorted);
   if (value === null || typeof value !== "object") return value;
@@ -94,14 +126,54 @@ export async function renderOverlays(
   options: RenderOverlaysOptions = {},
 ): Promise<string[]> {
   const code = await codeVersion();
+  return renderAll(
+    "overlays",
+    jobs.map((job) => {
+      const { fps, ...rest } = job;
+      return {
+        key: overlayKey(job, code),
+        props: { ...rest, fps: fps.num / fps.den } as OverlayProps,
+      };
+    }),
+    code,
+    options,
+  );
+}
+
+/**
+ * Renders each card as VP9 in WebM, frame n of the file being frame n of the card, and returns
+ * the files in the order of `jobs`. Cards are opaque, so they need no alpha; otherwise as
+ * renderOverlays.
+ */
+export async function renderCards(
+  jobs: CardJob[],
+  options: RenderOverlaysOptions = {},
+): Promise<string[]> {
+  const code = await codeVersion();
+  return renderAll(
+    "cards",
+    jobs.map((job) => {
+      const { fps, ...rest } = job;
+      return { key: cardKey(job, code), props: { ...rest, fps: fps.num / fps.den } as CardProps };
+    }),
+    code,
+    options,
+  );
+}
+
+async function renderAll(
+  kind: "overlays" | "cards",
+  jobs: { key: string; props: OverlayProps | CardProps }[],
+  code: string,
+  options: RenderOverlaysOptions,
+): Promise<string[]> {
   const dir = cacheDir();
-  const files = jobs.map((job) => join(dir, "overlays", `${overlayKey(job, code)}.webm`));
-  const missing = new Map<string, OverlayProps>();
+  const files = jobs.map((job) => join(dir, kind, `${job.key}.webm`));
+  const missing = new Map<string, OverlayProps | CardProps>();
   for (const [i, job] of jobs.entries()) {
     const file = files[i] as string;
     if (missing.has(file) || (await exists(file))) continue;
-    const { fps, ...rest } = job;
-    missing.set(file, { ...rest, fps: fps.num / fps.den } as OverlayProps);
+    missing.set(file, job.props);
   }
   if (missing.size > 0) {
     const binaries = await compositorDir(dir, (bytes, total) =>
@@ -156,7 +228,7 @@ async function runWorker(task: Task, options: RenderOverlaysOptions) {
     child.on("error", reject);
     child.on("exit", (code, signal) => {
       if (code === 0) resolve();
-      else reject(new Error(`Rendering overlays failed (${signal ?? code}): ${failure ?? ""}`));
+      else reject(new Error(`Rendering effects failed (${signal ?? code}): ${failure ?? ""}`));
     });
     child.send(task);
   });
