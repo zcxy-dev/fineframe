@@ -32,6 +32,9 @@ import { buildTimeline } from "./timeline.ts";
 export interface RenderOptions {
   /** Called as the render advances, with the fraction done (0 to 1) and a line to show. */
   onProgress?: (fraction: number, message: string) => void;
+  /** Called while what renders the effect overlays downloads on its first use: its name, and
+   * the bytes so far of `total`. */
+  onDownload?: (name: string, bytes: number, total: number) => void;
   /** Renders the effect overlays; @video-editor/effects' Remotion renderer unless replaced,
    * as the tests replace it with files FFmpeg draws. */
   renderOverlays?: typeof renderOverlays;
@@ -148,7 +151,10 @@ export async function render(
       fps,
       frames: end - start,
     })),
-    { onProgress: (fraction, message) => report(fraction * share, message) },
+    {
+      onProgress: (fraction, message) => report(fraction * share, message),
+      ...(options.onDownload ? { onDownload: options.onDownload } : {}),
+    },
   );
   const progress = (fraction: number, message: string) =>
     report(share + fraction * (1 - share), message);

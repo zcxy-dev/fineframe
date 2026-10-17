@@ -4,7 +4,31 @@ import { useEffect, useId, useRef, useState } from "react";
 import styles from "./editor.module.css";
 import { AlertIcon, LockIcon } from "./icons.tsx";
 
+/** What the dialog says for each service's key. */
+const TEXT = {
+  anthropic: {
+    title: "Connect Claude",
+    about:
+      "Claude plans each edit and checks its cuts with your Anthropic API key, billed to your Anthropic account. Create one at",
+    link: "https://console.anthropic.com/settings/keys",
+    site: "console.anthropic.com",
+    placeholder: "sk-ant-…",
+    name: "Anthropic",
+  },
+  openrouter: {
+    title: "Connect OpenRouter",
+    about:
+      "OpenRouter hears the speech with your OpenRouter API key, billed to your OpenRouter account at about US$0.03 an hour of footage. Create one at",
+    link: "https://openrouter.ai/settings/keys",
+    site: "openrouter.ai",
+    placeholder: "sk-or-…",
+    name: "OpenRouter",
+  },
+} as const;
+
 interface Props {
+  /** Whose key it asks for. */
+  service: keyof typeof TEXT;
   open: boolean;
   /** Whether a key is saved already, so this one replaces it. */
   replacing: boolean;
@@ -12,9 +36,10 @@ interface Props {
   onSaved: () => void;
 }
 
-/** Asks for the Anthropic API key, has the server check it with Anthropic, and saves it there.
- * The page never gets the key back. */
-export function KeyDialog({ open, replacing, onClose, onSaved }: Props) {
+/** Asks for an API key, has the server check it with its service, and saves it there. The page
+ * never gets the key back. */
+export function KeyDialog({ service, open, replacing, onClose, onSaved }: Props) {
+  const text = TEXT[service];
   const id = useId();
   const dialog = useRef<HTMLDialogElement>(null);
   const [key, setKey] = useState("");
@@ -33,7 +58,7 @@ export function KeyDialog({ open, replacing, onClose, onSaved }: Props) {
       const response = await fetch("/api/key", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key }),
+        body: JSON.stringify({ key, service }),
       });
       const reply = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(reply.error ?? "The key could not be saved");
@@ -64,13 +89,12 @@ export function KeyDialog({ open, replacing, onClose, onSaved }: Props) {
         }}
       >
         <h2 id={`${id}-title`} className={styles.panelTitle}>
-          {replacing ? "Replace your API key" : "Connect Claude"}
+          {replacing ? `Replace your ${text.name} API key` : text.title}
         </h2>
         <p className={styles.dialogText}>
-          Claude plans each edit and checks its cuts with your Anthropic API key, billed to your
-          Anthropic account. Create one at{" "}
-          <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">
-            console.anthropic.com
+          {text.about}{" "}
+          <a href={text.link} target="_blank" rel="noreferrer">
+            {text.site}
           </a>
           .
         </p>
@@ -84,7 +108,7 @@ export function KeyDialog({ open, replacing, onClose, onSaved }: Props) {
             type="password"
             autoComplete="off"
             spellCheck={false}
-            placeholder="sk-ant-…"
+            placeholder={text.placeholder}
             value={key}
             aria-invalid={state.error !== undefined}
             autoFocus
@@ -106,14 +130,14 @@ export function KeyDialog({ open, replacing, onClose, onSaved }: Props) {
             className={`${styles.primary} ${styles.dialogPrimary}`}
             disabled={state.checking || key.trim() === ""}
           >
-            {state.checking ? "Checking with Anthropic…" : "Check and save"}
+            {state.checking ? `Checking with ${text.name}…` : "Check and save"}
           </button>
         </div>
         <p className={styles.note}>
           <LockIcon width={14} height={14} />
           <span>
-            Saved on this computer in the repository's .env, readable only by your user. It is sent
-            to Anthropic and nowhere else, and this page never shows it again.
+            Saved on this computer in a file only your user can read. It is sent to {text.name} and
+            nowhere else, and this page never shows it again.
           </span>
         </p>
       </form>

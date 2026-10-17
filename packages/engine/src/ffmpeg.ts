@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Writable } from "node:stream";
-import { cacheDir, pinnedFile } from "./download.ts";
+import { cacheDir, type DownloadProgress, pinnedFile } from "./download.ts";
 
 /** Overrides the pinned build, e.g. with a system FFmpeg; it must pass the same feature check. */
 export const FFMPEG_ENV = "VIDEO_EDITOR_FFMPEG";
@@ -91,11 +91,12 @@ export const REQUIRED_DECODERS = ["libvpx-vp9"];
 let resolved: Promise<string> | undefined;
 
 /** The FFmpeg binary to run: `VIDEO_EDITOR_FFMPEG`, or the pinned build, downloaded and checked
- * against its SHA-256 on first use. Either way it is checked for every filter and encoder the
- * renderer needs, so a build without one fails here instead of halfway through a render. */
-export function ffmpeg(): Promise<string> {
+ * against its SHA-256 on first use, with `onDownload` hearing its progress. Either way it is
+ * checked for every filter and encoder the renderer needs, so a build without one fails here
+ * instead of halfway through a render. */
+export function ffmpeg(onDownload?: DownloadProgress): Promise<string> {
   resolved ??= (async () => {
-    const path = process.env[FFMPEG_ENV] || (await pinned());
+    const path = process.env[FFMPEG_ENV] || (await pinned(onDownload));
     await checkFeatures(path);
     return path;
   })();
@@ -106,7 +107,7 @@ export function ffmpeg(): Promise<string> {
   return resolved;
 }
 
-async function pinned(): Promise<string> {
+async function pinned(onDownload?: DownloadProgress): Promise<string> {
   const platform = `${process.platform}-${process.arch}`;
   const build = PINNED[platform];
   if (!build) {
@@ -117,7 +118,7 @@ async function pinned(): Promise<string> {
   }
   const name = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
   const path = join(cacheDir(), `ffmpeg-${build.sha256.slice(0, 12)}`, name);
-  return pinnedFile(build.url, build.sha256, path, "the pinned FFmpeg build", 0o755);
+  return pinnedFile(build.url, build.sha256, path, "the pinned FFmpeg build", 0o755, onDownload);
 }
 
 /** Names in `ffmpeg -filters` output. */

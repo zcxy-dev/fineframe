@@ -1,0 +1,25 @@
+{
+  "name": "@video-editor/desktop",
+  "version": "0.1.0",
+  "productName": "Video Editor",
+  "private": true,
+  "description": "A fully automatic video editor",
+  "license": "MIT",
+  "author": "zcxy-dev",
+  "homepage": "https://github.com/zcxy-dev/video-editor",
+  "type": "module",
+  "main": "src/main.ts",
+  "scripts": {
+    "start": "electron .",
+    "stage": "node scripts/stage.ts",
+    "dist": "node scripts/stage.ts && electron-builder --publish never",
+    "smoke": "node scripts/smoke.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test 'src/**/*.test.ts'"
+  },
+  "devDependencies": {
+    "electron": "44.5.1",
+    "electron-builder": "26.17.0",
+    "playwright-core": "1.63.0"
+  }
+}

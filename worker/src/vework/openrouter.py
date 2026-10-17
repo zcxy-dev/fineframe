@@ -24,6 +24,8 @@ from vework.transcribe import LANGUAGE_CODES
 
 API = "https://openrouter.ai/api/v1"
 KEY = "OPENROUTER_API_KEY"
+# Points the client at another server with OpenRouter's API, such as a local stand-in in tests.
+BASE_URL = "OPENROUTER_BASE_URL"
 # The local default with a GPU, run by OpenRouter's provider: US$0.027 an hour of speech, and
 # the same text for the same audio every time (worker README).
 MODEL = "qwen/qwen3-asr-1.7b"
@@ -38,8 +40,9 @@ PROVIDER = {"data_collection": "deny"}
 class Client:
     """Transcribes chunks on OpenRouter and adds up what OpenRouter charged for them."""
 
-    def __init__(self, model: str = MODEL, key: str | None = None, api: str = API) -> None:
-        self.model, self.api = model, api
+    def __init__(self, model: str = MODEL, key: str | None = None, api: str | None = None) -> None:
+        self.model = model
+        self.api = (api or os.environ.get(BASE_URL) or API).rstrip("/")
         self.key = key if key is not None else os.environ.get(KEY, "")
         self.cost = 0.0
         self._lock = threading.Lock()

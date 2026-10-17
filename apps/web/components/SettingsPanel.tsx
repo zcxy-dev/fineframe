@@ -4,6 +4,7 @@ import { useId } from "react";
 import {
   ASPECTS,
   type Aspect,
+  type Asr,
   formatLength,
   LENGTH_PRESETS,
   LENGTH_RANGE,
@@ -26,6 +27,14 @@ export interface Choices {
   names: string;
   /** The licence the music is used under. */
   musicLicense: string;
+  /** Where the speech is heard. */
+  asr: Asr;
+}
+
+/** This computer's memory, and how much the local speech model needs, from the server. */
+export interface Machine {
+  memory: number;
+  needed: number;
 }
 
 /** The length the choices ask for, or why there is none. */
@@ -52,9 +61,22 @@ interface Props {
   footageSeconds: number;
   /** How many music tracks are offered to the edit. */
   music: number;
+  /** Null until the server says. */
+  machine: Machine | null;
+  /** Whether an OpenRouter key is saved; null until the server says. */
+  openrouter: boolean | null;
+  onAddOpenRouter: () => void;
 }
 
-export function SettingsPanel({ choices, onChange, footageSeconds, music }: Props) {
+export function SettingsPanel({
+  choices,
+  onChange,
+  footageSeconds,
+  music,
+  machine,
+  openrouter,
+  onAddOpenRouter,
+}: Props) {
   const id = useId();
   const set = (changes: Partial<Choices>) => onChange({ ...choices, ...changes });
   const length = chosenLength(choices);
@@ -188,6 +210,44 @@ export function SettingsPanel({ choices, onChange, footageSeconds, music }: Prop
           brands and jargon.
         </p>
       </div>
+
+      <fieldset className={styles.field}>
+        <legend className={styles.label}>Speech</legend>
+        <div className={styles.chips}>
+          <button
+            type="button"
+            className={styles.chip}
+            aria-pressed={choices.asr === "local"}
+            onClick={() => set({ asr: "local" })}
+          >
+            On this computer
+          </button>
+          <button
+            type="button"
+            className={styles.chip}
+            aria-pressed={choices.asr === "cloud"}
+            onClick={() => set({ asr: "cloud" })}
+          >
+            OpenRouter
+          </button>
+        </div>
+        {machine && machine.memory < machine.needed && (
+          <p className={styles.warning}>
+            This computer has {Math.round(machine.memory / 1024 ** 3)} GB of memory, and the speech
+            model needs about 9 GB of it, so speech is heard on OpenRouter.
+          </p>
+        )}
+        <p className={styles.help}>
+          {choices.asr === "local"
+            ? "The most accurate, and nothing is sent; it needs about 9 GB of memory and downloads 3.4 GB the first time."
+            : "Qwen3-ASR hears the speech on OpenRouter with your OpenRouter key, for about US$0.03 an hour of footage. Only the speech audio is sent; the words are timed on this computer."}
+        </p>
+        {choices.asr === "cloud" && openrouter === false && (
+          <button type="button" className={styles.button} onClick={onAddOpenRouter}>
+            Add your OpenRouter key
+          </button>
+        )}
+      </fieldset>
 
       {music > 0 && (
         <div className={styles.field}>

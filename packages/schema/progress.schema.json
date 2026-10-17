@@ -28,13 +28,13 @@
           "type": "string"
         },
         "download": {
-          "description": "A model the analysis is downloading on its first use, while it downloads.",
+          "description": "A model or program downloading on its first use, while it downloads: a model the analysis runs, FFmpeg, or Chrome Headless Shell for the effects.",
           "type": "object",
           "required": ["name", "bytes", "total"],
           "additionalProperties": false,
           "properties": {
             "name": {
-              "description": "The model, as its repository names it.",
+              "description": "The model, as its repository names it, or the program.",
               "type": "string",
               "minLength": 1
             },

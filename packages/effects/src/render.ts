@@ -3,11 +3,12 @@
 
 import { fork } from "node:child_process";
 import { createHash } from "node:crypto";
-import { access, readdir, readFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FrameRate } from "@video-editor/schema";
+import { compositorDir } from "./compositor.ts";
 import type { Aspect } from "./layout.ts";
 import type { OverlayProps } from "./remotion/props.ts";
 import type { Task, WorkerMessage } from "./worker.ts";
@@ -29,6 +30,10 @@ export interface OverlayJob {
 export interface RenderOverlaysOptions {
   /** Called as rendering advances, with the fraction done (0 to 1) and a line to show. */
   onProgress?: (fraction: number, message: string) => void;
+  /** Called while what renders the overlays downloads on its first use, Chrome Headless Shell
+   * and, where it was not installed, Remotion's compositor: its name, and the bytes so far of
+   * `total`. */
+  onDownload?: (name: string, bytes: number, total: number) => void;
 }
 
 /** Where rendered overlays and the page they render from are kept. */
@@ -81,7 +86,8 @@ function sorted(value: unknown): unknown {
  * Renders each overlay as VP9 with alpha in WebM, frame n of the file being frame n of the
  * overlay, and returns the files in the order of `jobs`. Reading the alpha needs FFmpeg's
  * libvpx-vp9 decoder; its built-in VP9 decoder drops it. Overlays already in the cache are not
- * rendered again. The first render downloads Chrome Headless Shell for Remotion.
+ * rendered again. The first render downloads Chrome Headless Shell for Remotion, and Remotion's
+ * compositor where it was not installed.
  */
 export async function renderOverlays(
   jobs: OverlayJob[],
@@ -98,11 +104,15 @@ export async function renderOverlays(
     missing.set(file, { ...rest, fps: fps.num / fps.den } as OverlayProps);
   }
   if (missing.size > 0) {
+    const binaries = await compositorDir(dir, (bytes, total) =>
+      options.onDownload?.("Remotion's compositor", bytes, total),
+    );
     const task: Task = {
       bundle: join(dir, `bundle-${code.slice(0, 16)}`),
+      binaries,
       jobs: [...missing].map(([out, props]) => ({ out, props })),
     };
-    await runWorker(task, options.onProgress ?? (() => {}));
+    await runWorker(task, options);
   }
   return files;
 }
@@ -117,21 +127,31 @@ async function exists(path: string): Promise<boolean> {
 }
 
 /**
- * Renders in a child process whose working directory is this package: Remotion keeps the Chrome
- * it downloads under the node_modules of the package around its working directory, and the
- * caller's could be anywhere, such as a footage folder. Its own output goes to stderr, so a
- * caller's stdout stays its own.
+ * The folder Chrome Headless Shell is kept in, as the working directory of the renders: Remotion
+ * keeps the Chrome it downloads under the node_modules of the package around its working
+ * directory. The package.json there ends its search, so neither the caller's folder, such as one
+ * of footage, nor this package, which an installed app cannot write to, is chosen.
  */
-function runWorker(task: Task, onProgress: (fraction: number, message: string) => void) {
+async function chromeDir(): Promise<string> {
+  const dir = join(cacheDir(), "chrome");
+  await mkdir(dir, { recursive: true });
+  const manifest = join(dir, "package.json");
+  if (!(await exists(manifest))) await writeFile(manifest, '{ "private": true }\n');
+  return dir;
+}
+
+/** Renders in a child process, whose own output goes to stderr, so a caller's stdout stays its
+ * own. */
+async function runWorker(task: Task, options: RenderOverlaysOptions) {
+  const cwd = await chromeDir();
   return new Promise<void>((resolve, reject) => {
-    const child = fork(join(PACKAGE, "src", "worker.ts"), {
-      cwd: PACKAGE,
-      stdio: ["ignore", 2, 2, "ipc"],
-    });
+    const child = fork(join(PACKAGE, "src", "worker.ts"), { cwd, stdio: ["ignore", 2, 2, "ipc"] });
     let failure: string | undefined;
     child.on("message", (message: WorkerMessage) => {
-      if (message.type === "progress") onProgress(message.fraction, message.message);
-      else failure = message.message;
+      if (message.type === "progress") options.onProgress?.(message.fraction, message.message);
+      else if (message.type === "download") {
+        options.onDownload?.(message.name, message.bytes, message.total);
+      } else failure = message.message;
     });
     child.on("error", reject);
     child.on("exit", (code, signal) => {

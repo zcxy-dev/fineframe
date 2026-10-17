@@ -1,7 +1,7 @@
 // What a person can do about an edit that failed, from the engine's message. The message stays
 // on the page as it is; this adds the step that fixes it, when there is one.
 
-export type FixKind = "key" | "credit" | "disk" | "file" | "network";
+export type FixKind = "key" | "openrouter" | "credit" | "disk" | "file" | "network";
 
 export interface Fix {
   kind: FixKind;
@@ -13,6 +13,11 @@ const FIXES: [FixKind, RegExp, string][] = [
     "key",
     /authentication_error|invalid x-api-key|ANTHROPIC_API_KEY|permission_error/i,
     "Anthropic did not accept the API key. Replace it, then start the edit again.",
+  ],
+  [
+    "openrouter",
+    /OpenRouter rejected|OPENROUTER_API_KEY|OpenRouter has no credit/i,
+    "OpenRouter did not accept the key or has no credit left for it. Replace the key or add credit at openrouter.ai/settings/credits, then start the edit again.",
   ],
   [
     "credit",

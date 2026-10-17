@@ -1,6 +1,8 @@
-// The Anthropic API key the edits use. The page saves it in the git-ignored .env at the
-// repository root, readable by its owner alone, where `pnpm edit` reads it too. The key goes to
-// Anthropic and to the edit's process, and nowhere else: never to a log, never back to the page.
+// The API keys the edits use: Anthropic's, which plans every edit, and OpenRouter's, for cloud
+// speech. The page saves them in one file readable by its owner alone: the git-ignored .env at the
+// repository root, where `pnpm edit` reads them too, or the one VIDEO_EDITOR_ENV_FILE names, such
+// as the desktop app's in its own folder. A key goes to its service and to the edit's process,
+// and nowhere else: never to a log, never back to the page.
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
@@ -10,34 +12,45 @@ import { parseEnv, promisify } from "node:util";
 import Anthropic from "@anthropic-ai/sdk";
 import { PLAN_MODELS } from "@video-editor/engine/claude";
 
-const NAME = "ANTHROPIC_API_KEY";
+export type Service = "anthropic" | "openrouter";
+export const SERVICES: readonly Service[] = ["anthropic", "openrouter"];
 
-/** The .env the key is saved in; VIDEO_EDITOR_ENV_FILE moves it. */
+/** The variable each key is saved as, the one `pnpm edit` and vework read. */
+export const VARIABLES: Record<Service, string> = {
+  anthropic: "ANTHROPIC_API_KEY",
+  openrouter: "OPENROUTER_API_KEY",
+};
+
+/** The file the keys are saved in; VIDEO_EDITOR_ENV_FILE moves it. */
 export function envFile(): string {
   return process.env.VIDEO_EDITOR_ENV_FILE ?? resolve(process.cwd(), "../../.env");
 }
 
-/** The key: the one saved in .env, which the page saved last, or else the server's own. */
-export async function readKey(): Promise<string | undefined> {
+/** A key: the one saved, which the page saved last, or else the server's own. */
+export async function readKey(service: Service = "anthropic"): Promise<string | undefined> {
+  const name = VARIABLES[service];
   const text = await readFile(envFile(), "utf8").catch(() => "");
-  return parseEnv(text)[NAME] || process.env[NAME] || undefined;
+  return parseEnv(text)[name] || process.env[name] || undefined;
 }
 
-/** Why `key` cannot be a key, or null. */
-export function keyProblem(key: string): string | null {
-  // Anthropic's keys are letters, digits, dashes and underscores after sk-ant-; anything else,
-  // such as a line break, could also break .env.
-  if (!/^sk-ant-[\w-]{1,400}$/.test(key)) {
-    return "Paste the whole key: one line, starting with sk-ant-";
+/** Why `key` cannot be a key for `service`, or null. */
+export function keyProblem(key: string, service: Service = "anthropic"): string | null {
+  // Keys are letters, digits, dashes and underscores after their prefix; anything else, such as
+  // a line break, could also break the file they are saved in.
+  const prefix = service === "anthropic" ? "sk-ant-" : "sk-or-";
+  if (!new RegExp(`^${prefix}[\\w-]{1,400}$`).test(key)) {
+    return `Paste the whole key: one line, starting with ${prefix}`;
   }
   return null;
 }
 
-/**
- * Asks Anthropic whether `key` can plan an edit: it looks up the planning model, which costs
- * nothing. Null when it can, or what to do when it cannot.
- */
-export async function checkKey(key: string): Promise<string | null> {
+/** Asks `service` whether `key` works, at no cost: null when it does, or what to do. */
+export function checkKey(key: string, service: Service = "anthropic"): Promise<string | null> {
+  return service === "anthropic" ? checkAnthropic(key) : checkOpenRouter(key);
+}
+
+/** Whether `key` can plan an edit: it looks up the planning model. */
+async function checkAnthropic(key: string): Promise<string | null> {
   const client = new Anthropic({ apiKey: key, maxRetries: 1, timeout: 20_000 });
   try {
     await client.models.retrieve(PLAN_MODELS.best);
@@ -60,15 +73,39 @@ export async function checkKey(key: string): Promise<string | null> {
   }
 }
 
-/** Saves `key` in .env, keeping its other lines, readable and writable by its owner alone. */
-export async function saveKey(key: string): Promise<void> {
+/** Whether OpenRouter knows `key`: it reads the key's own details, as vework does before it
+ * sends any speech. OPENROUTER_BASE_URL moves the server, as it does for vework. */
+async function checkOpenRouter(key: string): Promise<string | null> {
+  const api = (process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1").replace(
+    /\/$/,
+    "",
+  );
+  try {
+    const response = await fetch(`${api}/key`, {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (response.ok) return null;
+    if (response.status === 401) {
+      return "OpenRouter did not accept this key. Copy it again from openrouter.ai/settings/keys";
+    }
+    return `OpenRouter could not check the key (HTTP ${response.status}). Try again`;
+  } catch {
+    return "Could not reach OpenRouter to check the key. Check the internet connection and try again";
+  }
+}
+
+/** Saves `key` for `service`, keeping the file's other lines, readable and writable by its owner
+ * alone. */
+export async function saveKey(key: string, service: Service = "anthropic"): Promise<void> {
+  const name = VARIABLES[service];
   const file = envFile();
   const text = await readFile(file, "utf8").catch(() => "");
   const kept = text
     .split(/\r?\n/)
-    .filter((line) => !new RegExp(`^\\s*(export\\s+)?${NAME}\\s*=`).test(line));
+    .filter((line) => !new RegExp(`^\\s*(export\\s+)?${name}\\s*=`).test(line));
   while (kept.at(-1) === "") kept.pop();
-  const next = `${[...kept, `${NAME}=${key}`].join("\n")}\n`;
+  const next = `${[...kept, `${name}=${key}`].join("\n")}\n`;
   // Written whole beside it and renamed over it, so a half-written key is never read.
   const partial = `${file}.${randomUUID()}.partial`;
   try {

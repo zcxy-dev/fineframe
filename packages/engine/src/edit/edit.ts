@@ -153,6 +153,20 @@ type Reporter = (
   download?: Download,
 ) => void;
 
+/** Downloads' progress as progress lines, for each at most one every quarter of a second and
+ * the last when it is whole; nothing while the server does not say the size. The bar stays where
+ * it is. */
+function downloading(report: Reporter, stage: Stage) {
+  const shown = new Map<string, number>();
+  return (name: string, bytes: number, total: number) => {
+    const now = Date.now();
+    if (total <= 0 || (bytes < total && now - (shown.get(name) ?? 0) < 250)) return;
+    shown.set(name, now);
+    const download = { name, bytes: Math.min(bytes, total), total };
+    report(stage, 0, `Downloading ${name}, the first time it is used`, undefined, download);
+  };
+}
+
 /** Usage summed by the stage that asked: the plan with the callouts it finds on screen, or the
  * review with what it escalates. */
 export function costByStage(usages: readonly Usage[]): ClaudeCost {
@@ -223,6 +237,10 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
     spent.push(reply.usage);
     return reply;
   };
+  // The renderer's FFmpeg, downloaded on its first use, before the long analysis rather than
+  // after it.
+  const download = downloading(report, "analyze");
+  await ffmpeg((bytes, total) => download("FFmpeg", bytes, total));
   const worker = options.worker ?? (await localWorker());
   const cache = options.cache ?? defaultCache();
 
@@ -310,6 +328,7 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
       render(edit.path, video, {
         onProgress: (fraction, message) =>
           report("render", renderAt + fraction * (checkAt - renderAt), message),
+        onDownload: downloading(report, "render"),
       }),
     );
 

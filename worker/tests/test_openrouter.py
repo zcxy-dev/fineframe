@@ -177,6 +177,13 @@ def test_check_reads_the_key_from_the_environment(fake, monkeypatch):
     assert server.requests[0][2]["Authorization"] == "Bearer from-env"
 
 
+def test_the_server_can_be_moved_from_the_environment(fake, monkeypatch):
+    server = fake(dict(CHECKED))
+    monkeypatch.setenv(openrouter.BASE_URL, f"{server.api}/")
+    openrouter.Client(key="test-key").check()
+    assert [path for _, path, _, _ in server.requests] == list(CHECKED)
+
+
 def test_check_names_an_invalid_key(fake):
     server = fake({"/key": [(401, {"error": {"message": "User not found."}}, {})]})
     with pytest.raises(RuntimeError, match=r"rejected OPENROUTER_API_KEY \(401\): User not found"):

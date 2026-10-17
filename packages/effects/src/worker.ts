@@ -11,11 +11,14 @@ import { COMPOSITION, type OverlayProps } from "./remotion/props.ts";
 export interface Task {
   /** The folder the bundled page is kept in. */
   bundle: string;
+  /** Remotion's compositor, when it was downloaded rather than installed (./compositor.ts). */
+  binaries: string | null;
   jobs: { out: string; props: OverlayProps }[];
 }
 
 export type WorkerMessage =
   | { type: "progress"; fraction: number; message: string }
+  | { type: "download"; name: string; bytes: number; total: number }
   | { type: "error"; message: string };
 
 const ENTRY = fileURLToPath(new URL("./remotion/root.tsx", import.meta.url));
@@ -49,7 +52,19 @@ async function page(dir: string): Promise<string> {
 
 async function main(task: Task): Promise<void> {
   send({ type: "progress", fraction: 0, message: "Preparing the effects renderer" });
-  await ensureBrowser();
+  await ensureBrowser({
+    logLevel: "error",
+    onBrowserDownload: () => ({
+      version: null,
+      onProgress: ({ downloadedBytes, totalSizeInBytes }) =>
+        send({
+          type: "download",
+          name: "Chrome Headless Shell",
+          bytes: downloadedBytes,
+          total: totalSizeInBytes,
+        }),
+    }),
+  });
   const serveUrl = await page(task.bundle);
   const browser = await openBrowser("chrome", { logLevel: "error" });
   try {
@@ -61,6 +76,7 @@ async function main(task: Task): Promise<void> {
         id: COMPOSITION,
         inputProps,
         puppeteerInstance: browser,
+        binariesDirectory: task.binaries,
         logLevel: "error",
       });
       await mkdir(dirname(out), { recursive: true });
@@ -71,6 +87,7 @@ async function main(task: Task): Promise<void> {
           composition,
           inputProps,
           puppeteerInstance: browser,
+          binariesDirectory: task.binaries,
           // PNG frames keep the alpha channel and VP9 carries it. Chosen over ProRes 4444 for its
           // file size and decoding cost (packages/effects/README.md#format).
           codec: "vp9",

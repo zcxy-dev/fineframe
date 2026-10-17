@@ -32,6 +32,10 @@ export function styleName(style: Style): string {
   return style === "none" ? "None" : `${style[0]?.toUpperCase()}${style.slice(1)}`;
 }
 
+/** Where the speech is heard: by the model on this computer, or on OpenRouter (`--asr cloud`). */
+export const ASRS = ["local", "cloud"] as const;
+export type Asr = (typeof ASRS)[number];
+
 export interface Settings {
   /** Seconds, LENGTH_RANGE inclusive. */
   length: number;
@@ -41,6 +45,7 @@ export interface Settings {
   names: string[];
   /** The licence the music is used under, such as "CC0 1.0"; needed when there is music. */
   musicLicense?: string;
+  asr: Asr;
 }
 
 /** A file as the page offers it: its path inside what was dropped, and its size in bytes. */
@@ -67,10 +72,12 @@ export function namesFrom(text: string): string[] {
   return [...new Set(names)];
 }
 
-/** The settings in `input`, or why they cannot make an edit. */
-export function checkSettings(input: unknown): Settings | string {
+/** The settings in `input`, or why they cannot make an edit; `asr` unless it says otherwise. */
+export function checkSettings(input: unknown, asr: Asr = "local"): Settings | string {
   if (typeof input !== "object" || input === null) return "No settings";
   const { length, aspect, style, names, musicLicense } = input as Record<string, unknown>;
+  const heard = (input as Record<string, unknown>).asr ?? asr;
+  if (!ASRS.includes(heard as Asr)) return `Speech is heard ${ASRS.join(" or ")}`;
   if (typeof length !== "number") return "No length";
   const problem = lengthProblem(length);
   if (problem) return problem;
@@ -96,6 +103,7 @@ export function checkSettings(input: unknown): Settings | string {
     style: chosen as Style,
     names: list as string[],
     ...(license.trim() ? { musicLicense: license.trim() } : {}),
+    asr: heard as Asr,
   };
 }
 

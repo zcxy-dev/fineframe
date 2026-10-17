@@ -108,8 +108,9 @@ export function RunView({ job }: { job: Job }) {
   );
 }
 
-/** A model downloading on its first use: how much has arrived and how long the rest will take. */
-function DownloadView({ download }: { download: NonNullable<Job["download"]> }) {
+/** A model or program downloading on its first use: how much has arrived and how long the rest
+ * will take. */
+export function DownloadView({ download }: { download: NonNullable<Job["download"]> }) {
   const { name, bytes, total, secondsLeft } = download;
   const percent = Math.floor((bytes / total) * 100);
   return (
