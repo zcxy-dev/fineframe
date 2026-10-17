@@ -44,7 +44,13 @@ const CHAPTERS_MAX = 12;
  * too long) is left out alone. `broll` is where B-roll covers the speaker, which a lower third
  * waits for or else is left out, and which hides a callout's region; `cuts` are where the clips
  * join. `placed` holds where each found thing shows in the output frame while its callout plays
- * (calloutSpan), by wishKey; a thing that does not show whole and still has none.
+ * (calloutSpan), by wishKey; a thing that does not show whole and still has none. `changes` are
+ * where the picture may cut to someone else: the cuts and the sources' own shot changes;
+ * `speaking`, where someone on screen talks. A lower third shows in the first shot, while its
+ * person's line is said, where someone on screen talks for as long as its template needs, and
+ * ends before that shot does or the talking stops, coming in sooner than usual, but not before
+ * they speak, to fit; with no such shot it is left out. A keyword pop ends before the shot
+ * changes after its word.
  */
 export function plannedOverlays(
   state: PlanState,
@@ -53,20 +59,37 @@ export function plannedOverlays(
   broll: readonly { start: number; duration: number }[] = [],
   cuts: readonly number[] = [],
   placed: ReadonlyMap<string, Rect> = new Map(),
+  changes: readonly number[] = cuts,
+  speaking: readonly { start: number; end: number }[] = [{ start: 0, end: edit }],
 ): Overlay[] {
   const frame = ticksPerFrame(state.fps);
   const onFrame = (ticks: number) => Math.max(0, Math.round(ticks / frame) * frame);
   const wanted: Overlay[] = [];
-  const add = (template: TemplateId, start: number, params: Record<string, unknown>) => {
-    const { from, duration } = span(state.fps, edit, template, start);
+  /** The tick each wanted overlay must end by, when that is before the edit's end. */
+  const until = new Map<Overlay, number>();
+  const add = (
+    template: TemplateId,
+    start: number,
+    params: Record<string, unknown>,
+    end = edit,
+  ) => {
+    const { from, duration } = span(state.fps, end, template, start);
     if (duration >= secondsToTicks(catalog[template].seconds.min)) {
-      wanted.push({ template, start: from, duration, params });
+      const overlay = { template, start: from, duration, params };
+      wanted.push(overlay);
+      if (end < edit) until.set(overlay, end);
     }
   };
   /** The first kept word of a source's line, on the output timeline. */
   const lineStart = (source: string, n: number) => {
     const line = state.sources.get(source)?.lines.find((l) => l.n === n);
     return line && words.find((w) => w.source === source && w.index >= line.first && w.index <= line.last); // biome-ignore format: one line
+  };
+
+  /** Where the last kept word of a source's line ends, on the output timeline. */
+  const lineEnd = (source: string, n: number) => {
+    const line = state.sources.get(source)?.lines.find((l) => l.n === n);
+    return line ? Math.max(...words.filter((w) => w.source === source && w.index >= line.first && w.index <= line.last).map((w) => w.end)) : 0; // biome-ignore format: one line
   };
 
   const { title, people, emphasis } = state.decisions;
@@ -90,7 +113,11 @@ export function plannedOverlays(
     const word = lineStart(person.source, person.line);
     if (!name || !word || named.has(name)) continue;
     named.add(name);
-    add("lower-third", word.start + secondsToTicks(NAME_DELAY), { name, ...optional("role", person.role) }); // biome-ignore format: one line
+    const window = nameWindow(word, lineEnd(person.source, person.line), edit, frame, changes, speaking); // biome-ignore format: one line
+    if (!window) continue;
+    const fits = window.end - secondsToTicks(catalog["lower-third"].seconds.min);
+    const start = Math.min(window.start + secondsToTicks(NAME_DELAY), fits);
+    add("lower-third", start, { name, ...optional("role", person.role) }, window.end);
   }
   for (const wish of state.decisions.callouts ?? []) {
     const located = state.regions.get(wishKey(wish));
@@ -110,7 +137,10 @@ export function plannedOverlays(
       findWords(source.words, line.first, line.last, keyword) ??
       findWords(source.words, line.first, line.last, item.text);
     const word = at && words.find((w) => w.source === source.id && w.index === at[0]);
-    if (word) add("keyword", word.start - secondsToTicks(KEYWORD_LEAD), { text: keyword, position: "upper" }); // biome-ignore format: one line
+    if (!word) continue;
+    // It ends before the shot changes after its word, or else pops over another shot.
+    const end = Math.floor((changes.find((c) => c > word.start) ?? edit) / frame) * frame;
+    add("keyword", word.start - secondsToTicks(KEYWORD_LEAD), { text: keyword, position: "upper" }, end); // biome-ignore format: one line
   }
 
   // One at a time, the earlier-listed first: at 9:16 the lower third, the chapter marker and an
@@ -139,7 +169,10 @@ export function plannedOverlays(
     const wait = WAIT[overlay.template as TemplateId];
     if (blocking.length > 0 && wait !== undefined) {
       const start = onFrame(Math.max(...blocking.map((k) => k.start + k.duration)) + frame);
-      if (start - wish.start <= secondsToTicks(wait) && start + overlay.duration <= edit) {
+      if (
+        start - wish.start <= secondsToTicks(wait) &&
+        start + overlay.duration <= (until.get(wish) ?? edit)
+      ) {
         overlay = { ...overlay, start };
       }
     }
@@ -155,8 +188,32 @@ export function plannedOverlays(
   return kept.sort((a, b) => a.start - b.start);
 }
 
+/** The first stretch, from `word` until `until`, inside one shot and while someone on screen
+ * talks, long enough for a lower third; its end on the frame grid. */
+function nameWindow(
+  word: TimedWord,
+  until: number,
+  edit: number,
+  frame: number,
+  changes: readonly number[],
+  speaking: readonly { start: number; end: number }[],
+): { start: number; end: number } | undefined {
+  const min = secondsToTicks(catalog["lower-third"].seconds.min);
+  const bounds = [0, ...changes, edit].sort((a, b) => a - b);
+  for (const [i, shotStart] of bounds.slice(0, -1).entries()) {
+    const shotEnd = bounds[i + 1] as number;
+    if (shotEnd <= word.start || shotStart >= until) continue;
+    for (const talk of speaking) {
+      const start = Math.max(shotStart, talk.start, word.start);
+      const end = Math.floor(Math.min(shotEnd, talk.end) / frame) * frame;
+      if (start < until && end - start >= min) return { start, end };
+    }
+  }
+  return undefined;
+}
+
 /** Where an overlay of `template` meant to start at output tick `start` is placed, on the
- * frame grid, and how long it shows in an edit `edit` ticks long. */
+ * frame grid, and how long it shows when it must end by tick `edit`. */
 function span(fps: FrameRate, edit: number, template: TemplateId, start: number) {
   const frame = ticksPerFrame(fps);
   const onFrame = (ticks: number) => Math.max(0, Math.round(ticks / frame) * frame);
