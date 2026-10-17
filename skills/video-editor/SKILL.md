@@ -20,7 +20,7 @@ Done when each of these holds:
 ## 2. Make the edit
 
 ```bash
-pnpm -s edit footage/ --length 60s --aspect 9:16 -o out/edit.mp4 > out/progress.jsonl
+mkdir -p out && pnpm -s edit footage/ --length 60s --aspect 9:16 -o out/edit.mp4 > out/progress.jsonl
 ```
 
 - Footage: files or folders of video and still images. `--length` is 15 s to 1 h (`60s`, `90`, `3m`, `1:30`); `--aspect` is `9:16`, `1:1` or `16:9`.
