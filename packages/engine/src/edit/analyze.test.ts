@@ -18,7 +18,7 @@ async function copy(): Promise<string> {
 }
 
 async function edit(file: string, from: RegExp, to: string): Promise<void> {
-  const text = await readFile(file, "utf8");
+  const text = (await readFile(file, "utf8")).replaceAll("\r\n", "\n");
   assert.match(text, from);
   await writeFile(file, text.replace(from, to));
 }
@@ -40,4 +40,14 @@ test("a change to a dependency's locked version changes the worker's version", a
   const before = await workerVersion(dir);
   await edit(join(dir, "uv.lock"), /(\nname = "numpy"\nversion = )"[^"]+"/, '$1"0.0.1"');
   assert.notEqual(await workerVersion(dir), before);
+});
+
+test("a Windows checkout, with CRLF line endings, has the same version as any other", async () => {
+  const dir = await copy();
+  const before = await workerVersion(dir);
+  for (const file of ["pyproject.toml", "uv.lock"]) {
+    const path = join(dir, file);
+    await writeFile(path, (await readFile(path, "utf8")).replaceAll("\n", "\r\n"));
+  }
+  assert.equal(await workerVersion(dir), before);
 });

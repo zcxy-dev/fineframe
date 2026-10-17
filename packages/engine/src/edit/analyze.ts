@@ -52,7 +52,8 @@ export async function workerVersion(dir: string): Promise<string> {
     .sort();
   const hash = createHash("sha256");
   for (const file of ["pyproject.toml", "uv.lock", ...code]) {
-    let text = await readFile(join(dir, file), "utf8");
+    // As LF, so a Windows checkout (CRLF) hashes and matches the same.
+    let text = (await readFile(join(dir, file), "utf8")).replaceAll("\r\n", "\n");
     if (file === "pyproject.toml") text = text.replace(/^version = "[^"]*"$/m, "");
     if (file === "uv.lock") text = text.replace(/(\nname = "vework"\n)version = "[^"]*"\n/, "$1");
     hash.update(`${file}\0`).update(text);
