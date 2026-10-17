@@ -41,7 +41,13 @@ function track(beats = Array.from({ length: 2 + 32 * 4 }, (_, i) => 0.5 + i * BE
     loudness: Array.from({ length: Math.ceil(end) }, () => -15),
     end,
   };
-  return { id: "music-beat-112", path: "/music/beat-112.wav", indexPath: "", index, fingerprint: { bytes: 1, sha256: "0".repeat(64) } }; // biome-ignore format: one line
+  return {
+    id: "music-beat-112",
+    path: "/music/beat-112.wav",
+    indexPath: "",
+    index,
+    fingerprint: { bytes: 1, sha256: "0".repeat(64) },
+  };
 }
 
 const seconds = (ticks: number) => ticks / SECOND;
@@ -178,10 +184,18 @@ test("the music sits under the speech's loudness, ducked further while someone s
   assert.ok(music);
   // -20 LUFS speech, music measured at -15: -6 LU under in pauses, -18 under while talking.
   assert.equal(music.gainDb, -20 - UNDER_PAUSES + 15);
-  assert.deepEqual(music.ducking, { depthDb: UNDER_PAUSES - UNDER_SPEECH, attackMs: 250, releaseMs: 750 }); // biome-ignore format: one line
+  assert.deepEqual(music.ducking, {
+    depthDb: UNDER_PAUSES - UNDER_SPEECH,
+    attackMs: 250,
+    releaseMs: 750,
+  });
   assert.deepEqual(music.license, { name: "CC0 1.0" });
   assert.equal(music.source, "music-beat-112");
-  assert.deepEqual(music.beatGrid, { bpm: 112, downbeat: Math.round((0.5 + 2 * BEAT) * SECOND), beatsPerBar: 4 }); // biome-ignore format: one line
+  assert.deepEqual(music.beatGrid, {
+    bpm: 112,
+    downbeat: Math.round((0.5 + 2 * BEAT) * SECOND),
+    beatsPerBar: 4,
+  });
 });
 
 test("beats that drift from one tempo give no beat grid to check against", () => {
@@ -207,7 +221,10 @@ test("a shot's end comes back to the last beat less than a beat before it, and n
 });
 
 test("the speech's loudness is the gated mean of the seconds its clips play", () => {
-  const index = { source: { name: "a.mp4", audio: [{ channels: 1 }] }, loudness: { momentary: [], short_term: [-70, -20, -20, -40, -20, -70] } } as unknown as MediaIndex; // biome-ignore format: one line
+  const index = {
+    source: { name: "a.mp4", audio: [{ channels: 1 }] },
+    loudness: { momentary: [], short_term: [-70, -20, -20, -40, -20, -70] },
+  } as unknown as MediaIndex;
   // Seconds 1-4: the -40 one is more than 10 LU under the rest and gated out.
   assert.ok(Math.abs(speechLoudness([{ index, in: SECOND, out: 4.5 * SECOND }]) + 20) < 1e-9);
   // The index of a stereo source already reads as loud as its two channels together.
@@ -246,7 +263,15 @@ function shaped(lead: number, pickup: number, bars: number[], ring: number, bpm 
     loudness: -15,
   }));
   const source = track(beats);
-  source.index = { ...source.index, beats, downbeats, sections, end, tempo: { bpm, beats_per_bar: 4 }, loudness: Array.from({ length: Math.ceil(end) }, () => -15) }; // biome-ignore format: one line
+  source.index = {
+    ...source.index,
+    beats,
+    downbeats,
+    sections,
+    end,
+    tempo: { bpm, beats_per_bar: 4 },
+    loudness: Array.from({ length: Math.ceil(end) }, () => -15),
+  };
   return source;
 }
 
@@ -267,15 +292,25 @@ test("every fit is playable: ranges forward, fades inside them, joins on one gri
           for (const section of [1, 2, 3]) {
             for (let length = 15; length <= 130; length += 1.37) {
               const music = fitMusic(source, section, length, -20);
-              const where = `lead ${lead}, pickup ${pickup}, bars ${bars}, ring ${ring}, section ${section}, ${length.toFixed(2)} s`; // biome-ignore format: one line
+              const where = `lead ${lead}, pickup ${pickup}, bars ${bars}, ring ${ring}, section ${section}, ${length.toFixed(2)} s`;
               const fail = (what: string) => problems.push(`${where}: ${what}`);
               for (const [k, range] of music.entries()) {
-                if (!(range.in >= 0 && range.out > range.in && range.start >= 0)) fail(`range ${k} is ${JSON.stringify(range)}`); // biome-ignore format: one line
-                for (const fade of [range.fadeIn, range.fadeOut]) if (fade !== undefined && fade <= 0) fail(`range ${k} has a fade of ${fade}`); // biome-ignore format: one line
-                if ((range.fadeIn ?? 0) + (range.fadeOut ?? 0) > range.out - range.in) fail(`range ${k}'s fades outlast it`); // biome-ignore format: one line
-                if (music.length > 1 && seconds(range.out - range.in) < bar - 0.1) fail(`range ${k} lasts ${seconds(range.out - range.in)} s`); // biome-ignore format: one line
+                if (!(range.in >= 0 && range.out > range.in && range.start >= 0))
+                  fail(`range ${k} is ${JSON.stringify(range)}`);
+                for (const fade of [range.fadeIn, range.fadeOut])
+                  if (fade !== undefined && fade <= 0) fail(`range ${k} has a fade of ${fade}`);
+                if ((range.fadeIn ?? 0) + (range.fadeOut ?? 0) > range.out - range.in)
+                  fail(`range ${k}'s fades outlast it`);
+                if (music.length > 1 && seconds(range.out - range.in) < bar - 0.1)
+                  fail(`range ${k} lasts ${seconds(range.out - range.in)} s`);
                 const next = music[k + 1];
-                if (next && Math.abs(next.start - (range.start + range.out - range.in - crossfade)) > 2) fail(`join ${k} leaves ${seconds(next.start - range.start - range.out + range.in)} s`); // biome-ignore format: one line
+                if (
+                  next &&
+                  Math.abs(next.start - (range.start + range.out - range.in - crossfade)) > 2
+                )
+                  fail(
+                    `join ${k} leaves ${seconds(next.start - range.start - range.out + range.in)} s`,
+                  );
               }
               const first = music[0] as MusicTrack;
               if (seconds(first.start) > bar + 1e-3) fail(`enters ${seconds(first.start)} s in`);
@@ -284,7 +319,10 @@ test("every fit is playable: ranges forward, fades inside them, joins on one gri
               const ownEnding = Math.abs(seconds(last.out) - index.end) < 1e-3;
               const fadeStart = seconds(last.out - (last.fadeOut ?? 0));
               const onBar = index.downbeats.some((d) => Math.abs(d - fadeStart) < 1e-3);
-              if (!ownEnding && !(seconds(last.fadeOut ?? 0) >= 2 && onBar)) fail(`stops at ${seconds(last.out)} s of the track without its ending or a fade from a bar line`); // biome-ignore format: one line
+              if (!ownEnding && !(seconds(last.fadeOut ?? 0) >= 2 && onBar))
+                fail(
+                  `stops at ${seconds(last.out)} s of the track without its ending or a fade from a bar line`,
+                );
               try {
                 assertOneGrid(music, index);
               } catch (error) {

@@ -15,7 +15,16 @@ export const RAW_AUDIO = ["-f", "f32le", "-ar", String(SAMPLE_RATE), "-ac", "2"]
 /** BT.709 colour tags, limited range. The encoder reads them on its raw input too: FFmpeg 7.1
  * and later take primaries and transfer from the frames, not from output options, and convert
  * untagged frames, read as BT.601, to an output matrix that differs. */
-const BT709 = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]; // biome-ignore format: one line
+const BT709 = [
+  "-colorspace",
+  "bt709",
+  "-color_primaries",
+  "bt709",
+  "-color_trc",
+  "bt709",
+  "-color_range",
+  "tv",
+];
 
 /** Flags every FFmpeg run shares: quiet unless something fails, and never reading the terminal. */
 export const QUIET = ["-hide_banner", "-nostdin", "-nostats", "-loglevel", "error"];

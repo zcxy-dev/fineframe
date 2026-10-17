@@ -212,7 +212,23 @@ test("B-roll from a matched source carries its match", async (t) => {
     { aspect: "16:9", width: 160, height: 90, fps: { num: 30, den: 1 } },
   );
   project.broll = [
-    { source: "b", in: SECOND, out: 2 * SECOND, start: 0, grade: { match: { reference: "a", matrix: [[1, 0, 0], [0, 1, 0], [0, 0, 1]], offset: [0.5, 0, 0] } } }, // biome-ignore format: one line
+    {
+      source: "b",
+      in: SECOND,
+      out: 2 * SECOND,
+      start: 0,
+      grade: {
+        match: {
+          reference: "a",
+          matrix: [
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1],
+          ],
+          offset: [0.5, 0, 0],
+        },
+      },
+    },
     { source: "a", in: 0, out: SECOND, start: SECOND },
   ];
   const path = join(dir, "project.json");
@@ -264,7 +280,15 @@ test("an edit from one source is not measured", async (t) => {
   const dir = await scratch(t, "match-one-");
   const spec = { pattern: "testsrc2", width: 160, height: 90, fps: 30, seconds: 1, sound: null };
   const a = await makeSource(dir, { ...spec, id: "a" });
-  const stale: Grade["match"] = { reference: "b", matrix: [[1, 0, 0], [0, 1, 0], [0, 0, 1]], offset: [0.1, 0, 0] }; // biome-ignore format: one line
+  const stale: Grade["match"] = {
+    reference: "b",
+    matrix: [
+      [1, 0, 0],
+      [0, 1, 0],
+      [0, 0, 1],
+    ],
+    offset: [0.1, 0, 0],
+  };
   const project = projectOf([a], [{ source: "a", in: 0, out: SECOND, grade: { match: stale } }], {
     aspect: "16:9",
     width: 160,

@@ -45,7 +45,10 @@ export function faceZones(
     box: placement(clip.card.placement === "panel" ? panelRect(output.aspect) : undefined, output),
   }));
   // Layers bottom to top: each is covered by the ones after it.
-  const layers = [...main.map((layer) => [layer, 0] as const), ...broll.map((layer, i) => [layer, i + 1] as const)]; // biome-ignore format: one line
+  const layers = [
+    ...main.map((layer) => [layer, 0] as const),
+    ...broll.map((layer, i) => [layer, i + 1] as const),
+  ];
   return layers.flatMap(([layer, above]) =>
     zonesOf(layer, [...broll.slice(above), ...cards], timeline.frameTicks, output),
   );
@@ -61,11 +64,20 @@ export function visualZones(
   output: Pick<Project["output"], "width" | "height" | "aspect">,
 ): FaceZone[] {
   const speakers = new Set(timeline.main.map((clip) => clip.source?.id));
-  const zone = (start: number, end: number, box: { x: number; y: number; width: number; height: number }) => ({ start, end, boxes: [{ x0: box.x, y0: box.y, x1: box.x + box.width, y1: box.y + box.height }] }); // biome-ignore format: one line
+  const zone = (
+    start: number,
+    end: number,
+    box: { x: number; y: number; width: number; height: number },
+  ) => ({
+    start,
+    end,
+    boxes: [{ x0: box.x, y0: box.y, x1: box.x + box.width, y1: box.y + box.height }],
+  });
   const broll = timeline.broll
     .filter((clip) => clip.clip.rect && !speakers.has(clip.source?.id))
     .map((clip) => zone(clip.start, clip.end, placement(clip.clip.rect, output)));
-  const above = output.height - Math.round(layoutFor(output.aspect, output.width, output.height).safe.bottom); // biome-ignore format: one line
+  const above =
+    output.height - Math.round(layoutFor(output.aspect, output.width, output.height).safe.bottom);
   const cards = (timeline.cards ?? []).map((clip) =>
     clip.card.placement === "panel"
       ? zone(clip.start, clip.end, placement(panelRect(output.aspect), output))

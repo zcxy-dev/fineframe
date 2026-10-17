@@ -389,7 +389,9 @@ async function sourceWishes(state: PlanState): Promise<void> {
   );
   if (state.usage.length > before) {
     const spent = totalUsage(state.usage.slice(before)).dollars;
-    state.progress(`Rewrote the cards whose text broke their layout with ${CHECK_MODEL} (${dollars(spent)})`); // biome-ignore format: one line
+    state.progress(
+      `Rewrote the cards whose text broke their layout with ${CHECK_MODEL} (${dollars(spent)})`,
+    );
   }
   // Placed from these, whose params the assets are keyed by.
   state.decisions = { ...state.decisions, visuals };
@@ -667,14 +669,18 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
   const cuts = clips.slice(0, -1).map((clip) => (joined += clip.out - clip.in));
   // Where the picture changes shot: where a source's own shot changes, and at a cut to another
   // source or another of its shots, not at a jump cut inside one shot.
-  const transitionsAt = (source: string) => (state.sources.get(source)?.index?.transitions ?? []).map((t) => secondsToTicks(t.start)); // biome-ignore format: one line
+  const transitionsAt = (source: string) =>
+    (state.sources.get(source)?.index?.transitions ?? []).map((t) => secondsToTicks(t.start));
   const shotOf = (source: string, t: number) => transitionsAt(source).filter((s) => s <= t).length;
   let at = 0;
   const changes = clips.flatMap((clip, i) => {
     const offset = at;
     at += clip.out - clip.in;
     const next = clips[i + 1];
-    const cut = next && (next.source !== clip.source || shotOf(clip.source, clip.out - 1) !== shotOf(next.source, next.in)); // biome-ignore format: one line
+    const cut =
+      next &&
+      (next.source !== clip.source ||
+        shotOf(clip.source, clip.out - 1) !== shotOf(next.source, next.in));
     const inside = transitionsAt(clip.source).filter((t) => t > clip.in && t < clip.out);
     return [...inside.map((t) => offset + t - clip.in), ...(cut ? [at] : [])];
   });
@@ -697,10 +703,15 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
       at += clip.out - clip.in;
       const framing = state.sources.get(clip.source)?.index?.framing;
       if (!framing) return [{ start: offset, end: at }];
-      const talks = framing.shots.flatMap((shot) => shot.speakers.map((s) => ({ start: secondsToTicks(s.start), end: secondsToTicks(s.end) }))); // biome-ignore format: one line
+      const talks = framing.shots.flatMap((shot) =>
+        shot.speakers.map((s) => ({ start: secondsToTicks(s.start), end: secondsToTicks(s.end) })),
+      );
       return through(talks)
         .filter((t) => t.end > clip.in && t.start < clip.out)
-        .map((t) => ({ start: offset + Math.max(t.start, clip.in) - clip.in, end: offset + Math.min(t.end, clip.out) - clip.in })); // biome-ignore format: one line
+        .map((t) => ({
+          start: offset + Math.max(t.start, clip.in) - clip.in,
+          end: offset + Math.min(t.end, clip.out) - clip.in,
+        }));
     }),
   );
   // Each clip framed for the output's shape on the faces its source's index found.
@@ -718,7 +729,15 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
     const span = located && calloutSpan(state.fps, words, lengthOf(clips), located);
     if (!located || !source || !span) continue;
     const size = { width, height, frame: ticksPerFrame(state.fps) };
-    const rect = await calloutRect(source, main, located, span.from, span.duration, size, state.stills); // biome-ignore format: one line
+    const rect = await calloutRect(
+      source,
+      main,
+      located,
+      span.from,
+      span.duration,
+      size,
+      state.stills,
+    );
     if (rect) placed.set(wishKey(wish), rect);
   }
   const edit = lengthOf(clips);
@@ -733,7 +752,10 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
         edit,
         frame: ticksPerFrame(state.fps),
         aspect: state.aspect,
-        blocked: [...covered, ...first.filter((o) => o.template !== "keyword")].map((o) => ({ start: o.start, end: o.start + o.duration })), // biome-ignore format: one line
+        blocked: [...covered, ...first.filter((o) => o.template !== "keyword")].map((o) => ({
+          start: o.start,
+          end: o.start + o.duration,
+        })),
         onLeftOut: (wish, reason) =>
           state.progress(`Left out the ${wish.kind} visual on line ${wish.line}: ${reason}`),
       })
@@ -741,7 +763,17 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
   const shown = visuals.map((v) => ({ start: v.start, duration: v.end - v.start }));
   const overlays =
     visuals.length > 0
-      ? plannedOverlays(state, words, edit, [...covered, ...shown], cuts, placed, changes, speaking, shown) // biome-ignore format: one line
+      ? plannedOverlays(
+          state,
+          words,
+          edit,
+          [...covered, ...shown],
+          cuts,
+          placed,
+          changes,
+          speaking,
+          shown,
+        )
       : first;
   const output = { aspect: state.aspect, width, height };
   const parts = await visualParts(visuals, output, (file) => visualPath(folder, file));

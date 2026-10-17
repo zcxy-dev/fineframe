@@ -604,7 +604,18 @@ test("untagged footage keeps its colours, read with the matrix players assume fo
     const project = projectOf([source], [clip(source.id, 0, 0.2)], output);
     const result = await render(await write(dir, project), join(dir, `${source.id}.out.mp4`));
     const raw = join(dir, `${source.id}.yuv`);
-    await run(await ffmpeg(), [...QUIET, "-i", result.video, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "yuv420p", raw]); // biome-ignore format: one line
+    await run(await ffmpeg(), [
+      ...QUIET,
+      "-i",
+      result.video,
+      "-frames:v",
+      "1",
+      "-f",
+      "rawvideo",
+      "-pix_fmt",
+      "yuv420p",
+      raw,
+    ]);
     const frame = await readFile(raw);
     const size = width * height;
     // The output is tagged BT.709: the HD source passes through unchanged, and the SD one,
@@ -753,7 +764,18 @@ test("a mix louder than loudness normalisation measures is still normalised", as
   await run(bin, [...QUIET, "-f", "lavfi", "-i", lavfi, ...RAW_AUDIO, hot]);
   const target = { integratedLufs: -14, truePeakDbtp: -1 };
   const measure = (file: string) =>
-    run(bin, ["-hide_banner", "-nostats", ...RAW_AUDIO, "-i", file, "-af", measureLoudness(target), "-f", "null", "-"]); // biome-ignore format: one line
+    run(bin, [
+      "-hide_banner",
+      "-nostats",
+      ...RAW_AUDIO,
+      "-i",
+      file,
+      "-af",
+      measureLoudness(target),
+      "-f",
+      "null",
+      "-",
+    ]);
   const measured = parseMeasurement((await measure(hot)).stderr);
   assert.ok(measured.input_i > 0, String(measured.input_i));
   const out = join(dir, "master.f32");
@@ -782,7 +804,17 @@ test("a noisy mix with sharp transients keeps its true-peak ceiling once encoded
   const project = projectOf([source], [clip("clicks", 0, 8)], { ...tiny, width: 64, height: 36 });
   const result = await render(await write(dir, project), join(dir, "out.mp4"));
   const ceiling = project.audio.loudness.truePeakDbtp;
-  const log = await run(await ffmpeg(), ["-hide_banner", "-nostats", "-i", result.video, "-af", truePeakFilter, "-f", "null", "-"]); // biome-ignore format: one line
+  const log = await run(await ffmpeg(), [
+    "-hide_banner",
+    "-nostats",
+    "-i",
+    result.video,
+    "-af",
+    truePeakFilter,
+    "-f",
+    "null",
+    "-",
+  ]);
   const peak = parseTruePeak(log.stderr);
   assert.ok(peak <= ceiling, `true peak ${peak} dBTP over ${ceiling}`);
   assert.equal(result.loudness?.truePeakDbtp, peak);
@@ -849,7 +881,19 @@ async function song(dir: string, id: string, seconds: number): Promise<Source> {
 /** The left channel of a sound file, as 48 kHz samples. */
 async function left(file: string): Promise<Float32Array> {
   const pcm = `${file}.left.f32`;
-  await run(await ffmpeg(), [...QUIET, "-y", "-i", file, "-af", "pan=mono|c0=c0", "-ar", "48000", "-f", "f32le", pcm]); // biome-ignore format: one line
+  await run(await ffmpeg(), [
+    ...QUIET,
+    "-y",
+    "-i",
+    file,
+    "-af",
+    "pan=mono|c0=c0",
+    "-ar",
+    "48000",
+    "-f",
+    "f32le",
+    pcm,
+  ]);
   const bytes = await readFile(pcm);
   return new Float32Array(bytes.buffer, bytes.byteOffset, bytes.length / 4);
 }
@@ -971,7 +1015,15 @@ test("what the renderer does not draw yet fails the render instead of being drop
     [
       {
         ...clip(source.id, 0, 0.5),
-        framing: { crop: { type: "path", keyframes: [{ t: 0, rect: { x: 0, y: 0, w: 1, h: 1 } }, { t: 1, rect: { x: 0.2, y: 0.2, w: 0.5, h: 0.5 } }] } }, // biome-ignore format: one line
+        framing: {
+          crop: {
+            type: "path",
+            keyframes: [
+              { t: 0, rect: { x: 0, y: 0, w: 1, h: 1 } },
+              { t: 1, rect: { x: 0.2, y: 0.2, w: 0.5, h: 0.5 } },
+            ],
+          },
+        },
       },
     ],
     { ...tiny, width: 64, height: 36 },
@@ -1054,12 +1106,30 @@ test("every caption preset is drawn in the face its layout was measured in", asy
     // Staged as the render stages them; libass has to find the face whatever fonts the machine has.
     const env = { ...process.env, ...(await stageFonts(folder, [built.font])) };
     const lavfi = `color=black:s=${tiny.width}x${tiny.height}:r=30:d=0.5`;
-    const args = ["-hide_banner", "-nostdin", "-loglevel", "debug", "-f", "lavfi", "-i", lavfi, "-vf", captionFilter("captions.ass"), "-f", "null", "-"]; // biome-ignore format: one line
+    const args = [
+      "-hide_banner",
+      "-nostdin",
+      "-loglevel",
+      "debug",
+      "-f",
+      "lavfi",
+      "-i",
+      lavfi,
+      "-vf",
+      captionFilter("captions.ass"),
+      "-f",
+      "null",
+      "-",
+    ];
     const { stderr } = await execFileAsync(bin, args, { cwd: folder, env });
     const selected = [...stderr.matchAll(/fontselect: \(.*?\) -> ([^,]+),/g)].map((m) => m[1]);
     assert.ok(selected.length > 0, `${name}: libass selected no face`);
     const face = basename(built.font, ".otf");
-    assert.deepEqual(new Set(selected.map((path) => basename(path ?? "", ".otf"))), new Set([face]), `${name}: weight ${preset.weight}`); // biome-ignore format: one line
+    assert.deepEqual(
+      new Set(selected.map((path) => basename(path ?? "", ".otf"))),
+      new Set([face]),
+      `${name}: weight ${preset.weight}`,
+    );
   }
 });
 
@@ -1075,14 +1145,46 @@ test("caption colours land in the BT.709 output as BT.709 values", async (t) => 
   const box = `{\\an7\\pos(0,0)\\bord0\\shad0\\1c${bgr}\\p1}m 0 0 l ${width} 0 ${width} ${height} 0 ${height}`;
   await writeFile(
     join(dir, "captions.ass"),
-    ["[Script Info]", "ScriptType: v4.00+", `PlayResX: ${width}`, `PlayResY: ${height}`, "", "[V4+ Styles]", "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding", `Style: Box,${family(700)},20,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1`, "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text", `Dialogue: 0,0:00:00.00,0:00:01.00,Box,,0,0,0,,${box}`, ""].join("\n"), // biome-ignore format: one line
+    [
+      "[Script Info]",
+      "ScriptType: v4.00+",
+      `PlayResX: ${width}`,
+      `PlayResY: ${height}`,
+      "",
+      "[V4+ Styles]",
+      "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+      `Style: Box,${family(700)},20,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1`,
+      "",
+      "[Events]",
+      "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+      `Dialogue: 0,0:00:00.00,0:00:01.00,Box,,0,0,0,,${box}`,
+      "",
+    ].join("\n"),
   );
   const env = { ...process.env, ...(await stageFonts(dir, [await fontFile(700)])) };
-  const args = [...QUIET, ...RAW_VIDEO, "-video_size", `${width}x${height}`, "-i", "black.yuv", "-vf", captionFilter("captions.ass"), "-f", "rawvideo", "-pix_fmt", "yuv420p", "out.yuv"]; // biome-ignore format: one line
+  const args = [
+    ...QUIET,
+    ...RAW_VIDEO,
+    "-video_size",
+    `${width}x${height}`,
+    "-i",
+    "black.yuv",
+    "-vf",
+    captionFilter("captions.ass"),
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "yuv420p",
+    "out.yuv",
+  ];
   await execFileAsync(await ffmpeg(), args, { cwd: dir, env });
   const frame = await readFile(join(dir, "out.yuv"));
   const size = width * height;
-  const [r, g, b] = [1, 3, 5].map((i) => Number.parseInt(accent.slice(i, i + 2), 16) / 255) as [number, number, number]; // biome-ignore format: one line
+  const [r, g, b] = [1, 3, 5].map((i) => Number.parseInt(accent.slice(i, i + 2), 16) / 255) as [
+    number,
+    number,
+    number,
+  ];
   const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
   const expected = [16 + 219 * y, 128 + (224 * (b - y)) / 1.8556, 128 + (224 * (r - y)) / 1.5748];
   const actual = [frame[0], frame[size], frame[size + size / 4]] as number[];
@@ -1285,15 +1387,41 @@ test("a split screen: a card in the panel, the speaker in step below it, a sound
     sound: 220,
     filter: "geq=lum='16+2*N':cb=128:cr=128",
   });
-  const page = { ...(await still(dir, "page")), credit: { what: "Screenshot of example.com", source: "https://example.com/" } }; // biome-ignore format: one line
-  const tick = { ...(await song(dir, "tick", 0.2)), credit: { what: "Sound effect tick.wav", source: "https://example.com/tick", license: { name: "CC0 1.0", url: "https://creativecommons.org/publicdomain/zero/1.0/" } } }; // biome-ignore format: one line
-  const project = projectOf([speaker, page, tick], [clip("a", 1, 3)], { ...tiny, width: 64, height: 36 }); // biome-ignore format: one line
+  const page = {
+    ...(await still(dir, "page")),
+    credit: { what: "Screenshot of example.com", source: "https://example.com/" },
+  };
+  const tick = {
+    ...(await song(dir, "tick", 0.2)),
+    credit: {
+      what: "Sound effect tick.wav",
+      source: "https://example.com/tick",
+      license: { name: "CC0 1.0", url: "https://creativecommons.org/publicdomain/zero/1.0/" },
+    },
+  };
+  const project = projectOf([speaker, page, tick], [clip("a", 1, 3)], {
+    ...tiny,
+    width: 64,
+    height: 36,
+  });
   // At 30 fps: the card covers frames 15-45 in the upper half, the speaker frames 15-45 below.
   project.cards = [
-    { card: "logo", params: { name: "GitHub", logo: "github" }, start: SECOND / 2, duration: SECOND, placement: "panel" }, // biome-ignore format: one line
+    {
+      card: "logo",
+      params: { name: "GitHub", logo: "github" },
+      start: SECOND / 2,
+      duration: SECOND,
+      placement: "panel",
+    },
   ];
   project.broll = [
-    { source: "a", in: 1.5 * SECOND, out: 2.5 * SECOND, start: SECOND / 2, rect: { x: 0, y: 0.5, w: 1, h: 0.5 } }, // biome-ignore format: one line
+    {
+      source: "a",
+      in: 1.5 * SECOND,
+      out: 2.5 * SECOND,
+      start: SECOND / 2,
+      rect: { x: 0, y: 0.5, w: 1, h: 0.5 },
+    },
     { source: "page", in: 0, out: SECOND / 2, start: 2.5 * SECOND },
   ];
   project.audio.sfx = [{ source: "tick", start: 1.5 * SECOND, gainDb: 0 }];

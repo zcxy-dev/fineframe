@@ -229,12 +229,23 @@ test("music with its licence is analysed once, chosen by Claude, and credited be
   const song = join(music, "song.wav");
   const call = (await analyses()).find((args) => args[0] === "analyze-music");
   assert.deepEqual(call?.slice(0, 2), ["analyze-music", song]);
-  assert.deepEqual(call?.slice(4), ["--license", "CC BY 4.0", "--license-url", url, "--attribution", "Song by Someone"]); // biome-ignore format: one line
+  assert.deepEqual(call?.slice(4), [
+    "--license",
+    "CC BY 4.0",
+    "--license-url",
+    url,
+    "--attribution",
+    "Song by Someone",
+  ]);
   assert.ok(lines.some((line) => "file" in line && line.file === join(music, "song.wav")));
   assert.ok((schemas[0]?.required as string[] | undefined)?.includes("music"), "music offered");
   const project = await loadJson(result.outputs.project, validateProject);
   assert.ok((project.audio.music ?? []).length > 0, "the music plays");
-  assert.deepEqual(project.audio.music?.[0]?.license, { name: "CC BY 4.0", url, attribution: "Song by Someone" }); // biome-ignore format: one line
+  assert.deepEqual(project.audio.music?.[0]?.license, {
+    name: "CC BY 4.0",
+    url,
+    attribution: "Song by Someone",
+  });
   assert.equal(result.outputs.music, join(dir, "out", "talk.music.txt"));
   const credits = await readFile(join(dir, "out", "talk.music.txt"), "utf8");
   assert.match(
@@ -586,7 +597,12 @@ test("what Claude cost is summed by stage, the callouts found while planning wit
     output: 0,
     dollars,
   });
-  const spent = [usage("plan", 0.05), usage("locate", 0.0002), usage("check", 0.001), usage("judge", 0.01)]; // biome-ignore format: one line
+  const spent = [
+    usage("plan", 0.05),
+    usage("locate", 0.0002),
+    usage("check", 0.001),
+    usage("judge", 0.01),
+  ];
   const cost = costByStage(spent);
   assert.equal(cost.plan.requests, 2);
   assert.ok(Math.abs((cost.plan.dollars ?? 0) - 0.0502) < 1e-9);
