@@ -2163,7 +2163,7 @@ wheels = [
 
 [[package]]
 name = "vebench"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "../bench" }
 dependencies = [
     { name = "imageio-ffmpeg" },
@@ -2196,7 +2196,7 @@ dev = [
 
 [[package]]
 name = "vework"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
