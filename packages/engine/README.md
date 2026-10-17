@@ -113,7 +113,7 @@ render ─▶ review.ts  a strip around each cut ─▶ claude-haiku-5-5, doubtf
 
 ### Visuals
 
-A rich edit (`visuals: "rich"`, the default; `pnpm edit --visuals`) shows what the speaker talks about, at a creator's pace: real footage of the thing named first, then the page of a product or organisation zoomed into the part talked about, then an animated card, as short-form editors rank them. Claude proposes one visual for a point, on the line and the words it lands on, about one every 6 to 10 seconds; code sources, checks and places each (`visuals.ts`), and a visual it cannot use is left out, so its line keeps the speaker.
+A rich edit (`visuals: "rich"`, the default; `pnpm edit --visuals`) shows what the speaker talks about, at a creator's pace: real footage of the thing named first, then the page of a product or organisation zoomed into the part talked about, then an animated card, as short-form editors rank them. Claude proposes one visual for a point, on the line and the words it lands on, about one every 4 to 6 seconds; code sources, checks and places each (`visuals.ts`), and a visual it cannot use is left out, so its line keeps the speaker.
 
 - **What Claude may propose.** `stock`, a search in English for footage of a physical thing or scene, only when `PEXELS_API_KEY` or `PIXABAY_API_KEY` is set: without one the request does not offer it, and Claude proposes pages and cards instead. `web`, a page's own address and the words on it to zoom into. `card`, one of the [cards](../effects/README.md#cards) and its params as JSON, each card listed with its purpose and example, with the icons and logos it may draw; never a number the speaker does not say. And `sfx`, a sound for a visible action, none for most.
 - **Checks.** A card's params must pass its schema (`cardProblems`); a page must be http or https, public and not a search page ([web capture](#b-roll-sourcing)); a search needs a key. Each is sourced once per plan: footage is searched and downloaded with the clips the edit already shows excluded, and a page is captured in Chrome Headless Shell at twice the pixels of the box it fills, in a viewport of that box's shape, kept under `~/.cache/video-editor/broll/captures/`. A capture or search that fails says why on stderr and is left out; words not found on a page leave its first screen.
@@ -368,16 +368,10 @@ The EQ targets put the low-mids (150–500 Hz) 1 dB over the body (500 Hz–2 kH
 
 ## FFmpeg
 
-On first use the renderer downloads its pinned FFmpeg build ([which one](../../THIRD_PARTY_NOTICES.md#ffmpeg)), checks it against its SHA-256 and keeps it in `~/.cache/video-editor/` (`%USERPROFILE%\.cache\video-editor\` on Windows). The Intel macOS build is built by the project from pinned sources ([how](../../THIRD_PARTY_NOTICES.md#ffmpeg)), since the one imageio-binaries publishes may not be redistributed. CI tests the Linux x64, both macOS and the Windows x64 builds, rendering a [synthetic edit](scripts/synthetic-edit.ts) on Apple silicon, on Intel and on Windows that vebench scores for clicks and drift; the Linux arm64 build has every library the renderer needs but is not tested.
+On first use the renderer downloads its pinned FFmpeg build ([which one](../../THIRD_PARTY_NOTICES.md#ffmpeg)), checks it against its SHA-256 and keeps it in `~/.cache/video-editor/` (`%USERPROFILE%\.cache\video-editor\` on Windows). The Intel macOS build is built by the project from pinned sources ([how](../../THIRD_PARTY_NOTICES.md#ffmpeg)), since the one imageio-binaries publishes may not be redistributed. The Linux arm64 build has every library the renderer needs but is not tested.
 
 `VIDEO_EDITOR_FFMPEG` points the renderer at another FFmpeg instead. Whichever binary it uses must be FFmpeg 7.0 or later, which reads a filter graph from a file (`-/filter_complex`), and must have every filter, encoder and decoder the renderer needs: libass, libx264, zimg, loudnorm and libvpx's VP9 decoder, which reads the overlays' alpha, among them. If it is older or one is missing, the first render fails before any work and names each one.
 
 ## Tests
 
-`pnpm --filter @video-editor/engine test` runs them; the first run downloads the pinned FFmpeg and the caption fonts. Planning tests replay a reply Claude gave (`src/plan/fixtures/talk-plan.json`), so they need no key.
-
-CI runs none of these; run them locally when you change what they cover:
-
-- **Effect templates:** one test renders every template through Remotion and checks each shows only within its own frames. It is skipped where `CI` is set, since Remotion downloads Chrome and bundles its page on the first run. Run it when you change `packages/effects` or how overlays are composited.
-- **Web capture:** the B-roll capture tests open a local page in Chrome, which downloads on the first run, so they are skipped where `CI` is set too.
-- **Claude:** one planning test asks the real API and runs only with your own key, as [CONTRIBUTING](../../CONTRIBUTING.md#setup) says.
+`pnpm --filter @video-editor/engine test` runs every test here except the one that asks Claude, which needs your own key; with `CI` set it skips the ones that need Chrome too ([CONTRIBUTING](../../CONTRIBUTING.md#setup)). The first run downloads the pinned FFmpeg and the caption fonts. Planning tests replay `src/plan/fixtures/talk-plan.json`.

@@ -4,7 +4,7 @@ How the engine's behaviour, described in the [README](README.md), measures on th
 
 ## Edit measurements
 
-Each row is one `pnpm edit` run with the real API on the reference machine, shared with other jobs (load average 8 to 10). Every file was analysed with the 0.6B speech model and no transcript correction; the analysis time is from the first edit of that footage, the rest from a later one that found the indexes cached. The synthetic group comes from the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0); the other two are openly licensed web recordings whose transcripts nobody has corrected yet, so their cuts are checked against the words as the analysis timed them. `vebench edit` scores each project and `vebench render` each video:
+Each row is one `pnpm edit` run with the real API on the reference machine, shared with other jobs (load average 8 to 10). Every file was analysed with the 0.6B speech model and no transcript correction; the analysis time is from the first edit of that footage, the rest from a later one that found the indexes cached. The synthetic group comes from the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0); the other two are openly licensed web recordings whose transcripts nobody has corrected yet, so their cuts are checked against the words as the analysis timed them. `vebench edit` scores each project and `vebench render` each video. Measured before rich visuals; these hold for `--visuals minimal`.
 
 ```bash
 pnpm -s edit bench/synthetic/chat-b{1,2,3}/source.mp4 --length 60s --aspect 9:16 \
@@ -22,7 +22,7 @@ uv run vebench render --media synthetic/chat-b1/runs/edit-60s/output.mp4 \
 | Two-person interview, 5 clips from three cameras, 11.9 min | 60 s, 9:16 | 60.6 s (+1.0 %) | 0 of 4 | 0 | 0 of 2, 0.0 ms | 23.9 min | 29 s, 28 s, 5 s | $0.10 |
 | Live talks with slides, 3 clips, 8.8 min | 5 min, 16:9 | 301.5 s (+0.5 %) | 0 of 57 | 0 | 0 of 28, 0.0 ms | 16.0 min | 52 s, 60 s, 21 s | $0.13 |
 
-- **Music and effects:** in the second chat-b edit Claude chose the 96 BPM track, which plays under the whole edit with the voice 20.9 dB over it while anyone talks (15.3 dB in the quietest 5 %, `vebench mix` on the render's stems); it showed the guest's name in a lower third and popped three keywords; the sound measures -13.9 LUFS at -3.3 dBTP.
+- **Music and effects:** in the second chat-b edit Claude chose the 96 BPM track, which plays under the whole edit with the voice 20.9 dB over it while anyone talks (15.3 dB in the quietest 5 %, `vebench mix` on the render's stems); it showed the guest's name in a lower third and popped three keywords; the sound measures -13.9 LUFS at -3.3 dBTP. It was rendered before punch-ins could enlarge footage past its own detail, so it has none.
 - **Time:** the analysis takes about twice the footage's length and is nearly all of a first edit: shot detection about a fifth of it, faces an eighth, transcribing and aligning the rest. Another edit of the same footage starts at the plan and took 41 s to 2.3 min here.
 - **Pictures:** in the 9:16 edits the crop follows whoever is on screen, and cuts to the listener's shot with the source. The interview's cuts join two answers inside one camera's shot, so they show as jump cuts; the talks cut between the host and the speaker at a pause.
 - **Captions:** on the synthetic edit, each caption appears within 23 ms of its first word's true start at the median and 118 ms at the 95th percentile, and stays up about 0.4 s past its last word.
@@ -68,7 +68,7 @@ cd ../../bench && uv run vebench report synthetic/
 
 ## Quality measurements
 
-The talk-a and chat-b groups were planned, rendered and reviewed at 60 and 300 s, at 9:16 and 16:9, twice each, at both qualities: 32 edits, from indexes of the 720p corpus (seed 0) that `vework analyze` wrote on this commit's worker. `best` here is the code before `--quality` existed, which sends the same requests.
+The talk-a and chat-b groups were planned, rendered and reviewed at 60 and 300 s, at 9:16 and 16:9, twice each, at both qualities: 32 edits, from indexes of the 720p corpus (seed 0) that `vework analyze` wrote at 277effa. `best` here is the code before `--quality` existed, which sends the same requests.
 
 ```bash
 node scripts/plan-corpus.ts <corpus> --group talk-a --group chat-b --lengths 60,300 \

@@ -125,4 +125,4 @@ In `packages/effects`, `node scripts/cards-preview.ts <folder>` renders each car
 
 ## Tests
 
-`pnpm --filter @video-editor/effects test` checks the catalog, the params validation of templates and cards, the cache keys and the layout. Rendering every template through Remotion is tested in the engine ([Tests](../engine/README.md#tests)). One test renders every card's example through Remotion, full frame at 9:16 and as a 16:9 panel, at five frames a second so a few frames span its build; it is skipped where `CI` is set.
+`pnpm --filter @video-editor/effects test` checks the catalog, the params validation of templates and cards, the cache keys and the layout. Rendering every template through Remotion is tested in the engine, in [`render.test.ts`](../engine/src/render.test.ts). One test renders every card's example through Remotion, full frame at 9:16 and as a 16:9 panel, at five frames a second so a few frames span its build; it is skipped where `CI` is set.
