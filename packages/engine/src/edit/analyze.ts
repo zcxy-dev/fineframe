@@ -34,19 +34,30 @@ const WORKER = fileURLToPath(new URL("../../../../worker/", import.meta.url));
  * first Python on PATH, and installs only the extras asked for; both are named so the rebuilt one
  * still runs the models. Its version is a hash of the worker's code and lockfile. */
 export async function localWorker(): Promise<Worker> {
-  const code = (await readdir(join(WORKER, "src"), { recursive: true }))
+  const python = (await readFile(join(WORKER, "..", ".python-version"), "utf8")).trim();
+  return {
+    command: ["uv", "run", "--project", WORKER, "--python", python, "--extra", "ml", "vework"],
+    version: await workerVersion(WORKER),
+  };
+}
+
+/**
+ * A hash of the worker's code and locked dependencies in `dir`. The worker's own version number is
+ * left out, so a release that only raises it keeps every cached index.
+ */
+export async function workerVersion(dir: string): Promise<string> {
+  const code = (await readdir(join(dir, "src"), { recursive: true }))
     .filter((file) => file.endsWith(".py"))
     .map((file) => join("src", file))
     .sort();
   const hash = createHash("sha256");
   for (const file of ["pyproject.toml", "uv.lock", ...code]) {
-    hash.update(`${file}\0`).update(await readFile(join(WORKER, file)));
+    let text = await readFile(join(dir, file), "utf8");
+    if (file === "pyproject.toml") text = text.replace(/^version = "[^"]*"$/m, "");
+    if (file === "uv.lock") text = text.replace(/(\nname = "vework"\n)version = "[^"]*"\n/, "$1");
+    hash.update(`${file}\0`).update(text);
   }
-  const python = (await readFile(join(WORKER, "..", ".python-version"), "utf8")).trim();
-  return {
-    command: ["uv", "run", "--project", WORKER, "--python", python, "--extra", "ml", "vework"],
-    version: hash.digest("hex"),
-  };
+  return hash.digest("hex");
 }
 
 /** Where indexes are kept between runs, beside the renderer's FFmpeg. */
