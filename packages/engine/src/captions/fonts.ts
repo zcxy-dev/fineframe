@@ -60,7 +60,7 @@ export function metrics(path: string): Promise<Metrics> {
 }
 
 /** Reads head, hhea, hmtx, OS/2 and the format 12 cmap of an OpenType font. */
-export function parseMetrics(font: Buffer): Metrics {
+function parseMetrics(font: Buffer): Metrics {
   const tables = new Map<string, number>();
   for (let i = 0; i < font.readUInt16BE(4); i++) {
     const record = 12 + 16 * i;

@@ -14,14 +14,14 @@ export const EDGE_FADE_SAMPLES = 240;
 
 /** A range of one clip: `frames` output frames and `samples` output samples, starting
  * `fromFrame` frames and `fromSample` samples after the clip's own start. */
-export interface Span {
+interface Span {
   fromFrame: number;
   frames: number;
   fromSample: number;
   samples: number;
 }
 
-export interface MainLayer extends Span {
+interface MainLayer extends Span {
   clip: TimelineClip;
   /** Picture fades from and to a colour (dips) at this span's edges. */
   dipIn: Dip | null;
@@ -48,7 +48,7 @@ export interface OverlayLayer {
 }
 
 /** Frames of a rendered card, taken by count as an overlay's are. */
-export interface CardLayer {
+interface CardLayer {
   clip: TimelineCard;
   fromFrame: number;
   frames: number;

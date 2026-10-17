@@ -6,7 +6,7 @@ import { formatBytes, formatClock, formatLength } from "../lib/settings.ts";
 import styles from "./editor.module.css";
 import { AlertIcon, CheckIcon } from "./icons.tsx";
 
-export const STAGE_TEXT: Record<Stage, { name: string; doing: string; what: string }> = {
+const STAGE_TEXT: Record<Stage, { name: string; doing: string; what: string }> = {
   analyze: { name: "Analyse", doing: "Analysing", what: "Shots, speech and words in each file" },
   plan: { name: "Plan", doing: "Planning", what: "The best takes, cut to the length" },
   render: { name: "Render", doing: "Rendering", what: "Cuts, framing, colour and sound" },
@@ -15,7 +15,7 @@ export const STAGE_TEXT: Record<Stage, { name: string; doing: string; what: stri
 const ORDER: Stage[] = ["analyze", "plan", "render", "check"];
 
 /** Seconds since `start`, kept current while `running`. */
-export function useElapsed(start: number | undefined, end: number | undefined, running: boolean) {
+function useElapsed(start: number | undefined, end: number | undefined, running: boolean) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!running) return;

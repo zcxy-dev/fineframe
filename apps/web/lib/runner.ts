@@ -86,7 +86,7 @@ export function runEdit(options: RunOptions): Run {
 }
 
 /** A progress line, or null for anything else on stdout. */
-export function parseProgress(line: string): Progress | null {
+function parseProgress(line: string): Progress | null {
   if (!line.startsWith("{")) return null;
   try {
     const value = JSON.parse(line) as Partial<Progress>;

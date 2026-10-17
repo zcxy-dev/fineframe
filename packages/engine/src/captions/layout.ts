@@ -6,7 +6,7 @@ import type { CaptionLine, Captions } from "@video-editor/schema";
 import type { Metrics } from "./fonts.ts";
 
 /** A run of a row's text drawn one way: one timed word, or text between words. */
-export interface Segment {
+interface Segment {
   text: string;
   /** The page's word this text belongs to, or null for spaces and punctuation between words. */
   word: number | null;

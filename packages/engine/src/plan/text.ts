@@ -18,10 +18,6 @@ export function endsSentence(text: string): boolean {
   return SENTENCE_END.test(text);
 }
 
-export function isLatin(text: string): boolean {
-  return LATIN.test(text) && !HAN.test(text);
-}
-
 /** The BCP 47 language a word is written in: Han characters are Taiwan Mandarin, as the
  * transcript is converted to Taiwan Traditional Chinese; letters and digits are English. */
 export function wordLanguage(text: string): "zh-TW" | "en" | null {

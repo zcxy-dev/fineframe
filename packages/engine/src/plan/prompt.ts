@@ -240,7 +240,7 @@ const lineRange = {
 };
 
 /** The planner's answer, as a JSON Schema for structured output. */
-export const PLAN_SCHEMA = {
+const PLAN_SCHEMA = {
   type: "object",
   additionalProperties: false,
   required: ["content", "segments", "removed", "fillers", "cut_words", "broll", "emphasis"],

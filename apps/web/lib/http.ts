@@ -8,10 +8,7 @@ import { JobError } from "./jobs.ts";
  * The bytes a Range header asks for, as `[start, end]` inclusive; null without one, or for a
  * form a player does not send (several ranges, other units). "invalid" when it lies past the end.
  */
-export function byteRange(
-  header: string | null,
-  size: number,
-): [number, number] | null | "invalid" {
+function byteRange(header: string | null, size: number): [number, number] | null | "invalid" {
   const match = header?.match(/^bytes=(\d*)-(\d*)$/);
   if (!match) return null;
   const [, from, to] = match;

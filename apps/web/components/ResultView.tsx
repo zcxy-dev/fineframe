@@ -25,7 +25,7 @@ export function Player({ job }: { job: Job }) {
 }
 
 /** The video's length, read from its header. */
-export function useVideoLength(job: Job): number | null {
+function useVideoLength(job: Job): number | null {
   const [seconds, setSeconds] = useState<number | null>(null);
   useEffect(() => {
     const probe = document.createElement("video");

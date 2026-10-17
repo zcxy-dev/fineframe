@@ -96,7 +96,8 @@ import {
 export type Aspect = Project["output"]["aspect"];
 
 export { LENGTH_RANGE };
-export const TOLERANCE = 0.05;
+
+const TOLERANCE = 0.05;
 /** Planning requests per edit: the plan, and one more if code's fit comes out short. */
 export const MAX_PLAN_CALLS = 2;
 /** A target below this share of the footage's speech is a short edit of its strongest moments;
@@ -169,7 +170,7 @@ export interface PlanSource extends PlaceSource {
 }
 
 /** A segment the planner chose, resolved to its lines. */
-export interface Segment {
+interface Segment {
   source: string;
   lines: Line[];
   priority: number;

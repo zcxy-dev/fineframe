@@ -12,8 +12,8 @@ export type Aspect = (typeof ASPECTS)[number];
 export const LENGTH_PRESETS = [15, 30, 60, 180, 600] as const;
 
 /** Names and terms are a hint for the speech model; a few hundred is far more than it reads. */
-export const MAX_NAMES = 200;
-export const MAX_NAME_LENGTH = 100;
+const MAX_NAMES = 200;
+const MAX_NAME_LENGTH = 100;
 export const MAX_LICENSE_LENGTH = 200;
 
 /** The edit's style: one of the engine's looks, or the footage's own colour. */
@@ -33,7 +33,7 @@ export function styleName(style: Style): string {
 }
 
 /** Where the speech is heard: by the model on this computer, or on OpenRouter (`--asr cloud`). */
-export const ASRS = ["local", "cloud"] as const;
+const ASRS = ["local", "cloud"] as const;
 export type Asr = (typeof ASRS)[number];
 
 /** What Claude adds over the footage (`--visuals`): B-roll, layouts and sound effects, or none. */

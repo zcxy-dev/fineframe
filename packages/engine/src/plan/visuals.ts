@@ -125,7 +125,7 @@ export type Asset =
 
 /** Where visuals go: the whole frame, or the upper panel of a split screen with the speaker
  * below. */
-export type Layout = "full" | "panel";
+type Layout = "full" | "panel";
 
 /** The longest the speaker leaves the screen, as short-form editors keep it, and the longest a
  * split screen holds. */
@@ -264,7 +264,7 @@ export function stockAvailable(): boolean {
 /** The layout a visual of `kind` takes when shown for `seconds`: at 9:16, captures and anything
  * longer than the speaker may be away split the screen, and the rest fill it; other aspects have
  * no split. */
-export function layoutOf(
+function layoutOf(
   aspect: Project["output"]["aspect"],
   kind: Asset["kind"],
   seconds: number,
@@ -275,10 +275,7 @@ export function layoutOf(
 }
 
 /** The size of a panel or the frame, in output pixels. */
-export function boxOf(
-  layout: Layout,
-  output: Pick<Project["output"], "aspect" | "width" | "height">,
-) {
+function boxOf(layout: Layout, output: Pick<Project["output"], "aspect" | "width" | "height">) {
   if (layout === "full") return { width: output.width, height: output.height };
   return {
     width: output.width,
@@ -660,7 +657,7 @@ function sfxCredit(path: string, source: string): Credit {
 }
 
 /** A credit as project.json keeps it, without its empty parts. */
-export function projectCredit(credit: Credit): ProjectCredit {
+function projectCredit(credit: Credit): ProjectCredit {
   return {
     what: credit.what,
     source: credit.source,

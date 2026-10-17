@@ -164,7 +164,7 @@ export function Icon(props: { name: IconName; size: number; color?: string; stro
 }
 
 /** A brand logo from Simple Icons, filled in `color`. */
-export function Logo(props: { name: LogoName; size: number; color?: string }) {
+function Logo(props: { name: LogoName; size: number; color?: string }) {
   return (
     <svg
       width={props.size}

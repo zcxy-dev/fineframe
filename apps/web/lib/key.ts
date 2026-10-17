@@ -24,7 +24,7 @@ export const VARIABLES: Record<Service, string> = {
 };
 
 /** The file the keys are saved in; VIDEO_EDITOR_ENV_FILE moves it. */
-export function envFile(): string {
+function envFile(): string {
   return process.env.VIDEO_EDITOR_ENV_FILE ?? resolve(process.cwd(), "../../.env");
 }
 

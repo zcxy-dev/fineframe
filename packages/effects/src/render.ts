@@ -59,7 +59,7 @@ let version: Promise<string> | undefined;
 
 /** A hash of this package's source and its pinned dependencies: a change to either changes how
  * overlays may look, so it starts a fresh cache. */
-export function codeVersion(): Promise<string> {
+function codeVersion(): Promise<string> {
   version ??= (async () => {
     const hash = createHash("sha256");
     const entries = await readdir(join(PACKAGE, "src"), { recursive: true, withFileTypes: true });

@@ -8,6 +8,7 @@
     "edit": "node packages/engine/src/edit/cli.ts",
     "render": "node packages/engine/src/cli.ts",
     "lint": "biome check",
+    "knip": "knip",
     "typecheck": "pnpm -r typecheck && tsc -p bench",
     "test": "pnpm -r test",
     "gen": "pnpm -r gen",
@@ -16,6 +17,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
     "@types/node": "24.19.2",
+    "knip": "6.41.0",
     "typescript": "6.0.3"
   }
 }

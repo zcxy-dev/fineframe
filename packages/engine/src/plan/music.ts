@@ -30,12 +30,12 @@ export const PHRASE = 4;
 export const UNDER_SPEECH = 18;
 export const UNDER_PAUSES = 6;
 /** Ducking down before speech and back up after it, in milliseconds. */
-export const ATTACK_MS = 250;
-export const RELEASE_MS = 750;
+const ATTACK_MS = 250;
+const RELEASE_MS = 750;
 /** The most a quiet track is raised, so its noise floor stays down. */
 const MAX_GAIN_DB = 12;
 /** A cut that need not land between words moves to the nearest beat this close, in seconds. */
-export const SNAP = 0.15;
+const SNAP = 0.15;
 /** Loop joins sit this far before the downbeats they join, so they fall before the hits rather
  * than through them, and cross-fade over this long. */
 const JOIN_BEFORE = 0.05;
@@ -55,13 +55,6 @@ export interface MusicSource {
   indexPath: string;
   index: MusicIndex;
   fingerprint: Project["sources"][number]["fingerprint"];
-}
-
-/** What Claude chose: a track by id and the section, from 1, to open on; or no music. */
-export interface MusicChoice {
-  track: string;
-  section: number;
-  reason: string;
 }
 
 /** A music index file, whose track is the one it names next to it, or a folder of

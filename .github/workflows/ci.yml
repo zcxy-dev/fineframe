@@ -73,6 +73,7 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm lint
+          pnpm knip
           pnpm typecheck
           pnpm test
           pnpm check-gen

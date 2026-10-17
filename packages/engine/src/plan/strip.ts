@@ -7,7 +7,7 @@ import { ffmpeg, run } from "../ffmpeg.ts";
 import { QUIET } from "../graph/encode.ts";
 import { decimal } from "../graph/inputs.ts";
 
-export const STRIP_FRAMES = 8;
+const STRIP_FRAMES = 8;
 const WIDTH = 1280;
 const WAVE_HEIGHT = 160;
 /** Gaps between words at least this long are shaded as silence. */

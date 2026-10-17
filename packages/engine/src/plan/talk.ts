@@ -11,7 +11,7 @@ import { QUIET } from "../graph/encode.ts";
 
 /** One line per sentence as said; a Han character or an English word is one word, carrying the
  * punctuation after it. */
-export const TALK = [
+const TALK = [
   "嗯，大家好，歡迎收看。",
   "今天要講三件事。",
   "第一件事是剪輯，不對，",

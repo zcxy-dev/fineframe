@@ -5,7 +5,7 @@ import type { FillerCandidate } from "./fillers.ts";
 import { endsSentence, joinWords } from "./text.ts";
 
 /** A silence this long ends a phrase. */
-export const PHRASE_SILENCE = 0.5;
+const PHRASE_SILENCE = 0.5;
 /** Pauses at least this long are listed in a file's summary. */
 const LONG_PAUSE = 2;
 /** Momentary loudness this far above a file's median marks an energy peak. */
