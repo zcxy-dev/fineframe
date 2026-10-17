@@ -27,12 +27,12 @@ def write(root: Path = ROOT, check: bool = False) -> list[str]:
         doc = root / table["doc"]
         text = changed.get(doc) or doc.read_text(encoding="utf-8")
         marker = re.compile(
-            rf"(<!-- results:{re.escape(path.stem)} -->\n).*?(\n<!-- /results -->)", re.S
+            rf"(<!-- results:{re.escape(path.stem)} -->\n)(?:.*?\n)?(<!-- /results -->)", re.S
         )
         if not marker.search(text):
             raise ValueError(f"{table['doc']} has no <!-- results:{path.stem} --> block")
         markdown = render(table)
-        changed[doc] = marker.sub(lambda m, md=markdown: m.group(1) + md + m.group(2), text)
+        changed[doc] = marker.sub(lambda m, md=markdown: m.group(1) + md + "\n" + m.group(2), text)
     stale = []
     for doc, text in changed.items():
         if text != doc.read_text(encoding="utf-8"):

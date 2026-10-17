@@ -21,6 +21,7 @@ The project's own code is under the [MIT License](LICENSE). It uses the componen
 | [Lucide](https://lucide.dev) icons (`lucide-static` 1.50.0) | ISC; the icons drawn from Feather MIT, as its licence file lists them | npm registry tarball, SHA-256 checked; engine, on the first icon lookup |
 | [Tabler Icons](https://tabler.io/icons) (`@tabler/icons` 3.48.0), outline style | MIT | npm registry tarball, SHA-256 checked; engine, on the first icon lookup |
 | [Simple Icons](https://simpleicons.org) (`simple-icons` 16.33.0) | CC0-1.0, except the logos its data gives another licence (see [notes](#icons-and-logos)) | npm registry tarball, SHA-256 checked; engine, on the first logo lookup |
+| [ASCEND](https://huggingface.co/datasets/CAiRE/ASCEND) test split, 200 utterances and their transcripts | CC BY-SA 4.0 | Hugging Face's dataset viewer, pinned revision and SHA-256 per utterance; `vebench ascend` only, written into the git-ignored corpus folder |
 | [Kokoro-82M-v1.1-zh](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh) weights and voices | Apache-2.0 | Hugging Face, pinned revision; benchmark `synth` extra only |
 
 ### Python packages, installed by uv (direct dependencies)

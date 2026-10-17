@@ -41,6 +41,8 @@ bench/corpus/*/*
 !bench/corpus/*/truth/*.srt
 # `vebench synth` output, truth included: regenerate it from its seed.
 bench/synthetic/
+# `vebench ascend` output, truth included: its transcripts stay under ASCEND's licence.
+bench/corpus/ascend-*/
 
 # Blind-review rounds: the edits and the raters' ratings.
 bench/review/
