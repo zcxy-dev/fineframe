@@ -1,6 +1,6 @@
 # Third-party notices
 
-The project's own code is under the [MIT License](LICENSE). It uses the components below, each under its own licence. Nothing in this repository bundles a model weight, a font or a binary, and its only third-party media are [a few CC0 sound effects](#sound-effects): the tools download the rest on first use, from their publishers or, for the Intel macOS FFmpeg, from a release of this repository, or the package managers install them. The desktop app's installers do carry programs: Electron, uv and the npm packages the editor runs, but no FFmpeg, model or Python package ([what they carry](#desktop-installers)). Licences were checked against each component's own licence file or model card at the version or revision the project pins.
+The project's own code is under the [MIT License](LICENSE). It uses the components below, each under its own licence. Nothing in this repository bundles a model weight, a font or a binary, and its only third-party media are [a few CC0 sound effects](#sound-effects) and [the effect cards' icons](#icons-copied-into-the-source): the tools download the rest on first use, from their publishers or, for the Intel macOS FFmpeg, from a release of this repository, or the package managers install them. The desktop app's installers do carry programs: Electron, uv and the npm packages the editor runs, but no FFmpeg, model or Python package ([what they carry](#desktop-installers)). Licences were checked against each component's own licence file or model card at the version or revision the project pins.
 
 ## Components
 
@@ -62,6 +62,7 @@ Models that come inside a package: the TransNetV2 weights in transnetv2-pytorch,
 | [react](https://react.dev), react-dom | MIT | effects, web page |
 | [ajv](https://github.com/ajv-validator/ajv) | MIT | schema, effects |
 | [@fontsource/noto-sans-tc](https://fontsource.org/fonts/noto-sans-tc) | OFL-1.1 | effects, web page |
+| [@fontsource/jetbrains-mono](https://fontsource.org/fonts/jetbrains-mono) | OFL-1.1 | effects, the cards' terminal and code |
 | [@fontsource-variable/inter](https://fontsource.org/fonts/inter) | OFL-1.1 | web page |
 | [next](https://nextjs.org) | MIT | web page |
 | [typescript](https://www.typescriptlang.org) | Apache-2.0 | development |
@@ -83,6 +84,17 @@ In `packages/engine/assets/sfx/`, 22 short Ogg Vorbis files, 144 KB in all, each
 | `paper/card-slide-1`, `card-slide-5`, `card-place-1` | [Casino Audio](https://kenney.nl/assets/casino-audio) by Kenney |
 | `paper/bookFlip3` | [RPG Audio](https://kenney.nl/assets/rpg-audio) by Kenney |
 | `whoosh/air-1` to `air-3`, `tone/warm-1`, `warm-2` | This project, drawn from noise and sine waves by [`scripts/sfx.ts`](packages/engine/scripts/sfx.ts); dedicated to the public domain under CC0 1.0 |
+
+### Icons, copied into the source
+
+The effect cards draw icons and brand logos from `packages/effects/src/icons.ts`, which holds only the icons they can name, copied from these sets.
+
+| Component | Licence | Used by |
+|---|---|---|
+| [Lucide](https://lucide.dev) 1.50.0 (`lucide-static`) | ISC; the icons Lucide derived from [Feather](https://github.com/feathericons/feather) also MIT (both texts [below](#lucide)) | effects, the cards' icons |
+| [Simple Icons](https://simpleicons.org) 16.33.0 | CC0-1.0 | effects, the cards' brand logos |
+
+Each brand logo is its owner's trademark ([notes](#icons-and-logos)): a card shows a brand's logo only where the video names that brand. The logos Simple Icons' data gives a licence of their own are left out.
 
 ## Notes
 
@@ -263,6 +275,87 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+```
+
+### Herk Edit Kit
+
+The effect cards rebuild in Remotion the layouts and motion of cards from the [Herk Edit Kit](https://github.com/nateherkai/hyperframes-student-kit) (HTML, CSS and GSAP); none of its code, fonts or brand assets is copied.
+
+- `packages/effects/src/cards.ts`
+- `packages/effects/src/remotion/cards/`
+
+```text
+MIT License
+
+Copyright (c) 2026 Nate Herk
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### Lucide
+
+- `packages/effects/src/icons.ts`
+
+```text
+ISC License
+
+Copyright (c) 2026 Lucide Icons and Contributors
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+---
+
+The following Lucide icons are derived from the Feather project:
+
+airplay, alert-circle, alert-octagon, alert-triangle, aperture, arrow-down-circle, arrow-down-left, arrow-down-right, arrow-down, arrow-left-circle, arrow-left, arrow-right-circle, arrow-right, arrow-up-circle, arrow-up-left, arrow-up-right, arrow-up, at-sign, calendar, cast, check, chevron-down, chevron-left, chevron-right, chevron-up, chevrons-down, chevrons-left, chevrons-right, chevrons-up, circle, clipboard, clock, code, columns, command, compass, corner-down-left, corner-down-right, corner-left-down, corner-left-up, corner-right-down, corner-right-up, corner-up-left, corner-up-right, crosshair, database, divide-circle, divide-square, dollar-sign, download, external-link, feather, frown, hash, headphones, help-circle, info, italic, key, layout, life-buoy, link-2, link, loader, lock, log-in, log-out, maximize, meh, minimize, minimize-2, minus-circle, minus-square, minus, monitor, moon, more-horizontal, more-vertical, move, music, navigation-2, navigation, octagon, pause-circle, percent, plus-circle, plus-square, plus, power, radio, rss, search, server, share, shopping-bag, sidebar, smartphone, smile, square, table-2, tablet, target, terminal, trash-2, trash, triangle, tv, type, upload, x-circle, x-octagon, x-square, x, zoom-in, zoom-out
+
+The MIT License (MIT) (for the icons listed above)
+
+Copyright (c) 2013-present Cole Bemis
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ### OpenCut

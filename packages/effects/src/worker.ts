@@ -1,19 +1,25 @@
-// The child process renderOverlays starts: bundles the Remotion page once per code version,
-// then renders each overlay in one shared browser.
+// The child process renderOverlays and renderCards start: bundles the Remotion page once per
+// code version, then renders each overlay or card in one shared browser.
 
 import { access, mkdir, rename, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { bundle } from "@remotion/bundler";
 import { ensureBrowser, openBrowser, renderMedia, selectComposition } from "@remotion/renderer";
-import { COMPOSITION, type OverlayProps } from "./remotion/props.ts";
+import {
+  CARD_COMPOSITION,
+  type CardProps,
+  COMPOSITION,
+  type OverlayProps,
+} from "./remotion/props.ts";
 
 export interface Task {
   /** The folder the bundled page is kept in. */
   bundle: string;
   /** Remotion's compositor, when it was downloaded rather than installed (./compositor.ts). */
   binaries: string | null;
-  jobs: { out: string; props: OverlayProps }[];
+  /** Overlays, which carry a template, and cards, which carry a card. */
+  jobs: { out: string; props: OverlayProps | CardProps }[];
 }
 
 export type WorkerMessage =
@@ -69,11 +75,13 @@ async function main(task: Task): Promise<void> {
   const browser = await openBrowser("chrome", { logLevel: "error" });
   try {
     for (const [i, { out, props }] of task.jobs.entries()) {
-      const message = `Rendering effect ${i + 1}/${task.jobs.length} (${props.template})`;
+      const card = "card" in props;
+      const name = card ? props.card : props.template;
+      const message = `Rendering effect ${i + 1}/${task.jobs.length} (${name})`;
       const inputProps = props as unknown as Record<string, unknown>;
       const composition = await selectComposition({
         serveUrl,
-        id: COMPOSITION,
+        id: card ? CARD_COMPOSITION : COMPOSITION,
         inputProps,
         puppeteerInstance: browser,
         binariesDirectory: task.binaries,
@@ -89,10 +97,12 @@ async function main(task: Task): Promise<void> {
           puppeteerInstance: browser,
           binariesDirectory: task.binaries,
           // PNG frames keep the alpha channel and VP9 carries it. Chosen over ProRes 4444 for its
-          // file size and decoding cost (packages/effects/README.md#format).
+          // file size and decoding cost (packages/effects/README.md#format). Cards are opaque,
+          // so their frames come as JPEG, which Chrome captures faster.
           codec: "vp9",
-          imageFormat: "png",
-          pixelFormat: "yuva420p",
+          imageFormat: card ? "jpeg" : "png",
+          jpegQuality: card ? 92 : undefined,
+          pixelFormat: card ? "yuv420p" : "yuva420p",
           // The renderer composites in BT.709, which the output is tagged with.
           colorSpace: "bt709",
           outputLocation: partial,
