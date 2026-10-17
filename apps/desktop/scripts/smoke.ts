@@ -14,6 +14,7 @@
 // On Linux, run it under a display, such as `xvfb-run -a`. The clip's speech comes from the
 // system's voice: `say` on macOS, the speech synthesizer .NET ships on Windows, espeak-ng on Linux.
 import { spawnSync } from "node:child_process";
+import { existsSync, readdirSync } from "node:fs";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -49,6 +50,11 @@ const SENTENCES = [
 const work = await mkdtemp(join(tmpdir(), "video-editor-smoke-"));
 // The app's own folders and caches start empty, so every first-use download happens.
 const home = { XDG_CONFIG_HOME: join(work, "config"), XDG_CACHE_HOME: join(work, "cache") };
+/** Whether the app's own cache holds a download whose folder starts with `prefix`. */
+const fetched = (prefix: string) => {
+  const dir = join(home.XDG_CACHE_HOME, "video-editor");
+  return existsSync(dir) && readdirSync(dir).some((name) => name.startsWith(prefix));
+};
 
 // --- The clip: a test pattern and the sentences spoken, a pause after each. ---
 
@@ -475,7 +481,9 @@ async function makeEdit(): Promise<string[]> {
     heard === 0 && "OpenRouter heard nothing",
     ![...downloads].some((name) => name.startsWith("the analysis environment")) &&
       "the analysis environment's download was not shown",
-    !downloads.has("FFmpeg") && "FFmpeg's download was not shown",
+    // A download quicker than the page is polled is not caught on screen; it still has to land
+    // in the app's cache, which started empty.
+    !downloads.has("FFmpeg") && !fetched("ffmpeg-") && "FFmpeg was neither shown downloading nor downloaded", // biome-ignore format: one line
     !downloads.has("Chrome Headless Shell") && "Chrome Headless Shell's download was not shown",
     (playing.error || playing.width === 0 || playing.brightest < 32) &&
       "the window's player does not show the video",
