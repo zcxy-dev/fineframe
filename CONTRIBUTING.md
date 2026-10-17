@@ -31,7 +31,7 @@ A change passes the steps in [`.github/workflows/ci.yml`](.github/workflows/ci.y
 - **Keep data synthetic.** Tests generate their own media (ffmpeg `lavfi`, synthetic tones).
 - **Corpus footage** follows [bench/README.md](bench/README.md#corpus-layout).
 - **Never commit** other people's media, credentials or `.env` files.
-- **Keep third-party notices in one file.** A new model, font, program or dependency gets a row in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md#components) with its licence, checked against its own licence file or model card. Code adapted from another project keeps that project's copyright and licence in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), which lists the files it is in and is the only place, in files, commits or pull requests, that names the project. Its brand assets (logos, product names) are not covered by its licence; don't copy them.
+- **Keep third-party notices in one file.** A new model, font, program or dependency gets a row in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md#components) with its licence, checked against its own licence file or model card. Code adapted from another project keeps that project's copyright and licence in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), which lists the files it is in; no other file carries its copyright, licence or attribution. Its brand assets (logos, product names) are not covered by its licence; don't copy them.
 
 ## Pull requests
 
