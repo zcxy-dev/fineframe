@@ -344,7 +344,7 @@ export function placeVisuals(
         ? [cards[asset.card as keyof typeof cards].seconds.min, cards[asset.card as keyof typeof cards].seconds.typical] // biome-ignore format: one line
         : asset.kind === "image"
           ? [VISUAL_MIN, CAPTURE_SECONDS]
-          : [VISUAL_MIN, Math.min(asset.seconds, PANEL_MAX)];
+          : [VISUAL_MIN, Math.min(asset.seconds, FULL_MAX)];
     const layout = layoutOf(context.aspect, asset.kind, wantedSeconds);
     const cap = layout === "full" ? FULL_MAX : PANEL_MAX;
     const blockedAfter = (context.blocked ?? []).filter((b) => b.start >= start).map((b) => b.start); // biome-ignore format: one line

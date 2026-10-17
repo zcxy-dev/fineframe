@@ -186,6 +186,11 @@ test("visuals land on their words, a creator's pace apart, clear of what they ma
   // Ends where something it may not cover starts.
   const cut = placeVisuals([card(1)], assets, { ...context, blocked: [{ start: 1.9 * SECOND, end: 5 * SECOND }] }); // biome-ignore format: one line
   assert.equal((cut[0]?.end ?? 0) / SECOND, 1.9);
+  // Footage fills the frame, for at most 3.5 s.
+  const footage = wish({ kind: "stock", query: "the sun", line: 6 });
+  assets.set(visualKey(footage), { kind: "video", path: "/sun.mp4", seconds: 12, id: "pexels:1", credit: image.credit }); // biome-ignore format: one line
+  const [sun] = placeVisuals([footage], assets, context);
+  assert.deepEqual(sun && at(sun), [6, 10, 12.1, "full"]);
   // Other aspects have no split; every visual fills the frame.
   const wide = placeVisuals([web(4)], assets, { ...context, aspect: "16:9" });
   assert.equal(wide[0]?.layout, "full");
