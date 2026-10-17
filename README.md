@@ -7,6 +7,10 @@
 
 > **Status:** the analysis worker, the planner, the renderer with its captions and effect templates, the `pnpm edit` command that runs them from footage to a finished video, the web page in front of it, the desktop app for Apple silicon Macs, Windows and Linux that runs the page with nothing else to install, the agent skill that changes a finished edit by conversation, and the benchmark work today.
 
+![Six frames from a 60-second 9:16 edit of an interview about Surya, an AI model that forecasts solar flares: name cards for the interviewer and the researcher, close-ups framed on whoever speaks, "solar flare" and "data" highlighted, and captions lit word by word](https://github.com/zcxy-dev/video-editor/releases/download/v0.2.0/example-edit-9x16.jpg)
+
+*A 60-second 9:16 edit made by `pnpm edit` with no manual steps from IBM Research's 19-minute interview "[Why NASA and IBM made a new AI model that predicts the Sun's damaging flares](https://www.youtube.com/watch?v=KWMoF97C1Ds)" ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)), cut, reframed, captioned and named on screen ([watch it](https://github.com/zcxy-dev/video-editor/releases/download/v0.2.0/example-edit-60s-9x16.mp4), [16:9 version](https://github.com/zcxy-dev/video-editor/releases/download/v0.2.0/example-edit-90s-16x9.mp4), [credits](THIRD_PARTY_NOTICES.md#readme-example)).*
+
 ## Install
 
 The desktop app needs nothing else installed: no Node, no Python, no command line. Download the installer for your computer from the [latest release](https://github.com/zcxy-dev/video-editor/releases/latest):

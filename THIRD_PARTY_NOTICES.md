@@ -117,6 +117,13 @@ The ONNX export's model card states Apache-2.0. The same weights are published o
 
 A model's licence covers its weights, not the data it was trained on. Some of that data has its own terms: YuNet was trained on WIDER FACE (CC BY-NC-ND), CED on AudioSet's YouTube clips, and Beat This! notes that some of its training audio is copyrighted.
 
+## README example
+
+The example edits at the top of the README are made from footage the project does not own. Their frames and videos are assets of the [v0.2.0 release](https://github.com/zcxy-dev/video-editor/releases/tag/v0.2.0), not files in this repository, and are shared under the footage's licence.
+
+- **Footage:** "[Why NASA and IBM made a new AI model that predicts the Sun's damaging flares](https://www.youtube.com/watch?v=KWMoF97C1Ds)" by IBM Research, published 20 August 2025, with Mike Murphy and Johannes Schmude of IBM Research, licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). The edits shorten it to 60 s at 9:16 and 90 s at 16:9, reframe and grade it, process its sound and add music, captions, name cards and keyword highlights. Neither IBM Research nor the people in it endorse this project.
+- **Music:** in the 9:16 edit, "3 am West End" by statusq, dedicated to the public domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) ([source](https://commons.wikimedia.org/wiki/File:Statusq_-_3_am_West_End.opus)); in the 16:9 edit, "Cool Vibes" by Kevin MacLeod ([incompetech.com](https://incompetech.com)), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
 ## Adapted code
 
 Code adapted from these projects keeps their copyright and licence below, with the files it is in.
