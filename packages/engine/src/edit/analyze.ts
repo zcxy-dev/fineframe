@@ -1,10 +1,12 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, rm } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { MusicIndex, Source, StageProgress } from "@video-editor/schema";
+import { fingerprintOf } from "../sources.ts";
 import { EditError } from "./error.ts";
 import type { MediaFile } from "./inputs.ts";
 
@@ -133,6 +135,23 @@ export function analyze(
     if (options.asr !== "cloud") extra.push("--asr-context");
   }
   return vework(worker, "analyze", file, index, extra, report, log);
+}
+
+/** The file's media index in `cache`, analysed only when no index of it by this worker with
+ * these options is there yet; returns its path. */
+export async function cachedIndex(
+  worker: Worker,
+  file: MediaFile,
+  options: AnalysisOptions,
+  cache: string,
+  report: Report,
+  log: (line: string) => void,
+): Promise<string> {
+  const index = join(cache, indexName(worker, await fingerprintOf(file.path), options));
+  if (existsSync(index)) return index;
+  await mkdir(cache, { recursive: true });
+  await analyze(worker, file, index, options, report, log);
+  return index;
 }
 
 /** The licence a track is used under, as its music index records it. */
