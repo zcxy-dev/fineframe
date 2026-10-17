@@ -1,5 +1,4 @@
 import unicodedata
-import warnings
 from collections import Counter
 from collections.abc import Callable, Iterator
 from functools import cache
@@ -90,7 +89,7 @@ def _kept(ch: str) -> bool:
 
 
 def _pieces(text: str) -> list[tuple[str, bool, bool]]:
-    """Split `text` as the aligner does for Chinese and English, keeping what was written.
+    """Split `text` as the aligner does, keeping what was written.
 
     The aligner drops every character that is not a letter, digit or apostrophe, so its tokens
     ("35", "stateoftheart") are often not in the text; walking the text with its rules pairs
@@ -113,16 +112,13 @@ def _pieces(text: str) -> list[tuple[str, bool, bool]]:
     return pieces
 
 
-def attach_punctuation(
-    text: str, items: list[tuple[str, float, float]], language: str = "Chinese"
-) -> list[dict]:
+def attach_punctuation(text: str, items: list[tuple[str, float, float]]) -> list[dict]:
     """Pair the aligner's timed tokens with the words as written in `text`, punctuation included.
 
-    Subtitles need the punctuation and the original spelling the aligner strips. Japanese and
-    Korean are split by word segmenters this cannot mirror, so their tokens are kept as is.
+    Subtitles need the punctuation and the original spelling the aligner strips.
     """
     plain = [{"text": t, "start": s, "end": e} for t, s, e in items]
-    pieces = _pieces(text) if language not in ("Japanese", "Korean") else []
+    pieces = _pieces(text)
     if sum(is_token for _, is_token, _ in pieces) != len(items):
         return plain
     words, pending, timed = [], "", iter(plain)
@@ -299,9 +295,9 @@ def transcribe_chunks(
         # Padding added to a short chunk is not audio; keep words inside the real speech.
         items = [
             (token, round(min(start + s, end), 3), round(min(start + e, end), 3))
-            for token, s, e in align(chunk["wav"], text, language)
+            for token, s, e in align(chunk["wav"], text)
         ]
-        words = repair_durations(attach_punctuation(text, items, language))
+        words = repair_durations(attach_punctuation(text, items))
         # After the repair: a word the aligner gave no time would read as a pause around it.
         words = timing.refine(words, samples, speech, end)
         yield {"start": start, "end": end, "language": language, "text": text, "words": words}
@@ -311,7 +307,7 @@ def _models(asr_model: str | None):
     """The speech model and the aligner, as two functions.
 
     `recognize(wav, context)` returns the text heard and its language (None when it heard none);
-    `align(wav, text, language)` returns each aligner token with its start and end in `wav`.
+    `align(wav, text)` returns each aligner token with its start and end in `wav`.
     """
     return _recognizer(asr_model), _aligner()
 
@@ -381,18 +377,12 @@ def _aligner(half: bool = False):
     dtype = torch.bfloat16 if half else dtype
 
     @torch.inference_mode()
-    def align(wav: np.ndarray, text: str, language: str) -> list[tuple[str, float, float]]:
-        # The language only picks how the text is split into tokens: Japanese by nagisa, Korean
-        # by soynlp, every other language alike (and the aligner refuses some by name).
-        with warnings.catch_warnings():
-            # nagisa and soynlp, imported on the first Japanese or Korean chunk, have invalid
-            # escape sequences that warn as they compile.
-            warnings.simplefilter("ignore", SyntaxWarning)
-            inputs, tokens = aligner_processor.prepare_forced_aligner_inputs(
-                audio=_audio(wav),
-                transcript=text,
-                language=language if language in ("Japanese", "Korean") else None,
-            )
+    def align(wav: np.ndarray, text: str) -> list[tuple[str, float, float]]:
+        # No language: Japanese and Korean would need word splitters the project does not
+        # install, and every other language is split alike.
+        inputs, tokens = aligner_processor.prepare_forced_aligner_inputs(
+            audio=_audio(wav), transcript=text, language=None
+        )
         inputs = inputs.to(device, dtype)
         timed = aligner_processor.decode_forced_alignment(
             logits=aligner(**inputs).logits,

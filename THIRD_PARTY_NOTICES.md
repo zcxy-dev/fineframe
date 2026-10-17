@@ -25,7 +25,7 @@ The project's own code is under the [MIT License](LICENSE). It uses the componen
 
 ### Python packages, installed by uv (direct dependencies)
 
-Models that come inside a package: the TransNetV2 weights in transnetv2-pytorch, Silero VAD's in silero-vad, nagisa's tagger, OpenCC's dictionaries and spaCy's `en_core_web_sm`.
+Models that come inside a package: the TransNetV2 weights in transnetv2-pytorch, Silero VAD's in silero-vad, OpenCC's dictionaries and spaCy's `en_core_web_sm`.
 
 | Package | Licence | Used by |
 |---|---|---|
@@ -37,11 +37,9 @@ Models that come inside a package: the TransNetV2 weights in transnetv2-pytorch,
 | [scipy](https://scipy.org) | BSD-3-Clause | worker |
 | [beat-this](https://github.com/CPJKU/beat_this) | MIT | worker `ml` |
 | [huggingface-hub](https://github.com/huggingface/huggingface_hub) | Apache-2.0 | worker `ml`, benchmark `synth` |
-| [nagisa](https://github.com/taishi-i/nagisa) | MIT | worker `ml`, Japanese alignment |
 | [onnxruntime](https://github.com/microsoft/onnxruntime) | MIT | worker `ml` |
 | [opencv-python-headless](https://github.com/opencv/opencv-python) | Apache-2.0; its wheels bundle FFmpeg under LGPL-2.1-or-later | worker `ml` |
 | [silero-vad](https://github.com/snakers4/silero-vad) | MIT | worker `ml` |
-| [soynlp](https://github.com/lovit/soynlp) | GPL-3.0 on PyPI, LGPL-3.0 in its repository (see [notes](#copyleft-dependencies)) | worker `ml`, Korean alignment |
 | [torch](https://github.com/pytorch/pytorch) | BSD-3-Clause and bundled permissive licences | worker `ml`, benchmark `synth` |
 | [transformers](https://github.com/huggingface/transformers) | Apache-2.0 | worker `ml` |
 | [transnetv2-pytorch](https://github.com/allenday/transnetv2_pytorch) | MIT | worker `ml` |
@@ -112,7 +110,6 @@ Anyone who redistributes these builds, for example in a desktop app or a contain
 
 ### Copyleft dependencies
 
-- **soynlp**, installed with the worker's `ml` extra for the forced aligner's Korean word splitting, is marked GPL-3.0 on PyPI while its repository's licence file is LGPL-3.0.
 - **soxr** (LGPL-2.1-or-later) comes with beat-this in the worker's `ml` extra.
 - The benchmark's `synth` extra installs **phonemizer-fork** (GPL-3.0-or-later), **espeakng-loader**, whose wheel bundles espeak-ng (GPL-3.0), and **num2words** (LGPL-2.1), through kokoro's English support. The corpus generator never calls them.
 - **sharp**'s libvips (LGPL-3.0-or-later) is installed as an optional dependency of Next.js; the web page does not use it, and the desktop app's installers leave it out.

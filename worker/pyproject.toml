@@ -34,12 +34,9 @@ vework = "vework.cli:main"
 ml = [
     "beat-this>=1.1.0",
     "huggingface-hub>=2.2.0",
-    # The forced aligner splits Japanese text into words with nagisa, and Korean with soynlp.
-    "nagisa>=0.2.11",
     "onnxruntime>=1.31.0",
     "opencv-python-headless>=5.0.0.93",
     "silero-vad>=6.2.3",
-    "soynlp>=0.0.493",
     "torch>=2.14.1",
     "transformers>=5.20.0",
     "transnetv2-pytorch>=1.0.5",
