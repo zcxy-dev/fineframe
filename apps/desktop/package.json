@@ -1,6 +1,6 @@
 {
   "name": "@video-editor/desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "productName": "Video Editor",
   "private": true,
   "description": "A fully automatic video editor",
