@@ -14,6 +14,7 @@ import {
   FULL_MAX,
   PANEL_MAX,
   type PlacedVisual,
+  parseVisuals,
   placeVisuals,
   sourceVisuals,
   speakerClips,
@@ -47,19 +48,56 @@ test("a rich plan asks for visuals, with stock footage only when a key allows it
   assert.equal(planSystem(extras), planSystem({ ...extras, visuals: false }));
   assert.doesNotMatch(planSystem(extras), /## Visuals/);
 
-  const kinds = (stock: boolean) => {
-    const schema = planSchema({ ...extras, visuals: true, stock });
-    const visuals = (schema.properties as Record<string, { items: { properties: { kind: { enum: string[] } } } }>).visuals; // biome-ignore format: one line
-    assert.ok((schema.required as string[]).includes("visuals"));
-    return visuals?.items.properties.kind.enum;
-  };
-  assert.deepEqual(kinds(false), ["web", "card"]);
-  assert.deepEqual(kinds(true), ["stock", "web", "card"]);
+  // One JSON string, checked in code: with every other extra on, an array of objects in the
+  // schema makes a grammar too large for structured outputs to compile.
+  const every = { music: true, title: true, chapters: true, people: true, callouts: true };
+  const schema = planSchema({ ...every, visuals: true, stock: true });
+  assert.ok((schema.required as string[]).includes("visuals"));
+  assert.deepEqual((schema.properties as Record<string, object>).visuals, {
+    type: "string",
+    description: "The visuals as a JSON array, [] for none.",
+  });
   const rich = planSystem({ ...extras, visuals: true, stock: false });
   assert.match(rich, /## Visuals/);
   assert.match(rich, /- stat: /);
   assert.doesNotMatch(rich, /stock: real footage/);
   assert.match(planSystem({ ...extras, visuals: true, stock: true }), /stock: real footage/);
+});
+
+test("the plan's visuals are read from their JSON, each left out unless whole", () => {
+  const problems: string[] = [];
+  const good = { source: "a", line: 2, text: "Surya", kind: "card", card: "stat", params: "{}", sfx: "tap", reason: "r" }; // biome-ignore format: one line
+  const read = parseVisuals(
+    JSON.stringify([
+      good,
+      { ...good, line: "3" },
+      { ...good, kind: "stock" },
+      { ...good, sfx: "laser" },
+      { source: "a", line: 4, text: "x", kind: "web", url: "https://example.com/" },
+    ]),
+    false,
+    (problem) => problems.push(problem),
+  );
+  assert.deepEqual(read, [
+    wish({
+      line: 2,
+      text: "Surya",
+      kind: "card",
+      card: "stat",
+      params: "{}",
+      sfx: "tap",
+      reason: "r",
+    }),
+    wish({ line: 4, text: "x", kind: "web", url: "https://example.com/" }),
+  ]);
+  assert.equal(problems.length, 3);
+  assert.deepEqual(parseVisuals(JSON.stringify([{ ...good, kind: "stock", query: "sun" }]), true).length, 1); // biome-ignore format: one line
+  assert.deepEqual(
+    parseVisuals("[{", false, (problem) => problems.push(problem)),
+    [],
+  );
+  assert.match(problems.at(-1) ?? "", /not JSON/);
+  assert.deepEqual(parseVisuals("", false), []);
 });
 
 test("code checks each visual before sourcing it", () => {

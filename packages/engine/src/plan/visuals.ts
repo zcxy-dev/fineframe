@@ -36,6 +36,60 @@ export const VISUALS: readonly Visuals[] = ["rich", "minimal"];
 export const SFX_WISHES = ["click", "tap", "paper", "tone", "stop", "whoosh"] as const;
 
 /** One visual as the planner proposes it, on a line and the words it lands on. */
+/**
+ * The plan's visuals, which it gives as one JSON array in a string: an array of objects in the
+ * plan's schema, with every other extra on, makes a grammar too large for structured outputs to
+ * compile. Each entry is kept only when every field has its type; the rest are reported and left
+ * out, and stock footage only when it can be searched.
+ */
+export function parseVisuals(
+  text: string,
+  stock: boolean,
+  onProblem: (problem: string) => void = () => {},
+): VisualWish[] {
+  if (text.trim() === "") return [];
+  let entries: unknown;
+  try {
+    entries = JSON.parse(text);
+  } catch {
+    onProblem("The plan's visuals are not JSON; the edit has none");
+    return [];
+  }
+  if (!Array.isArray(entries)) {
+    onProblem("The plan's visuals are not a list; the edit has none");
+    return [];
+  }
+  const kinds: readonly string[] = stock ? ["stock", "web", "card"] : ["web", "card"];
+  const sounds: readonly string[] = ["none", ...SFX_WISHES];
+  const wishes: VisualWish[] = [];
+  for (const entry of entries) {
+    const e = (typeof entry === "object" && entry !== null ? entry : {}) as Record<string, unknown>; // biome-ignore format: one line
+    const text = (key: string) => (e[key] === undefined ? "" : e[key]);
+    const fields = {
+      source: e.source,
+      line: e.line,
+      text: e.text,
+      kind: e.kind,
+      query: text("query"),
+      url: text("url"),
+      focus: text("focus"),
+      card: text("card"),
+      params: text("params"),
+      sfx: e.sfx === undefined ? "none" : e.sfx,
+      reason: text("reason"),
+    };
+    const strings = ["source", "text", "query", "url", "focus", "card", "params", "reason"] as const; // biome-ignore format: one line
+    const ok =
+      strings.every((key) => typeof fields[key] === "string") &&
+      Number.isInteger(fields.line) &&
+      kinds.includes(fields.kind as string) &&
+      sounds.includes(fields.sfx as string);
+    if (ok) wishes.push(fields as VisualWish);
+    else onProblem(`Left out a visual the plan gave in another shape: ${JSON.stringify(entry)}`);
+  }
+  return wishes;
+}
+
 export interface VisualWish {
   source: string;
   line: number;

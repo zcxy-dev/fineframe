@@ -72,6 +72,14 @@ does not fit. Prefer, in this order:
 ${kinds.map((kind, i) => `${i + 1}. ${kind}`).join("\n")}
 An opening that names a tool, a product or an organisation can show it from its first word.
 
+Give the visuals as one JSON array in the visuals string, [] for none, each an object with \
+these keys, every value a string except line: source and line, the line it lands on; text, the \
+words it lands on; kind, ${kinds.length === 3 ? '"stock", "web" or "card"' : '"web" or "card"'}; \
+query, the stock search in English; url, the page's address; focus, the words on the page to \
+zoom into; card, which card; params, the card's params as a JSON object written as a string; \
+sfx, "none" or one of ${SFX_WISHES.map((s) => `"${s}"`).join(", ")}; and reason. Leave the \
+keys of other kinds empty.
+
 Cards, with their params as JSON objects like the examples:
 ${list}
 Icons are Lucide names, only these: ${iconNames.join(", ")}. Logos only these brands, and \
@@ -358,29 +366,8 @@ export interface PlanExtras {
 }
 
 /** The visuals in the plan's schema, stock footage only when it can be searched. */
-function visualsSchema(stock: boolean) {
-  return {
-    type: "array",
-    items: {
-      type: "object",
-      additionalProperties: false,
-      required: ["source", "line", "text", "kind", "query", "url", "focus", "card", "params", "sfx", "reason"], // biome-ignore format: one line
-      properties: {
-        source: { type: "string" },
-        line: { type: "integer" },
-        text: { type: "string", description: "The words it lands on, as in the line." },
-        kind: { type: "string", enum: stock ? ["stock", "web", "card"] : ["web", "card"] },
-        query: { type: "string", description: "stock: the search, in English; else empty." },
-        url: { type: "string", description: "web: the page's address; else empty." },
-        focus: { type: "string", description: "web: the words on the page to zoom into, or empty." }, // biome-ignore format: one line
-        card: { type: "string", enum: ["", ...cardIds], description: "card: which; else empty." },
-        params: { type: "string", description: "card: its params as a JSON object; else empty." },
-        sfx: { type: "string", enum: ["none", ...SFX_WISHES] },
-        reason: { type: "string" },
-      },
-    },
-  } as const;
-}
+/** The visuals in the plan's schema: one JSON string, read and checked by `parseVisuals`. */
+const VISUALS = { type: "string", description: "The visuals as a JSON array, [] for none." } as const; // biome-ignore format: one line
 
 /** The plan's schema, with the extras offered. */
 export function planSchema(extras: PlanExtras): Record<string, unknown> {
@@ -417,7 +404,7 @@ export function planSchema(extras: PlanExtras): Record<string, unknown> {
   }
   if (extras.visuals) {
     required.push("visuals");
-    properties.visuals = visualsSchema(extras.stock ?? false);
+    properties.visuals = VISUALS;
   }
   return { ...PLAN_SCHEMA, required, properties };
 }

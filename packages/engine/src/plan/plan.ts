@@ -80,6 +80,7 @@ import { bare, joinWords } from "./text.ts";
 import {
   type Asset,
   type PlacedVisual,
+  parseVisuals,
   placeVisuals,
   sourceVisuals,
   speakerClips,
@@ -358,7 +359,13 @@ async function decide(state: PlanState, request: string): Promise<void> {
   state.usage.push(reply.usage);
   state.model = reply.usage.model;
   state.progress(`${reply.usage.model} planned the edit (${dollars(reply.usage.dollars)})`);
-  state.decisions = reply.json as Decisions;
+  const { visuals, ...rest } = reply.json as Omit<Decisions, "visuals"> & { visuals?: string };
+  state.decisions = {
+    ...rest,
+    ...(visuals === undefined
+      ? {}
+      : { visuals: parseVisuals(visuals, state.extras.stock ?? false, state.progress) }),
+  };
   takeDecisions(state);
   await locateCallouts(state);
   await sourceWishes(state);
