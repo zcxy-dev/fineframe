@@ -29,7 +29,7 @@ Macs with an Intel processor are not supported: PyTorch and ONNX Runtime, which 
 
 **Linux.** Make the AppImage executable (`chmod +x Video-Editor-*.AppImage`) and run it. AppImages need FUSE 2: on Ubuntu 24.04, `sudo apt install libfuse2t64`.
 
-**The first time it opens,** the app asks for your [Anthropic API key](https://console.anthropic.com/settings/keys) and checks it; Claude plans each edit and checks its cuts, about US$0.05 to 0.20 an edit, more for long ones. Meanwhile it installs the analysis once, about 2 GB of Python and PyTorch, with its progress in the window. The first edit then downloads what it needs on first use, each with its own bar: the speech model (3.4 GB), FFmpeg and the effects renderer. On a computer with less than 12 GB of memory, too little for the speech model, speech is heard on OpenRouter instead, with your [OpenRouter API key](https://openrouter.ai/settings/keys), for about US$0.03 an hour of footage; the app says so, and either can be chosen.
+**The first time it opens,** the app asks for your [Anthropic API key](https://console.anthropic.com/settings/keys) and checks it; Claude plans each edit and checks its cuts, about US$0.05 to 0.20 an edit, more for long ones. Meanwhile it installs the analysis once, about 2 GB of Python and PyTorch, with its progress in the window. The first edit then downloads what it needs on first use, each with its own bar: the speech model ([sizes](#which-speech-model-runs)), FFmpeg and the effects renderer. On a computer with less than 12 GB of memory, too little for the speech model, speech is heard on OpenRouter instead, with your [OpenRouter API key](https://openrouter.ai/settings/keys), for about US$0.03 an hour of footage; the app says so, and either can be chosen.
 
 The keys stay on your computer, in a file only your user can read, in the app's folder (`~/Library/Application Support/Video Editor` on macOS, `%APPDATA%\Video Editor` on Windows, `~/.config/Video Editor` on Linux), with the Python it installed. The models and edits are in `.cache\video-editor` and `.cache\huggingface` in your user folder (`~/.cache/…` on macOS and Linux). To remove the app entirely, uninstall or delete it and delete those folders. The app does not update itself yet: install a newer version over it, and the keys and downloads stay. How the app is built: [`apps/desktop`](apps/desktop/README.md).
 
@@ -55,25 +55,25 @@ A single web page drives it: drop the files, pick the length and aspect ratio, p
 - **Probe:** rotated phone footage, non-square pixels, HDR and every audio track, read as they play ([sources](packages/engine/README.md#what-it-renders)).
 - **Shot detection:** [TransNetV2](https://github.com/soCzech/TransNetV2) finds hard cuts and dissolves.
 - **Speech and pauses:** [Silero VAD](https://github.com/snakers4/silero-vad) finds where someone speaks.
-- **Loudness and audio events:** EBU R128 loudness for every second, and laughter, applause and music from the [CED](https://github.com/RicherMans/CED) tagger ([details](worker/README.md#media-index)).
-- **Faces and who speaks:** [YuNet](https://huggingface.co/opencv/face_detection_yunet) faces tracked through each shot, each shot's layout, and who speaks when ([details](worker/README.md#faces-and-speakers)).
-- **Long sources:** frames stream through shot detection and faces; a 2-hour source's analysis peaks at about 2.8 GB while its speech is denoised (the 2.3 GB voice stage beside the 0.46 GB 16 kHz track), before the speech model's memory ([shots](worker/README.md#media-index), [voice](worker/README.md#voice)).
-- **Transcript:** [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) in sentence-sized chunks, so mixed Mandarin and English stays mixed, in Taiwan Traditional Chinese with [OpenCC](https://github.com/BYVoid/OpenCC) and timed word by word ([word timings](worker/README.md#word-timings)); `--asr cloud` hears the speech on OpenRouter instead ([cloud speech](worker/README.md#cloud-speech)).
+- **Loudness and audio events:** EBU R128 loudness, and laughter, applause and music from the [CED](https://github.com/RicherMans/CED) tagger ([details](worker/README.md#media-index)).
+- **Faces and who speaks:** [YuNet](https://huggingface.co/opencv/face_detection_yunet) faces tracked through each shot, and who speaks when ([details](worker/README.md#faces-and-speakers)).
+- **Long sources:** frames and speech stream through the analysis, so a 2-hour source fits in a few GB ([shots](worker/README.md#media-index), [voice](worker/README.md#voice)).
+- **Transcript:** [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) keeps mixed Mandarin and English mixed, in Taiwan Traditional Chinese with [OpenCC](https://github.com/BYVoid/OpenCC), timed word by word, locally or on OpenRouter ([details](worker/README.md#word-timings)).
 - **Transcript correction** (opt-in): Claude fixes misheard names, terms and homophones, and only edits that keep every spoken word apply ([details](worker/README.md#transcript-correction)).
-- **Plan:** [Claude plans the edit](packages/engine/README.md#planning) from any number of files and code cuts it between words to a length within ±5 %, then Claude checks every cut after each render ([measurements](packages/engine/MEASUREMENTS.md#planner-measurements)).
+- **Plan:** [Claude plans the edit](packages/engine/README.md#planning) and checks every cut; code cuts between words to the length asked ([measurements](packages/engine/MEASUREMENTS.md#planner-measurements)).
 - **Framing:** a [virtual camera](packages/engine/README.md#framing) frames every clip in the edit's shape and follows whoever speaks.
-- **Render:** [`project.json` to MP4](packages/engine/README.md#how-it-renders) with frame- and sample-exact cuts, dissolves, B-roll, punch-ins, colour matching, looks and loudness ([measurements](packages/engine/MEASUREMENTS.md#render-measurements)).
-- **Music:** tracks you supply, with their licences, fitted to the edit on whole phrases and ducked under speech ([details](packages/engine/README.md#planning), [measurements](packages/engine/MEASUREMENTS.md#music-measurements)).
+- **Render:** [`project.json` to MP4](packages/engine/README.md#how-it-renders) with frame- and sample-exact cuts, transitions, B-roll, grading and loudness ([measurements](packages/engine/MEASUREMENTS.md#render-measurements)).
+- **Music:** tracks you supply, fitted to the edit and ducked under speech ([details](packages/engine/README.md#planning), [measurements](packages/engine/MEASUREMENTS.md#music-measurements)).
 - **One command:** [`pnpm edit`](packages/engine/README.md#editing-footage) turns a folder of footage into the finished video at the length and aspect asked ([measurements](packages/engine/MEASUREMENTS.md#edit-measurements)).
 - **Desktop app:** [installers](#install) for Apple silicon Macs, Windows and Linux run the web page with nothing else to install ([details](apps/desktop/README.md)).
 - **Web page:** [one page](apps/web/README.md) runs `pnpm edit` on dropped footage, with live progress, cost estimates and downloads.
 - **Changing an edit:** [`pnpm render`](packages/engine/README.md#changing-an-edit) renders a changed `project.json` again, and the [agent skill](#use-it-from-an-ai-agent) changes an edit by conversation.
-- **Effects:** six animated [templates](packages/effects/) for Traditional Chinese and English text, rendered with [Remotion](https://www.remotion.dev), which planned edits use sparingly ([placement](packages/engine/README.md#planning)).
-- **B-roll and motion graphics:** a rich edit, the default, cuts away from the speaker on its points to stock footage, captures of the pages named and motion-graphics cards, from free sources only; `--visuals minimal` leaves them out ([details](packages/engine/README.md#visuals)).
-- **Motion-graphics cards:** [cards](packages/effects/#cards) to cut to as B-roll, full frame or as a split screen, each with typed params checked against its JSON Schema.
-- **Captions:** [burned in word by word](packages/engine/README.md#captions) in Taiwan Traditional Chinese with English words kept in English, with a SubRip file that matches the picture.
+- **Effects:** six animated text [templates](packages/effects/), rendered with [Remotion](https://www.remotion.dev) ([placement](packages/engine/README.md#planning)).
+- **B-roll:** a rich edit, the default, cuts away to stock footage, page captures and cards from free sources ([details](packages/engine/README.md#visuals)).
+- **Motion-graphics cards:** [cards](packages/effects/#cards) full frame or as a split screen, with params checked against their schemas.
+- **Captions:** [burned in word by word](packages/engine/README.md#captions), with a SubRip file that matches the picture.
 - **Studio voice:** each source's speech [denoised and processed](packages/engine/README.md#voice) by a chain chosen from its measurements ([measurements](packages/engine/MEASUREMENTS.md#voice-measurements)).
-- **Benchmark:** [`vebench`](bench/README.md#metrics) scores transcripts, shots, speakers, clicks and drift, music and planned edits, pooled across a corpus.
+- **Benchmark:** [`vebench`](bench/README.md#metrics) scores transcripts, shots, speakers, renders, music and edits across a corpus.
 - **Blind review:** a [local page](bench/README.md#blind-review) records people's ratings of edits and which of two versions they prefer.
 - **File formats:** [JSON Schemas](packages/schema/) for the media index, `project.json` and progress lines, with generated types and validators.
 - **Ground truth drafts:** `vework draft-truth` drafts a corpus clip's transcript for a person to correct ([workflow](bench/README.md#ground-truth)).
@@ -89,8 +89,8 @@ From the source, for development and the command line; to only use the editor, [
 **Requirements:**
 - macOS on Apple silicon, Windows 10 or 11 on x64, or Linux.
 - [mise](https://mise.jdx.dev), which installs the pinned Node, Python and `uv`; Node's corepack then provides the pinned pnpm. On Windows, install it with `winget install jdx.mise` and run the commands below in PowerShell, with [Git](https://git-scm.com/download/win) installed.
-- About 2 GB for the Python environment, plus the model weights downloaded on first use (3.4 GB for the speech model on a CPU).
-- An [Anthropic API key](https://console.anthropic.com/settings/keys): Claude plans the edit and checks its cuts, about US$0.05 to 0.20 an edit, more for long ones.
+- Disk space for the Python environment ([size](#install)) and the model weights downloaded on first use ([sizes](#which-speech-model-runs)).
+- An [Anthropic API key](https://console.anthropic.com/settings/keys): Claude plans the edit and checks its cuts ([cost](#install)).
 
 ```bash
 git clone https://github.com/zcxy-dev/video-editor.git
@@ -117,7 +117,7 @@ uv run vework analyze talk.mp4 -o talk.index.json
 
 The [media index format](packages/schema/media-index.schema.json) is defined with the other file formats in [`packages/schema`](packages/schema/).
 
-**Which speech model runs:**
+### Which speech model runs
 
 | Model | Weights to download | Speed on the [reference machine](bench/README.md#reference-machine) | Peak memory |
 |---|---|---|---|
