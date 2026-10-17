@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./broll": "./src/broll/index.ts",
     "./claude": "./src/plan/claude.ts",
     "./estimate": "./src/plan/estimate.ts",
     "./length": "./src/edit/length.ts",
@@ -19,7 +20,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.133.0",
+    "@remotion/renderer": "4.0.531",
     "@video-editor/effects": "workspace:*",
-    "@video-editor/schema": "workspace:*"
+    "@video-editor/schema": "workspace:*",
+    "playwright-core": "1.63.0"
   }
 }
