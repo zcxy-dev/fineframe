@@ -116,6 +116,10 @@ test("filler candidates: single words with their punctuation, and 那個 across 
 test("words join as subtitles write them, and carry their language", () => {
   assert.equal(joinWords(["我", "用", "Claude", "Code", "剪", "片。"]), "我用 Claude Code 剪片。");
   assert.equal(joinWords(["editing，", "也", "就"]), "editing，也就");
+  assert.equal(
+    joinWords(["flares,", "and", "you", "know,", "lo", "and", "behold.", "It's", "8.5%", "AI"]),
+    "flares, and you know, lo and behold. It's 8.5% AI",
+  );
   assert.equal(wordLanguage("好，"), "zh-TW");
   assert.equal(wordLanguage("API"), "en");
   assert.equal(wordLanguage("，"), null);

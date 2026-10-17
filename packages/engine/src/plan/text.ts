@@ -3,6 +3,8 @@
 
 const HAN = /\p{Script=Han}/u;
 const LATIN = /[A-Za-z0-9]/;
+/** Half-width punctuation that closes an English word, after which English text sets a space. */
+const CLOSES = /[,.;:!?%)\]"'’”]/;
 const PUNCTUATION = /[\p{P}\p{S}\s]/gu;
 // A sentence ends at one of these, so a cut there leaves whole sentences on both sides.
 const SENTENCE_END = /[。！？!?.…]["」』）)]*$/u;
@@ -29,7 +31,7 @@ export function wordLanguage(text: string): "zh-TW" | "en" | null {
 }
 
 /** Words joined as a subtitle writes them: Chinese characters run together, and a space sets
- * off each English word or number, except next to punctuation. */
+ * off each English word or number, except next to full-width punctuation or before punctuation. */
 export function joinWords(words: readonly string[]): string {
   let text = "";
   for (const word of words) {
@@ -37,6 +39,7 @@ export function joinWords(words: readonly string[]): string {
     const first = word[0] ?? "";
     const spaced =
       (LATIN.test(before) && (LATIN.test(first) || HAN.test(first))) ||
+      (CLOSES.test(before) && LATIN.test(first)) ||
       (HAN.test(before) && LATIN.test(first));
     text += (spaced ? " " : "") + word;
   }
