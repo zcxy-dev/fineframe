@@ -500,7 +500,7 @@ node scripts/finishing-preview.ts out/finishing --scene <clip folder>@<seconds> 
 | De-esser | Always | Above 6 kHz, harder after a presence lift |
 | Limiter | Always | Peaks held 11 dB over the speech, so the loudness pass reaches -14 LUFS with one gain instead of limiting dynamically |
 
-The EQ targets put the low-mids (150–500 Hz) 1 dB over the body (500 Hz–2 kHz), where a long-term average speech spectrum has them, and presence (2–5 kHz) 11 dB under it, a dB brighter than that average. They, like every threshold above, are starting points set on synthetic speech, for the hand-checked corpus and a blind review to tune.
+The EQ targets put the low-mids (150–500 Hz) 1 dB over the body (500 Hz–2 kHz), where a long-term average speech spectrum has them, and presence (2–5 kHz) 11 dB under it, a dB brighter than that average. They, like every threshold above, are starting points set on synthetic speech, for the hand-checked corpus to tune.
 
 `loudnessFor(aspect)` gives the loudness the loudness pass normalises to: -14 LUFS for 9:16 and 1:1, which social platforms play at about that level, and -16 for 16:9 long-form, both at -1 dBTP.
 
