@@ -482,11 +482,7 @@ export function placeVisuals(
     const layout = layoutOf(context.aspect, asset.kind, wantedSeconds);
     const cap = layout === "full" ? FULL_MAX : PANEL_MAX;
     const blockedAfter = (context.blocked ?? []).filter((b) => b.start >= start).map((b) => b.start); // biome-ignore format: one line
-    let end = Math.min(
-      start + s(Math.min(wantedSeconds, cap)),
-      edit,
-      ...blockedAfter,
-    );
+    let end = Math.min(start + s(Math.min(wantedSeconds, cap)), edit, ...blockedAfter);
     end = Math.floor(end / frame) * frame;
     if (end - start < s(least) - frame / 2) {
       leftOut(item.wish, "too little time before its line ends or something it may not cover");
