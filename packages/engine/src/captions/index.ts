@@ -5,7 +5,7 @@ import { basename, join } from "node:path";
 import { type Project, secondsToTicks } from "@video-editor/schema";
 import type { Timeline } from "../timeline.ts";
 import { writeAss } from "./ass.ts";
-import { faceZones } from "./faces.ts";
+import { faceZones, visualZones } from "./faces.ts";
 import { fontFile, metrics } from "./fonts.ts";
 import { layoutCaptions, type Page, rowText } from "./layout.ts";
 import { placeBlocks } from "./place.ts";
@@ -71,7 +71,7 @@ export async function buildCaptions(
     blocks,
     scale.bottom * output.height + CLEARANCE * em,
     [scale.band[0] * output.height, scale.band[1] * output.height],
-    faceZones(timeline, output),
+    [...faceZones(timeline, output), ...visualZones(timeline, output)],
   ).map((bottom) => bottom - CLEARANCE * em);
   const geometry = { width: output.width, height: output.height, em, frameTicks };
   return {

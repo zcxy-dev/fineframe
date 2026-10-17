@@ -4,7 +4,7 @@ import type { CropPath, FaceFraming, Framing } from "@video-editor/schema";
 import { visible } from "../framing.ts";
 import { facts, project, SECOND, sources } from "../testing.ts";
 import { buildTimeline } from "../timeline.ts";
-import { faceZones } from "./faces.ts";
+import { faceZones, visualZones } from "./faces.ts";
 import { buildCaptions } from "./index.ts";
 
 const WIDE = 16 / 9;
@@ -164,4 +164,37 @@ test("a caption sits at its place, and above a face that would be under it", asy
   const moved = await centre({ framing: LOW_FACE, aspect: WIDE });
   assert.ok(placed > 600, `placed at ${placed}`);
   assert.ok(moved < 504 - 0.25 * 180, `moved to ${moved}`);
+});
+
+test("captions keep off what a visual draws: a split screen's panel and a card's content", async () => {
+  const visuals = project([{ source: "a", in: 0, out: 3 * SECOND }], {
+    broll: [{ source: "b", in: 0, out: SECOND, start: 0, rect: { x: 0, y: 0, w: 1, h: 0.5 } }],
+    cards: [{ card: "stat", params: {}, start: SECOND, duration: SECOND, placement: "full" }],
+  });
+  // The speaker's own half of a split screen is B-roll of the main track's source: captions may
+  // sit over it.
+  const speaker = project([{ source: "a", in: 0, out: 3 * SECOND }], {
+    broll: [{ source: "a", in: 0, out: SECOND, start: 0, rect: { x: 0, y: 0.5, w: 1, h: 0.5 } }],
+  });
+  assert.deepEqual(visualZones(buildTimeline(speaker, sources(facts("a"))), speaker.output), []);
+  const zones = visualZones(
+    buildTimeline(visuals, sources(facts("a"), facts("b"))),
+    visuals.output,
+  );
+  // A visual's panel over its frames (B-roll of another source than the speaker's), and a full
+  // card over the frame above the captions' safe margin.
+  assert.deepEqual(zones, [
+    { start: 0, end: 30, boxes: [{ x0: 0, y0: 0, x1: 1280, y1: 360 }] },
+    { start: 30, end: 60, boxes: [{ x0: 0, y0: 0, x1: 1280, y1: 720 - Math.round(0.24 * 720) }] },
+  ]);
+  // A caption moved off a low face goes below it rather than up into the panel.
+  const line = { start: 0, end: SECOND, language: "zh-TW", text: "字幕", words: [{ text: "字幕", start: 0, end: SECOND }] }; // biome-ignore format: one line
+  const edit = project([{ source: "a", in: 0, out: 3 * SECOND }], {
+    broll: [{ source: "b", in: 0, out: SECOND, start: 0, rect: { x: 0, y: 0, w: 1, h: 0.5 } }],
+    captions: { preset: "bold", srt: false, lines: [line] },
+  });
+  const built = await buildCaptions(edit, buildTimeline(edit, sources(facts("a", { faces: { framing: LOW_FACE, aspect: WIDE } }), facts("b")))); // biome-ignore format: one line
+  const event = built?.ass.split("\n").find((e) => e.startsWith("Dialogue: 4,"));
+  const y = Number(/\\pos\([\d.]+,([\d.]+)\)/.exec(event ?? "")?.[1]);
+  assert.ok(y > 360, `caption at ${y}, inside the panel`);
 });

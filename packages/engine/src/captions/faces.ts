@@ -2,6 +2,7 @@
 // boxes, seen through the crop of the clip that shows them, on the main track or in a B-roll rect
 // such as the speaker's half of a split screen.
 
+import { layoutFor } from "@video-editor/effects";
 import { type Framing, type Project, TICKS_PER_SECOND } from "@video-editor/schema";
 import { visible } from "../framing.ts";
 import { panelRect, placement } from "../graph/broll.ts";
@@ -48,6 +49,29 @@ export function faceZones(
   return layers.flatMap(([layer, above]) =>
     zonesOf(layer, [...broll.slice(above), ...cards], timeline.frameTicks, output),
   );
+}
+
+/**
+ * What visuals draw, as zones captions keep off like faces: a split screen's panel of B-roll from
+ * another source than the speaker's (whose own half captions may sit over), a card in its panel,
+ * and a full-frame card above the bottom safe margin it leaves for captions.
+ */
+export function visualZones(
+  timeline: Pick<Timeline, "main" | "broll"> & Partial<Pick<Timeline, "cards">>,
+  output: Pick<Project["output"], "width" | "height" | "aspect">,
+): FaceZone[] {
+  const speakers = new Set(timeline.main.map((clip) => clip.source?.id));
+  const zone = (start: number, end: number, box: { x: number; y: number; width: number; height: number }) => ({ start, end, boxes: [{ x0: box.x, y0: box.y, x1: box.x + box.width, y1: box.y + box.height }] }); // biome-ignore format: one line
+  const broll = timeline.broll
+    .filter((clip) => clip.clip.rect && !speakers.has(clip.source?.id))
+    .map((clip) => zone(clip.start, clip.end, placement(clip.clip.rect, output)));
+  const above = output.height - Math.round(layoutFor(output.aspect, output.width, output.height).safe.bottom); // biome-ignore format: one line
+  const cards = (timeline.cards ?? []).map((clip) =>
+    clip.card.placement === "panel"
+      ? zone(clip.start, clip.end, placement(panelRect(output.aspect), output))
+      : zone(clip.start, clip.end, { x: 0, y: 0, width: output.width, height: above }),
+  );
+  return [...broll, ...cards];
 }
 
 function zonesOf(
