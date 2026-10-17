@@ -1,6 +1,6 @@
 # Third-party notices
 
-The project's own code is under the [MIT License](LICENSE). It uses the components below, each under its own licence. Nothing in this repository bundles a model weight, a font or a binary: the tools download them on first use, from their publishers or, for the Intel macOS FFmpeg, from a release of this repository, or the package managers install them. The desktop app's installers do carry programs: Electron, uv and the npm packages the editor runs, but no FFmpeg, model or Python package ([what they carry](#desktop-installers)). Licences were checked against each component's own licence file or model card at the version or revision the project pins.
+The project's own code is under the [MIT License](LICENSE). It uses the components below, each under its own licence. Nothing in this repository bundles a model weight, a font or a binary, and its only third-party media are [a few CC0 sound effects](#sound-effects): the tools download the rest on first use, from their publishers or, for the Intel macOS FFmpeg, from a release of this repository, or the package managers install them. The desktop app's installers do carry programs: Electron, uv and the npm packages the editor runs, but no FFmpeg, model or Python package ([what they carry](#desktop-installers)). Licences were checked against each component's own licence file or model card at the version or revision the project pins.
 
 ## Components
 
@@ -17,7 +17,10 @@ The project's own code is under the [MIT License](LICENSE). It uses the componen
 | [FFmpeg](https://ffmpeg.org) static builds: from [imageio-binaries](https://github.com/imageio/imageio-binaries), 7.0.2 on Linux, 7.1 on Apple silicon and on Windows ([gyan.dev](https://www.gyan.dev/ffmpeg/builds/)'s essentials build); on Intel macOS, 7.1.5 built by this project | GPL-3.0-or-later (Linux, Windows), GPL-2.0-or-later (macOS) | GitHub, pinned commit or this repository's release, and SHA-256; renderer, run as a separate program (see [notes](#ffmpeg)) |
 | Remotion's compositor (`@remotion/compositor-*`), with its own FFmpeg | [Remotion License](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md); its FFmpeg is configured with `--enable-gpl`, libx264, libx265 and libfdk-aac | Installed with @remotion/renderer by pnpm; for the desktop app, downloaded from npm on the first effect render, checked against `pnpm-lock.yaml` (see [notes](#desktop-installers)) |
 | [CPython](https://www.python.org) builds from [python-build-standalone](https://github.com/astral-sh/python-build-standalone) | PSF-2.0, with the licences of the libraries each build includes | Desktop app only: installed by uv into the app's folder on its first start |
-| Chrome Headless Shell ([Chromium](https://www.chromium.org)) | Chromium's BSD-3-Clause licence and the third-party licences it lists; Google's build also refers to the Chrome terms of service | Downloaded by Remotion on the first effect render: from Google's [Chrome for Testing](https://github.com/GoogleChromeLabs/chrome-for-testing), on Linux with glibc 2.35 or later from Remotion's own build, and on older Linux arm64 from Playwright's Chromium build |
+| Chrome Headless Shell ([Chromium](https://www.chromium.org)) | Chromium's BSD-3-Clause licence and the third-party licences it lists; Google's build also refers to the Chrome terms of service | Downloaded by Remotion on the first effect render or web capture: from Google's [Chrome for Testing](https://github.com/GoogleChromeLabs/chrome-for-testing), on Linux with glibc 2.35 or later from Remotion's own build, and on older Linux arm64 from Playwright's Chromium build |
+| [Lucide](https://lucide.dev) icons (`lucide-static` 1.50.0) | ISC; the icons drawn from Feather MIT, as its licence file lists them | npm registry tarball, SHA-256 checked; engine, on the first icon lookup |
+| [Tabler Icons](https://tabler.io/icons) (`@tabler/icons` 3.48.0), outline style | MIT | npm registry tarball, SHA-256 checked; engine, on the first icon lookup |
+| [Simple Icons](https://simpleicons.org) (`simple-icons` 16.33.0) | CC0-1.0, except the logos its data gives another licence (see [notes](#icons-and-logos)) | npm registry tarball, SHA-256 checked; engine, on the first logo lookup |
 | [Kokoro-82M-v1.1-zh](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh) weights and voices | Apache-2.0 | Hugging Face, pinned revision; benchmark `synth` extra only |
 
 ### Python packages, installed by uv (direct dependencies)
@@ -55,7 +58,7 @@ Models that come inside a package: the TransNetV2 weights in transnetv2-pytorch,
 | Package | Licence | Used by |
 |---|---|---|
 | [@anthropic-ai/sdk](https://github.com/anthropics/anthropic-sdk-typescript) | MIT | engine, web page |
-| [remotion](https://www.remotion.dev), @remotion/bundler, @remotion/renderer | [Remotion License](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md), source-available (see [notes](#remotion)) | effects |
+| [remotion](https://www.remotion.dev), @remotion/bundler, @remotion/renderer | [Remotion License](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md), source-available (see [notes](#remotion)) | effects; @remotion/renderer also engine, to download Chrome for web capture |
 | [react](https://react.dev), react-dom | MIT | effects, web page |
 | [ajv](https://github.com/ajv-validator/ajv) | MIT | schema, effects |
 | [@fontsource/noto-sans-tc](https://fontsource.org/fonts/noto-sans-tc) | OFL-1.1 | effects, web page |
@@ -66,7 +69,20 @@ Models that come inside a package: the TransNetV2 weights in transnetv2-pytorch,
 | [json-schema-to-typescript](https://github.com/bcherny/json-schema-to-typescript), @types/node, @types/react, @types/react-dom | MIT | development |
 | [electron](https://www.electronjs.org) | MIT; the Chromium and Node.js it is built from keep their licences, listed in `LICENSES.chromium.html` inside the app | desktop app, in its installers |
 | [electron-builder](https://www.electron.build) | MIT | desktop app, building the installers |
-| [playwright-core](https://playwright.dev) | Apache-2.0 | desktop app, its smoke test |
+| [playwright-core](https://playwright.dev) | Apache-2.0 | engine, web capture; desktop app, its smoke test |
+
+### Sound effects
+
+In `packages/engine/assets/sfx/`, 22 short Ogg Vorbis files, 144 KB in all, each under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) as its pack's `License.txt` states. The files are as the packs ship them, sorted into folders by kind.
+
+| Files | Source |
+|---|---|
+| `click/click_001`, `click_002`, `click_005`; `stop/back_002`, `back_004`; `tone/pluck_001`, `pluck_002` | [Interface Sounds](https://kenney.nl/assets/interface-sounds) 1.0 by Kenney |
+| `click/click2` | [UI Audio](https://kenney.nl/assets/ui-audio) by Kenney |
+| `tap/impactSoft_medium_000`, `_001`, `_002`, `impactWood_light_002`; `stop/impactGeneric_light_002` | [Impact Sounds](https://kenney.nl/assets/impact-sounds) 1.0 by Kenney |
+| `paper/card-slide-1`, `card-slide-5`, `card-place-1` | [Casino Audio](https://kenney.nl/assets/casino-audio) by Kenney |
+| `paper/bookFlip3` | [RPG Audio](https://kenney.nl/assets/rpg-audio) by Kenney |
+| `whoosh/air-1` to `air-3`, `tone/warm-1`, `warm-2` | This project, drawn from noise and sine waves by [`scripts/sfx.ts`](packages/engine/scripts/sfx.ts); dedicated to the public domain under CC0 1.0 |
 
 ## Notes
 
@@ -108,6 +124,14 @@ Left out on purpose, and downloaded on first use instead, from their publishers,
 - **sharp** and its libvips, which the page does not use.
 
 The installers are not signed with an Apple Developer ID or a Windows code-signing certificate yet; the macOS app is signed ad hoc, which Apple silicon requires to run it.
+
+### Icons and logos
+
+Simple Icons' logos are brands' trademarks, which its CC0 dedication does not cover: an edit may show a logo to refer to its brand, as the brand's guidelines allow, and not to suggest that the brand endorses the video. A few logos carry their own licence in Simple Icons' data; the lookup reports it, and each logo's credit carries the trademark note. Tabler's `brand-*` icons are logos too.
+
+### B-roll from the web
+
+Stock footage comes from [Pexels](https://www.pexels.com/license/) and [Pixabay](https://pixabay.com/service/license-summary/) under their own licences, through each one's API with the user's own key; each clip's credit names its creator and links to its page. A web capture shows someone else's page, whose owner keeps every right in it; its credit names the page.
 
 ### CED-Base
 

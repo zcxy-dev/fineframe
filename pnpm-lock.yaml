@@ -100,12 +100,18 @@ importers:
       '@anthropic-ai/sdk':
         specifier: 0.133.0
         version: 0.133.0(zod@4.5.4)
+      '@remotion/renderer':
+        specifier: 4.0.531
+        version: 4.0.531(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@video-editor/effects':
         specifier: workspace:*
         version: link:../effects
       '@video-editor/schema':
         specifier: workspace:*
         version: link:../schema
+      playwright-core:
+        specifier: 1.63.0
+        version: 1.63.0
 
   packages/schema:
     dependencies:
