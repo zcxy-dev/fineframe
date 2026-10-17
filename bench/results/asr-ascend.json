@@ -1,0 +1,40 @@
+{
+  "doc": "worker/README.md",
+  "columns": [
+    "Speech model",
+    "Clips (reference tokens)",
+    "MER",
+    "CJK / Latin error",
+    "Peak memory, whole analysis"
+  ],
+  "rows": [
+    [
+      "Local Qwen3-ASR-0.6B (the CPU default)",
+      "all 4 (2,675)",
+      "9.91 %",
+      "6.55 / 25.3 %",
+      "9.6 GB"
+    ],
+    [
+      "Local Qwen3-ASR-0.6B (the CPU default)",
+      "s02, s04 (724)",
+      "11.33 %",
+      "6.87 / 32.3 %",
+      "9.6 GB"
+    ],
+    [
+      "Local Qwen3-ASR-0.6B with `--correct`",
+      "s02, s04 (724)",
+      "11.19 %",
+      "6.70 / 32.3 %",
+      "9.6 GB"
+    ],
+    [
+      "Local Qwen3-ASR-1.7B (the GPU default)",
+      "s02, s04 (724)",
+      "9.94 %",
+      "6.37 / 26.8 %",
+      "15.2 GB"
+    ]
+  ]
+}

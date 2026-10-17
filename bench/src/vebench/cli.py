@@ -5,7 +5,7 @@ import sys
 from importlib.metadata import version
 from pathlib import Path
 
-from vebench import beats, edit, mix, render, review, shots, speakers, tables, transcript
+from vebench import ascend, beats, edit, mix, render, review, shots, speakers, tables, transcript
 from vebench.synth import corpus, published
 
 TRANSCRIPT_NAMES = ("transcript.json", "transcript.srt", "transcript.txt")
@@ -71,6 +71,13 @@ def main(argv: list[str] | None = None) -> None:
         elif args.command == "synthetic":
             published.download(args.out)
             result = {"corpus": str(args.out), "sha256": published.SHA256}
+        elif args.command == "ascend":
+            result = ascend.build(
+                args.out,
+                args.utterances,
+                args.seed,
+                lambda message: print(f"vebench: {message}", file=sys.stderr),
+            )["clips"]
         elif args.command == "synth":
             result = corpus.generate(
                 args.out, args.seed, lambda message: print(f"vebench: {message}", file=sys.stderr)
@@ -158,6 +165,15 @@ def _parser() -> argparse.ArgumentParser:
         epilog="What it holds: bench/README.md#synthetic-corpus",
     )
     p.add_argument("out", type=Path, help="folder to write, such as bench/synthetic/")
+
+    p = sub.add_parser(
+        "ascend",
+        help="a transcription corpus from ASCEND's Mandarin-English test utterances",
+        epilog="What it downloads and writes: bench/README.md#ascend",
+    )
+    p.add_argument("out", type=Path, help="folder to write, such as bench/corpus/")
+    p.add_argument("--utterances", type=int, default=200, help="how many (default: %(default)s)")
+    p.add_argument("--seed", type=int, default=0, help="which ones (default: %(default)s)")
 
     p = sub.add_parser(
         "synth",

@@ -166,6 +166,26 @@ and 3; a track can start a beat or two of hi-hats before its first downbeat. Eac
 intro, a main section with everything and an outro, each of whole 4-bar phrases; `parts` names
 what plays in each: `k`ick, `s`nare, `h`i-hats and `b`ass.
 
+## ASCEND
+
+`vebench ascend` builds a transcription corpus from real speech with human transcripts:
+[ASCEND](https://huggingface.co/datasets/CAiRE/ASCEND) (CC BY-SA 4.0), conversations in
+Mandarin and English that switch between them, recorded in Hong Kong.
+
+```bash
+uv sync --extra synth          # OpenCC, for the Taiwan Traditional transcripts
+uv run vebench ascend corpus/  # 200 utterances of the test split, seed 0
+```
+
+It takes a seeded sample of the test split's utterances of 1.5 s or more, downloads each from
+Hugging Face's dataset viewer (15.8 minutes of speech), checks it against the SHA-256 in
+[`ascend.json`](src/vebench/ascend.json) and joins each recording session's into a clip:
+`corpus/ascend-s<session>/source.mp4`, the utterances in the order they were said, 1 s apart,
+over a black picture, and `truth/transcript.txt`, their transcripts converted to Taiwan
+Traditional Chinese with OpenCC's `s2twp`, as the worker converts its own. ASCEND has no word
+timings, so only the error rates are scored. The transcripts stay under ASCEND's licence and are
+never committed.
+
 ## Commands
 
 ```bash
@@ -173,6 +193,7 @@ uv run vebench report corpus/
 uv run vebench synthetic synthetic/
 uv run vebench tables
 uv run vebench synth synthetic/ --seed 0
+uv run vebench ascend corpus/
 uv run vebench transcript --ref truth.json --hyp hyp.json
 uv run vebench shots --ref truth/shots.json --hyp shots.json --tolerance 0.1
 uv run vebench speakers --ref truth/speakers.json --hyp speakers.json

@@ -30,3 +30,10 @@ def test_a_table_its_document_does_not_mark_is_an_error(tmp_path):
     corpus(tmp_path, "No markers.\n")
     with pytest.raises(ValueError, match="results:asr"):
         tables.write(tmp_path)
+
+
+def test_a_new_table_is_written_into_empty_markers(tmp_path):
+    doc = corpus(tmp_path, "<!-- results:asr -->\n<!-- /results -->\n")
+    tables.write(tmp_path)
+    assert doc.read_text().startswith("<!-- results:asr -->\n| Model | MER |\n")
+    assert doc.read_text().endswith("| b | 2.0 % |\n<!-- /results -->\n")

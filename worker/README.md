@@ -74,6 +74,20 @@ uv run --env-file ../.env vework analyze talk.mp4 -o talk.index.json --asr cloud
 
 The Latin error rates rest on 71 English words. Once the host was quiet, the whole analysis of `talk-a1` (144 s), shots, faces and voice included, took 73 s and 242 s of CPU time with cloud speech and peaked at 3.3 GB. With the local model it took 204 s and 425 s of CPU time and peaked at 9.7 GB. The cost counts only the speech sent, so a source with long silences costs less.
 
+**On real speech:** [ASCEND](../bench/README.md#ascend)'s 200-utterance sample (seed 0), 15.8 minutes of conversation in four clips, scored on text only, since ASCEND has no word timings. The 1.7B model and `--correct` ran on the two shortest clips, `ascend-s02` and `-s04` (4.4 minutes), against the 0.6B model on the same two. Wall times are not comparable: the host's load varied from 5 to 25.
+
+<!-- results:asr-ascend -->
+| Speech model | Clips (reference tokens) | MER | CJK / Latin error | Peak memory, whole analysis |
+|---|---|---|---|---|
+| Local Qwen3-ASR-0.6B (the CPU default) | all 4 (2,675) | 9.91 % | 6.55 / 25.3 % | 9.6 GB |
+| Local Qwen3-ASR-0.6B (the CPU default) | s02, s04 (724) | 11.33 % | 6.87 / 32.3 % | 9.6 GB |
+| Local Qwen3-ASR-0.6B with `--correct` | s02, s04 (724) | 11.19 % | 6.70 / 32.3 % | 9.6 GB |
+| Local Qwen3-ASR-1.7B (the GPU default) | s02, s04 (724) | 9.94 % | 6.37 / 26.8 % | 15.2 GB |
+<!-- /results -->
+
+- **The default stays as it is.** On the same clips the 1.7B model makes 1.4 points fewer errors, most of them English words, but peaks at 15.2 GB against 9.6, more than a computer the page already turns to cloud speech on has ([how much](../README.md#install)); it remains the default with a CUDA GPU only.
+- **`--correct` gained 0.14 points.** Of its three applied corrections, 異星 → 異性 was right, `dream` → `jump` was as wrong as before (`gym` was said) and 分析 → 份析 made a word that does not exist; Claude's own reasons for the last two were "Not confident enough; placeholder" and "Uncertain." ([#64](https://github.com/zcxy-dev/video-editor/issues/64)).
+
 - **Why Qwen3-ASR-1.7B:** it is the cheapest of the models that handle mixed Mandarin and English, more accurate than the local CPU default, and it gives the same text for the same audio every time.
 - **Scribe v2** read more words right, but not reliably. Run again on `talk-a1`, it dropped a 嗯, which the editor cuts by its timings, and heard a chunk of speech as the audio-event tag `[موسيقى]` ("music" in Arabic), for 4.82 % MER against 2.24 % the first time. `--asr-model elevenlabs/scribe-v2` picks it.
 - **Without the aligner:** with Scribe v2's own word timings, transcription needs almost no memory and no CPU, but a fifth of the words have an edge more than 100 ms off, against 7 % with the aligner. Its timings are not used.
