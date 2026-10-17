@@ -14,7 +14,7 @@ Run every command from the repository root: the folder two levels above this ski
 Done when each of these holds:
 
 - `mise --version`, `pnpm --version` and `uv --version` work. If `mise` is missing, ask the user to install it (https://mise.jdx.dev). Then run `mise install`, `pnpm install`, and `uv sync --extra ml` in `worker/`.
-- The key is checked by the edit itself, which fails at once without it. On that error, ask the user to copy `.env.example` to `.env` and paste their key, or to run `mise run start`.
+- The key is checked by the edit itself, which fails at once without it. Never read or print `.env`. On that error, ask the user to copy `.env.example` to `.env` and paste their key, or to run `mise run start`.
 - `pnpm edit --help` prints the options.
 
 ## 2. Make the edit
@@ -24,7 +24,7 @@ pnpm -s edit footage/ --length 60s --aspect 9:16 -o out/edit.mp4 > out/progress.
 ```
 
 - Footage: files or folders of video and still images. `--length` is 15 s to 1 h (`60s`, `90`, `3m`, `1:30`); `--aspect` is `9:16`, `1:1` or `16:9`.
-- Options are in `pnpm edit --help`. Ask before using music the user has not said they have the right to use. Stock footage needs `PEXELS_API_KEY` or `PIXABAY_API_KEY`; without either, B-roll comes from cards and pages.
+- Options are in `pnpm edit --help`. Ask before using music the user has not said they have the right to use. Stock footage needs a free `PEXELS_API_KEY` or `PIXABAY_API_KEY` in `.env`; without either, B-roll comes from cards and pages.
 - The first edit of new footage analyses it, about twice the footage's length on a CPU: run it in the background and follow its stderr. Later edits of the same footage start at the plan and take a minute or two. Claude costs about US$0.05 to 0.20 an edit, more for long ones.
 - Done when the last line of `out/progress.jsonl` has `"stage": "done"`. An `"error"` line carries the reason; the stderr says what to change.
 

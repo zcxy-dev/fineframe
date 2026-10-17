@@ -368,10 +368,10 @@ The EQ targets put the low-mids (150–500 Hz) 1 dB over the body (500 Hz–2 kH
 
 ## FFmpeg
 
-On first use the renderer downloads its pinned FFmpeg build ([which one](../../THIRD_PARTY_NOTICES.md#ffmpeg)), checks it against its SHA-256 and keeps it in `~/.cache/video-editor/` (`%USERPROFILE%\.cache\video-editor\` on Windows). The Intel macOS build is built by the project from pinned sources ([how](../../THIRD_PARTY_NOTICES.md#ffmpeg)), since the one imageio-binaries publishes may not be redistributed.
+On first use the renderer downloads its pinned FFmpeg build ([which one](../../THIRD_PARTY_NOTICES.md#ffmpeg)), checks it against its SHA-256 and keeps it in `~/.cache/video-editor/` (`%USERPROFILE%\.cache\video-editor\` on Windows). The Intel macOS build is built by the project from pinned sources ([how](../../THIRD_PARTY_NOTICES.md#ffmpeg)), since the one imageio-binaries publishes may not be redistributed. The Linux arm64 build has every library the renderer needs but is not tested.
 
 `VIDEO_EDITOR_FFMPEG` points the renderer at another FFmpeg instead. Whichever binary it uses must be FFmpeg 7.0 or later, which reads a filter graph from a file (`-/filter_complex`), and must have every filter, encoder and decoder the renderer needs: libass, libx264, zimg, loudnorm and libvpx's VP9 decoder, which reads the overlays' alpha, among them. If it is older or one is missing, the first render fails before any work and names each one.
 
 ## Tests
 
-`pnpm --filter @video-editor/engine test` runs every test here except the one that asks Claude, which needs your own key; with `CI` set it skips the ones that need Chrome too ([CONTRIBUTING](../../CONTRIBUTING.md#setup)). Planning tests replay `src/plan/fixtures/talk-plan.json`.
+`pnpm --filter @video-editor/engine test` runs every test here except the one that asks Claude, which needs your own key; with `CI` set it skips the ones that need Chrome too ([CONTRIBUTING](../../CONTRIBUTING.md#setup)). The first run downloads the pinned FFmpeg and the caption fonts. Planning tests replay `src/plan/fixtures/talk-plan.json`.
