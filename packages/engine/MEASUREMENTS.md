@@ -33,7 +33,7 @@ These runs use the [synthetic corpus](../../bench/README.md#synthetic-corpus) (s
 
 ```bash
 # Each clip is analysed once into the index cache, then read from it
-node scripts/plan-corpus.ts ../../bench/synthetic --group talk-a --lengths 30,60,300 --naive
+node scripts/plan-corpus.ts ../../bench/synthetic --group talk-a --lengths 30,60,300 --naive  # --live-claude the first time
 cd ../../bench && uv run vebench report synthetic/
 ```
 
