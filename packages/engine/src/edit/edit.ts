@@ -179,7 +179,7 @@ export function costByStage(usages: readonly Usage[]): ClaudeCost {
     const total = totalUsage(usages.filter((usage) => purposes.includes(usage.purpose)));
     return { dollars: total.dollars, requests: total.calls };
   };
-  return { plan: stage(["plan", "locate"]), check: stage(["check", "judge"]) };
+  return { plan: stage(["plan", "locate", "repair"]), check: stage(["check", "judge"]) };
 }
 
 async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Promise<EditResult> {

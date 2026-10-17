@@ -25,6 +25,7 @@ import { cacheDir } from "../download.ts";
 import { cropPath } from "../framing.ts";
 import { fingerprintOf } from "../sources.ts";
 import type { TimedWord } from "./captions.ts";
+import { CHECK_MODEL, type Claude, type Usage } from "./claude.ts";
 import { findWords } from "./fillers.ts";
 import type { Line } from "./pack.ts";
 
@@ -161,6 +162,64 @@ export const visualKey = (wish: VisualWish) =>
 
 /** Why a wish cannot be shown, or null when it can be sourced: a card whose params break its
  * schema, an address a capture may not open, or a stock search with no key to make it. */
+const REPAIR_SYSTEM = `You fix the params of animated motion-graphics cards so they pass each \
+card's JSON Schema. Keep the meaning, the speaker's language and every number; shorten text to \
+its limit with fewer words, never by cutting a word; never invent a figure. Give each card's \
+fixed params as a JSON object written as a string, in the order given.`;
+
+/**
+ * The wishes with each card whose params break its card's schema rewritten once by
+ * CHECK_MODEL, from the schema and the problems found. A fix that still breaks it, and every
+ * card when the request fails, stays as it was, to be left out with its reason.
+ */
+export async function repairCards(
+  wishes: readonly VisualWish[],
+  claude: Claude,
+  usage: Usage[],
+): Promise<VisualWish[]> {
+  const broken = wishes.flatMap((wish, at) => {
+    if (wish.kind !== "card" || !isCardId(wish.card)) return [];
+    const problem = wishProblem(wish, false);
+    return problem && !/not JSON|not an object/.test(problem) ? [{ at, wish, problem }] : [];
+  });
+  if (broken.length === 0) return [...wishes];
+  const asked = broken
+    .map(
+      ({ wish, problem }, i) =>
+        `${i + 1}. Card ${wish.card}, its schema ${JSON.stringify(cards[wish.card as keyof typeof cards].params)}\nParams: ${wish.params}\nProblems: ${problem}`, // biome-ignore format: one line
+    )
+    .join("\n\n");
+  let fixed: unknown[];
+  try {
+    const reply = await claude({
+      purpose: "repair",
+      model: CHECK_MODEL,
+      system: REPAIR_SYSTEM,
+      content: [{ type: "text", text: asked }],
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["fixed"],
+        properties: { fixed: { type: "array", items: { type: "string" } } },
+      },
+      effort: "low",
+      maxTokens: 8000,
+    });
+    usage.push(reply.usage);
+    fixed = (reply.json as { fixed?: unknown[] }).fixed ?? [];
+  } catch {
+    return [...wishes];
+  }
+  const repaired = [...wishes];
+  broken.forEach(({ at, wish }, i) => {
+    const params = fixed[i];
+    if (typeof params !== "string") return;
+    const candidate = { ...wish, params };
+    if (wishProblem(candidate, false) === null) repaired[at] = candidate;
+  });
+  return repaired;
+}
+
 export function wishProblem(wish: VisualWish, stock: boolean): string | null {
   if (wish.kind === "card") {
     if (!isCardId(wish.card)) return `no card ${wish.card}`;

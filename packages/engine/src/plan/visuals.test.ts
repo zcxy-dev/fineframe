@@ -7,6 +7,7 @@ import { validateProject } from "@video-editor/schema";
 import type { Capture } from "../broll/capture.ts";
 import { project, SECOND, scratch } from "../testing.ts";
 import type { TimedWord } from "./captions.ts";
+import { recordedClaude, type Usage } from "./claude.ts";
 import type { Line } from "./pack.ts";
 import { planSchema, planSystem } from "./prompt.ts";
 import {
@@ -16,6 +17,7 @@ import {
   type PlacedVisual,
   parseVisuals,
   placeVisuals,
+  repairCards,
   sourceVisuals,
   speakerClips,
   stillFraming,
@@ -102,6 +104,27 @@ test("the plan's visuals are read from their JSON, each left out unless whole", 
   );
   assert.match(problems.at(-1) ?? "", /not JSON/);
   assert.deepEqual(parseVisuals("", false), []);
+});
+
+test("a card whose params break its schema is rewritten once, then checked again", async () => {
+  const long = wish({ line: 2, card: "stat", params: JSON.stringify({ value: 3, label: "這是一段超過二十八個字元的標籤，太長了放不進卡片的版面裡面" }) }); // biome-ignore format: one line
+  const zero = wish({ line: 3, card: "list", params: JSON.stringify({ items: [{ text: "一" }, { text: "二" }], active: 0 }) }); // biome-ignore format: one line
+  const page = wish({ line: 4, kind: "web", url: "https://example.com/" });
+  const fixedStat = JSON.stringify({ value: 3, label: "倍的速度" });
+  const { claude, requests } = recordedClaude({ repair: [{ fixed: [fixedStat, "{\"items\": []}"] }] }); // biome-ignore format: one line
+  const usage: Usage[] = [];
+  const repaired = await repairCards([stat, long, zero, page], claude, usage);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0]?.purpose, "repair");
+  const asked = requests[0]?.content.at(-1);
+  assert.match(asked?.type === "text" ? asked.text : "", /label.*28 characters/s);
+  assert.deepEqual(repaired, [stat, { ...long, params: fixedStat }, zero, page]);
+  assert.equal(usage.length, 1);
+  // Nothing to repair, nothing asked; a failed request keeps the wishes as they were.
+  const none = recordedClaude({});
+  assert.deepEqual(await repairCards([stat, page], none.claude, []), [stat, page]);
+  assert.equal(none.requests.length, 0);
+  assert.deepEqual(await repairCards([long], none.claude, []), [long]);
 });
 
 test("code checks each visual before sourcing it", () => {

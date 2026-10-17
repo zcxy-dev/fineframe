@@ -30,6 +30,7 @@ import { loudnessFor, planVoice } from "../voice.ts";
 import { captionLines, outputWords, type TimedWord } from "./captions.ts";
 import {
   anthropicClaude,
+  CHECK_MODEL,
   type Claude,
   PLAN_MODELS,
   type Quality,
@@ -82,6 +83,7 @@ import {
   type PlacedVisual,
   parseVisuals,
   placeVisuals,
+  repairCards,
   sourceVisuals,
   speakerClips,
   stockAvailable,
@@ -377,9 +379,19 @@ async function sourceWishes(state: PlanState): Promise<void> {
   const playing = new Set(
     state.segments.flatMap((s) => s.lines.map((line) => `${s.source}:${line.n}`)),
   );
-  const wishes = (state.decisions.visuals ?? []).filter((wish) =>
-    playing.has(`${wish.source}:${wish.line}`),
+  const before = state.usage.length;
+  const visuals = await repairCards(
+    (state.decisions.visuals ?? []).filter((wish) => playing.has(`${wish.source}:${wish.line}`)),
+    state.claude,
+    state.usage,
   );
+  if (state.usage.length > before) {
+    const spent = totalUsage(state.usage.slice(before)).dollars;
+    state.progress(`Rewrote the cards whose text broke their layout with ${CHECK_MODEL} (${dollars(spent)})`); // biome-ignore format: one line
+  }
+  // Placed from these, whose params the assets are keyed by.
+  state.decisions = { ...state.decisions, visuals };
+  const wishes = visuals;
   if (wishes.length === 0) return;
   const [width, height] = outputSize(state.aspect, state.sources);
   await sourceVisuals(wishes, state.assets, {
