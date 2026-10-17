@@ -24,8 +24,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The tested commit and its first parent, for the secret scan.
-          fetch-depth: 2
+          # The whole history, so the secret scan sees every commit of the change.
+          fetch-depth: 0
           persist-credentials: false
       # Release binaries pinned by version and SHA-256; Dependabot does not update them.
       - name: Install actionlint, zizmor and betterleaks
@@ -49,11 +49,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
       - name: Scan the tested change for secrets (betterleaks)
-        # A root commit has no parent, so it is scanned whole.
+        # Every commit of a pull request, or every commit a push added; a new branch's first push
+        # has no previous commit, so the tested commit's history is scanned whole.
         run: |
-          range=HEAD
-          if git rev-parse -q --verify HEAD^1 >/dev/null; then range=HEAD^1..HEAD; fi
-          betterleaks git --no-banner --redact --log-opts="--first-parent $range" .
+          if [ -n "$BASE" ]; then range="$BASE..$HEAD_SHA"
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then range="$BEFORE..$HEAD_SHA"
+          else range=$HEAD_SHA; fi
+          betterleaks git --no-banner --redact --log-opts="$range" .
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          BEFORE: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
         with:
           cache: false
