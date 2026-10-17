@@ -32,7 +32,7 @@ pnpm --filter @video-editor/desktop dist     # dist/Video-Editor-<version>-<os>-
 
 ## Releases
 
-[`.github/workflows/desktop.yml`](../../.github/workflows/desktop.yml) builds the installers on GitHub's Apple silicon macOS, Windows and Linux runners for every pull request that changes the app or the page, and runs each built app. A tag `v<version>`, matching `version` in [package.json](package.json), also attaches the installers and their `SHA256SUMS` to a draft release of that tag, for the owner to publish.
+[`.github/workflows/desktop.yml`](../../.github/workflows/desktop.yml) builds the installers on GitHub's Apple silicon macOS, Windows and Linux runners for every pull request that changes the app or the page, and runs each built app. A tag `v<version>`, matching `version` in [package.json](package.json), also attaches the installers and their `SHA256SUMS` to a draft release of that tag, which is published manually.
 
 ## Tests
 

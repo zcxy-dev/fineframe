@@ -1,6 +1,6 @@
 # Recipes for changing an edit
 
-Each recipe starts from the newest version, here `out/edit.project.json`, and makes the next one, here `edit-v2`. For a field no recipe covers, the schema says what each one means (`packages/schema/project.schema.json`), the effect templates' catalog gives their params and limits (`packages/effects/src/catalog.ts`), and the cards' theirs (`packages/effects/src/cards.ts`).
+Each recipe starts from the newest version, here `out/edit.project.json`, and makes the next one, here `edit-v2`. For a field no recipe covers, the schema says what each one means (`packages/schema/project.schema.json`), the effect templates' catalog gives their params and limits (`packages/effects/src/catalog.ts`), and the cards' theirs (`packages/effects/src/cards.ts`). The overlays' limits below are copied from the catalog; where they differ, the catalog wins.
 
 **Ticks.** Every time and length is an integer: 120 000 ticks a second. Seconds × 120 000, rounded, gives ticks; `start` of captions, overlays, cards, B-roll, music and sound effects is on the output timeline, from the video's first frame.
 

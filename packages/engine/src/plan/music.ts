@@ -24,8 +24,9 @@ import { formatDuration } from "./pack.ts";
 export const PHRASE = 4;
 /** How far the music sits under the speech's loudness while someone talks, and in the pauses,
  * in LU. The first keeps the voice at least 15 dB over the music while talking, with a margin
- * for the quiet ends of phrases (measured in packages/engine/README.md#music-measurements); the
- * second lets the music carry the gaps without competing with the voice. */
+ * for the quiet ends of phrases (measured in
+ * packages/engine/MEASUREMENTS.md#music-measurements); the second lets the music carry the gaps
+ * without competing with the voice. */
 export const UNDER_SPEECH = 18;
 export const UNDER_PAUSES = 6;
 /** Ducking down before speech and back up after it, in milliseconds. */

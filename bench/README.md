@@ -116,8 +116,8 @@ uv run vebench synth synthetic/ --seed 0
 ```
 
 It writes 16 minutes of clips and 85 MB to `bench/synthetic/`, which git ignores, in 5 to
-7 minutes on 8 cores of an EPYC 9355P; the first run also downloads 330 MB of speech model. The same
-seed gives the same files with the same lockfile on the same machine.
+7 minutes on the [reference machine](#reference-machine); the first run also downloads 330 MB
+of speech model. The same seed gives the same files with the same lockfile on the same machine.
 
 | Clips | Content |
 |---|---|
@@ -174,6 +174,10 @@ uv run vebench mix --voice voice.wav --music music.wav --project project.json
 uv run vebench beats --ref synthetic/music/beat-112.json --hyp beat-112.music.json
 uv run vebench edit --project runs/video-editor-60s/project.json
 ```
+
+## Reference machine
+
+Run times and memory in this repository's docs were measured on 8 cores of an EPYC 9355P.
 
 ## Metrics
 

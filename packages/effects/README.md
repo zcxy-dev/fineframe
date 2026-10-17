@@ -91,7 +91,7 @@ A card lays out in the content box [`cardLayout`](src/layout.ts) gives it: insid
 
 `renderOverlays(jobs)` renders each overlay at the output's size and frame rate, for exactly the frames it covers, and returns one file per job. The renderer calls it; nothing else needs to.
 
-- **Speed:** a new overlay costs about 0.2 s a frame at 1080p on 8 cores of an EPYC 9355P, so the six templates at 16:9 take about 100 s; a cached one costs only its compositing.
+- **Speed:** a new overlay costs about 0.2 s a frame at 1080p on the [reference machine](../../bench/README.md#reference-machine), so the six templates at 16:9 take about 100 s; a cached one costs only its compositing.
 - **Format:** VP9 with alpha in WebM ([why](#format)). Reading the alpha needs the libvpx decoder ([FFmpeg requirements](../engine/README.md#ffmpeg)).
 - **Cache:** renders are kept in `~/.cache/video-editor/effects/` (or under `XDG_CACHE_HOME`). An overlay is keyed by its template, params (in any key order), aspect, size, frame rate and frame count, and a hash of this package's source and pinned dependencies. An unchanged overlay renders once. The bundled page each source version renders from takes about 45 MB; delete the folder to reclaim the space.
 - **Chrome:** Remotion renders in Chrome Headless Shell, which it downloads (about 92 MB) on the first render into `~/.cache/video-editor/effects/chrome/node_modules/.remotion/`. Renders run in a child process with that folder as its working directory, because Remotion chooses where Chrome goes from the working directory, and this package's own folder may not be writable, as in the desktop app. `onDownload` reports the download's bytes. No licence key or usage event is sent to Remotion.
@@ -100,7 +100,7 @@ A card lays out in the content box [`cardLayout`](src/layout.ts) gives it: insid
 
 ### Format
 
-The renderer composites an overlay in every piece of the edit it spans, so the format is chosen by render speed, file size and decoding cost. Each template at its typical length, 30 fps, rendered on 8 cores of an EPYC 9355P shared with other jobs, with PNG frames from Chrome; decoding as the renderer does, into `yuva420p`:
+The renderer composites an overlay in every piece of the edit it spans, so the format is chosen by render speed, file size and decoding cost. Each template at its typical length, 30 fps, rendered on the [reference machine](../../bench/README.md#reference-machine), shared with other jobs, with PNG frames from Chrome; decoding as the renderer does, into `yuva420p`:
 
 | | ProRes 4444 | VP9 with alpha |
 |---|---|---|

@@ -4,7 +4,7 @@ name: desktop
 # a person would the first time (apps/desktop/scripts/smoke.ts): it installs the analysis, makes
 # an edit of a synthetic clip with stand-ins for Claude and OpenRouter, and quits, leaving nothing
 # running. A pull request that changes the app or the page builds and checks them; a tag v<version>
-# also attaches them to a draft release of that tag, for the owner to publish.
+# also attaches them to a draft release of that tag, which is published manually.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
