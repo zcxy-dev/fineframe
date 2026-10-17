@@ -1,6 +1,6 @@
 [project]
 name = "vebench"
-version = "0.2.0"
+version = "0.2.1"
 description = "Benchmark for automatic video editing: caption accuracy, word timing, shot detection, clicks, A/V drift and blind review"
 readme = "README.md"
 license = "MIT"
