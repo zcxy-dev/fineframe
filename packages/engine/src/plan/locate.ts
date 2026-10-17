@@ -115,7 +115,16 @@ export async function locate(
       if (!onScreen(source, said, said)) continue;
       const text = joinWords(source.words.slice(line.first, line.last + 1).map((w) => w.text));
       const key = createHash("sha256")
-        .update(JSON.stringify([VERSION, LOCATE_MODEL, source.fingerprint.sha256, said, wish.target, text])) // biome-ignore format: one line
+        .update(
+          JSON.stringify([
+            VERSION,
+            LOCATE_MODEL,
+            source.fingerprint.sha256,
+            said,
+            wish.target,
+            text,
+          ]),
+        )
         .digest("hex");
       const file = join(cache, `${key.slice(0, 32)}.json`);
       let answer: Answer;
@@ -123,7 +132,13 @@ export async function locate(
         answer = JSON.parse(await readFile(file, "utf8")) as Answer;
       } catch {
         try {
-          answer = await ask(claude, usage, await frame(source.path, said, work), wish.target, text); // biome-ignore format: one line
+          answer = await ask(
+            claude,
+            usage,
+            await frame(source.path, said, work),
+            wish.target,
+            text,
+          );
         } catch (error) {
           // A request declined or failed leaves that callout out, not the edit; asked again
           // next time.
@@ -197,7 +212,9 @@ export async function calloutRect(
     for (const t of [a, b]) {
       const rect = visible(clip.framing, t, aspect, output);
       shown ??= rect;
-      const moved = (["x", "y", "w", "h"] as const).some((k) => Math.abs(rect[k] - (shown as Rect)[k]) > 1e-4); // biome-ignore format: one line
+      const moved = (["x", "y", "w", "h"] as const).some(
+        (k) => Math.abs(rect[k] - (shown as Rect)[k]) > 1e-4,
+      );
       if (moved) return undefined;
       times.push(t / TICKS_PER_SECOND);
     }
@@ -266,7 +283,7 @@ async function ask(
       { type: "image", png: image.png },
       {
         type: "text",
-        text: `This frame is ${width} x ${height} pixels. As it shows, the speaker says: "${line}" Find ${target}, and give its box in pixels of this frame.`, // biome-ignore format: one line
+        text: `This frame is ${width} x ${height} pixels. As it shows, the speaker says: "${line}" Find ${target}, and give its box in pixels of this frame.`,
       },
     ],
     schema: SCHEMA,
@@ -274,7 +291,13 @@ async function ask(
     maxTokens: 2000,
   });
   usage.push(reply.usage);
-  const box = reply.json as { found: boolean; left: number; top: number; right: number; bottom: number }; // biome-ignore format: one line
+  const box = reply.json as {
+    found: boolean;
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+  };
   const x0 = Math.max(0, box.left) / width;
   const y0 = Math.max(0, box.top) / height;
   const x1 = Math.min(width, box.right) / width;

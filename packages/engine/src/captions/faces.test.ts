@@ -122,7 +122,15 @@ test("beside a split screen, the speaker's face is where the lower half shows it
   const face = facts("a", { faces: { framing: LOW_FACE, aspect: WIDE } });
   // A card over the top half for the first second, the speaker in step in the bottom half.
   const split = project([{ source: "a", in: 2 * SECOND, out: 4 * SECOND }], {
-    broll: [{ source: "a", in: 2 * SECOND, out: 3 * SECOND, start: 0, rect: { x: 0, y: 0.5, w: 1, h: 0.5 } }], // biome-ignore format: one line
+    broll: [
+      {
+        source: "a",
+        in: 2 * SECOND,
+        out: 3 * SECOND,
+        start: 0,
+        rect: { x: 0, y: 0.5, w: 1, h: 0.5 },
+      },
+    ],
     cards: [{ card: "stat", params: {}, start: 0, duration: SECOND, placement: "panel" }],
   });
   const zones = faceZones(buildTimeline(split, sources(face)), split.output);
@@ -188,12 +196,24 @@ test("captions keep off what a visual draws: a split screen's panel and a card's
     { start: 30, end: 60, boxes: [{ x0: 0, y0: 0, x1: 1280, y1: 720 - Math.round(0.24 * 720) }] },
   ]);
   // A caption moved off a low face goes below it rather than up into the panel.
-  const line = { start: 0, end: SECOND, language: "zh-TW", text: "字幕", words: [{ text: "字幕", start: 0, end: SECOND }] }; // biome-ignore format: one line
+  const line = {
+    start: 0,
+    end: SECOND,
+    language: "zh-TW",
+    text: "字幕",
+    words: [{ text: "字幕", start: 0, end: SECOND }],
+  };
   const edit = project([{ source: "a", in: 0, out: 3 * SECOND }], {
     broll: [{ source: "b", in: 0, out: SECOND, start: 0, rect: { x: 0, y: 0, w: 1, h: 0.5 } }],
     captions: { preset: "bold", srt: false, lines: [line] },
   });
-  const built = await buildCaptions(edit, buildTimeline(edit, sources(facts("a", { faces: { framing: LOW_FACE, aspect: WIDE } }), facts("b")))); // biome-ignore format: one line
+  const built = await buildCaptions(
+    edit,
+    buildTimeline(
+      edit,
+      sources(facts("a", { faces: { framing: LOW_FACE, aspect: WIDE } }), facts("b")),
+    ),
+  );
   const event = built?.ass.split("\n").find((e) => e.startsWith("Dialogue: 4,"));
   const y = Number(/\\pos\([\d.]+,([\d.]+)\)/.exec(event ?? "")?.[1]);
   assert.ok(y > 360, `caption at ${y}, inside the panel`);

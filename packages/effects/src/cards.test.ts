@@ -167,7 +167,10 @@ test("a long English statement shrinks until its words, wrapped whole, fit the c
       used = w;
     } else used = next;
   }
-  assert.ok(lines * 1.32 * size <= box.height, `${lines} lines of ${size} px overflow ${box.height}`); // biome-ignore format: one line
+  assert.ok(
+    lines * 1.32 * size <= box.height,
+    `${lines} lines of ${size} px overflow ${box.height}`,
+  );
   // The old estimate, by characters, let this statement run past the box at a larger size.
   assert.ok(size < type("display"));
 });

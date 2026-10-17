@@ -274,7 +274,9 @@ export function cutEdit(
     out.cards = project.cards.flatMap((card, i) => {
       const moved = span(card.start, card.duration, `/cards/${i} (${card.card})`);
       if (!moved) return [];
-      return [{ ...card, start: moved.to, duration: keptOf(moved.from, card.start + card.duration) }]; // biome-ignore format: one line
+      return [
+        { ...card, start: moved.to, duration: keptOf(moved.from, card.start + card.duration) },
+      ];
     });
   }
   if (project.audio.music) {

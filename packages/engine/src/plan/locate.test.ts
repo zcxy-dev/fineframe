@@ -57,7 +57,16 @@ async function edit(
   media.framing = { fps: 5, shots: [{ start: 0, end, layout: "screen", faces: [], speakers: [] }] };
   // makeTalk draws a test pattern: the screen goes in its place.
   const { duration } = media.source;
-  await makeSource(dir, { id: "talk", pattern: "color", width: 320, height: 180, fps: 25, seconds: duration, sound: 440, filter: SCREEN }); // biome-ignore format: one line
+  await makeSource(dir, {
+    id: "talk",
+    pattern: "color",
+    width: 320,
+    height: 180,
+    fps: 25,
+    seconds: duration,
+    sound: 440,
+    filter: SCREEN,
+  });
   await writeFile(path, JSON.stringify(media));
   const decisions: Decisions = { ...(await recorded()), callouts: wishes };
   const { claude, requests } = recordedClaude({ plan: [decisions], locate: replies });
@@ -89,7 +98,9 @@ test("a callout points at what Claude boxed on the frame where it is named, mapp
   const rect = callout.params.rect as { x: number; y: number; w: number; h: number };
   const near = (a: number, b: number) => Math.abs(a - b) < 2e-3;
   assert.ok(near(rect.x, (140 / 320 - crop.rect.x) / crop.rect.w), JSON.stringify(rect));
-  assert.ok(near(rect.w, 40 / 320 / crop.rect.w) && near(rect.y, 120 / 180) && near(rect.h, 24 / 180)); // biome-ignore format: one line
+  assert.ok(
+    near(rect.w, 40 / 320 / crop.rect.w) && near(rect.y, 120 / 180) && near(rect.h, 24 / 180),
+  );
   assert.equal(callout.params.label, "就是這裡");
   // It starts 0.3 s before "video" is said, on the output timeline, and on a frame.
   const video = first.edit.state.sources.get("talk")?.words.findIndex((w) => w.text === "video");
@@ -134,20 +145,47 @@ test("a callout is left out where the thing is not found, is not one thing or mo
 test("a callout plays on across a jump cut in the screen recording, never into another source or a change", async (t) => {
   const dir = await scratch(t, "locate-cut-");
   const seconds = Math.ceil(SAID + 8);
-  await makeSource(dir, { id: "screen", pattern: "color", width: 320, height: 180, fps: 25, seconds, sound: 440, filter: SCREEN }); // biome-ignore format: one line
+  await makeSource(dir, {
+    id: "screen",
+    pattern: "color",
+    width: 320,
+    height: 180,
+    fps: 25,
+    seconds,
+    sound: 440,
+    filter: SCREEN,
+  });
   const media = JSON.parse(await readFile(join(dir, "screen.index.json"), "utf8")) as MediaIndex;
   const shot = { start: 0, end: seconds, layout: "screen" as const, faces: [], speakers: [] };
   media.framing = { fps: 5, shots: [shot] };
   const words = [{ text: "video", start: SAID, end: SAID + 0.4 }];
-  const source = { id: "screen", path: join(dir, "screen.mp4"), index: media, words } as unknown as PlanSource; // biome-ignore format: one line
+  const source = {
+    id: "screen",
+    path: join(dir, "screen.mp4"),
+    index: media,
+    words,
+  } as unknown as PlanSource;
   const T = secondsToTicks(1);
   // The word 0.3 s into the edit's first clip, which ends 1 s later; the edit jumps on 2 s.
   const first = { source: "screen", in: (SAID - 0.3) * T, out: (SAID + 0.7) * T };
   const jump = { source: "screen", in: (SAID + 2.7) * T, out: (SAID + 6) * T };
   const output = { width: 320, height: 180, frame: T / 25 };
-  const at = (box: typeof MIDDLE) => ({ x: box.left / 320, y: box.top / 180, w: (box.right - box.left) / 320, h: (box.bottom - box.top) / 180 }); // biome-ignore format: one line
+  const at = (box: typeof MIDDLE) => ({
+    x: box.left / 320,
+    y: box.top / 180,
+    w: (box.right - box.left) / 320,
+    h: (box.bottom - box.top) / 180,
+  });
   const place = (box: typeof MIDDLE, main: object[]) =>
-    calloutRect(source, main as never, { source: "screen", word: 0, rect: at(box) }, 0, 3 * T, output, new Map()); // biome-ignore format: one line
+    calloutRect(
+      source,
+      main as never,
+      { source: "screen", word: 0, rect: at(box) },
+      0,
+      3 * T,
+      output,
+      new Map(),
+    );
   const placed = (await place(MIDDLE, [first, jump])) ?? assert.fail("not placed");
   for (const k of ["x", "y", "w", "h"] as const)
     assert.ok(Math.abs(placed[k] - at(MIDDLE)[k]) < 1e-4);
@@ -161,6 +199,8 @@ test("callouts are offered to the planner only for footage with a screen recordi
   const extras = { music: false, title: false, chapters: false, people: false };
   assert.doesNotMatch(planSystem({ ...extras, callouts: false }), /callout/);
   assert.match(planSystem({ ...extras, callouts: true }), /- callouts, on screen recordings/);
-  assert.ok(!(planSchema({ ...extras, callouts: false }).required as string[]).includes("callouts")); // biome-ignore format: one line
+  assert.ok(
+    !(planSchema({ ...extras, callouts: false }).required as string[]).includes("callouts"),
+  );
   assert.ok((planSchema({ ...extras, callouts: true }).required as string[]).includes("callouts"));
 });

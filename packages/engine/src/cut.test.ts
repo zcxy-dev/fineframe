@@ -267,7 +267,15 @@ test("the speaker beside a split screen splits with the main track, so it stays 
     { source: "a", in: s(1), out: s(4), start: s(1), rect: below },
     { source: "b", in: s(20), out: s(23), start: s(1), rect: { x: 0, y: 0, w: 1, h: 0.5 } },
   ];
-  project.cards = [{ card: "stat", params: { value: 3, label: "x" }, start: s(1), duration: s(3), placement: "panel" }]; // biome-ignore format: one line
+  project.cards = [
+    {
+      card: "stat",
+      params: { value: 3, label: "x" },
+      start: s(1),
+      duration: s(3),
+      placement: "panel",
+    },
+  ];
   project.audio.sfx = [
     { source: "m", start: s(1), gainDb: -16 },
     { source: "m", start: s(2.7), gainDb: -16 },
@@ -289,7 +297,10 @@ test("the speaker beside a split screen splits with the main track, so it stays 
     assert.equal(piece.in, mainAt(piece.start));
     assert.deepEqual(piece.rect, below);
   }
-  assert.equal((first?.out ?? 0) + (second?.out ?? 0) - (first?.in ?? 0) - (second?.in ?? 0), (cut.cards?.[0]?.duration ?? 0)); // biome-ignore format: one line
+  assert.equal(
+    (first?.out ?? 0) + (second?.out ?? 0) - (first?.in ?? 0) - (second?.in ?? 0),
+    cut.cards?.[0]?.duration ?? 0,
+  );
   assert.equal(other?.source, "b");
   assert.equal(cut.cards?.length, 1);
   // The sound on a moment cut out goes with it.

@@ -83,18 +83,30 @@ export function plannedOverlays(
   /** The first kept word of a source's line, on the output timeline. */
   const lineStart = (source: string, n: number) => {
     const line = state.sources.get(source)?.lines.find((l) => l.n === n);
-    return line && words.find((w) => w.source === source && w.index >= line.first && w.index <= line.last); // biome-ignore format: one line
+    return (
+      line &&
+      words.find((w) => w.source === source && w.index >= line.first && w.index <= line.last)
+    );
   };
 
   /** Where the last kept word of a source's line ends, on the output timeline. */
   const lineEnd = (source: string, n: number) => {
     const line = state.sources.get(source)?.lines.find((l) => l.n === n);
-    return line ? Math.max(...words.filter((w) => w.source === source && w.index >= line.first && w.index <= line.last).map((w) => w.end)) : 0; // biome-ignore format: one line
+    return line
+      ? Math.max(
+          ...words
+            .filter((w) => w.source === source && w.index >= line.first && w.index <= line.last)
+            .map((w) => w.end),
+        )
+      : 0;
   };
 
   const { title, people, emphasis } = state.decisions;
   if (state.extras.title && title?.text.trim() && words[0]) {
-    add("title", words[0].start, { text: title.text.trim(), ...optional("subtitle", title.subtitle) }); // biome-ignore format: one line
+    add("title", words[0].start, {
+      text: title.text.trim(),
+      ...optional("subtitle", title.subtitle),
+    });
   }
   if (state.extras.chapters) {
     const marked = chapters(state, words, edit, lineStart);
@@ -113,7 +125,14 @@ export function plannedOverlays(
     const word = lineStart(person.source, person.line);
     if (!name || !word || named.has(name)) continue;
     named.add(name);
-    const window = nameWindow(word, lineEnd(person.source, person.line), edit, frame, changes, speaking); // biome-ignore format: one line
+    const window = nameWindow(
+      word,
+      lineEnd(person.source, person.line),
+      edit,
+      frame,
+      changes,
+      speaking,
+    );
     if (!window) continue;
     const fits = window.end - secondsToTicks(catalog["lower-third"].seconds.min);
     const start = Math.min(window.start + secondsToTicks(NAME_DELAY), fits);
@@ -122,9 +141,13 @@ export function plannedOverlays(
   for (const wish of state.decisions.callouts ?? []) {
     const located = state.regions.get(wishKey(wish));
     const rect = placed.get(wishKey(wish));
-    const word = located && words.find((w) => w.source === located.source && w.index === located.word); // biome-ignore format: one line
+    const word =
+      located && words.find((w) => w.source === located.source && w.index === located.word);
     if (word && rect) {
-      add("callout", word.start - secondsToTicks(CALLOUT_LEAD), { rect, ...optional("label", wish.label) }); // biome-ignore format: one line
+      add("callout", word.start - secondsToTicks(CALLOUT_LEAD), {
+        rect,
+        ...optional("label", wish.label),
+      });
     }
   }
   for (const item of emphasis) {
@@ -140,7 +163,12 @@ export function plannedOverlays(
     if (!word) continue;
     // It ends before the shot changes after its word, or else pops over another shot.
     const end = Math.floor((changes.find((c) => c > word.start) ?? edit) / frame) * frame;
-    add("keyword", word.start - secondsToTicks(KEYWORD_LEAD), { text: keyword, position: "upper" }, end); // biome-ignore format: one line
+    add(
+      "keyword",
+      word.start - secondsToTicks(KEYWORD_LEAD),
+      { text: keyword, position: "upper" },
+      end,
+    );
   }
 
   // One at a time, the earlier-listed first: at 9:16 the lower third, the chapter marker and an

@@ -138,7 +138,12 @@ test("a file's header says when it shows a screen recording, its shots next to e
   assert.doesNotMatch(packSource("talk", media, lines, []), /Screen recording/);
   media.framing = {
     fps: 5,
-    shots: [shot(0, 5, "talking_head"), shot(5, 12.4, "screen"), shot(12.4, 20, "screen_cam"), shot(20, 30, "talking_head")], // biome-ignore format: one line
+    shots: [
+      shot(0, 5, "talking_head"),
+      shot(5, 12.4, "screen"),
+      shot(12.4, 20, "screen_cam"),
+      shot(20, 30, "talking_head"),
+    ],
   };
   assert.match(packSource("talk", media, lines, []), /\nScreen recording: 5\.0-20\.0 s\n/);
 });

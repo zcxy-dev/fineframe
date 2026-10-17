@@ -35,7 +35,14 @@ export function planSystem(
 /** A card's text limits from its params' schema, " At most: …." or "": a param past one is left
  * out with its card. */
 function limits(schema: object): string {
-  type Node = { type?: string; maxLength?: number; minItems?: number; maxItems?: number; items?: Node; properties?: Record<string, Node> }; // biome-ignore format: one line
+  type Node = {
+    type?: string;
+    maxLength?: number;
+    minItems?: number;
+    maxItems?: number;
+    items?: Node;
+    properties?: Record<string, Node>;
+  };
   // The text limits under a node, nested objects named by their path.
   const texts = (node: Node, path = ""): string[] =>
     Object.entries(node.properties ?? {}).flatMap(([key, value]) =>
@@ -51,7 +58,9 @@ function limits(schema: object): string {
   for (const [key, value] of Object.entries((schema as Node).properties ?? {})) {
     const each = value.type === "array" && value.items ? texts(value.items) : [];
     if (each.length > 0) {
-      parts.push(`${key} ${value.minItems} to ${value.maxItems}, each ${each.join(", ")} characters`); // biome-ignore format: one line
+      parts.push(
+        `${key} ${value.minItems} to ${value.maxItems}, each ${each.join(", ")} characters`,
+      );
     }
   }
   return parts.length > 0 ? ` At most: ${parts.join("; ")}.` : "";
@@ -393,7 +402,10 @@ export interface PlanExtras {
 
 /** The visuals in the plan's schema, stock footage only when it can be searched. */
 /** The visuals in the plan's schema: one JSON string, read and checked by `parseVisuals`. */
-const VISUALS = { type: "string", description: "The visuals as a JSON array, [] for none." } as const; // biome-ignore format: one line
+const VISUALS = {
+  type: "string",
+  description: "The visuals as a JSON array, [] for none.",
+} as const;
 
 /** The plan's schema, with the extras offered. */
 export function planSchema(extras: PlanExtras): Record<string, unknown> {

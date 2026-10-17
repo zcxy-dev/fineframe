@@ -483,7 +483,9 @@ async function makeEdit(): Promise<string[]> {
       "the analysis environment's download was not shown",
     // A download quicker than the page is polled is not caught on screen; it still has to land
     // in the app's cache, which started empty.
-    !downloads.has("FFmpeg") && !fetched("ffmpeg-") && "FFmpeg was neither shown downloading nor downloaded", // biome-ignore format: one line
+    !downloads.has("FFmpeg") &&
+      !fetched("ffmpeg-") &&
+      "FFmpeg was neither shown downloading nor downloaded",
     !downloads.has("Chrome Headless Shell") && "Chrome Headless Shell's download was not shown",
     (playing.error || playing.width === 0 || playing.brightest < 32) &&
       "the window's player does not show the video",

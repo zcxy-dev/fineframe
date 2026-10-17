@@ -168,10 +168,13 @@ test("Claude's effects become overlays timed on the speech, one at a time and on
   const edit = await plan({ inputs: [dir], length: 60, aspect: "9:16", out, claude, names });
 
   const request = requests[0] ?? assert.fail("no request");
-  assert.deepEqual((request.schema.required as string[]).slice(-3), ["title", "people", "visuals"]); // biome-ignore format: one line
+  assert.deepEqual((request.schema.required as string[]).slice(-3), ["title", "people", "visuals"]);
   const asked = request.content[1]?.type === "text" ? request.content[1].text : "";
   assert.match(asked, /Give the video a title over its opening\./);
-  assert.match(asked, /Names the user gave, of people and terms said in the footage: 林語安; 王大同; video editor\./); // biome-ignore format: one line
+  assert.match(
+    asked,
+    /Names the user gave, of people and terms said in the footage: 林語安; 王大同; video editor\./,
+  );
 
   const overlays = edit.project.overlays ?? [];
   assert.deepEqual(
@@ -209,7 +212,13 @@ test("Claude's effects become overlays timed on the speech, one at a time and on
   // An edit under a minute is offered neither a title nor, without names, lower thirds, and a
   // title in the answer anyway is not shown.
   const unnamed = recordedClaude({ plan: [{ ...movedTo(base, "a"), title: decisions.title }] });
-  const short = await plan({ inputs: [join(dir, "a.index.json")], length: 15, aspect: "9:16", out, claude: unnamed.claude }); // biome-ignore format: one line
+  const short = await plan({
+    inputs: [join(dir, "a.index.json")],
+    length: 15,
+    aspect: "9:16",
+    out,
+    claude: unnamed.claude,
+  });
   const required = (unnamed.requests[0] ?? assert.fail("no request")).schema.required as string[];
   assert.ok(!required.includes("people") && !required.includes("title"), String(required));
   assert.ok(!(short.project.overlays ?? []).some((o) => o.template === "title"));
@@ -306,7 +315,13 @@ test("a long edit marks each chapter as it starts, and a wipe hides the cut into
       },
     ],
   });
-  const again = await plan({ inputs: [dir], length: 150, aspect: "16:9", out, claude: renamed.claude }); // biome-ignore format: one line
+  const again = await plan({
+    inputs: [dir],
+    length: 150,
+    aspect: "16:9",
+    out,
+    claude: renamed.claude,
+  });
   const marked = again.project.overlays ?? [];
   assert.deepEqual(
     marked.map((o) => [o.template, o.params]),
@@ -322,8 +337,16 @@ test("a long edit marks each chapter as it starts, and a wipe hides the cut into
 
   // An edit under two minutes is not asked for chapters, nor told of them, so its prompt is as
   // it was before chapters; chapters in the answer anyway are not shown.
-  const unasked = recordedClaude({ plan: [{ ...movedTo(base, "a"), chapters: decisions.chapters }] }); // biome-ignore format: one line
-  const short = await plan({ inputs: [join(dir, "a.index.json")], length: 15, aspect: "16:9", out, claude: unasked.claude }); // biome-ignore format: one line
+  const unasked = recordedClaude({
+    plan: [{ ...movedTo(base, "a"), chapters: decisions.chapters }],
+  });
+  const short = await plan({
+    inputs: [join(dir, "a.index.json")],
+    length: 15,
+    aspect: "16:9",
+    out,
+    claude: unasked.claude,
+  });
   const required = (unasked.requests[0] ?? assert.fail("no request")).schema.required as string[];
   assert.ok(!required.includes("chapters"), String(required));
   const told = unasked.requests[0];
@@ -409,7 +432,10 @@ test("an edit that comes out short asks once more, then fails with the reason", 
   assert.equal(requests.length, MAX_PLAN_CALLS);
   assert.match(textOf(requests[1], 1), /short of the 15 s target/);
   // The second request asks for the same extras as the first.
-  assert.match(textOf(requests[1], 1), /Names the user gave, of people and terms said in the footage: 林語安\./); // biome-ignore format: one line
+  assert.match(
+    textOf(requests[1], 1),
+    /Names the user gave, of people and terms said in the footage: 林語安\./,
+  );
 });
 
 test("B-roll from a file without speech covers the line it was placed over", async (t) => {
@@ -723,7 +749,15 @@ test("music Claude picks for the content plays under the whole edit, with its li
   const dir = await scratch(t, "plan-music-");
   const index = await makeTalk(dir);
   const song = await withMusic(dir, index);
-  await makeSource(dir, { id: "cutaway", pattern: "smptebars", width: 160, height: 90, fps: 25, seconds: 6, sound: null }); // biome-ignore format: one line
+  await makeSource(dir, {
+    id: "cutaway",
+    pattern: "smptebars",
+    width: 160,
+    height: 90,
+    fps: 25,
+    seconds: 6,
+    sound: null,
+  });
   const decisions: Decisions = {
     ...(await recorded()),
     broll: [{ broll: "cutaway", start: 1, end: 4.5, source: "talk", line: 4, reason: "The tool." }],
@@ -733,7 +767,10 @@ test("music Claude picks for the content plays under the whole edit, with its li
   const out = join(dir, "edit", "project.json");
   await plan({ inputs: [dir], music: [song], length: 15, aspect: "16:9", out, claude });
 
-  assert.match(textOf(requests[0], 1), /^music-song: song\.wav, 38\.5 s, 120 BPM, licence CC BY 4\.0\. Sections: 1\) 0\.0-16\.3 s, -24 LUFS; 2\) 16\.3-38\.5 s, -15 LUFS$/m); // biome-ignore format: one line
+  assert.match(
+    textOf(requests[0], 1),
+    /^music-song: song\.wav, 38\.5 s, 120 BPM, licence CC BY 4\.0\. Sections: 1\) 0\.0-16\.3 s, -24 LUFS; 2\) 16\.3-38\.5 s, -15 LUFS$/m,
+  );
   assert.ok((requests[0]?.schema.required as string[] | undefined)?.includes("music"));
   const project = await loadJson(out, validateProject);
   const music = project.audio.music ?? [];
@@ -753,7 +790,10 @@ test("music Claude picks for the content plays under the whole edit, with its li
     assert.deepEqual(track.ducking, { depthDb: -12, attackMs: 250, releaseMs: 750 });
   }
   const source = project.sources.find((s) => s.id === "music-song");
-  assert.deepEqual([source?.kind, source?.path, source?.index], ["audio", "../song.wav", "../song.music.json"]); // biome-ignore format: one line
+  assert.deepEqual(
+    [source?.kind, source?.path, source?.index],
+    ["audio", "../song.wav", "../song.music.json"],
+  );
   assert.match(project.plan?.rationale ?? "", /\n\nMusic: An upbeat talk\.$/);
 
   // The B-roll's cuts need not fall between words: its start moves to a beat within 150 ms of
@@ -783,7 +823,14 @@ test("a track Claude names that was not offered, or none, plays no music", async
     const decisions = { ...(await recorded()), music: { track, section: 1, reason: "-" } };
     const { claude } = recordedClaude({ plan: [decisions] });
     const out = join(dir, `${track || "none"}.json`);
-    const edit = await plan({ inputs: [index], music: [song], length: 15, aspect: "16:9", out, claude }); // biome-ignore format: one line
+    const edit = await plan({
+      inputs: [index],
+      music: [song],
+      length: 15,
+      aspect: "16:9",
+      out,
+      claude,
+    });
     assert.equal(edit.project.audio.music, undefined);
     assert.ok(edit.project.sources.every((s) => s.kind === "video"));
   }

@@ -64,7 +64,7 @@ export function parseVisuals(
   const sounds: readonly string[] = ["none", ...SFX_WISHES];
   const wishes: VisualWish[] = [];
   for (const entry of entries) {
-    const e = (typeof entry === "object" && entry !== null ? entry : {}) as Record<string, unknown>; // biome-ignore format: one line
+    const e = (typeof entry === "object" && entry !== null ? entry : {}) as Record<string, unknown>;
     const text = (key: string) => (e[key] === undefined ? "" : e[key]);
     const fields = {
       source: e.source,
@@ -79,7 +79,16 @@ export function parseVisuals(
       sfx: e.sfx === undefined ? "none" : e.sfx,
       reason: text("reason"),
     };
-    const strings = ["source", "text", "query", "url", "focus", "card", "params", "reason"] as const; // biome-ignore format: one line
+    const strings = [
+      "source",
+      "text",
+      "query",
+      "url",
+      "focus",
+      "card",
+      "params",
+      "reason",
+    ] as const;
     const ok =
       strings.every((key) => typeof fields[key] === "string") &&
       Number.isInteger(fields.line) &&
@@ -186,7 +195,7 @@ export async function repairCards(
   const asked = broken
     .map(
       ({ wish, problem }, i) =>
-        `${i + 1}. Card ${wish.card}, its schema ${JSON.stringify(cards[wish.card as keyof typeof cards].params)}\nParams: ${wish.params}\nProblems: ${problem}`, // biome-ignore format: one line
+        `${i + 1}. Card ${wish.card}, its schema ${JSON.stringify(cards[wish.card as keyof typeof cards].params)}\nParams: ${wish.params}\nProblems: ${problem}`,
     )
     .join("\n\n");
   let fixed: unknown[];
@@ -319,7 +328,10 @@ export async function sourceVisuals(
         if (wish.kind === "card") {
           assets.set(key, { kind: "card", card: wish.card, params: JSON.parse(wish.params) });
         } else if (wish.kind === "web") {
-          const box = boxOf(layoutOf(options.output.aspect, "image", CAPTURE_SECONDS), options.output); // biome-ignore format: one line
+          const box = boxOf(
+            layoutOf(options.output.aspect, "image", CAPTURE_SECONDS),
+            options.output,
+          );
           const capture = options.capture ?? capturePage;
           if (!options.capture) browser ??= await openCaptureBrowser();
           assets.set(key, await captured(wish, box, dir, capture, browser));
@@ -335,7 +347,13 @@ export async function sourceVisuals(
           });
           if (!clip) throw new Error(`no stock footage of "${wish.query}"`);
           used.push(`${clip.provider}:${clip.id}`);
-          assets.set(key, { kind: "video", path: clip.path, seconds: clip.seconds, id: `${clip.provider}:${clip.id}`, credit: clip.credit }); // biome-ignore format: one line
+          assets.set(key, {
+            kind: "video",
+            path: clip.path,
+            seconds: clip.seconds,
+            id: `${clip.provider}:${clip.id}`,
+            credit: clip.credit,
+          });
         }
       } catch (error) {
         options.onProblem(
@@ -368,7 +386,11 @@ async function captured(
   const out = join(dir, `${name}.png`);
   const facts = join(dir, `${name}.json`);
   if (existsSync(out) && existsSync(facts)) {
-    return { kind: "image", path: out, ...(JSON.parse(await readFile(facts, "utf8")) as Omit<Capture, "path" | "kind">) }; // biome-ignore format: one line
+    return {
+      kind: "image",
+      path: out,
+      ...(JSON.parse(await readFile(facts, "utf8")) as Omit<Capture, "path" | "kind">),
+    };
   }
   await mkdir(dir, { recursive: true });
   const focus = wish.focus.trim();
@@ -433,7 +455,9 @@ export function placeVisuals(
       leftOut(wish, "its line does not play");
       return [];
     }
-    const inLine = words.filter((w) => w.source === wish.source && w.index >= line.first && w.index <= line.last); // biome-ignore format: one line
+    const inLine = words.filter(
+      (w) => w.source === wish.source && w.index >= line.first && w.index <= line.last,
+    );
     if (inLine.length === 0) {
       leftOut(wish, "its line's words were cut");
       return [];
@@ -460,7 +484,9 @@ export function placeVisuals(
     const { asset } = item;
     const before = placed.at(-1);
     // Under a title, chapter or name, a visual waits for it to end while its line is said.
-    const under = (context.blocked ?? []).find((b) => item.start < b.end && b.start < item.start + s(VISUAL_MIN)); // biome-ignore format: one line
+    const under = (context.blocked ?? []).find(
+      (b) => item.start < b.end && b.start < item.start + s(VISUAL_MIN),
+    );
     const start = under ? onFrame(Math.ceil(under.end / frame) * frame) : item.start;
     if (under && start > item.lineEnd - s(LINE_TAIL)) {
       leftOut(item.wish, "it would start under a title, chapter or name");
@@ -472,13 +498,18 @@ export function placeVisuals(
     }
     const [least, wantedSeconds] =
       asset.kind === "card"
-        ? [cards[asset.card as keyof typeof cards].seconds.min, cards[asset.card as keyof typeof cards].seconds.typical] // biome-ignore format: one line
+        ? [
+            cards[asset.card as keyof typeof cards].seconds.min,
+            cards[asset.card as keyof typeof cards].seconds.typical,
+          ]
         : asset.kind === "image"
           ? [VISUAL_MIN, CAPTURE_SECONDS]
           : [VISUAL_MIN, Math.min(asset.seconds, FULL_MAX)];
     const layout = layoutOf(context.aspect, asset.kind, wantedSeconds);
     const cap = layout === "full" ? FULL_MAX : PANEL_MAX;
-    const blockedAfter = (context.blocked ?? []).filter((b) => b.start >= start).map((b) => b.start); // biome-ignore format: one line
+    const blockedAfter = (context.blocked ?? [])
+      .filter((b) => b.start >= start)
+      .map((b) => b.start);
     let end = Math.min(start + s(Math.min(wantedSeconds, cap)), edit, ...blockedAfter);
     end = Math.floor(end / frame) * frame;
     if (end - start < s(least) - frame / 2) {
@@ -533,7 +564,13 @@ export async function visualParts(
     if (known) return known;
     const id = `visual-${ids.size + 1}`;
     ids.set(path, id);
-    sources.push({ id, kind, path: await folderPath(path), fingerprint: await fingerprintOf(path), credit: projectCredit(credit) }); // biome-ignore format: one line
+    sources.push({
+      id,
+      kind,
+      path: await folderPath(path),
+      fingerprint: await fingerprintOf(path),
+      credit: projectCredit(credit),
+    });
     return id;
   };
   let lastSound = -Infinity;
@@ -541,7 +578,8 @@ export async function visualParts(
   for (const visual of placed) {
     const { asset, start, end, layout } = visual;
     const duration = end - start;
-    const rect = layout === "panel" ? { x: 0, y: 0, w: 1, h: panelShare(output.aspect) } : undefined; // biome-ignore format: one line
+    const rect =
+      layout === "panel" ? { x: 0, y: 0, w: 1, h: panelShare(output.aspect) } : undefined;
     if (asset.kind === "card") {
       cardClips.push({
         card: asset.card,
@@ -563,7 +601,13 @@ export async function visualParts(
       });
     } else {
       const source = await sourceFor(asset.path, "video", asset.credit);
-      broll.push({ source, in: 0, out: Math.min(duration, secondsToTicks(asset.seconds)), start, ...(rect ? { rect } : {}) }); // biome-ignore format: one line
+      broll.push({
+        source,
+        in: 0,
+        out: Math.min(duration, secondsToTicks(asset.seconds)),
+        start,
+        ...(rect ? { rect } : {}),
+      });
     }
     const wish = visual.wish.sfx;
     if (wish !== "none" && start - lastSound >= secondsToTicks(SFX_EVERY)) {
@@ -595,7 +639,12 @@ export function stillFraming(
   const cy = focus ? focus.y + focus.height / 2 : still.height / 2;
   const x = Math.min(Math.max(cx - w / 2, 0), still.width - w);
   const y = Math.min(Math.max(cy - h / 2, 0), still.height - h);
-  const rect: Rect = { x: x / still.width, y: y / still.height, w: w / still.width, h: h / still.height }; // biome-ignore format: one line
+  const rect: Rect = {
+    x: x / still.width,
+    y: y / still.height,
+    w: w / still.width,
+    h: h / still.height,
+  };
   const anchor = { x: round(clamp01((cx - x) / w)), y: round(clamp01((cy - y) / h)) };
   return {
     crop: { type: "static", rect: tidy(rect) },
@@ -635,7 +684,13 @@ export function speakerClips(
         const range = { in: clipIn, out: clipIn + to - from };
         const index = indexes(clip.source);
         const crop = index && cropPath(index, range, box);
-        clips.push({ source: clip.source, ...range, start: from, rect, ...(crop ? { framing: { crop } } : {}) }); // biome-ignore format: one line
+        clips.push({
+          source: clip.source,
+          ...range,
+          start: from,
+          rect,
+          ...(crop ? { framing: { crop } } : {}),
+        });
       }
       at += clip.out - clip.in;
     }
@@ -662,7 +717,9 @@ function projectCredit(credit: Credit): ProjectCredit {
     what: credit.what,
     source: credit.source,
     ...(credit.license ? { license: credit.license } : {}),
-    ...(credit.by ? { by: { name: credit.by.name, ...(credit.by.url ? { url: credit.by.url } : {}) } } : {}), // biome-ignore format: one line
+    ...(credit.by
+      ? { by: { name: credit.by.name, ...(credit.by.url ? { url: credit.by.url } : {}) } }
+      : {}),
     ...(credit.note ? { note: credit.note } : {}),
   };
 }

@@ -66,14 +66,26 @@ test("a rich plan asks for visuals, with stock footage only when a key allows it
   // Each card's text limits, so its params pass the card's schema.
   assert.match(rich, /- versus: .*left\.name 14/);
   assert.match(rich, /- stat: .*At most: prefix 4, suffix 6, label 28, context 40 characters\./);
-  assert.match(rich, /- kpis: .*At most: title 24 characters; items 2 to 4, each prefix 4, suffix 6, label 14 characters\./); // biome-ignore format: one line
+  assert.match(
+    rich,
+    /- kpis: .*At most: title 24 characters; items 2 to 4, each prefix 4, suffix 6, label 14 characters\./,
+  );
   assert.doesNotMatch(rich, /stock: real footage/);
   assert.match(planSystem({ ...extras, visuals: true, stock: true }), /stock: real footage/);
 });
 
 test("the plan's visuals are read from their JSON, each left out unless whole", () => {
   const problems: string[] = [];
-  const good = { source: "a", line: 2, text: "Surya", kind: "card", card: "stat", params: "{}", sfx: "tap", reason: "r" }; // biome-ignore format: one line
+  const good = {
+    source: "a",
+    line: 2,
+    text: "Surya",
+    kind: "card",
+    card: "stat",
+    params: "{}",
+    sfx: "tap",
+    reason: "r",
+  };
   const read = parseVisuals(
     JSON.stringify([
       good,
@@ -98,7 +110,10 @@ test("the plan's visuals are read from their JSON, each left out unless whole", 
     wish({ line: 4, text: "x", kind: "web", url: "https://example.com/" }),
   ]);
   assert.equal(problems.length, 3);
-  assert.deepEqual(parseVisuals(JSON.stringify([{ ...good, kind: "stock", query: "sun" }]), true).length, 1); // biome-ignore format: one line
+  assert.deepEqual(
+    parseVisuals(JSON.stringify([{ ...good, kind: "stock", query: "sun" }]), true).length,
+    1,
+  );
   assert.deepEqual(
     parseVisuals("[{", false, (problem) => problems.push(problem)),
     [],
@@ -108,11 +123,24 @@ test("the plan's visuals are read from their JSON, each left out unless whole", 
 });
 
 test("a card whose params break its schema is rewritten once, then checked again", async () => {
-  const long = wish({ line: 2, card: "stat", params: JSON.stringify({ value: 3, label: "這是一段超過二十八個字元的標籤，太長了放不進卡片的版面裡面" }) }); // biome-ignore format: one line
-  const zero = wish({ line: 3, card: "list", params: JSON.stringify({ items: [{ text: "一" }, { text: "二" }], active: 0 }) }); // biome-ignore format: one line
+  const long = wish({
+    line: 2,
+    card: "stat",
+    params: JSON.stringify({
+      value: 3,
+      label: "這是一段超過二十八個字元的標籤，太長了放不進卡片的版面裡面",
+    }),
+  });
+  const zero = wish({
+    line: 3,
+    card: "list",
+    params: JSON.stringify({ items: [{ text: "一" }, { text: "二" }], active: 0 }),
+  });
   const page = wish({ line: 4, kind: "web", url: "https://example.com/" });
   const fixedStat = JSON.stringify({ value: 3, label: "倍的速度" });
-  const { claude, requests } = recordedClaude({ repair: [{ fixed: [fixedStat, "{\"items\": []}"] }] }); // biome-ignore format: one line
+  const { claude, requests } = recordedClaude({
+    repair: [{ fixed: [fixedStat, '{"items": []}'] }],
+  });
   const usage: Usage[] = [];
   const repaired = await repairCards([stat, long, zero, page], claude, usage);
   assert.equal(requests.length, 1);
@@ -151,7 +179,7 @@ test("a visual that cannot be sourced is left out and its line keeps the speaker
   const dir = await scratch(t, "visuals-");
   const assets = new Map<string, Asset | null>();
   const problems: string[] = [];
-  const page = wish({ kind: "web", url: "https://example.com/", focus: "Example Domain", line: 2 }); // biome-ignore format: one line
+  const page = wish({ kind: "web", url: "https://example.com/", focus: "Example Domain", line: 2 });
   const broken = wish({ kind: "web", url: "https://example.org/", line: 3 });
   const footage = wish({ kind: "stock", query: "solar flare", line: 4 });
   const captured: { url: string; text?: string; viewport?: object }[] = [];
@@ -165,11 +193,27 @@ test("a visual that cannot be sourced is left out and its line keeps the speaker
       if (options.url.includes("example.org")) throw new Error("timed out");
       await writeFile(options.out, "png");
       const focus = { x: 400, y: 300, width: 600, height: 80 };
-      const credit = { what: "Screenshot of example.com", source: options.url, license: null, by: null }; // biome-ignore format: one line
-      return { path: options.out, kind: "still", width: 2200, height: 1792, focus, credit } satisfies Capture; // biome-ignore format: one line
+      const credit = {
+        what: "Screenshot of example.com",
+        source: options.url,
+        license: null,
+        by: null,
+      };
+      return {
+        path: options.out,
+        kind: "still",
+        width: 2200,
+        height: 1792,
+        focus,
+        credit,
+      } satisfies Capture;
     },
   });
-  assert.deepEqual(assets.get(visualKey(stat)), { kind: "card", card: "stat", params: { value: 3, label: "倍的速度" } }); // biome-ignore format: one line
+  assert.deepEqual(assets.get(visualKey(stat)), {
+    kind: "card",
+    card: "stat",
+    params: { value: 3, label: "倍的速度" },
+  });
   assert.equal(assets.get(visualKey(page))?.kind, "image");
   assert.equal(assets.get(visualKey(broken)), null);
   assert.equal(assets.get(visualKey(footage)), null);
@@ -200,21 +244,35 @@ function speech(lines: number) {
     const first = words.length;
     for (let k = 0; k < 3; k++) {
       const start = ((n - 1) * 2 + k * 0.6) * SECOND;
-      words.push({ source: "a", index: words.length, text: `w${words.length}`, start, end: start + 0.5 * SECOND }); // biome-ignore format: one line
+      words.push({
+        source: "a",
+        index: words.length,
+        text: `w${words.length}`,
+        start,
+        end: start + 0.5 * SECOND,
+      });
     }
     list.push({ source: "a", n, first, last: words.length - 1 });
   }
   return {
     words,
     lines: (_: string, n: number) => list.find((line) => line.n === n),
-    sourceWords: () => words.map((w) => ({ text: w.text, start: w.start / SECOND, end: w.end / SECOND })), // biome-ignore format: one line
+    sourceWords: () =>
+      words.map((w) => ({ text: w.text, start: w.start / SECOND, end: w.end / SECOND })),
   };
 }
 
 test("visuals land on their words, a creator's pace apart, clear of what they may not cover", () => {
   const talk = speech(20);
   const assets = new Map<string, Asset | null>();
-  const image: Asset = { kind: "image", path: "/p.png", width: 2200, height: 1792, focus: null, credit: { what: "x", source: "https://x.com", license: null, by: null } }; // biome-ignore format: one line
+  const image: Asset = {
+    kind: "image",
+    path: "/p.png",
+    width: 2200,
+    height: 1792,
+    focus: null,
+    credit: { what: "x", source: "https://x.com", license: null, by: null },
+  };
   const card = (line: number, text = "") => ({ ...stat, line, text });
   const web = (line: number) => wish({ kind: "web", url: "https://x.com/", line });
   assets.set(visualKey(stat), { kind: "card", card: "stat", params: { value: 3, label: "x" } });
@@ -246,20 +304,39 @@ test("visuals land on their words, a creator's pace apart, clear of what they ma
     [1, 4, 12, 14, 16, 18],
   );
   // At most one every 5 s of the edit.
-  const few = placeVisuals([card(1), card(5), card(9), card(13)], assets, { ...context, edit: 10 * SECOND }); // biome-ignore format: one line
+  const few = placeVisuals([card(1), card(5), card(9), card(13)], assets, {
+    ...context,
+    edit: 10 * SECOND,
+  });
   assert.equal(few.length, 2);
   // Under a name, it waits for the name to end while its line is said.
-  const waits = placeVisuals([card(1, "w1")], assets, { ...context, blocked: [{ start: 0.5 * SECOND, end: 0.8 * SECOND }] }); // biome-ignore format: one line
+  const waits = placeVisuals([card(1, "w1")], assets, {
+    ...context,
+    blocked: [{ start: 0.5 * SECOND, end: 0.8 * SECOND }],
+  });
   assert.deepEqual(waits.map(at), [[1, 0.8, 3.8, "full"]]);
   // Ends where something it may not cover starts.
-  const cut = placeVisuals([card(1)], assets, { ...context, blocked: [{ start: 1.9 * SECOND, end: 5 * SECOND }] }); // biome-ignore format: one line
+  const cut = placeVisuals([card(1)], assets, {
+    ...context,
+    blocked: [{ start: 1.9 * SECOND, end: 5 * SECOND }],
+  });
   const why: string[] = [];
-  placeVisuals([card(1)], assets, { ...context, blocked: [{ start: 0, end: 5 * SECOND }], onLeftOut: (_, reason) => why.push(reason) }); // biome-ignore format: one line
+  placeVisuals([card(1)], assets, {
+    ...context,
+    blocked: [{ start: 0, end: 5 * SECOND }],
+    onLeftOut: (_, reason) => why.push(reason),
+  });
   assert.deepEqual(why, ["it would start under a title, chapter or name"]);
   assert.equal((cut[0]?.end ?? 0) / SECOND, 1.9);
   // Footage fills the frame, for at most 3.5 s.
   const footage = wish({ kind: "stock", query: "the sun", line: 6 });
-  assets.set(visualKey(footage), { kind: "video", path: "/sun.mp4", seconds: 12, id: "pexels:1", credit: image.credit }); // biome-ignore format: one line
+  assets.set(visualKey(footage), {
+    kind: "video",
+    path: "/sun.mp4",
+    seconds: 12,
+    id: "pexels:1",
+    credit: image.credit,
+  });
   const [sun] = placeVisuals([footage], assets, context);
   assert.deepEqual(sun && at(sun), [6, 10, 13.5, "full"]);
   // Other aspects have no split; every visual fills the frame.
@@ -309,7 +386,11 @@ test("the speaker beside a split screen plays in step with the main track, acros
     { source: "a", in: 10 * SECOND, out: 13 * SECOND },
     { source: "a", in: 20 * SECOND, out: 24 * SECOND },
   ];
-  const panel = { wish: stat, asset: { kind: "card", card: "stat", params: {} }, layout: "panel" } as const; // biome-ignore format: one line
+  const panel = {
+    wish: stat,
+    asset: { kind: "card", card: "stat", params: {} },
+    layout: "panel",
+  } as const;
   const clips = speakerClips(
     [
       { ...panel, start: 2 * SECOND, end: 5 * SECOND },
@@ -330,11 +411,24 @@ test("placed visuals become cards, B-roll with credits and an occasional sound",
   const dir = await scratch(t, "visual-parts-");
   const still = join(dir, "page.png");
   await writeFile(still, "png");
-  const credit = { what: "Screenshot of x.com", source: "https://x.com/", license: null, by: null }; // biome-ignore format: one line
-  const image: Asset = { kind: "image", path: still, width: 2200, height: 1792, focus: null, credit }; // biome-ignore format: one line
+  const credit = { what: "Screenshot of x.com", source: "https://x.com/", license: null, by: null };
+  const image: Asset = {
+    kind: "image",
+    path: still,
+    width: 2200,
+    height: 1792,
+    focus: null,
+    credit,
+  };
   const card: Asset = { kind: "card", card: "stat", params: { value: 3, label: "x" } };
   const output = { aspect: "9:16" as const, width: 1080, height: 1920 };
-  const at = (start: number, end: number, asset: Asset, layout: "full" | "panel", sfx: VisualWish["sfx"]) => ({ wish: wish({ sfx }), asset, start: start * SECOND, end: end * SECOND, layout }); // biome-ignore format: one line
+  const at = (
+    start: number,
+    end: number,
+    asset: Asset,
+    layout: "full" | "panel",
+    sfx: VisualWish["sfx"],
+  ) => ({ wish: wish({ sfx }), asset, start: start * SECOND, end: end * SECOND, layout });
   const parts = await visualParts(
     [
       at(0, 2, card, "full", "tap"),

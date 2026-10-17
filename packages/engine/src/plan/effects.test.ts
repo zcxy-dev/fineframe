@@ -25,7 +25,13 @@ function talk(): PlanState {
 
 /** Four words a second apart from `from` seconds. */
 const said = (source: string, from: number): TimedWord[] =>
-  [0, 1, 2, 3].map((i) => ({ source, index: i, text: source, start: (from + i) * T, end: (from + i + 0.8) * T })); // biome-ignore format: one line
+  [0, 1, 2, 3].map((i) => ({
+    source,
+    index: i,
+    text: source,
+    start: (from + i) * T,
+    end: (from + i + 0.8) * T,
+  }));
 
 const span = (start: number, end: number) => ({ start: start * T, end: end * T });
 
@@ -36,7 +42,16 @@ test("a lower third shows while someone on screen talks, in one shot, or is left
   const words = [...said("a", 0.5), ...said("b", 6), ...said("c", 12)];
   const changes = [2.9 * T, 6.2 * T, 9.8 * T, 16 * T];
   const speaking = [span(0.5, 2.9), span(6, 6.2), span(6.2, 9.5)];
-  const overlays = plannedOverlays(talk(), words, 20 * T, [], [2.9 * T, 9.8 * T], new Map(), changes, speaking); // biome-ignore format: one line
+  const overlays = plannedOverlays(
+    talk(),
+    words,
+    20 * T,
+    [],
+    [2.9 * T, 9.8 * T],
+    new Map(),
+    changes,
+    speaking,
+  );
   const spans = overlays.map((o) => [o.params.name, o.start / T, (o.start + o.duration) / T]);
   // Ada's comes in as she starts, not 1 s later, to show 2 s before the cut; Ben's waits for the
   // shot that shows him; Cy's is left out.
@@ -48,7 +63,13 @@ test("a lower third shows while someone on screen talks, in one shot, or is left
 
 test("a keyword pop ends before the shot changes, or is left out", () => {
   const state = talk();
-  const emphasis = (keyword: string, line: number) => ({ source: "a", line, text: keyword, keyword, reason: "" }); // biome-ignore format: one line
+  const emphasis = (keyword: string, line: number) => ({
+    source: "a",
+    line,
+    text: keyword,
+    keyword,
+    reason: "",
+  });
   const lines = [
     { n: 1, first: 0, last: 0 },
     { n: 2, first: 1, last: 1 },

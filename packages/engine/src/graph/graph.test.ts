@@ -577,7 +577,11 @@ test("music rides further down under speech quieter than the edit's own", () => 
     const c = 0.1 * k - 0.1;
     return (c > 1.1 && c < 2.9) || (c > 7.1 && c < 7.9) ? -20 : c > 3.3 && c < 4.9 ? -30 : -120;
   };
-  const text = Array.from({ length: 90 }, (_, k) => `frame:${k} pts:${k * 4800} pts_time:${k / 10}\nlavfi.r128.M=${level(k).toFixed(3)}\n`).join(""); // biome-ignore format: one line
+  const text = Array.from(
+    { length: 90 },
+    (_, k) =>
+      `frame:${k} pts:${k * 4800} pts_time:${k / 10}\nlavfi.r128.M=${level(k).toFixed(3)}\n`,
+  ).join("");
   const momentary = parseMomentary(text);
   assert.equal(momentary.length, 90);
   const speech: [number, number][] = [
@@ -589,7 +593,10 @@ test("music rides further down under speech quieter than the edit's own", () => 
   // The edit's speech: the power mean of the windows that lie inside a stretch, 17 and 7 of them
   // at -20 and 15 at -30.
   const edit = 10 * Math.log10((24 * 10 ** -2 + 15 * 10 ** -3) / 39);
-  assert.deepEqual(ride.map((r) => Number(r.toFixed(6))), [0, Number((edit + 30).toFixed(6)), 0]); // biome-ignore format: one line
+  assert.deepEqual(
+    ride.map((r) => Number(r.toFixed(6))),
+    [0, Number((edit + 30).toFixed(6)), 0],
+  );
   const silent = rides(
     speech,
     momentary.map((v) => (v === -30 ? -60 : v)),
@@ -598,7 +605,15 @@ test("music rides further down under speech quieter than the edit's own", () => 
 
   const edits = project([clip("a", 0, 9)]);
   const music: Project["audio"]["music"] = [
-    { source: "m", license: { name: "CC0 1.0" }, in: 0, out: 9 * SECOND, start: 0, gainDb: -6, ducking: { depthDb: -12, attackMs: 250, releaseMs: 750 } }, // biome-ignore format: one line
+    {
+      source: "m",
+      license: { name: "CC0 1.0" },
+      in: 0,
+      out: 9 * SECOND,
+      start: 0,
+      gainDb: -6,
+      ducking: { depthDb: -12, attackMs: 250, releaseMs: 750 },
+    },
   ];
   const timeline = buildTimeline(
     { ...edits, audio: { ...edits.audio, music } },
@@ -662,7 +677,10 @@ test("the music bed: each range clocked, faded, at its gain, ducked, placed and 
     graph,
     /afade=t=in:ss=0:ns=48000:curve=qsin,afade=t=out:ss=95760:ns=240:curve=hsin,volume=-9dB\[s0\]/,
   );
-  assert.match(graph, /\[1:a\]aresample=48000,pan=stereo\|c0=c0\|c1=c0,aformat=sample_fmts=fltp,apad=whole_len=96000,atrim=end_sample=96000\[g0\]/); // biome-ignore format: one line
+  assert.match(
+    graph,
+    /\[1:a\]aresample=48000,pan=stereo\|c0=c0\|c1=c0,aformat=sample_fmts=fltp,apad=whole_len=96000,atrim=end_sample=96000\[g0\]/,
+  );
   assert.match(graph, /\[s0\]\[g0\]amultiply,adelay=delays=0S:all=1\[m0\]/);
   assert.match(graph, /\[2:a:0\].*volume=-9dB,adelay=delays=96000S:all=1\[m1\]/);
   assert.match(

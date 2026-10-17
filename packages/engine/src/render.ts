@@ -180,7 +180,16 @@ export async function render(
           timeline.cards.map(({ card, start, end }) => {
             const [w, h] = cardSize(aspect, card.placement, width, height);
             const { placement } = card;
-            return { card: card.card, params: card.params, placement, aspect, width: w, height: h, fps, frames: end - start }; // biome-ignore format: one line
+            return {
+              card: card.card,
+              params: card.params,
+              placement,
+              aspect,
+              width: w,
+              height: h,
+              fps,
+              frames: end - start,
+            };
           }),
           {
             onProgress: (fraction, message) =>
@@ -273,7 +282,7 @@ export async function render(
     // peaks over the target, the master is made again with a limiter set that much lower.
     const masterTo = (path: string, ceiling?: number) => {
       const master = masterAudio("", audible ? measured : null, target, timeline.samples, ceiling);
-      return run(bin, [...QUIET, "-y", ...RAW_AUDIO, "-i", pcm, "-af", master, ...RAW_AUDIO, path]); // biome-ignore format: one line
+      return run(bin, [...QUIET, "-y", ...RAW_AUDIO, "-i", pcm, "-af", master, ...RAW_AUDIO, path]);
     };
     let peak = -Infinity;
     if (!audible) await masterTo(finished);
@@ -394,8 +403,29 @@ async function encodedPeak(
   samples: number,
   out: string,
 ): Promise<number> {
-  await run(bin, [...QUIET, "-y", ...RAW_AUDIO, "-i", pcm, "-af", alignToAacFrames(samples), ...AAC, out]); // biome-ignore format: one line
-  const log = await run(bin, ["-hide_banner", "-nostdin", "-nostats", "-i", out, "-af", truePeakFilter, "-f", "null", "-"]); // biome-ignore format: one line
+  await run(bin, [
+    ...QUIET,
+    "-y",
+    ...RAW_AUDIO,
+    "-i",
+    pcm,
+    "-af",
+    alignToAacFrames(samples),
+    ...AAC,
+    out,
+  ]);
+  const log = await run(bin, [
+    "-hide_banner",
+    "-nostdin",
+    "-nostats",
+    "-i",
+    out,
+    "-af",
+    truePeakFilter,
+    "-f",
+    "null",
+    "-",
+  ]);
   await rm(out);
   return parseTruePeak(log.stderr);
 }
@@ -438,11 +468,16 @@ function brollCredits(project: Project, timeline: ReturnType<typeof buildTimelin
     const credit = byId.get(id)?.credit;
     if (!credit) return [];
     const { license, by, ...rest } = credit;
-    return [{ ...rest, license: license ?? null, by: by ? { name: by.name, url: by.url ?? null } : null }]; // biome-ignore format: one line
+    return [
+      { ...rest, license: license ?? null, by: by ? { name: by.name, url: by.url ?? null } : null },
+    ];
   };
   const played: [number, Credit[]][] = [
     ...timeline.broll.map((clip): [number, Credit[]] => [clip.start * ticks, of(clip.clip.source)]),
-    ...timeline.cards.map((clip): [number, Credit[]] => [clip.start * ticks, cardCredits(clip.card.params)]), // biome-ignore format: one line
+    ...timeline.cards.map((clip): [number, Credit[]] => [
+      clip.start * ticks,
+      cardCredits(clip.card.params),
+    ]),
     ...(project.audio.sfx ?? []).map((sfx): [number, Credit[]] => [sfx.start, of(sfx.source)]),
   ];
   return played.sort((a, b) => a[0] - b[0]).flatMap(([, credits]) => credits);

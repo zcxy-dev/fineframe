@@ -189,7 +189,17 @@ test("a cut strip draws the sound it is given instead of the video's, such as th
     const file = join(dir, "strip.png");
     await writeFile(file, png);
     const raw = join(dir, "wave.gray");
-    await run(bin, [...QUIET, "-y", "-i", file, "-vf", "crop=iw:160:0:ih-160,format=gray", "-f", "rawvideo", raw]); // biome-ignore format: one line
+    await run(bin, [
+      ...QUIET,
+      "-y",
+      "-i",
+      file,
+      "-vf",
+      "crop=iw:160:0:ih-160,format=gray",
+      "-f",
+      "rawvideo",
+      raw,
+    ]);
     return [...(await readFile(raw))].filter((value) => value > 60).length;
   };
   const tone = await lit();
