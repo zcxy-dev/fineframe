@@ -60,6 +60,10 @@ test("a rich plan asks for visuals, with stock footage only when a key allows it
   const rich = planSystem({ ...extras, visuals: true, stock: false });
   assert.match(rich, /## Visuals/);
   assert.match(rich, /- stat: /);
+  // Each card's text limits, so its params pass the card's schema.
+  assert.match(rich, /- versus: .*left\.name 14/);
+  assert.match(rich, /- stat: .*At most: prefix 4, suffix 6, label 28, context 40 characters\./);
+  assert.match(rich, /- kpis: .*At most: title 24 characters; items 2 to 4, each prefix 4, suffix 6, label 14 characters\./); // biome-ignore format: one line
   assert.doesNotMatch(rich, /stock: real footage/);
   assert.match(planSystem({ ...extras, visuals: true, stock: true }), /stock: real footage/);
 });

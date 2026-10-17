@@ -32,6 +32,31 @@ export function planSystem(
 
 /** How the planner proposes B-roll for each point: stock footage when a key allows it, a web
  * capture of a page named, or a motion-graphics card. */
+/** A card's text limits from its params' schema, " At most: …." or "": a param past one is left
+ * out with its card. */
+function limits(schema: object): string {
+  type Node = { type?: string; maxLength?: number; minItems?: number; maxItems?: number; items?: Node; properties?: Record<string, Node> }; // biome-ignore format: one line
+  // The text limits under a node, nested objects named by their path.
+  const texts = (node: Node, path = ""): string[] =>
+    Object.entries(node.properties ?? {}).flatMap(([key, value]) =>
+      value.type === "string" && value.maxLength !== undefined
+        ? [`${path}${key} ${value.maxLength}`]
+        : value.type === "object"
+          ? texts(value, `${path}${key}.`)
+          : [],
+    );
+  const parts: string[] = [];
+  const own = texts(schema as Node);
+  if (own.length > 0) parts.push(`${own.join(", ")} characters`);
+  for (const [key, value] of Object.entries((schema as Node).properties ?? {})) {
+    const each = value.type === "array" && value.items ? texts(value.items) : [];
+    if (each.length > 0) {
+      parts.push(`${key} ${value.minItems} to ${value.maxItems}, each ${each.join(", ")} characters`); // biome-ignore format: one line
+    }
+  }
+  return parts.length > 0 ? ` At most: ${parts.join("; ")}.` : "";
+}
+
 function visualsSection(stock: boolean): string {
   const kinds = [
     ...(stock
@@ -55,7 +80,7 @@ what the speaker says or what is common knowledge about a thing they name.",
   const list = cardIds
     .map(
       (id) => `- ${id}: ${cards[id].purpose} ${cards[id].whenToUse} Example params: \
-${JSON.stringify(cards[id].example)}`,
+${JSON.stringify(cards[id].example)}${limits(cards[id].params)}`,
     )
     .join("\n");
   return `
