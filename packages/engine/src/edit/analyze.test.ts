@@ -47,7 +47,8 @@ test("a Windows checkout, with CRLF line endings, has the same version as any ot
   const before = await workerVersion(dir);
   for (const file of ["pyproject.toml", "uv.lock"]) {
     const path = join(dir, file);
-    await writeFile(path, (await readFile(path, "utf8")).replaceAll("\n", "\r\n"));
+    const lf = (await readFile(path, "utf8")).replaceAll("\r\n", "\n");
+    await writeFile(path, lf.replaceAll("\n", "\r\n"));
   }
   assert.equal(await workerVersion(dir), before);
 });
