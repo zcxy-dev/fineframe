@@ -15,16 +15,16 @@ import {
 import { displayAspect, median, scaleAt, visible } from "./framing.ts";
 
 /** The framing a jump cut alternates to: 12 % tighter than the wide framing. */
-export const PUNCH_IN = 1.12;
+const PUNCH_IN = 1.12;
 /** A smaller change of framing reads as the picture bumping rather than as another angle. */
-export const MIN_PUNCH_IN = 1.08;
+const MIN_PUNCH_IN = 1.08;
 /** How far a punch-in or push-in may enlarge the framing even where the footage has no pixels
  * to spare, as 1080p footage edited at 1080 lines has none: the picture softens a little, while
  * a jump cut left in shows. Where the footage has more room, it may go as far as that. */
-export const UPSCALE = 1.2;
+const UPSCALE = 1.2;
 /** The furthest a push-in goes, and how fast: 6 % over 2 s at most, slow enough to feel like a
  * camera moving in rather than a zoom. */
-export const PUSH_IN = 1.06;
+const PUSH_IN = 1.06;
 const PUSH_RATE = 0.03;
 /** A push-in starts this long before the words it lands on and lasts at least PUSH_SECONDS. */
 const PUSH_LEAD = 0.5;

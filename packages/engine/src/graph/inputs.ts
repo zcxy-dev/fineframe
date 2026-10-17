@@ -3,7 +3,7 @@ import type { SourceFacts } from "../sources.ts";
 
 /** How far before a span the seek lands: room to decode the frame on screen at the span's first
  * instant, and the packets the audio decoder needs before it outputs clean samples. */
-export const PREROLL_SECONDS = 0.5;
+const PREROLL_SECONDS = 0.5;
 
 export interface Input {
   /** FFmpeg's input options and `-i`. */

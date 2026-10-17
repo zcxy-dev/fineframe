@@ -93,7 +93,7 @@ function srtTime(frame: number, frameTicks: number): string {
   return `${pad(hours)}:${pad(Math.floor(ms / 60_000) % 60)}:${pad(Math.floor(ms / 1000) % 60)},${pad(ms % 1000, 3)}`;
 }
 
-export function toSrt(pages: Page[], frameTicks: number): string {
+function toSrt(pages: Page[], frameTicks: number): string {
   return pages
     .map((page, i) => {
       const time = `${srtTime(page.start, frameTicks)} --> ${srtTime(page.end, frameTicks)}`;

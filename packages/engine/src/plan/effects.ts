@@ -16,8 +16,6 @@ import { CALLOUT_LEAD, type Located, wishKey } from "./locate.ts";
 import type { PlanState } from "./plan.ts";
 import { bare } from "./text.ts";
 
-/** The templates the planner places. */
-export const PLANNED: readonly TemplateId[] = ["title", "lower-third", "keyword", "chapter", "wipe", "callout"]; // biome-ignore format: one line
 /** Keyword pops per minute of edit at most, the top of the catalog's one to three, and callouts:
  * one every 20 s, as the planner is told. */
 const KEYWORDS_PER_MINUTE = 3;

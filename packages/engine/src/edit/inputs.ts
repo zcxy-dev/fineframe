@@ -4,8 +4,6 @@ import { basename, extname, join, resolve } from "node:path";
 import { EditError } from "./error.ts";
 import { kindOf, type MediaKind } from "./media.ts";
 
-export type { MediaKind };
-
 /** A media file to edit from. */
 export interface MediaFile {
   /** The path as the caller gave it, or the folder they gave joined with the file's name. */

@@ -16,11 +16,10 @@ import { type Run, runEdit } from "./runner.ts";
 import { type FileEntry, type Role, roleOf, type Settings } from "./settings.ts";
 
 export type Stage = "analyze" | "plan" | "render" | "check";
-export const STAGES: readonly Stage[] = ["analyze", "plan", "render", "check"];
 
-export type Status = "uploading" | "running" | "done" | "error" | "cancelled";
+type Status = "uploading" | "running" | "done" | "error" | "cancelled";
 
-export interface JobFile extends FileEntry {
+interface JobFile extends FileEntry {
   use: Role;
   /** Bytes the server has of it. */
   received: number;
@@ -492,7 +491,7 @@ function gigabytes(bytes: number): string {
 }
 
 /** Where jobs go unless VIDEO_EDITOR_JOBS says otherwise: beside the engine's own cache. */
-export function defaultRoot(): string {
+function defaultRoot(): string {
   return process.env.VIDEO_EDITOR_JOBS ?? join(homedir(), ".cache", "video-editor", "jobs");
 }
 

@@ -104,7 +104,7 @@ export function unrendered(project: Project): string[] {
 }
 
 /** Looks the project names that the catalog does not have. */
-export function unknownLooks(project: Project): string[] {
+function unknownLooks(project: Project): string[] {
   const clips = [
     ...project.main.map((clip, i) => [`/main/${i}`, clip] as const),
     ...(project.broll ?? []).map((clip, i) => [`/broll/${i}`, clip] as const),

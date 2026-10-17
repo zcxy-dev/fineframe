@@ -17,7 +17,7 @@ export interface MusicFile {
  * that is a web address says where its terms are, and any other lines are the credit it asks
  * for. Null when there is no such file.
  */
-export async function readLicense(track: string): Promise<License | null> {
+async function readLicense(track: string): Promise<License | null> {
   const path = join(dirname(track), `${basename(track, extname(track))}.txt`);
   if (!existsSync(path)) return null;
   const lines = (await readFile(path, "utf8"))

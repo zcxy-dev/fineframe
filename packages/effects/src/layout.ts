@@ -192,7 +192,7 @@ export const CARD_COLORS = {
  * overlays' from 4 units: small print, body text, a list item, a card's heading, a section's
  * name and a hero number, at 4, 5, 6.25, 9.8, 15.3 and 23.8 units. */
 const cardStep = (n: number) => 4 * 1.25 ** n;
-export const CARD_TYPE = {
+const CARD_TYPE = {
   hero: cardStep(8),
   display: cardStep(6),
   heading: cardStep(4),

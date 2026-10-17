@@ -82,7 +82,7 @@ export interface TimelineCard {
 }
 
 /** The longest a sound effect plays. */
-export const SFX_SECONDS = 2;
+const SFX_SECONDS = 2;
 
 /** A music track's range placed on the output sample grid. */
 export interface TimelineMusic {

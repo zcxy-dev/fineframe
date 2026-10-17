@@ -67,7 +67,7 @@ const OFFSET = 0.15;
 
 /** Samples a clip's picture as the render shows it after its auto grade: frames spread over it
  * as the auto grade samples them, framed into a small box of the output's shape. */
-export async function measureColour(
+async function measureColour(
   source: SourceFacts,
   clip: { in: number; out: number; framing?: Project["main"][number]["framing"]; grade?: Grade },
   aspect: { width: number; height: number },

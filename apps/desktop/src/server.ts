@@ -45,7 +45,7 @@ export async function restoreLinks(editor: string): Promise<void> {
 }
 
 /** A port nothing listens on at 127.0.0.1, as the system hands one out. */
-export function freePort(): Promise<number> {
+function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const probe = createServer();
     probe.once("error", reject);
@@ -169,7 +169,7 @@ export async function startServer(
  * to stop, and made to after a few seconds; the server stops a running edit's own group as it
  * exits. On Windows, taskkill stops the tree.
  */
-export async function stopTree(child: ChildProcess, exited: Promise<unknown>): Promise<void> {
+async function stopTree(child: ChildProcess, exited: Promise<unknown>): Promise<void> {
   const pid = child.pid;
   if (pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
   if (process.platform === "win32") {

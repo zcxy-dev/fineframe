@@ -65,6 +65,7 @@ Models that come inside a package: the TransNetV2 weights in transnetv2-pytorch,
 | [next](https://nextjs.org) | MIT | web page |
 | [typescript](https://www.typescriptlang.org) | Apache-2.0 | development |
 | [@biomejs/biome](https://biomejs.dev) | MIT OR Apache-2.0 | development |
+| [knip](https://knip.dev) | ISC | development |
 | [json-schema-to-typescript](https://github.com/bcherny/json-schema-to-typescript), @types/node, @types/react, @types/react-dom | MIT | development |
 | [electron](https://www.electronjs.org) | MIT; the Chromium and Node.js it is built from keep their licences, listed in `LICENSES.chromium.html` inside the app | desktop app, in its installers |
 | [electron-builder](https://www.electron.build) | MIT | desktop app, building the installers |
