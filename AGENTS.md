@@ -14,4 +14,4 @@
 
 ## Pitfalls
 - Keep one language mode per ASR chunk.
-- `packages/engine/MEASUREMENTS.md` and `packages/engine/src/plan/plan.ts` conflict between parallel pull requests; rebase right before merging.
+- `packages/engine/MEASUREMENTS.md` and `packages/engine/src/plan/plan.ts` conflict between parallel pull requests; rebase right before merging. A table in a `<!-- results:… -->` block comes from `bench/results/`: change the JSON and run `uv run vebench tables` in `bench/`.

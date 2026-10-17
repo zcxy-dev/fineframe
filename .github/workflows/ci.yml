@@ -76,6 +76,7 @@ jobs:
               uv run pytest -q
             )
           done
+          (cd bench && uv run vebench tables --check)
       # After the Python packages: check-gen runs the worker's model generator.
       - name: Check the TypeScript workspace
         run: |

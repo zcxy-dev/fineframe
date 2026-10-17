@@ -5,7 +5,7 @@ import sys
 from importlib.metadata import version
 from pathlib import Path
 
-from vebench import beats, edit, mix, render, review, shots, speakers, transcript
+from vebench import beats, edit, mix, render, review, shots, speakers, tables, transcript
 from vebench.synth import corpus, published
 
 TRANSCRIPT_NAMES = ("transcript.json", "transcript.srt", "transcript.txt")
@@ -36,6 +36,18 @@ def main(argv: list[str] | None = None) -> None:
             return
         if args.command == "review-report":
             print(review.report(args.round), end="")
+            return
+        if args.command == "tables":
+            stale = tables.write(check=args.check)
+            for doc in stale:
+                verb = (
+                    "is out of date; run `uv run vebench tables` in bench/"
+                    if args.check
+                    else "written"
+                )
+                print(f"vebench: {doc} {verb}", file=sys.stderr)
+            if args.check and stale:
+                sys.exit(1)
             return
         if args.command == "transcript":
             result = transcript.score(transcript.load(args.ref), transcript.load(args.hyp))
@@ -82,6 +94,13 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=f"vebench {version('vebench')}")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    p = sub.add_parser(
+        "tables",
+        help="write the measurement tables in the docs from bench/results/*.json",
+        epilog="Format: bench/README.md#results-tables",
+    )
+    p.add_argument("--check", action="store_true", help="fail if a table is out of date instead")
 
     p = sub.add_parser("transcript", help="error rate and word timing of one transcript")
     p.add_argument("--ref", type=Path, required=True, help="truth transcript (JSON, SRT or text)")

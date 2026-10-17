@@ -171,6 +171,7 @@ what plays in each: `k`ick, `s`nare, `h`i-hats and `b`ass.
 ```bash
 uv run vebench report corpus/
 uv run vebench synthetic synthetic/
+uv run vebench tables
 uv run vebench synth synthetic/ --seed 0
 uv run vebench transcript --ref truth.json --hyp hyp.json
 uv run vebench shots --ref truth/shots.json --hyp shots.json --tolerance 0.1
@@ -180,6 +181,16 @@ uv run vebench mix --voice voice.wav --music music.wav --project project.json
 uv run vebench beats --ref synthetic/music/beat-112.json --hyp beat-112.music.json
 uv run vebench edit --project runs/video-editor-60s/project.json
 ```
+
+## Results tables
+
+A measurement's table lives as data: `bench/results/<name>.json` holds
+`{"doc": "<path from the repository root>", "columns": [...], "rows": [[...], ...]}`, and the
+document shows it between `<!-- results:<name> -->` and `<!-- /results -->`.
+`uv run vebench tables` writes every table into its document; CI runs it with `--check` and
+fails when a document's table differs from its data. Change the JSON, never the table, and when
+two pull requests touch the same document, run `vebench tables` again after the rebase. Older
+tables are moved to data when they are next measured.
 
 ## Reference machine
 
