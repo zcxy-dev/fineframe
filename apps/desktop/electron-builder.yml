@@ -1,6 +1,9 @@
 # Installers: `pnpm -C apps/desktop dist` on each system builds that system's own.
 appId: io.github.zcxy-dev.video-editor
 productName: Video Editor
+# The installed folder's name on Windows (Programs\video-editor), rather than the package's.
+extraMetadata:
+  name: video-editor
 copyright: Copyright © zcxy-dev
 directories:
   output: dist
