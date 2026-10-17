@@ -785,12 +785,7 @@ test("a mix louder than loudness normalisation measures is still normalised", as
   assert.ok(Math.abs(after.input_i - target.integratedLufs) < 1, String(after.input_i));
 });
 
-// On Windows the search for a ceiling lands 1.3 dB under it: AAC's overshoot on these
-// transients does not follow the ceiling (https://github.com/zcxy-dev/video-editor/issues/16).
-const peakSearchTodo = process.platform === "win32" ? "#16" : false;
-test("a noisy mix with sharp transients keeps its true-peak ceiling once encoded", {
-  todo: peakSearchTodo,
-}, async (t) => {
+test("a noisy mix with sharp transients keeps its true-peak ceiling once encoded", async (t) => {
   const dir = await scratch(t, "peaks-");
   const source = await makeSource(dir, {
     id: "clicks",
@@ -825,7 +820,7 @@ test("a noisy mix with sharp transients keeps its true-peak ceiling once encoded
 test("a sound whose encoded peak will not settle under the target keeps its lowest try", async () => {
   // AAC's overshoot does not fall steadily with the limiter's ceiling: encoded peaks as measured
   // on noise with 2 ms bursts at 17 kHz, each try with a lower ceiling.
-  const peaks = [1.1, -0.7, -0.5, 0.3];
+  const peaks = [1.1, -0.7, -0.5, 0.3, -0.2, 0.4];
   const ceilings: (number | undefined)[] = [];
   const discarded: number[] = [];
   const kept = await limitPeak(
@@ -839,7 +834,7 @@ test("a sound whose encoded peak will not settle under the target keeps its lowe
     },
   );
   assert.deepEqual(kept, { n: 1, peak: -0.7 });
-  assert.deepEqual(discarded.sort(), [0, 2, 3]);
+  assert.deepEqual(discarded.sort(), [0, 2, 3, 4, 5]);
   assert.equal(ceilings.length, peaks.length);
   // Each try sets the limiter lower than the one before.
   for (let i = 2; i < ceilings.length; i++) {
@@ -847,6 +842,21 @@ test("a sound whose encoded peak will not settle under the target keeps its lowe
   }
   // One under the target is kept at once.
   assert.deepEqual(await limitPeak(-1, async () => -1.5), { n: 0, peak: -1.5 });
+});
+
+test("a peak search that overshoots well under the target tries again nearer it", async () => {
+  // Encoded peaks by limiter ceiling: Windows' tries on noise with sharp transients (none,
+  // -1.6, -3.9), and Linux's at forced ceilings between, from #16; the nearest ceiling is used.
+  const measured: [number, number][] = [
+    [-1.4, 0.1], [-1.5, -0.5], [-1.6, 1.2], [-1.7, -0.3], [-1.8, -1.1], [-2.0, -1.0],
+    [-2.2, -1.2], [-2.5, -2.0], [-2.75, -2.0], [-3.0, -1.4], [-3.9, -2.3],
+  ]; // biome-ignore format: a table
+  const encoded = (ceiling: number | undefined) =>
+    ceiling === undefined
+      ? -0.5
+      : measured.reduce((a, b) => (Math.abs(b[0] - ceiling) < Math.abs(a[0] - ceiling) ? b : a))[1];
+  const kept = await limitPeak(-1, async (ceiling) => encoded(ceiling));
+  assert.ok(kept.peak <= -1 && kept.peak > -2, `kept ${kept.peak} dBTP`);
 });
 
 test("a source that changed since planning fails before anything is rendered", async (t) => {
