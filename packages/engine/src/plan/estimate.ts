@@ -5,9 +5,9 @@
  * US dollars Claude is likely to cost for an edit of `length` seconds from `footage` seconds of
  * video, as a range. The plan reads every transcript and writes more decisions for a longer
  * edit; the review checks each cut, and a longer edit has more of them. Fitted to the
- * measurements in packages/engine/README.md: a first plan of 7 minutes of footage cost $0.06 for
- * 30 s, $0.07 for 1 min and $0.12 for 5 min, and whole edits $0.10 to $0.13. Edits much longer
- * than those are not measured, so the range is wide.
+ * measurements in packages/engine/MEASUREMENTS.md: a first plan of 7 minutes of footage cost
+ * $0.06 for 30 s, $0.07 for 1 min and $0.12 for 5 min, and whole edits $0.10 to $0.13. Edits
+ * much longer than those are not measured, so the range is wide.
  */
 export function estimateCost(footage: number, length: number): { low: number; high: number } {
   const footageMinutes = Math.max(0, footage) / 60;

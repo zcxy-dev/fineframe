@@ -16,7 +16,7 @@ CI runs none of the tests that need the worker's `ml` extra or the benchmark's `
 
 ## Checks
 
-A change passes the steps in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Run the same commands locally before opening a pull request. Its `macos`, `macos-intel` and `windows` jobs run the engine tests on Apple silicon, on Intel and on Windows x64 and score a [synthetic edit](packages/engine/scripts/synthetic-edit.ts), one run of it with effect overlays rendered by Remotion, with `vebench report`: every run except `copy-joined`, a deliberately naive baseline joined with `-c copy`, must have no clicks and under 10 ms of drift. The `windows` job also runs the rest of the workspace's tests and the worker's checks, and starts the page with `mise run start`. A change to `apps/desktop` or `apps/web` also runs [`.github/workflows/desktop.yml`](.github/workflows/desktop.yml), which builds the desktop installers on Apple silicon macOS, Windows and Linux and runs each built app through a first edit ([details](apps/desktop/README.md#tests)). `pnpm exec biome check --write` fixes TypeScript and JSON formatting.
+A change passes the steps in [`.github/workflows/ci.yml`](.github/workflows/ci.yml); run them locally before opening a pull request. Every synthetic edit CI renders has no clicks and under 10 ms of drift, except `copy-joined`, a deliberately naive baseline joined with `-c copy`. `pnpm exec biome check --write` fixes TypeScript and JSON formatting.
 
 ## Where code goes
 
@@ -31,7 +31,7 @@ A change passes the steps in [`.github/workflows/ci.yml`](.github/workflows/ci.y
 - **Keep data synthetic.** Tests generate their own media (ffmpeg `lavfi`, synthetic tones).
 - **Corpus footage** follows [bench/README.md](bench/README.md#corpus-layout).
 - **Never commit** other people's media, credentials or `.env` files.
-- **Keep third-party notices in one file.** A new model, font, program or dependency gets a row in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md#components) with its licence, checked against its own licence file or model card. Code adapted from another project keeps that project's copyright and licence in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), which lists the files it is in. The project is named nowhere else: not in code, comments, docs, tests, commits or pull requests. Its brand assets (logos, product names) are not covered by its licence; don't copy them.
+- **Keep third-party notices in one file.** A new model, font, program or dependency gets a row in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md#components) with its licence, checked against its own licence file or model card. Code adapted from another project keeps that project's copyright and licence in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), which lists the files it is in; its attribution lives only there. Its brand assets (logos, product names) are not covered by its licence; don't copy them.
 
 ## Pull requests
 

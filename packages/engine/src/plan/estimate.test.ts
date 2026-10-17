@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { estimateCost } from "./estimate.ts";
 
 test("the estimate's range holds what whole edits cost in the measured runs", () => {
-  // packages/engine/README.md's edit measurements: footage, length, what Claude cost.
+  // packages/engine/MEASUREMENTS.md's edit measurements: footage, length, what Claude cost.
   const runs: [number, number, number][] = [
     [6.7 * 60, 60, 0.1],
     [11.9 * 60, 60, 0.1],
