@@ -5,6 +5,7 @@ import "@fontsource/noto-sans-tc/700.css";
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { BACKGROUND, backgroundCss } from "../lib/theme.ts";
 
 export const metadata: Metadata = {
   title: "Video editor",
@@ -13,14 +14,17 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#0b0b0d" },
-    { media: "(prefers-color-scheme: light)", color: "#f6f6f4" },
+    { media: "(prefers-color-scheme: dark)", color: BACKGROUND.dark },
+    { media: "(prefers-color-scheme: light)", color: BACKGROUND.light },
   ],
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        <style>{backgroundCss}</style>
+      </head>
       <body>{children}</body>
     </html>
   );

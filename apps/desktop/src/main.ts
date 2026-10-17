@@ -1,7 +1,7 @@
 // The desktop app: the page's server on a free loopback port, the page in the app's own window,
 // and everything the server started stopped when the app quits.
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { app, BrowserWindow, dialog, nativeTheme, shell } from "electron";
 import { type Places, type Server, startServer } from "./server.ts";
 
@@ -21,6 +21,10 @@ function places(): Places {
     log: join(app.getPath("logs"), "server.log"),
   };
 }
+
+// The page's background, from the editor's own copy of the page.
+const theme = pathToFileURL(join(places().editor, "apps", "web", "lib", "theme.ts")).href;
+const { BACKGROUND }: typeof import("../../web/lib/theme.ts") = await import(theme);
 
 let starting: Promise<Server> | null = null;
 let window: BrowserWindow | null = null;
@@ -43,7 +47,7 @@ async function open(): Promise<void> {
     minWidth: 880,
     minHeight: 600,
     // The page's own background, dark unless the system is light.
-    backgroundColor: nativeTheme.shouldUseDarkColors ? "#0b0b0d" : "#f6f6f4",
+    backgroundColor: nativeTheme.shouldUseDarkColors ? BACKGROUND.dark : BACKGROUND.light,
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
   });
   window.on("closed", () => {
@@ -111,6 +115,6 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal
 
 const STARTING = `<!doctype html><html><head><meta charset="utf-8"><title>${NAME}</title>
 <style>body{margin:0;height:100vh;display:grid;place-items:center;font:15px system-ui,sans-serif;
-color:#a1a1aa;background:#0b0b0d}
-@media (prefers-color-scheme:light){body{color:#52525b;background:#f6f6f4}}</style></head>
+color:#a1a1aa;background:${BACKGROUND.dark}}
+@media (prefers-color-scheme:light){body{color:#52525b;background:${BACKGROUND.light}}}</style></head>
 <body>Starting ${NAME}…</body></html>`;
