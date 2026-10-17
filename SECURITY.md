@@ -26,4 +26,4 @@ Especially welcome:
 
 ## Supported versions
 
-The project is pre-release; fixes land on `main`.
+Fixes land on `main` and ship in the next release; only the latest release is supported. The desktop app does not update itself: install the newest release.
