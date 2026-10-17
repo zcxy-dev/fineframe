@@ -169,7 +169,7 @@ what plays in each: `k`ick, `s`nare, `h`i-hats and `b`ass.
 ## ASCEND
 
 `vebench ascend` builds a transcription corpus from real speech with human transcripts:
-[ASCEND](https://huggingface.co/datasets/CAiRE/ASCEND) (CC BY-SA 4.0), conversations in
+[ASCEND](https://huggingface.co/datasets/CAiRE/ASCEND) by Lovenia et al. (CC BY-SA 4.0, [attribution](../THIRD_PARTY_NOTICES.md#ascend)), conversations in
 Mandarin and English that switch between them, recorded in Hong Kong.
 
 ```bash
