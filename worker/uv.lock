@@ -1953,6 +1953,7 @@ dev = [
 name = "vework"
 version = "0.3.0"
 source = { editable = "." }
+default-groups = ["dev", "ml"]
 dependencies = [
     { name = "anthropic" },
     { name = "av" },
@@ -1962,7 +1963,14 @@ dependencies = [
     { name = "scipy" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
+dev = [
+    { name = "datamodel-code-generator" },
+    { name = "imageio-ffmpeg" },
+    { name = "pytest" },
+    { name = "ruff" },
+    { name = "vebench" },
+]
 ml = [
     { name = "beat-this" },
     { name = "huggingface-hub" },
@@ -1975,34 +1983,15 @@ ml = [
     { name = "transnetv2-pytorch" },
 ]
 
-[package.dev-dependencies]
-dev = [
-    { name = "datamodel-code-generator" },
-    { name = "imageio-ffmpeg" },
-    { name = "pytest" },
-    { name = "ruff" },
-    { name = "vebench" },
-]
-
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=1.14.0" },
     { name = "av", specifier = ">=19.0.1" },
-    { name = "beat-this", marker = "extra == 'ml'", specifier = ">=1.1.0" },
-    { name = "huggingface-hub", marker = "extra == 'ml'", specifier = ">=2.2.0" },
     { name = "numpy", specifier = ">=2.5.4" },
-    { name = "onnxruntime", marker = "extra == 'ml'", specifier = ">=1.31.0" },
     { name = "opencc", specifier = ">=1.4.2" },
-    { name = "opencv-python-headless", marker = "extra == 'ml'", specifier = ">=5.0.0.93" },
     { name = "pydantic", specifier = ">=2.14.1" },
     { name = "scipy", specifier = ">=1.18.1" },
-    { name = "silero-vad", marker = "extra == 'ml'", specifier = ">=6.2.3" },
-    { name = "torch", marker = "sys_platform == 'linux' and extra == 'ml'", specifier = ">=2.14.1", index = "https://download.pytorch.org/whl/cpu" },
-    { name = "torch", marker = "sys_platform != 'linux' and extra == 'ml'", specifier = ">=2.14.1" },
-    { name = "transformers", marker = "extra == 'ml'", specifier = ">=5.20.0" },
-    { name = "transnetv2-pytorch", marker = "extra == 'ml'", specifier = ">=1.0.5" },
 ]
-provides-extras = ["ml"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -2011,4 +2000,15 @@ dev = [
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "ruff", specifier = ">=0.17.0" },
     { name = "vebench", editable = "../bench" },
+]
+ml = [
+    { name = "beat-this", specifier = ">=1.1.0" },
+    { name = "huggingface-hub", specifier = ">=2.2.0" },
+    { name = "onnxruntime", specifier = ">=1.31.0" },
+    { name = "opencv-python-headless", specifier = ">=5.0.0.93" },
+    { name = "silero-vad", specifier = ">=6.2.3" },
+    { name = "torch", marker = "sys_platform != 'linux'", specifier = ">=2.14.1" },
+    { name = "torch", marker = "sys_platform == 'linux'", specifier = ">=2.14.1", index = "https://download.pytorch.org/whl/cpu" },
+    { name = "transformers", specifier = ">=5.20.0" },
+    { name = "transnetv2-pytorch", specifier = ">=1.0.5" },
 ]

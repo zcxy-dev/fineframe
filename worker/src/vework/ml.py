@@ -1,5 +1,5 @@
 def require() -> None:
-    """Fail with install instructions when the optional `ml` extra is missing."""
+    """Fail with install instructions when the `ml` group is missing."""
     try:
         # Not just torch: an environment synced before a package joined the extra lacks only it,
         # and finding that out at the audio events would waste the shot detection before them.
@@ -9,6 +9,4 @@ def require() -> None:
         import onnxruntime  # noqa: F401
         import torch  # noqa: F401
     except ImportError as exc:
-        raise RuntimeError(
-            "model analysis needs the ml extra: run `uv sync --extra ml` in worker/"
-        ) from exc
+        raise RuntimeError("model analysis needs the ml group: run `uv sync` in worker/") from exc

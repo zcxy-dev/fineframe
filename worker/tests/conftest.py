@@ -9,7 +9,7 @@ import pytest
 
 def pytest_collection_modifyitems(items):
     if importlib.util.find_spec("torch") is None:
-        skip = pytest.mark.skip(reason="needs the ml extra (uv sync --extra ml)")
+        skip = pytest.mark.skip(reason="needs the ml group (uv sync)")
         for item in items:
             if "ml" in item.keywords:
                 item.add_marker(skip)

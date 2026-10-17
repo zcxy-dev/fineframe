@@ -12,7 +12,7 @@ uv sync
 uv run vebench --help
 ```
 
-CI runs none of the tests that need the worker's `ml` extra or the benchmark's `synth` extra (the `windows` job installs the `ml` extra only to start the page). Run them locally when you change those parts: `uv sync --extra ml` in `worker/`, `uv sync --extra synth` in `bench/`, then `uv run pytest`. CI also skips the tests that need Chrome: the Remotion renders of templates (`engine/src/render.test.ts`) and cards (`effects/src/cards.test.ts`), and web capture (`engine/src/broll/capture.test.ts`); run them when you change those parts. Tests that call the Claude API run only with your own key: `uv run --env-file ../.env pytest -m claude` in `worker/` ([details](worker/README.md#transcript-correction)), and `CLAUDE_TESTS=1 node --env-file=../../.env --test src/plan/plan.test.ts` in `packages/engine/`.
+CI's `windows` job runs the worker's `ml` tests except those marked `big`, which load the speech model; CI runs none of the benchmark's `synth` tests. The `ml` group is a default one, so `uv sync` and `uv run` in `worker/` install it; `--no-group ml` leaves it out. Run the rest locally when you change those parts: `uv sync` in `worker/`, `uv sync --extra synth` in `bench/`, then `uv run pytest`. CI also skips the tests that need Chrome: the Remotion renders of templates (`engine/src/render.test.ts`) and cards (`effects/src/cards.test.ts`), and web capture (`engine/src/broll/capture.test.ts`); run them when you change those parts. Tests that call the Claude API run only with your own key: `uv run --env-file ../.env pytest -m claude` in `worker/` ([details](worker/README.md#transcript-correction)), and `CLAUDE_TESTS=1 node --env-file=../../.env --test src/plan/plan.test.ts` in `packages/engine/`.
 
 ## Checks
 

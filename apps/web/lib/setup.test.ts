@@ -79,7 +79,7 @@ next();
       .map((line) => JSON.parse(line));
   const [first] = await calls();
   assert.deepEqual(first, [
-    ...["sync", "--project", worker, "--python", "3.12", "--extra", "ml"],
+    ...["sync", "--project", worker, "--python", "3.12"],
     ...["--frozen", "--no-dev", "--no-editable"],
   ]);
 

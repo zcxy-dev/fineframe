@@ -108,7 +108,7 @@ export class Setup {
     const version = await workerVersion(this.#worker);
     const installed = stamp ? await readFile(stamp, "utf8").catch(() => "") : "";
     const python = (await readFile(join(this.#worker, "..", ".python-version"), "utf8")).trim();
-    const args = ["sync", "--project", this.#worker, "--python", python, "--extra", "ml"];
+    const args = ["sync", "--project", this.#worker, "--python", python];
     args.push("--frozen", "--no-dev", "--no-editable");
     if (installed && installed !== version) args.push("--reinstall-package", "vework");
 

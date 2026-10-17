@@ -30,18 +30,6 @@ Issues = "https://github.com/zcxy-dev/video-editor/issues"
 [project.scripts]
 vework = "vework.cli:main"
 
-[project.optional-dependencies]
-ml = [
-    "beat-this>=1.1.0",
-    "huggingface-hub>=2.2.0",
-    "onnxruntime>=1.31.0",
-    "opencv-python-headless>=5.0.0.93",
-    "silero-vad>=6.2.3",
-    "torch>=2.14.1",
-    "transformers>=5.20.0",
-    "transnetv2-pytorch>=1.0.5",
-]
-
 [build-system]
 requires = ["uv_build>=0.13.0,<0.14.0"]
 build-backend = "uv_build"
@@ -56,6 +44,7 @@ explicit = true
 # beat_this needs torchaudio only for its file loader and mel front end, which vework replaces
 # (beats.py); no torchaudio release matches torch 2.14, so it is left out.
 override-dependencies = ["torchaudio; sys_platform == 'never'"]
+default-groups = ["dev", "ml"]
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
@@ -75,11 +64,24 @@ select = ["E", "F", "I", "B", "UP"]
 
 [tool.pytest.ini_options]
 markers = [
-    "ml: needs the ml extra and downloads model weights",
+    "ml: needs the ml group and downloads model weights",
+    "big: loads the speech model, too big for CI",
     "claude: calls the Claude API; runs only when ANTHROPIC_API_KEY is set",
 ]
 
 [dependency-groups]
+# The models' packages. A default group, so `uv sync` and `uv run` install it; CI's quick checks
+# leave it out with `--no-group ml`.
+ml = [
+    "beat-this>=1.1.0",
+    "huggingface-hub>=2.2.0",
+    "onnxruntime>=1.31.0",
+    "opencv-python-headless>=5.0.0.93",
+    "silero-vad>=6.2.3",
+    "torch>=2.14.1",
+    "transformers>=5.20.0",
+    "transnetv2-pytorch>=1.0.5",
+]
 dev = [
     "datamodel-code-generator>=0.83.0",
     "imageio-ffmpeg>=0.6.0",

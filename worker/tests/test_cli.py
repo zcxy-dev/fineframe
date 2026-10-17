@@ -61,7 +61,7 @@ def test_missing_ml_extra_says_how_to_install_it(monkeypatch, call, missing):
     for cached in (transcribe._device, transcribe._recognizer, transcribe._aligner):
         cached.cache_clear()
     denoise._model.cache_clear()
-    with pytest.raises(RuntimeError, match="uv sync --extra ml"):
+    with pytest.raises(RuntimeError, match="needs the ml group"):
         call()
 
 

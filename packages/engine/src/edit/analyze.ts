@@ -29,14 +29,14 @@ export interface AnalysisOptions {
 
 const WORKER = fileURLToPath(new URL("../../../../worker/", import.meta.url));
 
-/** vework in the repository's worker/, run by uv on the Python version the repository pins and
- * with the ml extra. uv rebuilds an environment whose Python is gone (after an upgrade) with the
- * first Python on PATH, and installs only the extras asked for; both are named so the rebuilt one
- * still runs the models. Its version is a hash of the worker's code and lockfile. */
+/** vework in the repository's worker/, run by uv on the Python version the repository pins, with
+ * the worker's default groups, ml among them. uv rebuilds an environment whose Python is gone
+ * (after an upgrade) with the first Python on PATH, so the Python is named. Its version is a hash
+ * of the worker's code and lockfile. */
 export async function localWorker(): Promise<Worker> {
   const python = (await readFile(join(WORKER, "..", ".python-version"), "utf8")).trim();
   return {
-    command: ["uv", "run", "--project", WORKER, "--python", python, "--extra", "ml", "vework"],
+    command: ["uv", "run", "--project", WORKER, "--python", python, "vework"],
     version: await workerVersion(WORKER),
   };
 }

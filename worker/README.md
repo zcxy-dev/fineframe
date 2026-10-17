@@ -51,7 +51,7 @@ The index's `framing` says, shot by shot, how the picture is laid out, where eac
 `--asr cloud` has a speech-to-text model on [OpenRouter](https://openrouter.ai) hear the speech, paid with your own key, for machines without the memory or the time for the local model. Everything else runs on this machine, the aligner that times the words included.
 
 ```bash
-uv run --extra ml --env-file ../.env vework analyze talk.mp4 -o talk.index.json --asr cloud
+uv run --env-file ../.env vework analyze talk.mp4 -o talk.index.json --asr cloud
 ```
 
 - **Off by default:** the local model is the default. It needs no key, costs nothing per minute and sends nothing anywhere.
