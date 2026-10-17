@@ -29,7 +29,7 @@ Macs with an Intel processor are not supported: PyTorch and ONNX Runtime, which 
 
 **Linux.** Make the AppImage executable (`chmod +x Video-Editor-*.AppImage`) and run it. AppImages need FUSE 2: on Ubuntu 24.04, `sudo apt install libfuse2t64`.
 
-**The first time it opens,** the app asks for your [Anthropic API key](https://console.anthropic.com/settings/keys) and checks it; Claude plans each edit and checks its cuts, about US$0.05 to 0.15 an edit. Meanwhile it installs the analysis once, about 2 GB of Python and PyTorch, with its progress in the window. The first edit then downloads what it needs on first use, each with its own bar: the speech model (3.4 GB), FFmpeg and the effects renderer. On a computer with less than 12 GB of memory, too little for the speech model, speech is heard on OpenRouter instead, with your [OpenRouter API key](https://openrouter.ai/settings/keys), for about US$0.03 an hour of footage; the app says so, and either can be chosen.
+**The first time it opens,** the app asks for your [Anthropic API key](https://console.anthropic.com/settings/keys) and checks it; Claude plans each edit and checks its cuts, about US$0.05 to 0.20 an edit, more for long ones. Meanwhile it installs the analysis once, about 2 GB of Python and PyTorch, with its progress in the window. The first edit then downloads what it needs on first use, each with its own bar: the speech model (3.4 GB), FFmpeg and the effects renderer. On a computer with less than 12 GB of memory, too little for the speech model, speech is heard on OpenRouter instead, with your [OpenRouter API key](https://openrouter.ai/settings/keys), for about US$0.03 an hour of footage; the app says so, and either can be chosen.
 
 The keys stay on your computer, in a file only your user can read, in the app's folder (`~/Library/Application Support/Video Editor` on macOS, `%APPDATA%\Video Editor` on Windows, `~/.config/Video Editor` on Linux), with the Python it installed. The models and edits are in `.cache\video-editor` and `.cache\huggingface` in your user folder (`~/.cache/…` on macOS and Linux). To remove the app entirely, uninstall or delete it and delete those folders. The app does not update itself yet: install a newer version over it, and the keys and downloads stay. How the app is built: [`apps/desktop`](apps/desktop/README.md).
 
@@ -52,12 +52,12 @@ A single web page drives it: drop the files, pick the length and aspect ratio, p
 
 ## What works today
 
-- **Probe:** rotated phone footage, non-square pixels, HDR and every audio track, read as they play ([media index](worker/README.md#media-index)).
+- **Probe:** rotated phone footage, non-square pixels, HDR and every audio track, read as they play ([sources](packages/engine/README.md#what-it-renders)).
 - **Shot detection:** [TransNetV2](https://github.com/soCzech/TransNetV2) finds hard cuts and dissolves.
 - **Speech and pauses:** [Silero VAD](https://github.com/snakers4/silero-vad) finds where someone speaks.
 - **Loudness and audio events:** EBU R128 loudness for every second, and laughter, applause and music from the [CED](https://github.com/RicherMans/CED) tagger ([details](worker/README.md#media-index)).
 - **Faces and who speaks:** [YuNet](https://huggingface.co/opencv/face_detection_yunet) faces tracked through each shot, each shot's layout, and who speaks when ([details](worker/README.md#faces-and-speakers)).
-- **Long sources:** frames and audio stream through the analysis, so hours of footage fit in memory ([shots](worker/README.md#media-index), [voice](worker/README.md#voice)).
+- **Long sources:** frames stream through shot detection and faces, so a 2-hour source peaks at about 2.8 GB before the speech model's memory ([voice](worker/README.md#voice)).
 - **Transcript:** [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) in sentence-sized chunks, so mixed Mandarin and English stays mixed, in Taiwan Traditional Chinese with [OpenCC](https://github.com/BYVoid/OpenCC) and timed word by word ([word timings](worker/README.md#word-timings)); `--asr cloud` hears the speech on OpenRouter instead ([cloud speech](worker/README.md#cloud-speech)).
 - **Transcript correction** (opt-in): Claude fixes misheard names, terms and homophones, and only edits that keep every spoken word apply ([details](worker/README.md#transcript-correction)).
 - **Plan:** [Claude plans the edit](packages/engine/README.md#planning) from any number of files and code cuts it between words to a length within ±5 %, then Claude checks every cut after each render ([measurements](packages/engine/MEASUREMENTS.md#planner-measurements)).
@@ -90,7 +90,7 @@ From the source, for development and the command line; to only use the editor, [
 - macOS, Windows 10 or 11 on x64, or Linux.
 - [mise](https://mise.jdx.dev), which installs the pinned Node, Python and `uv`; Node's corepack then provides the pinned pnpm. On Windows, install it with `winget install jdx.mise` and run the commands below in PowerShell, with [Git](https://git-scm.com/download/win) installed.
 - About 2 GB for the Python environment, plus the model weights downloaded on first use (3.4 GB for the speech model on a CPU).
-- An [Anthropic API key](https://console.anthropic.com/settings/keys): Claude plans the edit and checks its cuts, about US$0.05 to 0.15 an edit.
+- An [Anthropic API key](https://console.anthropic.com/settings/keys): Claude plans the edit and checks its cuts, about US$0.05 to 0.20 an edit, more for long ones.
 
 ```bash
 git clone https://github.com/zcxy-dev/video-editor.git

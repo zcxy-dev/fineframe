@@ -5,11 +5,12 @@
 - Renders have 0 clicks, A/V drift under 10 ms (never join with `-c copy`), no cut inside a word and a length within ±5 % of the target.
 
 ## Commands
-- Setup, checks and the tests CI skips (the `ml` and `synth` extras, Remotion, Claude) are in [CONTRIBUTING.md](CONTRIBUTING.md#setup).
+- Setup, checks and the tests CI skips (the `ml` and `synth` extras, Chrome for Remotion and web capture, Claude) are in [CONTRIBUTING.md](CONTRIBUTING.md#setup).
 
 ## Verify
 - Run the change for real on the [synthetic corpus](bench/README.md#synthetic-corpus) and look at the result.
 - Update the README's "What works today" and the package README in the same pull request; a pipeline change that is measured again updates `packages/engine/MEASUREMENTS.md`.
+- A change to `pnpm edit`/`pnpm render` options, `project.schema.json` or the effects catalogs updates `skills/video-editor` in the same pull request.
 
 ## Pitfalls
 - In `worker/`, `uv sync` without `--extra ml` removes the `ml` extra from the environment; use `uv sync --extra ml` (`uv run` keeps it).

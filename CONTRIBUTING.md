@@ -12,7 +12,7 @@ uv sync
 uv run vebench --help
 ```
 
-CI runs none of the tests that need the worker's `ml` extra or the benchmark's `synth` extra (the `windows` job installs the `ml` extra only to start the page). Run them locally when you change those parts: `uv sync --extra ml` in `worker/`, `uv sync --extra synth` in `bench/`, then `uv run pytest`. CI also skips the [engine test that renders the effect templates with Remotion](packages/engine/README.md#tests). Tests that call the Claude API run only with your own key: `uv run --env-file ../.env pytest -m claude` in `worker/` ([details](worker/README.md#transcript-correction)), and `CLAUDE_TESTS=1 node --env-file=../../.env --test src/plan/plan.test.ts` in `packages/engine/`.
+CI runs none of the tests that need the worker's `ml` extra or the benchmark's `synth` extra (the `windows` job installs the `ml` extra only to start the page). Run them locally when you change those parts: `uv sync --extra ml` in `worker/`, `uv sync --extra synth` in `bench/`, then `uv run pytest`. CI also skips the tests that need Chrome: the Remotion renders of templates (`engine/src/render.test.ts`) and cards (`effects/src/cards.test.ts`), and web capture (`engine/src/broll/capture.test.ts`); run them when you change those parts. Tests that call the Claude API run only with your own key: `uv run --env-file ../.env pytest -m claude` in `worker/` ([details](worker/README.md#transcript-correction)), and `CLAUDE_TESTS=1 node --env-file=../../.env --test src/plan/plan.test.ts` in `packages/engine/`.
 
 ## Checks
 
@@ -31,7 +31,7 @@ A change passes the steps in [`.github/workflows/ci.yml`](.github/workflows/ci.y
 - **Keep data synthetic.** Tests generate their own media (ffmpeg `lavfi`, synthetic tones).
 - **Corpus footage** follows [bench/README.md](bench/README.md#corpus-layout).
 - **Never commit** other people's media, credentials or `.env` files.
-- **Keep third-party notices in one file.** A new model, font, program or dependency gets a row in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md#components) with its licence, checked against its own licence file or model card. Code adapted from another project keeps that project's copyright and licence in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), which lists the files it is in; its attribution lives only there. Its brand assets (logos, product names) are not covered by its licence; don't copy them.
+- **Keep third-party notices in one file.** A new model, font, program or dependency gets a row in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md#components) with its licence, checked against its own licence file or model card. Code adapted from another project keeps that project's copyright and licence in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), which lists the files it is in, and is the only place that names it. Its brand assets (logos, product names) are not covered by its licence; don't copy them.
 
 ## Pull requests
 
