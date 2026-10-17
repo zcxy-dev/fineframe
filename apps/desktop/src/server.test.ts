@@ -31,7 +31,8 @@ async function fakeEditor(dir: string): Promise<Places> {
     `const { createServer } = require("node:http");
 const { spawn } = require("node:child_process");
 const { writeFileSync } = require("node:fs");
-const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+// The child takes a moment to exit once asked, as an edit cleaning up would.
+const child = spawn(process.execPath, ["-e", "process.on('SIGTERM', () => setTimeout(() => process.exit(0), 300)); setInterval(() => {}, 1000)"], { stdio: "ignore" });
 writeFileSync(${JSON.stringify(join(dir, "started.json"))}, JSON.stringify({
   args: process.argv.slice(2), cwd: process.cwd(), child: child.pid,
   keys: process.env.VIDEO_EDITOR_ENV_FILE, setup: process.env.VIDEO_EDITOR_SETUP,
