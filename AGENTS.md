@@ -10,7 +10,7 @@
 ## Verify
 - Run the change for real on the [synthetic corpus](bench/README.md#synthetic-corpus) and look at the result.
 - Update the README's "What works today" and the package README in the same pull request; a pipeline change that is measured again updates `packages/engine/MEASUREMENTS.md`.
-- A change to `pnpm edit`/`pnpm render` options, `project.schema.json` or the effects catalogs updates `skills/video-editor` in the same pull request.
+- A change to `pnpm edit`/`pnpm render` options or the effects catalogs' limits updates `skills/video-editor` in the same pull request; `packages/effects/src/recipes.test.ts` checks the `project.json` paths it names.
 
 ## Pitfalls
 - In `worker/`, `uv sync` without `--extra ml` removes the `ml` extra from the environment; use `uv sync --extra ml` (`uv run` keeps it).
