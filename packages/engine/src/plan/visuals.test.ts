@@ -250,6 +250,9 @@ test("visuals land on their words, a creator's pace apart, clear of what they ma
   assert.equal(few.length, 2);
   // Ends where something it may not cover starts.
   const cut = placeVisuals([card(1)], assets, { ...context, blocked: [{ start: 1.9 * SECOND, end: 5 * SECOND }] }); // biome-ignore format: one line
+  const why: string[] = [];
+  placeVisuals([card(1)], assets, { ...context, blocked: [{ start: 0, end: 5 * SECOND }], onLeftOut: (_, reason) => why.push(reason) }); // biome-ignore format: one line
+  assert.deepEqual(why, ["it would start under a title, chapter or name"]);
   assert.equal((cut[0]?.end ?? 0) / SECOND, 1.9);
   // Footage fills the frame, for at most 3.5 s.
   const footage = wish({ kind: "stock", query: "the sun", line: 6 });

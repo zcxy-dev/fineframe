@@ -420,17 +420,27 @@ export function placeVisuals(
     frame: number;
     aspect: Project["output"]["aspect"];
     blocked?: readonly { start: number; end: number }[];
+    /** Told why each visual left out was. */
+    onLeftOut?: (wish: VisualWish, reason: string) => void;
   },
 ): PlacedVisual[] {
   const { words, frame, edit } = context;
+  const leftOut = (wish: VisualWish, reason: string) => context.onLeftOut?.(wish, reason);
   const onFrame = (ticks: number) => Math.round(ticks / frame) * frame;
   const s = secondsToTicks;
   const wanted = wishes.flatMap((wish) => {
     const asset = assets.get(visualKey(wish));
     const line = context.lines(wish.source, wish.line);
-    if (!asset || !line) return [];
+    if (!asset) return [];
+    if (!line) {
+      leftOut(wish, "its line does not play");
+      return [];
+    }
     const inLine = words.filter((w) => w.source === wish.source && w.index >= line.first && w.index <= line.last); // biome-ignore format: one line
-    if (inLine.length === 0) return [];
+    if (inLine.length === 0) {
+      leftOut(wish, "its line's words were cut");
+      return [];
+    }
     const found = findWords(
       context.sourceWords(wish.source) as never,
       line.first,
@@ -446,12 +456,20 @@ export function placeVisuals(
   const most = Math.max(1, Math.floor(edit / s(VISUAL_EVERY)));
   const placed: PlacedVisual[] = [];
   for (const item of wanted) {
-    if (placed.length >= most) break;
+    if (placed.length >= most) {
+      leftOut(item.wish, `more than one every ${VISUAL_EVERY} s`);
+      continue;
+    }
     const { asset, start } = item;
     const before = placed.at(-1);
-    if (before && start < before.end + s(SPEAKER_GAP)) continue;
-    if ((context.blocked ?? []).some((b) => start < b.end && b.start < start + s(VISUAL_MIN)))
+    if (before && start < before.end + s(SPEAKER_GAP)) {
+      leftOut(item.wish, "too close to the visual before");
       continue;
+    }
+    if ((context.blocked ?? []).some((b) => start < b.end && b.start < start + s(VISUAL_MIN))) {
+      leftOut(item.wish, "it would start under a title, chapter or name");
+      continue;
+    }
     const [least, wantedSeconds] =
       asset.kind === "card"
         ? [cards[asset.card as keyof typeof cards].seconds.min, cards[asset.card as keyof typeof cards].seconds.typical] // biome-ignore format: one line
@@ -468,7 +486,10 @@ export function placeVisuals(
       ...blockedAfter,
     );
     end = Math.floor(end / frame) * frame;
-    if (end - start < s(least) - frame / 2) continue;
+    if (end - start < s(least) - frame / 2) {
+      leftOut(item.wish, "too little time before its line ends or something it may not cover");
+      continue;
+    }
     placed.push({ wish: item.wish, asset, start, end, layout });
   }
   return placed;

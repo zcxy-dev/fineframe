@@ -732,6 +732,8 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
         frame: ticksPerFrame(state.fps),
         aspect: state.aspect,
         blocked: [...covered, ...first.filter((o) => o.template !== "keyword")].map((o) => ({ start: o.start, end: o.start + o.duration })), // biome-ignore format: one line
+        onLeftOut: (wish, reason) =>
+          state.progress(`Left out the ${wish.kind} visual on line ${wish.line}: ${reason}`),
       })
     : [];
   const shown = visuals.map((v) => ({ start: v.start, duration: v.end - v.start }));
