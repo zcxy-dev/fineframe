@@ -7,10 +7,6 @@
 
 > **Status:** the analysis worker, the planner, the renderer with its captions and effect templates, the `pnpm edit` command that runs them from footage to a finished video, the web page in front of it, the desktop app for Apple silicon Macs, Windows and Linux that runs the page with nothing else to install, the agent skill that changes a finished edit by conversation, and the benchmark work today.
 
-![Seven frames from a five-minute 9:16 edit: a title, chapter markers, a lower third, a keyword highlight, a wipe over a cut and word-by-word captions](docs/example-edit.png)
-
-*Frames from a five-minute 9:16 edit of a synthetic two-person podcast, made with `pnpm edit` and no manual steps: a title, chapter markers, a lower third for the guest, a keyword highlight, a wipe into a chapter and captions lit word by word.*
-
 ## Install
 
 The desktop app needs nothing else installed: no Node, no Python, no command line. Download the installer for your computer from the [latest release](https://github.com/zcxy-dev/video-editor/releases/latest):
