@@ -59,8 +59,9 @@ export interface RenderOptions {
 const OVERLAY_SHARE = 0.4;
 /** Masters of the sound tried for its true peak, and how far under the overshoot each next try
  * sets the limiter. */
-const PEAK_TRIES = 4;
+const PEAK_TRIES = 6;
 const PEAK_STEP_DB = 0.1;
+const PEAK_NEAR_DB = 1;
 
 export interface RenderResult {
   /** Absolute paths of what the render wrote. */
@@ -369,31 +370,47 @@ export async function render(
 }
 
 /**
- * Masters the sound until its encoded true peak is at most `target` dBTP: `attempt(ceiling, n)`
- * writes try `n` with the limiter at `ceiling` (none on the first) and returns its encoded peak,
- * and `discard(n)` removes a try no longer wanted. Returns the try to keep: the first under the
- * target, or else the one that peaked lowest. AAC's overshoot does not fall steadily as the
- * ceiling does, so the render goes on with a peak a little over rather than fail after its
- * whole analysis; the result reports the peak.
+ * Masters the sound until its encoded true peak is at most `target` dBTP and within
+ * `PEAK_NEAR_DB` of it: `attempt(ceiling, n)` writes try `n` with the limiter at `ceiling` (none
+ * on the first) and returns its encoded peak, and `discard(n)` removes a try no longer wanted.
+ * While every try peaks over, each sets the limiter lower by its overshoot. AAC's overshoot does
+ * not fall steadily as the ceiling does, so once a try passes far under the target, the next
+ * ceilings halve the gap between it and the nearest one above that peaked over. Returns the try
+ * to keep: the passing one nearest the target, or else the one that peaked lowest, so the render
+ * goes on with a peak a little over rather than fail after its whole analysis; the result
+ * reports the peak.
  */
 export async function limitPeak(
   target: number,
   attempt: (ceiling: number | undefined, n: number) => Promise<number>,
   discard: (n: number) => Promise<void> = async () => {},
 ): Promise<{ n: number; peak: number }> {
-  let best: { n: number; peak: number } | null = null;
+  type Try = { n: number; peak: number; ceiling: number | undefined };
+  let best: Try | null = null;
+  // The ceilings that peaked over; no limiter counts as one at the target.
+  const over: number[] = [];
   let ceiling: number | undefined;
   for (let n = 0; n < PEAK_TRIES; n++) {
     const peak = await attempt(ceiling, n);
-    if (best === null || peak < best.peak) {
-      if (best) await discard(best.n);
-      best = { n, peak };
-    } else await discard(n);
-    const over = peak - target;
-    if (over <= 0) break;
-    ceiling = (ceiling ?? target) - over - PEAK_STEP_DB;
+    const at = ceiling ?? target;
+    const passes = peak <= target;
+    const better =
+      best === null || (passes ? best.peak > target || peak > best.peak : peak < best.peak);
+    if (best && better) await discard(best.n);
+    else if (!better) await discard(n);
+    const kept: Try = best && !better ? best : { n, peak, ceiling };
+    best = kept;
+    if (!passes) over.push(at);
+    if (kept.peak <= target) {
+      // Without a limiter the peak is what loudness alone leaves; no ceiling raises it.
+      if (kept.peak > target - PEAK_NEAR_DB || kept.ceiling === undefined) break;
+      const below = kept.ceiling;
+      const above = Math.min(...over.filter((c) => c > below));
+      ceiling = (below + (Number.isFinite(above) ? above : target)) / 2;
+    } else ceiling = at - (peak - target) - PEAK_STEP_DB;
   }
-  return best as { n: number; peak: number };
+  if (!best) throw new Error("No try of the master");
+  return { n: best.n, peak: best.peak };
 }
 
 /** The true peak, in dBTP, of a raw stereo float file once encoded as the output encodes it. */
