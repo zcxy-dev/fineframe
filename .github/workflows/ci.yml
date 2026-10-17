@@ -77,7 +77,7 @@ jobs:
           pnpm test
           pnpm check-gen
 
-  # The renderer on macOS, Apple silicon and Intel, and on Windows, with each one's pinned
+  # The renderer on macOS (Apple silicon) and on Windows, with each one's pinned
   # FFmpeg: the engine tests, then a synthetic edit scored by vebench. On Windows also the rest of
   # the workspace, the worker and the page as `mise run start` starts it.
   platforms:
@@ -90,9 +90,6 @@ jobs:
           - check: macos
             runner: macos-latest
             timeout: 15
-          - check: macos-intel
-            runner: macos-15-intel
-            timeout: 30
           - check: windows
             runner: windows-latest
             timeout: 20

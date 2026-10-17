@@ -9,8 +9,7 @@ import { cacheDir, type DownloadProgress, pinnedFile } from "./download.ts";
 export const FFMPEG_ENV = "VIDEO_EDITOR_FFMPEG";
 
 // The static builds imageio-ffmpeg 0.6.0 ships to bench/ and worker/, from the repository it
-// builds its wheels from, at a fixed commit; on Intel Macs, whose imageio build is nonfree and
-// may not be redistributed, the project's own (scripts/build-ffmpeg-macos-x64.sh).
+// builds its wheels from, at a fixed commit.
 const IMAGEIO =
   "https://raw.githubusercontent.com/imageio/imageio-binaries/f8f64710ea88e7e4a352c0f7d8c0deac9f5fd685/ffmpeg";
 const PINNED: Record<string, { url: string; sha256: string }> = {
@@ -21,10 +20,6 @@ const PINNED: Record<string, { url: string; sha256: string }> = {
   "linux-arm64": {
     url: `${IMAGEIO}/ffmpeg-linux-aarch64-v7.0.2`,
     sha256: "6bb182d0d75d23028db82e9e4f723ca69b853d055698486e6984ddb2c06fb8ce",
-  },
-  "darwin-x64": {
-    url: "https://github.com/zcxy-dev/video-editor/releases/download/ffmpeg-7.1.5-macos-x86_64/ffmpeg",
-    sha256: "f26c58ee5500076765baa96f90e378b48925bb34f8961670260542ed5049d6ec",
   },
   "darwin-arm64": {
     url: `${IMAGEIO}/ffmpeg-macos-aarch64-v7.1`,
