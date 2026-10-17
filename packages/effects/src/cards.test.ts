@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { SchemaError } from "@video-editor/schema";
 import { type CardId, cardIds, cards } from "./cards.ts";
 import { ICONS, LOGOS } from "./icons.ts";
-import { type Aspect, cardLayout, type Placement } from "./layout.ts";
+import { type Aspect, cardLayout, ems, fitRuns, type Placement } from "./layout.ts";
 import { type CardJob, cardKey, renderCards } from "./render.ts";
 import { cardProblems, validateCards } from "./validate.ts";
 
@@ -149,4 +149,25 @@ test("every card renders through Remotion, full and as a panel", {
   const files = await renderCards(jobs);
   assert.equal(files.length, jobs.length);
   for (const file of files) assert.ok((await stat(file)).size > 1000, file);
+});
+
+test("a long English statement shrinks until its words, wrapped whole, fit the card", () => {
+  const { box, type } = cardLayout("9:16", "full", 1080, 1920);
+  const text = "A visual flare forecast: to our knowledge, a first.";
+  const words = text.split(" ");
+  const size = fitRuns(words, type("display"), box.width * 0.96, box.height, 1.32);
+  // Lay the words out greedily at that size, in heavy type, as the browser does.
+  let lines = 1;
+  let used = 0;
+  for (const word of words) {
+    const w = ems(word) * 1.08 * size;
+    const next = used === 0 ? w : used + ems(" ") * size + w;
+    if (next > box.width * 0.96 && used > 0) {
+      lines += 1;
+      used = w;
+    } else used = next;
+  }
+  assert.ok(lines * 1.32 * size <= box.height, `${lines} lines of ${size} px overflow ${box.height}`); // biome-ignore format: one line
+  // The old estimate, by characters, let this statement run past the box at a larger size.
+  assert.ok(size < type("display"));
 });

@@ -121,6 +121,38 @@ export function ems(text: string): number {
   return total;
 }
 
+/**
+ * The type size, at most `max`, at which `text`, broken only between `runs` (words, and CJK after
+ * punctuation) the way a browser wraps it, fits `width` by `height` pixels. Each run is set in
+ * heavy type a little wider than `ems` counts.
+ */
+export function fitRuns(
+  runs: readonly string[],
+  max: number,
+  width: number,
+  height: number,
+  lineHeight: number,
+): number {
+  const heavy = 1.08;
+  const space = ems(" ");
+  const widths = runs.filter((run) => run !== "").map((run) => ems(run) * heavy);
+  const lines = (size: number) => {
+    let count = 1;
+    let used = 0;
+    for (const w of widths) {
+      const next = used === 0 ? w * size : used + (space + w) * size;
+      if (next > width && used > 0) {
+        count += 1;
+        used = w * size;
+      } else used = next;
+    }
+    return count;
+  };
+  let size = Math.min(max, (width * 0.98) / Math.max(...widths, 1));
+  while (size > 6 && lines(size) * lineHeight * size > height) size *= 0.95;
+  return size;
+}
+
 /** The type size, at most `size`, at which `text` fits on one line `available` pixels wide. */
 export function fit(text: string, size: number, available: number): number {
   const width = ems(text) * size;

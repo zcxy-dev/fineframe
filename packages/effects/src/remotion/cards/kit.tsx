@@ -4,7 +4,7 @@
 import { type CSSProperties, createElement, type ReactNode } from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { ICONS, type IconName, LOGOS, type LogoName } from "../../icons.ts";
-import { type CardLayout, COLORS, ems, MOTION, rgba } from "../../layout.ts";
+import { type CardLayout, COLORS, fitRuns, MOTION, rgba } from "../../layout.ts";
 
 const enter = Easing.bezier(...MOTION.enter);
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
@@ -271,17 +271,15 @@ export function fitBlock(
   height: number,
   lineHeight = 1.3,
 ): number {
-  const length = ems(text);
-  // The longest run keep-all will not break: up to a space between Latin words or after CJK
+  // The runs keep-all will not break: up to a space between Latin words or after CJK
   // punctuation.
-  const runs = glue(text).split(/ +|(?<=[，。、！？；：」』）])/);
-  const longest = Math.max(...runs.map(ems));
-  let size = Math.min(max, (width * 0.98) / longest);
-  // Wrapping at word and punctuation boundaries leaves each line a little short.
-  while (size > 6 && Math.ceil((length * size * 1.1) / width) * lineHeight * size > height) {
-    size *= 0.95;
-  }
-  return size;
+  return fitRuns(
+    glue(text).split(/ +|(?<=[，。、！？；：」』）])/),
+    max,
+    width,
+    height,
+    lineHeight,
+  );
 }
 
 /** The monospaced face of terminals and code, falling back to Noto Sans TC for CJK. */
