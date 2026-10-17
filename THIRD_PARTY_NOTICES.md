@@ -1,6 +1,6 @@
 # Third-party notices
 
-The project's own code is under the [MIT License](LICENSE). It uses the components below, each under its own licence. Nothing in this repository bundles a model weight, a font or a binary, and its only third-party media are [a few CC0 sound effects](#sound-effects) and [the effect cards' icons](#icons-copied-into-the-source): the tools download the rest on first use, from their publishers or, for the Intel macOS FFmpeg, from a release of this repository, or the package managers install them. The desktop app's installers do carry programs: Electron, uv and the npm packages the editor runs, but no FFmpeg, model or Python package ([what they carry](#desktop-installers)). Licences were checked against each component's own licence file or model card at the version or revision the project pins.
+The project's own code is under the [MIT License](LICENSE). It uses the components below, each under its own licence. Nothing in this repository bundles a model weight, a font or a binary, and its only third-party media are [a few CC0 sound effects](#sound-effects) and [the effect cards' icons](#icons-copied-into-the-source): the tools download the rest on first use, from their publishers, or the package managers install them. The desktop app's installers do carry programs: Electron, uv and the npm packages the editor runs, but no FFmpeg, model or Python package ([what they carry](#desktop-installers)). Licences were checked against each component's own licence file or model card at the version or revision the project pins.
 
 ## Components
 
@@ -14,7 +14,7 @@ The project's own code is under the [MIT License](LICENSE). It uses the componen
 | [Beat This!](https://github.com/CPJKU/beat_this) `final0` checkpoint | MIT | JKU Linz's file server, SHA-256 checked; worker `ml` extra |
 | [DeepFilterNet3](https://github.com/Rikorose/DeepFilterNet) ONNX export | MIT OR Apache-2.0 | GitHub, pinned commit and SHA-256; worker `ml` extra |
 | [Noto Sans CJK TC](https://github.com/notofonts/noto-cjk) Bold and Black | OFL-1.1 | GitHub, pinned commit and SHA-256; renderer, for captions |
-| [FFmpeg](https://ffmpeg.org) static builds: from [imageio-binaries](https://github.com/imageio/imageio-binaries), 7.0.2 on Linux, 7.1 on Apple silicon and on Windows ([gyan.dev](https://www.gyan.dev/ffmpeg/builds/)'s essentials build); on Intel macOS, 7.1.5 built by this project | GPL-3.0-or-later (Linux, Windows), GPL-2.0-or-later (macOS) | GitHub, pinned commit or this repository's release, and SHA-256; renderer, run as a separate program (see [notes](#ffmpeg)) |
+| [FFmpeg](https://ffmpeg.org) static builds: from [imageio-binaries](https://github.com/imageio/imageio-binaries), 7.0.2 on Linux, 7.1 on Apple silicon and on Windows ([gyan.dev](https://www.gyan.dev/ffmpeg/builds/)'s essentials build) | GPL-3.0-or-later (Linux, Windows), GPL-2.0-or-later (macOS) | GitHub, pinned commit and SHA-256; renderer, run as a separate program (see [notes](#ffmpeg)) |
 | Remotion's compositor (`@remotion/compositor-*`), with its own FFmpeg | [Remotion License](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md); its FFmpeg is configured with `--enable-gpl`, libx264, libx265 and libfdk-aac | Installed with @remotion/renderer by pnpm; for the desktop app, downloaded from npm on the first effect render, checked against `pnpm-lock.yaml` (see [notes](#desktop-installers)) |
 | [CPython](https://www.python.org) builds from [python-build-standalone](https://github.com/astral-sh/python-build-standalone) | PSF-2.0, with the licences of the libraries each build includes | Desktop app only: installed by uv into the app's folder on its first start |
 | Chrome Headless Shell ([Chromium](https://www.chromium.org)) | Chromium's BSD-3-Clause licence and the third-party licences it lists; Google's build also refers to the Chrome terms of service | Downloaded by Remotion on the first effect render or web capture: from Google's [Chrome for Testing](https://github.com/GoogleChromeLabs/chrome-for-testing), on Linux with glibc 2.35 or later from Remotion's own build, and on older Linux arm64 from Playwright's Chromium build |
@@ -45,7 +45,7 @@ Models that come inside a package: the TransNetV2 weights in transnetv2-pytorch,
 | [torch](https://github.com/pytorch/pytorch) | BSD-3-Clause and bundled permissive licences | worker `ml`, benchmark `synth` |
 | [transformers](https://github.com/huggingface/transformers) | Apache-2.0 | worker `ml` |
 | [transnetv2-pytorch](https://github.com/allenday/transnetv2_pytorch) | MIT | worker `ml` |
-| [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg) | BSD-2-Clause; its wheels bundle imageio-binaries' FFmpeg builds, on Intel macOS a nonfree one (see [notes](#ffmpeg)) | benchmark; worker tests |
+| [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg) | BSD-2-Clause; its wheels bundle imageio-binaries' FFmpeg builds (see [notes](#ffmpeg)) | benchmark; worker tests |
 | [rapidfuzz](https://github.com/rapidfuzz/RapidFuzz) | MIT | benchmark |
 | [kokoro](https://github.com/hexgrad/kokoro) and [misaki](https://github.com/hexgrad/misaki) | Apache-2.0 | benchmark `synth` |
 | [jieba](https://github.com/fxsjy/jieba) | MIT | benchmark `synth` |
@@ -108,9 +108,7 @@ The renderer runs FFmpeg as a separate program and needs libx264, which is GPL; 
 
 The Windows build is gyan.dev's 7.1 essentials build, which imageio-binaries republishes; it is configured with `--enable-gpl --enable-version3` and nothing nonfree, so the binary is GPL-3.0-or-later and may be redistributed.
 
-The Intel macOS build is the project's own, because imageio-binaries' (`ffmpeg-macos-x86_64-v7.1`) is configured with `--enable-nonfree` and declares itself not redistributable. [build-ffmpeg-macos-x64.sh](packages/engine/scripts/build-ffmpeg-macos-x64.sh) builds FFmpeg 7.1.5 statically with x264, libvpx, zimg, Opus, libass, FreeType, FriBidi and HarfBuzz, each pinned by SHA-256 or commit, and nothing nonfree, so the binary is GPL-2.0-or-later. A [workflow](.github/workflows/ffmpeg-macos-x64.yml) runs it on GitHub's Intel macOS runner and publishes the binary as a release, with `sources.tar.gz`: every source it was built from and the script. imageio-ffmpeg, which the benchmark and the worker's tests run, still installs imageio-binaries' nonfree build on Intel Macs; nothing ships it.
-
-Anyone who redistributes these builds, for example in a desktop app or a container image, must meet the GPL, including offering the corresponding source: for the Intel macOS build that is its release's `sources.tar.gz`, while imageio-binaries publishes none beside its builds. The alternative is an LGPL build of FFmpeg, which means encoding H.264 without libx264.
+Anyone who redistributes these builds, for example in a desktop app or a container image, must meet the GPL, including offering the corresponding source, which imageio-binaries publishes none of beside its builds. The alternative is an LGPL build of FFmpeg, which means encoding H.264 without libx264.
 
 ### Copyleft dependencies
 

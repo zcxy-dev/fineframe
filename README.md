@@ -77,7 +77,7 @@ A single web page drives it: drop the files, pick the length and aspect ratio, p
 - **Blind review:** a [local page](bench/README.md#blind-review) records people's ratings of edits and which of two versions they prefer.
 - **File formats:** [JSON Schemas](packages/schema/) for the media index, `project.json` and progress lines, with generated types and validators.
 - **Ground truth drafts:** `vework draft-truth` drafts a corpus clip's transcript for a person to correct ([workflow](bench/README.md#ground-truth)).
-- **Platforms:** macOS on Apple silicon, Windows x64 and Linux x64, tested by CI on every change; on Intel Macs only the renderer runs ([#27](https://github.com/zcxy-dev/video-editor/issues/27)).
+- **Platforms:** macOS on Apple silicon, Windows x64 and Linux x64, tested by CI on every change. Intel Macs are not supported.
 - **Synthetic corpus:** [`vebench synth`](bench/README.md#synthetic-corpus) generates talks, conversations, a phone walk, screen recordings and music with exact truth.
 
 Analysis and rendering run locally; [SECURITY.md](SECURITY.md#scope) says what planning, the cut review, transcript correction, cloud speech and a rich edit's B-roll send or fetch.
@@ -87,7 +87,7 @@ Analysis and rendering run locally; [SECURITY.md](SECURITY.md#scope) says what p
 From the source, for development and the command line; to only use the editor, [install the app](#install).
 
 **Requirements:**
-- macOS, Windows 10 or 11 on x64, or Linux.
+- macOS on Apple silicon, Windows 10 or 11 on x64, or Linux.
 - [mise](https://mise.jdx.dev), which installs the pinned Node, Python and `uv`; Node's corepack then provides the pinned pnpm. On Windows, install it with `winget install jdx.mise` and run the commands below in PowerShell, with [Git](https://git-scm.com/download/win) installed.
 - About 2 GB for the Python environment, plus the model weights downloaded on first use (3.4 GB for the speech model on a CPU).
 - An [Anthropic API key](https://console.anthropic.com/settings/keys): Claude plans the edit and checks its cuts, about US$0.05 to 0.20 an edit, more for long ones.

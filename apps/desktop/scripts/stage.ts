@@ -28,10 +28,6 @@ const UV: Record<string, { target: string; sha256: string }> = {
     target: "aarch64-apple-darwin",
     sha256: "a9c1b29002cf3c83f07fa9cd8a887a3be0107d90e23189721221e7257db8e3d6",
   },
-  "darwin-x64": {
-    target: "x86_64-apple-darwin",
-    sha256: "5f44dcbde809b632f47c36fadb241cb4d6f9af71d0c8f172b5d2026d3dde742c",
-  },
   "linux-x64": {
     target: "x86_64-unknown-linux-gnu",
     sha256: "1468ebd5a5541121837c5a2817b9972ba6090fa6caa3d142620850a47fb75154",

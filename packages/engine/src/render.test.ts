@@ -763,12 +763,9 @@ test("a mix louder than loudness normalisation measures is still normalised", as
   assert.ok(Math.abs(after.input_i - target.integratedLufs) < 1, String(after.input_i));
 });
 
-// On Intel macOS and Windows the search for a ceiling lands 1.3 dB under it: AAC's overshoot on
-// these transients does not follow the ceiling (https://github.com/zcxy-dev/video-editor/issues/16).
-const peakSearchTodo =
-  (process.platform === "darwin" && process.arch === "x64") || process.platform === "win32"
-    ? "#16"
-    : false;
+// On Windows the search for a ceiling lands 1.3 dB under it: AAC's overshoot on these
+// transients does not follow the ceiling (https://github.com/zcxy-dev/video-editor/issues/16).
+const peakSearchTodo = process.platform === "win32" ? "#16" : false;
 test("a noisy mix with sharp transients keeps its true-peak ceiling once encoded", {
   todo: peakSearchTodo,
 }, async (t) => {
@@ -1315,7 +1312,7 @@ test("a split screen: a card in the panel, the speaker in step below it, a sound
   const picture = await grey(result.video, 64, 36);
   assert.equal(picture.length, 90);
   // Within 3 levels: Apple silicon's FFmpeg build rounds a flat grey up to 2.2 levels away from
-  // the Linux and Intel builds, in one half of a frame where the other half matches.
+  // the Linux build, in one half of a frame where the other half matches.
   const near = (actual: number, expected: number, at: string) =>
     assert.ok(Math.abs(actual - expected) <= 3, `${at}: luma ${actual}, expected ${expected}`);
   for (const [n, frame] of picture.entries()) {
