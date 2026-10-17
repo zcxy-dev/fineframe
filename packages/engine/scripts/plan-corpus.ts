@@ -4,7 +4,9 @@
 //   node scripts/plan-corpus.ts <corpus> --group talk-a --lengths 30,60,300 --aspect 16:9
 //   cd ../../bench && uv run vebench report <corpus>
 //
-// Each clip folder of the corpus holds source.mp4 and the index.json vework wrote for it. For
+// Each clip folder of the corpus holds source.mp4 and, optionally, the index.json vework wrote
+// for it; without one, the clip is analysed once into the index cache `pnpm edit` keeps
+// (~/.cache/video-editor/indexes/), so a regenerated corpus is not analysed again. For
 // each length it writes to <first clip>/runs/<system>-<length>s/: project.json (as reviewed)
 // and planned.json (before the first review), output.mp4, edit_cuts.json and the stems
 // voice.wav and music.wav from the renderer, claude.json (every reply, replayed instead of
@@ -25,6 +27,7 @@ import {
   ticksPerFrame,
   validateMediaIndex,
 } from "@video-editor/schema";
+import { cachedIndex, defaultCache, localWorker } from "../src/edit/analyze.ts";
 import { autoGrade } from "../src/grade.ts";
 import {
   anthropicClaude,
@@ -34,7 +37,7 @@ import {
   recordedClaude,
   totalUsage,
 } from "../src/plan/claude.ts";
-import { type Aspect, type PlannedEdit, plan } from "../src/plan/plan.ts";
+import { type Aspect, type PlanInput, type PlannedEdit, plan } from "../src/plan/plan.ts";
 import { review } from "../src/plan/review.ts";
 import { render } from "../src/render.ts";
 import { fingerprintOf, gridTicks } from "../src/sources.ts";
@@ -66,13 +69,15 @@ const aspect = (values.aspect ?? "16:9") as Aspect;
 const here = process.env.INIT_CWD ?? process.cwd();
 const music = (values.music ?? []).map((input) => resolve(here, input));
 const log = (message: string) => process.stderr.write(`${message}\n`);
+/** A clip's index beside its media, or a cached index with the media it is of. */
+type CorpusInput = Extract<PlanInput, string | { index: string }>;
 
 for (const group of values.group) {
   const clips = (await readdir(corpus))
     .filter((name) => name === group || name.match(new RegExp(`^${group}\\d+$`)))
     .sort();
   if (clips.length === 0) throw new Error(`${group}: no clips in ${corpus}`);
-  const indexes = clips.map((clip) => join(corpus, clip, "index.json"));
+  const indexes = await Promise.all(clips.map((clip) => indexOf(join(corpus, clip))));
   const home = join(corpus, clips[0] as string, "runs");
   for (const length of lengths) {
     if (values.naive) await naive(indexes, length, join(home, `naive-${length}s`));
@@ -133,6 +138,26 @@ async function renderEdit(edit: PlannedEdit, folder: string): Promise<void> {
   });
 }
 
+/** The clip's own index.json, or else its source.mp4's index from the cache, analysed now if it
+ * is not there. */
+async function indexOf(clip: string): Promise<CorpusInput> {
+  const own = join(clip, "index.json");
+  if (existsSync(own)) return own;
+  const source = join(clip, "source.mp4");
+  const file = { given: source, path: source, kind: "video" as const };
+  const step = (fraction: number, message: string) =>
+    log(`${relative(corpus, clip)}: ${message} (${Math.round(fraction * 100)} %)`);
+  const index = await cachedIndex(
+    await localWorker(),
+    file,
+    { correct: false },
+    defaultCache(),
+    step,
+    log,
+  );
+  return { index, source };
+}
+
 /** Replays claude.json when it holds every reply the run asks for; otherwise calls the API and
  * records each reply, so a corpus run can be repeated without paying for it again. */
 async function recorder(file: string): Promise<{ claude: Claude; save: () => Promise<void> }> {
@@ -160,16 +185,18 @@ async function recorder(file: string): Promise<{ claude: Claude; save: () => Pro
 }
 
 /** The baseline: every clip whole, in file order, cut off at the target length. */
-async function naive(indexes: string[], length: number, folder: string): Promise<void> {
+async function naive(indexes: CorpusInput[], length: number, folder: string): Promise<void> {
   await mkdir(folder, { recursive: true });
   const target = secondsToTicks(length);
   const sources: Project["sources"] = [] as never;
   const main: Project["main"][number][] = [];
   let left = target;
   let fps = { num: 30, den: 1 };
-  for (const [i, indexPath] of indexes.entries()) {
+  for (const [i, input] of indexes.entries()) {
+    const indexPath = typeof input === "string" ? input : input.index;
     const index = await loadJson(indexPath, validateMediaIndex);
-    const media = join(indexPath, "..", index.source.name);
+    const media =
+      typeof input === "string" ? join(indexPath, "..", index.source.name) : input.source;
     const id = `clip-${i + 1}`;
     if (i === 0) {
       const ticks = gridTicks(index.source.video?.fps ?? 30);

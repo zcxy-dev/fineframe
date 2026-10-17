@@ -32,7 +32,7 @@ uv run vebench render --media synthetic/chat-b1/runs/edit-60s/output.mp4 \
 These runs use the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0), each clip analysed with `vework analyze` and no transcript correction. Each footage was planned, rendered and reviewed at each length its speech allows: the two groups at 16:9, the single clips at 9:16 except the screen recording. The baseline keeps every clip whole, in file order, cut off at the target. `vebench edit` scores both, and `vebench render` the planner's renders.
 
 ```bash
-# Each clip analysed first: vework analyze <clip>/source.mp4 -o <clip>/index.json
+# Each clip is analysed once into the index cache, then read from it
 node scripts/plan-corpus.ts ../../bench/synthetic --group talk-a --lengths 30,60,300 --naive
 cd ../../bench && uv run vebench report synthetic/
 ```

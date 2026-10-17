@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { workerVersion } from "./analyze.ts";
+import { cachedIndex, type Worker, workerVersion } from "./analyze.ts";
 
 const WORKER = fileURLToPath(new URL("../../../../worker/", import.meta.url));
 
@@ -51,4 +51,26 @@ test("a Windows checkout, with CRLF line endings, has the same version as any ot
     await writeFile(path, lf.replaceAll("\n", "\r\n"));
   }
   assert.equal(await workerVersion(dir), before);
+});
+
+test("a file analysed before is read from the cache, without running vework again", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "cached-"));
+  const source = join(dir, "talk.mp4");
+  await writeFile(source, "footage");
+  // What the stand-in for vework copies to the index it is asked for.
+  await writeFile(join(dir, "talk.index.json"), "{}");
+  const calls = join(dir, "vework.jsonl");
+  process.env.FAKE_VEWORK_LOG = calls;
+  const worker: Worker = {
+    command: [process.execPath, fileURLToPath(new URL("fixtures/vework.ts", import.meta.url))],
+    version: "test",
+  };
+  const file = { given: source, path: source, kind: "video" as const };
+  const cache = join(dir, "cache");
+  const quiet = () => {};
+  const first = await cachedIndex(worker, file, { correct: false }, cache, quiet, quiet);
+  const second = await cachedIndex(worker, file, { correct: false }, cache, quiet, quiet);
+  assert.equal(second, first);
+  assert.equal((await readFile(first, "utf8")).trim(), "{}");
+  assert.equal((await readFile(calls, "utf8")).trim().split("\n").length, 1);
 });
