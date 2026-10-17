@@ -9,9 +9,10 @@
 // (~/.cache/video-editor/indexes/), so a regenerated corpus is not analysed again. For
 // each length it writes to <first clip>/runs/<system>-<length>s/: project.json (as reviewed)
 // and planned.json (before the first review), output.mp4, edit_cuts.json and the stems
-// voice.wav and music.wav from the renderer, claude.json (every reply, replayed instead of
-// calling the API when the same request comes again) and usage.json, with every request's
-// tokens and cost. The system is video-editor unless --system names another; --music offers
+// voice.wav and music.wav from the renderer, claude.json (every reply, replayed when the same
+// request comes again) and usage.json, with every request's tokens and cost. Claude is only
+// replayed, so an engine-only change is compared on the same plans for nothing; a request with
+// no recorded reply fails unless --live-claude lets it call the API (and record the reply). The system is video-editor unless --system names another; --music offers
 // the tracks of music indexes, and --quality economy plans with the cheaper model.
 // --naive also writes naive-<length>s/: every clip whole, in file order, cut off at the length.
 
@@ -53,12 +54,13 @@ const { values, positionals } = parseArgs({
     music: { type: "string", multiple: true },
     system: { type: "string" },
     quality: { type: "string" },
+    "live-claude": { type: "boolean" },
   },
 });
 const usage =
   "Usage: node scripts/plan-corpus.ts <corpus> --group <prefix>... --lengths 30,60 " +
   "[--aspect 16:9] [--naive] [--no-review] [--music <music.json | folder>]... [--system <name>] " +
-  "[--quality <best | economy>]";
+  "[--quality <best | economy>] [--live-claude]";
 if (positionals.length !== 1 || !values.group || !values.lengths) {
   console.error(usage);
   process.exit(2);
@@ -158,8 +160,8 @@ async function indexOf(clip: string): Promise<CorpusInput> {
   return { index, source };
 }
 
-/** Replays claude.json when it holds every reply the run asks for; otherwise calls the API and
- * records each reply, so a corpus run can be repeated without paying for it again. */
+/** Replays claude.json; a request it holds no reply to calls the API with --live-claude, and
+ * fails without, so a corpus run is repeated without paying for it again. */
 async function recorder(file: string): Promise<{ claude: Claude; save: () => Promise<void> }> {
   type Entry = { purpose: ClaudeRequest["purpose"]; key: string; json: unknown };
   const recorded: Entry[] = existsSync(file) ? JSON.parse(await readFile(file, "utf8")) : [];
@@ -170,14 +172,20 @@ async function recorder(file: string): Promise<{ claude: Claude; save: () => Pro
       .update(request.model)
       .update(request.content.map((block) => (block.type === "text" ? block.text : "")).join("\n"))
       .digest("hex");
-  const live = anthropicClaude();
+  const live = values["live-claude"] ? anthropicClaude() : null;
   const entries: Entry[] = [];
   const claude: Claude = async (request) => {
     const key = keyOf(request);
     const found = recorded.find((entry) => entry.key === key);
+    if (!found && !live) {
+      throw new Error(
+        `${file}: no recorded reply to a ${request.purpose} request; ` +
+          "run with --live-claude to ask Claude and record it",
+      );
+    }
     const reply = found
       ? await recordedClaude({ [request.purpose]: [found.json] }).claude(request)
-      : await live(request);
+      : await (live as Claude)(request);
     entries.push({ purpose: request.purpose, key, json: reply.json });
     return reply;
   };
