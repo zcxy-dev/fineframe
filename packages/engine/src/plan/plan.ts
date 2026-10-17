@@ -77,6 +77,17 @@ import {
   planSystem,
 } from "./prompt.ts";
 import { bare, joinWords } from "./text.ts";
+import {
+  type Asset,
+  type PlacedVisual,
+  placeVisuals,
+  sourceVisuals,
+  speakerClips,
+  stockAvailable,
+  type Visuals,
+  visualKey,
+  visualParts,
+} from "./visuals.ts";
 
 export type Aspect = Project["output"]["aspect"];
 
@@ -122,6 +133,9 @@ export interface PlanOptions {
   names?: string[];
   /** The model that plans, and judges the cut checks a review doubts: best unless given. */
   quality?: Quality;
+  /** `rich` (the default) shows B-roll on the edit's points, sourced from free web captures,
+   * motion-graphics cards and, with a Pexels or Pixabay key, stock footage; `minimal` none. */
+  visuals?: Visuals;
   /** Defaults to the Anthropic API. */
   claude?: Claude;
   onProgress?: (message: string) => void;
@@ -197,6 +211,8 @@ export interface PlanState {
   regions: Map<string, Located>;
   /** Whether a found region looks at a time as it did when found, by calloutRect's key. */
   stills: Map<string, boolean>;
+  /** Each visual the planner proposed, sourced, by visualKey; null for one that could not be. */
+  assets: Map<string, Asset | null>;
   look: Look | null;
   /** The model that answered the last planning request. */
   model: string;
@@ -282,6 +298,8 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
       chapters: options.length >= CHAPTER_SECONDS,
       people: names.length > 0,
       callouts: [...sources.values()].some((s) => s.index && screenSpans(s.index).length > 0),
+      visuals: (options.visuals ?? "rich") === "rich",
+      stock: (options.visuals ?? "rich") === "rich" && stockAvailable(),
     },
     fps,
     short,
@@ -296,6 +314,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
     colours: new Map(),
     regions: new Map(),
     stills: new Map(),
+    assets: new Map(),
     look: options.look === undefined ? DEFAULT_LOOK : options.look,
     model: PLAN_MODELS[options.quality ?? "best"],
     planCalls: 0,
@@ -342,6 +361,27 @@ async function decide(state: PlanState, request: string): Promise<void> {
   state.decisions = reply.json as Decisions;
   takeDecisions(state);
   await locateCallouts(state);
+  await sourceWishes(state);
+}
+
+/** Sources each visual on a line that plays, once per plan: a failed one is left out, and its
+ * line keeps the speaker. */
+async function sourceWishes(state: PlanState): Promise<void> {
+  const playing = new Set(
+    state.segments.flatMap((s) => s.lines.map((line) => `${s.source}:${line.n}`)),
+  );
+  const wishes = (state.decisions.visuals ?? []).filter((wish) =>
+    playing.has(`${wish.source}:${wish.line}`),
+  );
+  if (wishes.length === 0) return;
+  const [width, height] = outputSize(state.aspect, state.sources);
+  await sourceVisuals(wishes, state.assets, {
+    output: { aspect: state.aspect, width, height },
+    stock: state.extras.stock ?? false,
+    onProblem: state.progress,
+  });
+  const ready = wishes.filter((wish) => state.assets.get(visualKey(wish))).length;
+  state.progress(`Sourced ${ready} of ${wishes.length} visuals`);
 }
 
 /** Finds on screen what each callout on a line that plays points at, once per plan. */
@@ -576,7 +616,7 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
   );
   for (const clip of broll) used.add(clip.source);
   // Every input, used or not, so plan.dropped can say why a whole file was left out.
-  const sources = [
+  const sources: Project["sources"][number][] = [
     ...[...state.sources.values()].map(({ id, kind, indexPath, fingerprint, ...s }) =>
       indexPath
         ? { id, kind, path: path(s.path), index: path(indexPath), fingerprint }
@@ -660,7 +700,29 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
     const rect = await calloutRect(source, main, located, span.from, span.duration, size, state.stills); // biome-ignore format: one line
     if (rect) placed.set(wishKey(wish), rect);
   }
-  const overlays = plannedOverlays(state, words, lengthOf(clips), covered, cuts, placed, changes, speaking); // biome-ignore format: one line
+  const edit = lengthOf(clips);
+  const first = plannedOverlays(state, words, edit, covered, cuts, placed, changes, speaking);
+  // Visuals keep clear of the B-roll placed and of every effect but a keyword, which they then
+  // keep off themselves.
+  const visuals = state.extras.visuals
+    ? placeVisuals(state.decisions.visuals ?? [], state.assets, {
+        words,
+        lines: (source, n) => state.sources.get(source)?.lines.find((line) => line.n === n),
+        sourceWords: (source) => state.sources.get(source)?.words ?? [],
+        edit,
+        frame: ticksPerFrame(state.fps),
+        aspect: state.aspect,
+        blocked: [...covered, ...first.filter((o) => o.template !== "keyword")].map((o) => ({ start: o.start, end: o.start + o.duration })), // biome-ignore format: one line
+      })
+    : [];
+  const shown = visuals.map((v) => ({ start: v.start, duration: v.end - v.start }));
+  const overlays =
+    visuals.length > 0
+      ? plannedOverlays(state, words, edit, [...covered, ...shown], cuts, placed, changes, speaking, shown) // biome-ignore format: one line
+      : first;
+  const output = { aspect: state.aspect, width, height };
+  const parts = await visualParts(visuals, output, path);
+  sources.push(...parts.sources);
   let project: Project = {
     version: 1,
     output: {
@@ -694,8 +756,44 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
   await mkdir(folder, { recursive: true });
   await writeFile(state.out, `${JSON.stringify(project, null, 2)}\n`);
   project = await planVoice(punchIns(await graded(state, project), shots(state)), state.out);
+  project = withVisuals(state, project, visuals, parts);
   await writeFile(state.out, `${JSON.stringify(validateProject(project), null, 2)}\n`);
   return { path: state.out, project, assembly, state };
+}
+
+/**
+ * The project with its visuals, added once its own clips are graded and punched in: captures and
+ * footage as B-roll, as sourced; the speaker beside each split screen, framed for that shape and
+ * graded as the main clip it plays in step with; cards; and the sound effects.
+ */
+function withVisuals(
+  state: PlanState,
+  project: Project,
+  visuals: readonly PlacedVisual[],
+  parts: Awaited<ReturnType<typeof visualParts>>,
+): Project {
+  if (visuals.length === 0) return project;
+  const speakers = speakerClips(
+    visuals,
+    project.main,
+    (source) => state.sources.get(source)?.index ?? null,
+    project.output,
+  ).map((clip) => {
+    let at = 0;
+    const under = project.main.find((main) => {
+      const hit = clip.start >= at && clip.start < at + main.out - main.in;
+      at += main.out - main.in;
+      return hit;
+    });
+    return under?.grade ? { ...clip, grade: under.grade } : clip;
+  });
+  const broll = [...(project.broll ?? []), ...parts.broll, ...speakers];
+  return {
+    ...project,
+    ...(broll.length > 0 ? { broll } : {}),
+    ...(parts.cards.length > 0 ? { cards: parts.cards } : {}),
+    audio: { ...project.audio, ...(parts.sfx.length > 0 ? { sfx: parts.sfx } : {}) },
+  };
 }
 
 /**

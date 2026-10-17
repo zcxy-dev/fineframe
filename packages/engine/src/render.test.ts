@@ -1275,6 +1275,84 @@ test("overlays land on exact output frames, across cuts and dissolves", async (t
   );
 });
 
+test("a split screen: a card in the panel, the speaker in step below it, a sound and the credits", async (t) => {
+  const dir = await scratch(t, "split-");
+  // Each source frame one step brighter, so the speaker's frame shows which source frame it is.
+  const speaker = await makeSource(dir, {
+    id: "a",
+    pattern: "color",
+    width: 64,
+    height: 36,
+    fps: 30,
+    seconds: 5,
+    sound: 220,
+    filter: "geq=lum='16+2*N':cb=128:cr=128",
+  });
+  const page = { ...(await still(dir, "page")), credit: { what: "Screenshot of example.com", source: "https://example.com/" } }; // biome-ignore format: one line
+  const tick = { ...(await song(dir, "tick", 0.2)), credit: { what: "Sound effect tick.wav", source: "https://example.com/tick", license: { name: "CC0 1.0", url: "https://creativecommons.org/publicdomain/zero/1.0/" } } }; // biome-ignore format: one line
+  const project = projectOf([speaker, page, tick], [clip("a", 1, 3)], { ...tiny, width: 64, height: 36 }); // biome-ignore format: one line
+  // At 30 fps: the card covers frames 15-45 in the upper half, the speaker frames 15-45 below.
+  project.cards = [
+    { card: "logo", params: { name: "GitHub", logo: "github" }, start: SECOND / 2, duration: SECOND, placement: "panel" }, // biome-ignore format: one line
+  ];
+  project.broll = [
+    { source: "a", in: 1.5 * SECOND, out: 2.5 * SECOND, start: SECOND / 2, rect: { x: 0, y: 0.5, w: 1, h: 0.5 } }, // biome-ignore format: one line
+    { source: "page", in: 0, out: SECOND / 2, start: 2.5 * SECOND },
+  ];
+  project.audio.sfx = [{ source: "tick", start: 1.5 * SECOND, gainDb: 0 }];
+  const path = await write(dir, project);
+  const stems = join(dir, "stems");
+  const result = await render(path, join(dir, "out", "edit.mp4"), {
+    stems,
+    renderCards: async (jobs) => {
+      assert.deepEqual(
+        jobs.map((job) => [job.card, job.placement, job.width, job.height, job.frames]),
+        [["logo", "panel", 64, 18, 30]],
+      );
+      return [await numbered(join(dir, "card.webm"), 30, 64, 18)];
+    },
+  });
+  const picture = await grey(result.video, 64, 36);
+  assert.equal(picture.length, 90);
+  const near = (actual: number, expected: number, at: string) =>
+    assert.ok(Math.abs(actual - expected) <= 2, `${at}: luma ${actual}, expected ${expected}`);
+  for (const [n, frame] of picture.entries()) {
+    const top = frame[4 * 64 + 32] ?? 0;
+    const bottom = frame[30 * 64 + 32] ?? 0;
+    // Frame n of the edit shows source frame 30 + n, in both halves outside the split and in
+    // the lower one inside it.
+    const speakerLuma = (2 * (30 + n) * 255) / 219;
+    if (n >= 15 && n < 45) near(top, ((24 + 4 * (n - 15)) * 255) / 219, `frame ${n}, the card`);
+    else if (n < 75) near(top, speakerLuma, `frame ${n}, above`);
+    if (n < 75) near(bottom, speakerLuma, `frame ${n}, the speaker`);
+  }
+  // The sound plays from 1.5 s, at most 2 s of its file, and nowhere else.
+  const bed = await left(join(stems, "music.wav"));
+  assert.ok(level(bed, 1.52, 1.68) > -30, `${level(bed, 1.52, 1.68)} dB`);
+  assert.ok(level(bed, 0, 1.45) < -90 && level(bed, 1.75, 3) < -90);
+  assert.equal(result.music, null);
+  assert.equal(result.broll, join(dir, "out", "edit.broll.txt"));
+  assert.equal(
+    await readFile(result.broll ?? "", "utf8"),
+    [
+      "B-roll in edit.mp4, with where each piece came from.",
+      "",
+      "GitHub logo, from Simple Icons",
+      "  Source: https://simpleicons.org/?q=github",
+      "  Licence: CC0-1.0 (https://creativecommons.org/publicdomain/zero/1.0/)",
+      "  Note: GitHub is a trademark of its owner: show it only to refer to GitHub.",
+      "",
+      "Sound effect tick.wav",
+      "  Source: https://example.com/tick",
+      "  Licence: CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/)",
+      "",
+      "Screenshot of example.com",
+      "  Source: https://example.com/",
+      "",
+    ].join("\n"),
+  );
+});
+
 // Remotion downloads Chrome and bundles its page on the first run, which CI's time limit leaves
 // no room for; the graph and the frame placement are tested above.
 const remotion = { skip: process.env.CI ? "renders with Chrome: run it locally" : false };

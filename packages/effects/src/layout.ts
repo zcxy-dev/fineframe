@@ -131,6 +131,24 @@ export function fit(text: string, size: number, available: number): number {
  * below it. */
 export type Placement = "full" | "panel";
 
+/** The upper panel of a split screen, as a share of the frame's height: at 9:16 the top 880 of
+ * every 1920 rows, the split short-form edits use, and the upper half otherwise. */
+export function panelShare(aspect: Aspect): number {
+  return aspect === "9:16" ? 880 / 1920 : 0.5;
+}
+
+/** A card's size in pixels in an output of `width` by `height`: the frame, or the panel in even
+ * rows. */
+export function cardSize(
+  aspect: Aspect,
+  placement: Placement,
+  width: number,
+  height: number,
+): [number, number] {
+  if (placement === "full") return [width, height];
+  return [width, Math.round((panelShare(aspect) * height) / 2) * 2];
+}
+
 /** The colours cards add to the overlays' ink, paper and accent: one for what works or is
  * gained, one for what fails or is lost. */
 export const CARD_COLORS = {

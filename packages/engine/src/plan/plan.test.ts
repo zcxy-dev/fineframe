@@ -168,7 +168,7 @@ test("Claude's effects become overlays timed on the speech, one at a time and on
   const edit = await plan({ inputs: [dir], length: 60, aspect: "9:16", out, claude, names });
 
   const request = requests[0] ?? assert.fail("no request");
-  assert.deepEqual((request.schema.required as string[]).slice(-2), ["title", "people"]);
+  assert.deepEqual((request.schema.required as string[]).slice(-3), ["title", "people", "visuals"]); // biome-ignore format: one line
   const asked = request.content[1]?.type === "text" ? request.content[1].text : "";
   assert.match(asked, /Give the video a title over its opening\./);
   assert.match(asked, /Names the user gave, of people and terms said in the footage: 林語安; 王大同; video editor\./); // biome-ignore format: one line

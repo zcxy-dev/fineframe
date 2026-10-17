@@ -15,6 +15,8 @@ import {
   STYLES,
   type Style,
   styleName,
+  VISUALS,
+  type Visuals,
 } from "../lib/settings.ts";
 import styles from "./editor.module.css";
 
@@ -29,6 +31,7 @@ export interface Choices {
   musicLicense: string;
   /** Where the speech is heard. */
   asr: Asr;
+  visuals: Visuals;
 }
 
 /** This computer's memory, and how much the local speech model needs, from the server. */
@@ -48,6 +51,14 @@ export function chosenLength(choices: Choices): { seconds: number } | { problem:
   return problem ? { problem } : { seconds };
 }
 
+const VISUALS_TEXT: Record<Visuals, { name: string; help: string }> = {
+  rich: {
+    name: "Rich",
+    help: "Claude adds B-roll to each point: motion-graphics cards, web pages, stock footage and logos, beside the speaker or full frame, with soft sound effects.",
+  },
+  minimal: { name: "Minimal", help: "Only the footage you dropped in, cut and captioned." },
+};
+
 const ASPECT_LABELS: Record<Aspect, { name: string; hint: string }> = {
   "9:16": { name: "Vertical", hint: "9:16 · phones" },
   "1:1": { name: "Square", hint: "1:1 · feeds" },
@@ -66,6 +77,9 @@ interface Props {
   /** Whether an OpenRouter key is saved; null until the server says. */
   openrouter: boolean | null;
   onAddOpenRouter: () => void;
+  /** Whether the optional stock footage keys are saved; null until the server says. */
+  stock: { pexels: boolean; pixabay: boolean } | null;
+  onAddStock: (service: "pexels" | "pixabay") => void;
 }
 
 export function SettingsPanel({
@@ -76,6 +90,8 @@ export function SettingsPanel({
   machine,
   openrouter,
   onAddOpenRouter,
+  stock,
+  onAddStock,
 }: Props) {
   const id = useId();
   const set = (changes: Partial<Choices>) => onChange({ ...choices, ...changes });
@@ -246,6 +262,42 @@ export function SettingsPanel({
           <button type="button" className={styles.button} onClick={onAddOpenRouter}>
             Add your OpenRouter key
           </button>
+        )}
+      </fieldset>
+
+      <fieldset className={styles.field}>
+        <legend className={styles.label}>Visuals</legend>
+        <div className={styles.chips}>
+          {VISUALS.map((visuals) => (
+            <button
+              key={visuals}
+              type="button"
+              className={styles.chip}
+              aria-pressed={choices.visuals === visuals}
+              onClick={() => set({ visuals })}
+            >
+              {VISUALS_TEXT[visuals].name}
+            </button>
+          ))}
+        </div>
+        <p className={styles.help}>{VISUALS_TEXT[choices.visuals].help}</p>
+        {choices.visuals === "rich" && stock && (
+          <p className={styles.help}>
+            Stock footage needs a free Pexels or Pixabay key; optional.{" "}
+            {(["pexels", "pixabay"] as const).map((service, i) => (
+              <span key={service}>
+                {i > 0 && " · "}
+                <button
+                  type="button"
+                  className={styles.linkButton}
+                  onClick={() => onAddStock(service)}
+                >
+                  {service === "pexels" ? "Pexels" : "Pixabay"}{" "}
+                  {stock[service] ? "key saved · Replace" : "key"}
+                </button>
+              </span>
+            ))}
+          </p>
         )}
       </fieldset>
 

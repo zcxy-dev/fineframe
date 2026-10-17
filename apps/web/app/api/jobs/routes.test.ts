@@ -23,6 +23,8 @@ process.env.VIDEO_EDITOR_ENV_FILE = env;
 process.env.ANTHROPIC_API_KEY = "sk-ant-server";
 process.env.FAKE_EDIT_KEY = "sk-ant-saved";
 delete process.env.OPENROUTER_API_KEY;
+delete process.env.PEXELS_API_KEY;
+delete process.env.PIXABAY_API_KEY;
 
 // After the environment is set: the job store reads it once.
 const jobsRoute = await import("./route.ts");
@@ -32,6 +34,7 @@ const startRoute = await import("./[id]/start/route.ts");
 const eventsRoute = await import("./[id]/events/route.ts");
 const videoRoute = await import("./[id]/video/route.ts");
 const captionsRoute = await import("./[id]/captions/route.ts");
+const brollRoute = await import("./[id]/broll/route.ts");
 
 test.after(() => rm(root, { recursive: true, force: true }));
 
@@ -100,6 +103,7 @@ test("bad input is refused, saying why", async () => {
     ],
     [{ settings: { ...settings, musicLicense: "CC0\nMIT" } }, video, /licence/],
     [{ settings: { ...settings, asr: "elsewhere" } }, video, /Speech is heard/],
+    [{ settings: { ...settings, visuals: "loud" } }, video, /Visuals are rich or minimal/],
     [{ settings }, [], /Drop some footage/],
   ];
   for (const [body, files, pattern] of cases) {
@@ -198,7 +202,8 @@ test("an edit: files streamed in, one edit at a time, live progress, then the do
   const args = JSON.parse(await readFile(join(dir, "args.json"), "utf8")) as string[];
   assert.deepEqual(args, [
     ...[join("footage", "day 1", "a.mp4"), join("footage", "logo.png")],
-    ...["--length", "60", "--aspect", "9:16", "--look", "warm", "-o", join("out", "edit.mp4")],
+    ...["--length", "60", "--aspect", "9:16", "--look", "warm", "--visuals=rich"],
+    ...["-o", join("out", "edit.mp4")],
     ...["--music", join("footage", "music", "song.mp3"), "--music-license=-CC0 1.0"],
     ...["--names", "names.txt"],
   ]);
@@ -229,6 +234,18 @@ test("an edit: files streamed in, one edit at a time, live progress, then the do
   );
   assert.match(captions.headers.get("content-disposition") ?? "", /edit-60s-9x16\.srt/);
   assert.match(await captions.text(), /大家好/);
+  // Rich visuals, the default, credit the B-roll the video shows.
+  assert.equal(seen.at(-1)?.settings.visuals, "rich");
+  assert.equal(seen.at(-1)?.result?.broll, true);
+  const credits = await brollRoute.GET(
+    new Request(`${url}/${job.id}/broll?download`),
+    ctx({ id: job.id }),
+  );
+  assert.equal(credits.status, 200);
+  assert.match(credits.headers.get("content-disposition") ?? "", /edit-60s-9x16\.broll\.txt/);
+  assert.match(await credits.text(), /Pexels License/);
+  // No stock footage keys saved, none passed.
+  assert.equal(await readFile(join(dir, "stock.txt"), "utf8"), " ");
 
   // With the first done, a second is taken in; captions with no lines offer no download.
   const second = (await create([{ path: "b.mp4", size: 2 }])).body;
@@ -244,7 +261,9 @@ test("an edit: files streamed in, one edit at a time, live progress, then the do
 });
 
 test("speech heard on OpenRouter needs its key, which the edit gets with --asr cloud", async () => {
-  const cloud = { settings: { ...settings, musicLicense: undefined, asr: "cloud" } };
+  const cloud = {
+    settings: { ...settings, musicLicense: undefined, asr: "cloud", visuals: "minimal" },
+  };
   const refused = await create([{ path: "c.mp4", size: 2 }], cloud);
   assert.equal(refused.response.status, 400);
   assert.match(refused.body.error ?? "", /OpenRouter API key/);
@@ -265,4 +284,29 @@ test("speech heard on OpenRouter needs its key, which the edit gets with --asr c
     "cloud",
   ]);
   assert.equal(await readFile(join(dir, "openrouter.txt"), "utf8"), "sk-or-saved");
+  // Minimal visuals: no B-roll, so no credits to download.
+  assert.ok(args.includes("--visuals=minimal"));
+  assert.equal((await latest()).result?.broll, false);
+  const credits = await brollRoute.GET(new Request(`${url}/${job.id}/broll`), ctx({ id: job.id }));
+  assert.equal(credits.status, 404);
+});
+
+test("the Pexels and Pixabay keys the page saved go to an edit with rich visuals only", async () => {
+  await writeFile(
+    env,
+    "ANTHROPIC_API_KEY=sk-ant-saved\nPEXELS_API_KEY=pexels-saved\nPIXABAY_API_KEY=1-pixabay\n",
+  );
+  const passed = async (visuals: string) => {
+    const { body: job } = await create([{ path: "d.mp4", size: 2 }], {
+      settings: { ...settings, musicLicense: undefined, visuals },
+    });
+    assert.equal((await put(job.id, 0, new Uint8Array(2))).status, 200);
+    assert.equal((await start(job.id)).status, 200);
+    const latest = async () =>
+      (await (await jobRoute.GET(new Request(url), ctx({ id: job.id }))).json()) as Job;
+    while ((await latest()).status === "running") await new Promise((done) => setTimeout(done, 20));
+    return readFile(join(root, job.id, "stock.txt"), "utf8");
+  };
+  assert.equal(await passed("rich"), "pexels-saved 1-pixabay");
+  assert.equal(await passed("minimal"), " ");
 });

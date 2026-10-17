@@ -6,8 +6,10 @@ import type { Picked } from "../lib/collect.ts";
 import { durationOf } from "../lib/collect.ts";
 import { fixFor } from "../lib/fixes.ts";
 import type { Job } from "../lib/jobs.ts";
+import type { Service } from "../lib/key.ts";
 import {
   DEFAULT_STYLE,
+  DEFAULT_VISUALS,
   formatBytes,
   formatDollars,
   formatLength,
@@ -23,6 +25,9 @@ import { KeyDialog } from "./KeyDialog.tsx";
 import { Player, ResultSummary } from "./ResultView.tsx";
 import { DownloadView, RunView } from "./RunView.tsx";
 import { type Choices, chosenLength, type Machine, SettingsPanel } from "./SettingsPanel.tsx";
+
+/** What /api/key says: which keys the server has, never the keys. */
+type Keys = { set: boolean; openrouter: boolean; pexels: boolean; pixabay: boolean };
 
 /** What /api/setup says: whether the analysis can run yet, and this computer's memory. */
 type Setup = SetupState & Machine & { asr: Choices["asr"] };
@@ -53,20 +58,21 @@ export function Editor() {
     names: "",
     musicLicense: "",
     asr: "local",
+    visuals: DEFAULT_VISUALS,
   });
   const [phase, setPhase] = useState<Phase>({ kind: "compose" });
   const upload = useRef<XMLHttpRequest | null>(null);
-  // Whether the server has an Anthropic key and an OpenRouter one (never the keys); null until
-  // it says.
-  const [keys, setKeys] = useState<{ set: boolean; openrouter: boolean } | null>(null);
+  // Whether the server has an Anthropic key, an OpenRouter one and the optional stock footage
+  // ones (never the keys); null until it says.
+  const [keys, setKeys] = useState<Keys | null>(null);
   const keySet = keys?.set ?? null;
-  const [asking, setAsking] = useState<"anthropic" | "openrouter" | null>(null);
+  const [asking, setAsking] = useState<Service | null>(null);
   const [setup, setSetup] = useState<Setup | null>(null);
 
   // The first time, with no key yet, the page asks for one.
   useEffect(() => {
     void fetch("/api/key")
-      .then((response) => response.json() as Promise<{ set: boolean; openrouter: boolean }>)
+      .then((response) => response.json() as Promise<Keys>)
       .then((found) => {
         setKeys(found);
         if (!found.set) setAsking("anthropic");
@@ -224,6 +230,7 @@ export function Editor() {
             names: namesFrom(choices.names),
             ...(music > 0 ? { musicLicense: choices.musicLicense.trim() } : {}),
             asr: choices.asr,
+            visuals: choices.visuals,
           },
           files: used.map((item) => ({ path: item.path, size: item.file.size })),
         }),
@@ -297,13 +304,15 @@ export function Editor() {
       <KeyDialog
         service={asking ?? "anthropic"}
         open={asking !== null}
-        replacing={asking === "openrouter" ? keys?.openrouter === true : keySet === true}
+        replacing={keys?.[asking === "anthropic" || asking === null ? "set" : asking] === true}
         onClose={() => setAsking(null)}
         onSaved={() => {
           const service = asking ?? "anthropic";
           setKeys((current) => ({
             set: service === "anthropic" || (current?.set ?? false),
             openrouter: service === "openrouter" || (current?.openrouter ?? false),
+            pexels: service === "pexels" || (current?.pexels ?? false),
+            pixabay: service === "pixabay" || (current?.pixabay ?? false),
           }));
           setAsking(null);
           setPhase((current) => (current.kind === "compose" ? { kind: "compose" } : current));
@@ -349,6 +358,8 @@ export function Editor() {
               machine={setup}
               openrouter={keys?.openrouter ?? null}
               onAddOpenRouter={() => setAsking("openrouter")}
+              stock={keys}
+              onAddStock={setAsking}
             />
             {phase.kind === "compose" && phase.error && (
               <p className={styles.error} role="alert">
@@ -489,6 +500,12 @@ function Done({ job, onNew }: { job: Job; onNew: () => void }) {
             Download captions (SRT)
           </a>
         )}
+        {job.result?.broll && (
+          <a className={styles.button} href={`${base}/broll?download`} download>
+            <DownloadIcon width={18} height={18} />
+            Download B-roll credits (TXT)
+          </a>
+        )}
       </div>
       <Summary job={job} />
       <button type="button" className={styles.linkButton} onClick={onNew}>
@@ -553,6 +570,10 @@ function Summary({ job }: { job: Job }) {
     ["Aspect", job.settings.aspect],
     ["Style", styleName(job.settings.style)],
     ["Speech", job.settings.asr === "cloud" ? "OpenRouter" : "On this computer"],
+    // Edits from before the setting had none.
+    ...(job.settings.visuals
+      ? [["Visuals", job.settings.visuals === "rich" ? "Rich" : "Minimal"] as [string, string]]
+      : []),
     [
       "Footage",
       `${videos} ${videos === 1 ? "video" : "videos"}${photos ? `, ${photos} ${photos === 1 ? "photo" : "photos"}` : ""}`,

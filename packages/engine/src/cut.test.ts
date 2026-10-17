@@ -258,3 +258,44 @@ test("pnpm render --cut says when the cut leaves the planned length", async (t) 
   assert.equal(bad.code, 2);
   assert.match(bad.stderr, /--cut 8-5 is not <from>-<to>/);
 });
+
+test("the speaker beside a split screen splits with the main track, so it stays in step", () => {
+  const project = edit();
+  const below = { x: 0, y: 0.5, w: 1, h: 0.5 };
+  // In step with a's clip from 1 to 4 s; and b's picture over a, not in step: it moves as B-roll.
+  project.broll = [
+    { source: "a", in: s(1), out: s(4), start: s(1), rect: below },
+    { source: "b", in: s(20), out: s(23), start: s(1), rect: { x: 0, y: 0, w: 1, h: 0.5 } },
+  ];
+  project.cards = [{ card: "stat", params: { value: 3, label: "x" }, start: s(1), duration: s(3), placement: "panel" }]; // biome-ignore format: one line
+  project.audio.sfx = [
+    { source: "m", start: s(1), gainDb: -16 },
+    { source: "m", start: s(2.7), gainDb: -16 },
+  ];
+  // w5, said 2.6 to 2.9 s.
+  const { project: cut } = cutEdit(project, [[s(2.5), s(3)]], sources);
+  const [first, second, other] = cut.broll ?? [];
+  // Each piece shows the source time the main track plays under it.
+  const mainAt = (t: number) => {
+    let at = 0;
+    for (const clip of cut.main) {
+      if (t < at + clip.out - clip.in) return clip.in + t - at;
+      at += clip.out - clip.in;
+    }
+    return null;
+  };
+  for (const piece of [first, second]) {
+    assert.ok(piece);
+    assert.equal(piece.in, mainAt(piece.start));
+    assert.deepEqual(piece.rect, below);
+  }
+  assert.equal((first?.out ?? 0) + (second?.out ?? 0) - (first?.in ?? 0) - (second?.in ?? 0), (cut.cards?.[0]?.duration ?? 0)); // biome-ignore format: one line
+  assert.equal(other?.source, "b");
+  assert.equal(cut.cards?.length, 1);
+  // The sound on a moment cut out goes with it.
+  assert.deepEqual(
+    cut.audio.sfx?.map((sfx) => sfx.start),
+    [s(1)],
+  );
+  validateProject(cut);
+});

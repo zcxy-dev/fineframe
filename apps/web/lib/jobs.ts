@@ -10,7 +10,7 @@ import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import type { ClaudeCost, Progress } from "@video-editor/schema";
 import type { FixKind } from "./fixes.ts";
-import { readKey, type Service } from "./key.ts";
+import { readKey, type Service, VARIABLES } from "./key.ts";
 import { safeRelativePath } from "./paths.ts";
 import { type Run, runEdit } from "./runner.ts";
 import { type FileEntry, type Role, roleOf, type Settings } from "./settings.ts";
@@ -49,6 +49,8 @@ export interface Job {
     captions: boolean;
     /** The music files the video plays, by their paths in the job. */
     music?: string[];
+    /** Whether the edit wrote the credits of the B-roll it shows. */
+    broll?: boolean;
   };
   error?: string;
 }
@@ -90,6 +92,7 @@ export function secondsLeft(
 const VIDEO = join("out", "edit.mp4");
 const CAPTIONS = join("out", "edit.srt");
 const PROJECT = join("out", "edit.project.json");
+const BROLL = join("out", "edit.broll.txt");
 /** stderr lines kept with a failed edit, for a person to read in edit.log. */
 const LOG = "edit.log";
 
@@ -261,7 +264,7 @@ export class Jobs {
     job.status = "running";
     job.started = Date.now();
     const dir = this.#dir(job);
-    const { length, aspect, style, names, musicLicense } = job.settings;
+    const { length, aspect, style, names, musicLicense, visuals } = job.settings;
     const footage = (file: JobFile) => join("footage", file.path);
     const music = job.files.filter((file) => file.use === "music");
     const args = [
@@ -272,6 +275,7 @@ export class Jobs {
       aspect,
       "--look",
       style,
+      `--visuals=${visuals}`,
       "-o",
       VIDEO,
       ...music.flatMap((file) => ["--music", footage(file)]),
@@ -308,21 +312,31 @@ export class Jobs {
     return job;
   }
 
-  /** The keys an edit with `settings` needs, as the edit's environment reads them. */
+  /** The keys an edit with `settings` needs, and the optional stock footage ones it can use, as
+   * the edit's environment reads them. */
   async #requireKeys(settings: Settings): Promise<Record<string, string>> {
     const key = await this.#key("anthropic");
     if (!key)
       throw new JobError("Add your Anthropic API key first: Claude plans the edit", 400, "key");
-    if (settings.asr !== "cloud") return { ANTHROPIC_API_KEY: key };
-    const openrouter = await this.#key("openrouter");
-    if (!openrouter) {
-      throw new JobError(
-        "Add your OpenRouter API key first: it hears the speech, or choose this computer",
-        400,
-        "openrouter",
-      );
+    const keys: Record<string, string> = { ANTHROPIC_API_KEY: key };
+    if (settings.asr === "cloud") {
+      const openrouter = await this.#key("openrouter");
+      if (!openrouter) {
+        throw new JobError(
+          "Add your OpenRouter API key first: it hears the speech, or choose this computer",
+          400,
+          "openrouter",
+        );
+      }
+      keys.OPENROUTER_API_KEY = openrouter;
     }
-    return { ANTHROPIC_API_KEY: key, OPENROUTER_API_KEY: openrouter };
+    if (settings.visuals === "rich") {
+      for (const service of ["pexels", "pixabay"] as const) {
+        const stock = await this.#key(service);
+        if (stock) keys[VARIABLES[service]] = stock;
+      }
+    }
+    return keys;
   }
 
   #refuseWhileRunning(): void {
@@ -348,7 +362,11 @@ export class Jobs {
       this.#downloads.delete(job.id);
     }
     if (line.stage === "done") {
-      job.result = { message: line.message, captions: line.outputs.captions !== undefined };
+      job.result = {
+        message: line.message,
+        captions: line.outputs.captions !== undefined,
+        broll: line.outputs.broll !== undefined,
+      };
     } else if (line.stage === "error") {
       job.error = line.message;
     } else {
@@ -384,6 +402,7 @@ export class Jobs {
       // Captions with no lines, when no speech is kept, are not worth a download.
       const captions = await stat(join(dir, CAPTIONS)).catch(() => null);
       job.result.captions = (captions?.size ?? 0) > 0;
+      if (job.result.broll) job.result.broll = existsSync(join(dir, BROLL));
       if (job.files.some((file) => file.use === "music")) {
         // Unknown, rather than none, when the project cannot be read.
         const played = await playedMusic(dir).catch(() => null);
@@ -413,11 +432,12 @@ export class Jobs {
     return job;
   }
 
-  /** The finished video, or its captions as SubRip; null until the edit is done. */
-  async output(id: string, kind: "video" | "captions"): Promise<string | null> {
+  /** The finished video, its captions as SubRip, or the credits of its B-roll; null until the
+   * edit is done. */
+  async output(id: string, kind: "video" | "captions" | "broll"): Promise<string | null> {
     const job = await this.get(id);
     if (job.status !== "done") return null;
-    const path = join(this.#dir(job), kind === "video" ? VIDEO : CAPTIONS);
+    const path = join(this.#dir(job), { video: VIDEO, captions: CAPTIONS, broll: BROLL }[kind]);
     return existsSync(path) ? path : null;
   }
 

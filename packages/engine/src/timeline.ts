@@ -1,10 +1,12 @@
-import { catalog, isTemplateId } from "@video-editor/effects";
+import { catalog, isCardId, isTemplateId } from "@video-editor/effects";
 import {
   type BrollClip,
+  type CardClip,
   type Clip,
   type MusicTrack,
   type Overlay,
   type Project,
+  secondsToTicks,
   TICKS_PER_SECOND,
   ticksPerFrame,
   ticksToFrame,
@@ -69,6 +71,19 @@ export interface TimelineOverlay {
   end: number;
 }
 
+/** A motion-graphics card placed on the output frame grid. */
+export interface TimelineCard {
+  /** Position in `project.cards`. */
+  index: number;
+  card: CardClip;
+  /** Output frames [start, end). */
+  start: number;
+  end: number;
+}
+
+/** The longest a sound effect plays. */
+export const SFX_SECONDS = 2;
+
 /** A music track's range placed on the output sample grid. */
 export interface TimelineMusic {
   /** Position in `project.audio.music`. */
@@ -95,7 +110,11 @@ export interface Timeline {
   main: TimelineClip[];
   broll: TimelineBroll[];
   overlays: TimelineOverlay[];
+  cards: TimelineCard[];
   music: TimelineMusic[];
+  /** The sound effects, each as a range of its file from its start, mixed in with the music and
+   * never ducked. */
+  sfx: TimelineMusic[];
   /** Where someone speaks in the output, as [start, end] seconds in time order, from the speech
    * detected in each source the main track and B-roll sound play. */
   speech: [number, number][];
@@ -202,6 +221,15 @@ export function buildTimeline(project: Project, sources: Map<string, SourceFacts
     return { index, overlay, start, end };
   });
 
+  // A card is cut to like B-roll, so its ends round to the nearest frame.
+  const cards = (project.cards ?? []).flatMap((card, index): TimelineCard[] => {
+    if (!isCardId(card.card)) throw new Error(`/cards/${index}/card: no card ${card.card}`);
+    const start = frame(card.start);
+    if (start >= frames) throw new Error(`/cards/${index}: starts after the edit ends`);
+    const end = Math.min(frame(card.start + card.duration), frames);
+    return end > start ? [{ index, card, start, end }] : [];
+  });
+
   const samples = ticksToSamples(frames * frameTicks);
   const music = (project.audio.music ?? []).map((track, index): TimelineMusic => {
     const start = ticksToSamples(track.start);
@@ -218,6 +246,21 @@ export function buildTimeline(project: Project, sources: Map<string, SourceFacts
       samples: length,
       fadeIn: fade(track.fadeIn),
       fadeOut: fade(track.fadeOut),
+    };
+  });
+
+  const sfx = (project.audio.sfx ?? []).map((effect, index): TimelineMusic => {
+    const start = ticksToSamples(effect.start);
+    if (start >= samples) throw new Error(`/audio/sfx/${index}: starts after the edit ends`);
+    const out = secondsToTicks(SFX_SECONDS);
+    return {
+      index,
+      music: { ...effect, license: { name: "sound effect" }, in: 0, out },
+      source: fact(effect.source),
+      start,
+      samples: Math.min(ticksToSamples(out), samples - start),
+      fadeIn: 0,
+      fadeOut: 0,
     };
   });
 
@@ -239,7 +282,9 @@ export function buildTimeline(project: Project, sources: Map<string, SourceFacts
     main,
     broll,
     overlays,
+    cards,
     music,
+    sfx,
     speech: speechOf(heard, frameTicks),
     cuts,
   };

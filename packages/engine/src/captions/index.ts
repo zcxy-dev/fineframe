@@ -32,7 +32,8 @@ const CLEARANCE = 0.3;
  */
 export async function buildCaptions(
   project: Project,
-  timeline: Pick<Timeline, "main" | "broll" | "frames" | "frameTicks">,
+  timeline: Pick<Timeline, "main" | "broll" | "frames" | "frameTicks"> &
+    Partial<Pick<Timeline, "cards">>,
 ): Promise<CaptionFiles | null> {
   const { captions, output } = project;
   if (!captions) return null;

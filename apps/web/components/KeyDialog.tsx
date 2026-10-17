@@ -24,6 +24,24 @@ const TEXT = {
     placeholder: "sk-or-…",
     name: "OpenRouter",
   },
+  pexels: {
+    title: "Connect Pexels",
+    about:
+      "Optional: with your free Pexels API key, Claude can show stock footage from Pexels in the edit. Without it, the edit shows cards and web pages instead. Get one at",
+    link: "https://www.pexels.com/api/",
+    site: "pexels.com/api",
+    placeholder: "Pexels API key",
+    name: "Pexels",
+  },
+  pixabay: {
+    title: "Connect Pixabay",
+    about:
+      "Optional: with your free Pixabay API key, Claude can show stock footage from Pixabay in the edit. Without it, the edit shows cards and web pages instead. Get one at",
+    link: "https://pixabay.com/api/docs/",
+    site: "pixabay.com/api/docs",
+    placeholder: "Pixabay API key",
+    name: "Pixabay",
+  },
 } as const;
 
 interface Props {

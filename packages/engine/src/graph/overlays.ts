@@ -14,7 +14,10 @@ export function overlayInput(file: string): string[] {
  * one tick per frame, so overlay frame k lands on exactly piece frame `atFrame + k` whatever
  * timestamps the file carries.
  */
-export function overlayTiming(layer: OverlayLayer, fps: FrameRate): string[] {
+export function overlayTiming(
+  layer: Pick<OverlayLayer, "fromFrame" | "frames" | "atFrame">,
+  fps: FrameRate,
+): string[] {
   return [
     `trim=start_frame=${layer.fromFrame}:end_frame=${layer.fromFrame + layer.frames}`,
     `settb=expr=${fps.den}/${fps.num}`,

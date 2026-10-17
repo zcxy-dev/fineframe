@@ -279,10 +279,12 @@ THE SOFTWARE.
 
 ### Herk Edit Kit
 
-The effect cards rebuild in Remotion the layouts and motion of cards from the [Herk Edit Kit](https://github.com/nateherkai/hyperframes-student-kit) (HTML, CSS and GSAP); none of its code, fonts or brand assets is copied.
+The effect cards rebuild in Remotion the layouts and motion of cards from the [Herk Edit Kit](https://github.com/nateherkai/hyperframes-student-kit) (HTML, CSS and GSAP); none of its code, fonts or brand assets is copied. The planner's visuals follow its editing playbook's B-roll order, split-screen proportions, time away from the speaker and sound-effect rules.
 
 - `packages/effects/src/cards.ts`
 - `packages/effects/src/remotion/cards/`
+- `packages/effects/src/layout.ts` (`panelShare`)
+- `packages/engine/src/plan/visuals.ts`
 
 ```text
 MIT License

@@ -1,6 +1,6 @@
 ---
 name: video-editor
-description: Edits footage into a finished, captioned video with the open-source video-editor (zcxy-dev/video-editor), then changes the finished edit by conversation. Use when asked to edit, cut down or caption footage with it, or to change one of its edits (an edit.project.json): drop or trim a part, fix a caption, change the title, a lower third, a keyword or chapter, the music or the look.
+description: Edits footage into a finished, captioned video with the open-source video-editor (zcxy-dev/video-editor), then changes the finished edit by conversation. Use when asked to edit, cut down or caption footage with it, or to change one of its edits (an edit.project.json): drop or trim a part, fix a caption, change the title, a lower third, a keyword or chapter, a card or B-roll, the music or the look.
 ---
 
 # video-editor
@@ -24,11 +24,11 @@ pnpm -s edit footage/ --length 60s --aspect 9:16 -o out/edit.mp4 > out/progress.
 ```
 
 - Footage: files or folders of video and still images. `--length` is 15 s to 1 h (`60s`, `90`, `3m`, `1:30`); `--aspect` is `9:16`, `1:1` or `16:9`.
-- Options the user may want: `--names names.txt` (people and terms said in the footage, one per line; a person's name there can get a lower third), `--music track-or-folder/` with each track's licence in `<track>.txt` beside it or `--music-license "CC0 1.0"`, `--look clean|warm|cool|film|none`, `--quality economy` (half the Claude cost), `--asr cloud` (for machines without 9 GB of memory to spare; needs `OPENROUTER_API_KEY` and sends the speech audio to OpenRouter). Ask before using music the user has not said they have the right to use.
+- Options the user may want: `--names names.txt` (people and terms said in the footage, one per line; a person's name there can get a lower third), `--music track-or-folder/` with each track's licence in `<track>.txt` beside it or `--music-license "CC0 1.0"`, `--look clean|warm|cool|film|none`, `--quality economy` (half the Claude cost), `--visuals minimal` (no B-roll, cards or sound effects; `rich`, the default, cuts to them on the edit's points; stock footage needs a free `PEXELS_API_KEY` or `PIXABAY_API_KEY` in `.env`, tested for like the Anthropic key), `--asr cloud` (for machines without 9 GB of memory to spare; needs `OPENROUTER_API_KEY` and sends the speech audio to OpenRouter). Ask before using music the user has not said they have the right to use.
 - The first edit of new footage analyses it, about twice the footage's length on a CPU: run it in the background and follow its stderr. Later edits of the same footage start at the plan and take a minute or two. Claude costs about US$0.05 to 0.15 an edit.
 - Done when the last line of `out/progress.jsonl` has `"stage": "done"`. An `"error"` line carries the reason; the stderr says what to change.
 
-Beside the video: `edit.project.json` (the whole edit), `edit.srt` (the captions), `edit_cuts.json` (where each cut of the newest render in the folder falls, in seconds) and, with music, `edit.music.txt` (the licences to credit). Tell the user what was made: its length, and what the captions and overlays say.
+Beside the video: `edit.project.json` (the whole edit), `edit.srt` (the captions), `edit_cuts.json` (where each cut of the newest render in the folder falls, in seconds) with music `edit.music.txt` (the licences to credit) and, with B-roll or sound effects, `edit.broll.txt` (where each came from, to credit). Tell the user what was made: its length, and what the captions and overlays say.
 
 ## 3. Change the edit
 

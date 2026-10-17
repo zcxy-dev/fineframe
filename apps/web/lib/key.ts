@@ -1,5 +1,5 @@
-// The API keys the edits use: Anthropic's, which plans every edit, and OpenRouter's, for cloud
-// speech. The page saves them in one file readable by its owner alone: the git-ignored .env at the
+// The API keys the edits use: Anthropic's, which plans every edit, OpenRouter's, for cloud
+// speech, and the optional free ones of Pexels and Pixabay, for stock footage. The page saves them in one file readable by its owner alone: the git-ignored .env at the
 // repository root, where `pnpm edit` reads them too, or the one VIDEO_EDITOR_ENV_FILE names, such
 // as the desktop app's in its own folder. A key goes to its service and to the edit's process,
 // and nowhere else: never to a log, never back to the page.
@@ -12,13 +12,15 @@ import { parseEnv, promisify } from "node:util";
 import Anthropic from "@anthropic-ai/sdk";
 import { PLAN_MODELS } from "@video-editor/engine/claude";
 
-export type Service = "anthropic" | "openrouter";
-export const SERVICES: readonly Service[] = ["anthropic", "openrouter"];
+export type Service = "anthropic" | "openrouter" | "pexels" | "pixabay";
+export const SERVICES: readonly Service[] = ["anthropic", "openrouter", "pexels", "pixabay"];
 
 /** The variable each key is saved as, the one `pnpm edit` and vework read. */
 export const VARIABLES: Record<Service, string> = {
   anthropic: "ANTHROPIC_API_KEY",
   openrouter: "OPENROUTER_API_KEY",
+  pexels: "PEXELS_API_KEY",
+  pixabay: "PIXABAY_API_KEY",
 };
 
 /** The file the keys are saved in; VIDEO_EDITOR_ENV_FILE moves it. */
@@ -36,7 +38,13 @@ export async function readKey(service: Service = "anthropic"): Promise<string | 
 /** Why `key` cannot be a key for `service`, or null. */
 export function keyProblem(key: string, service: Service = "anthropic"): string | null {
   // Keys are letters, digits, dashes and underscores after their prefix; anything else, such as
-  // a line break, could also break the file they are saved in.
+  // a line break, could also break the file they are saved in. Pexels and Pixabay keys have no
+  // prefix.
+  if (service === "pexels" || service === "pixabay") {
+    return /^[\w-]{1,400}$/.test(key)
+      ? null
+      : "Paste the whole key: one line of letters and digits";
+  }
   const prefix = service === "anthropic" ? "sk-ant-" : "sk-or-";
   if (!new RegExp(`^${prefix}[\\w-]{1,400}$`).test(key)) {
     return `Paste the whole key: one line, starting with ${prefix}`;
@@ -46,7 +54,9 @@ export function keyProblem(key: string, service: Service = "anthropic"): string 
 
 /** Asks `service` whether `key` works, at no cost: null when it does, or what to do. */
 export function checkKey(key: string, service: Service = "anthropic"): Promise<string | null> {
-  return service === "anthropic" ? checkAnthropic(key) : checkOpenRouter(key);
+  if (service === "anthropic") return checkAnthropic(key);
+  if (service === "openrouter") return checkOpenRouter(key);
+  return checkStock(key, service);
 }
 
 /** Whether `key` can plan an edit: it looks up the planning model. */
@@ -92,6 +102,34 @@ async function checkOpenRouter(key: string): Promise<string | null> {
     return `OpenRouter could not check the key (HTTP ${response.status}). Try again`;
   } catch {
     return "Could not reach OpenRouter to check the key. Check the internet connection and try again";
+  }
+}
+
+/** Whether Pexels or Pixabay takes `key`: one search for a single clip, which is free. */
+async function checkStock(key: string, service: "pexels" | "pixabay"): Promise<string | null> {
+  const [name, url, init] =
+    service === "pexels"
+      ? [
+          "Pexels",
+          "https://api.pexels.com/v1/search?query=test&per_page=1",
+          { headers: { Authorization: key } },
+        ]
+      : [
+          "Pixabay",
+          `https://pixabay.com/api/videos/?${new URLSearchParams({ key, q: "test", per_page: "3" })}`,
+          {},
+        ];
+  try {
+    const response = await fetch(url, { ...init, signal: AbortSignal.timeout(20_000) });
+    if (response.ok) return null;
+    // Pixabay answers a key it does not know with 400.
+    if ([400, 401, 403].includes(response.status)) {
+      const site = service === "pexels" ? "pexels.com/api" : "pixabay.com/api/docs";
+      return `${name} did not accept this key. Copy it again from ${site}`;
+    }
+    return `${name} could not check the key (HTTP ${response.status}). Try again`;
+  } catch {
+    return `Could not reach ${name} to check the key. Check the internet connection and try again`;
   }
 }
 

@@ -190,7 +190,8 @@ function rideCurve(
 /**
  * FFmpeg's arguments for the music bed: exactly `timeline.samples` samples of stereo, as raw
  * samples into `out`. `envelopes[k]` is the file holding the gain envelope of
- * `timeline.music[k]` (mono 32-bit float at ENVELOPE_RATE), or null for a range not ducked.
+ * `timeline.music[k]` (mono 32-bit float at ENVELOPE_RATE), or null for a range not ducked. The
+ * sound effects join the bed after the music, never ducked.
  *
  * Each track is decoded from its start rather than sought: a variable-bitrate MP3 without a
  * seek table only estimates where a seek lands, which would move the beats the edit's cuts were
@@ -200,7 +201,8 @@ export function musicBed(timeline: Timeline, envelopes: (string | null)[], out: 
   const args: string[] = [];
   const graph: string[] = [];
   let inputs = 0;
-  for (const [k, track] of timeline.music.entries()) {
+  const ranges = [...timeline.music, ...timeline.sfx];
+  for (const [k, track] of ranges.entries()) {
     args.push("-i", track.source.path);
     const sound = inputs++;
     const { samples } = track;
@@ -229,8 +231,8 @@ export function musicBed(timeline: Timeline, envelopes: (string | null)[], out: 
       graph.push(`${chain.join(",")},adelay=delays=${track.start}S:all=1[m${k}]`);
     }
   }
-  const labels = timeline.music.map((_, k) => `[m${k}]`).join("");
-  const together = timeline.music.length > 1 ? `${mix(timeline.music.length, "longest")},` : "";
+  const labels = ranges.map((_, k) => `[m${k}]`).join("");
+  const together = ranges.length > 1 ? `${mix(ranges.length, "longest")},` : "";
   graph.push(
     `${labels}${together}apad=whole_len=${timeline.samples},atrim=end_sample=${timeline.samples}[a]`,
   );

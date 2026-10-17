@@ -71,6 +71,11 @@
               "description": "The licence of each music track the video plays, when it plays music.",
               "type": "string",
               "minLength": 1
+            },
+            "broll": {
+              "description": "Where each piece of B-roll and each sound effect the video plays came from, when it plays any with a credit.",
+              "type": "string",
+              "minLength": 1
             }
           }
         }

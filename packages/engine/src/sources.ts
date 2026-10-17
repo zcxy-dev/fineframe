@@ -109,16 +109,26 @@ export function gridTicks(fps: number): number | null {
   return null;
 }
 
-/** Reads the facts of every source the main track, B-roll and music use, after checking that
- * each file is the one the edit was planned on. A voice decision applies to the source's sound on
- * the main track. */
+/** Reads the facts of every source the main track, B-roll, music and sound effects use, after
+ * checking that each file is the one the edit was planned on. A voice decision applies to the
+ * source's sound on the main track. A video only B-roll shows, muted, needs no media index, as
+ * stock footage and web captures have none: it is read as BT.709 SDR from its container's time
+ * zero. */
 export async function loadSources(
   project: Project,
   projectPath: string,
 ): Promise<Map<string, SourceFacts>> {
   const base = dirname(resolve(projectPath));
   const used = new Set(
-    [...project.main, ...(project.broll ?? []), ...(project.audio.music ?? [])].map(
+    [
+      ...project.main,
+      ...(project.broll ?? []),
+      ...(project.audio.music ?? []),
+      ...(project.audio.sfx ?? []),
+    ].map((clip) => clip.source),
+  );
+  const heard = new Set(
+    [...project.main, ...(project.broll ?? []).filter((clip) => clip.gainDb !== undefined)].map(
       (clip) => clip.source,
     ),
   );
@@ -134,6 +144,13 @@ export async function loadSources(
           const { id, kind } = source;
           return {
             ...{ id, kind, path, audio: kind === "audio", hdr: null, matrix: null },
+            ...{ frameTicks: null, duration: 0, zero: 0, faces: null, speech: [], voice: null },
+          };
+        }
+        if (!source.index && !heard.has(source.id)) {
+          const { id, kind } = source;
+          return {
+            ...{ id, kind, path, audio: false, hdr: null, matrix: "bt709" as const },
             ...{ frameTicks: null, duration: 0, zero: 0, faces: null, speech: [], voice: null },
           };
         }

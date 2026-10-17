@@ -1,20 +1,85 @@
 // The planner's instructions and the shape of its answer.
 
-import { catalog, type TemplateId } from "@video-editor/effects";
+import {
+  cardIds,
+  cards,
+  catalog,
+  iconNames,
+  logoNames,
+  type TemplateId,
+} from "@video-editor/effects";
 import type { CalloutWish } from "./locate.ts";
+import { SFX_WISHES, type VisualWish } from "./visuals.ts";
 
 /** The most characters a template's text param takes, as its schema in the catalog allows. */
 const most = (id: TemplateId, param: string) =>
   (catalog[id].params as { properties: Record<string, { maxLength?: number }> }).properties[param]
     ?.maxLength;
 
-/** The planner's instructions, which tell of chapters only when the request may ask for them
- * and of callouts only when a file has a screen recording; the same for every plan of either
- * kind, so it is cached with the transcripts after it. */
-export function planSystem(extras: Pick<PlanExtras, "chapters" | "callouts">): string {
-  return system(
-    (extras.chapters ? CHAPTERS_EFFECT : "") + (extras.callouts ? CALLOUTS_EFFECT : ""),
+/** The planner's instructions, which tell of chapters only when the request may ask for them,
+ * of callouts only when a file has a screen recording and of visuals only when the edit is rich
+ * with them; the same for every plan of either kind, so it is cached with the transcripts after
+ * it. */
+export function planSystem(
+  extras: Pick<PlanExtras, "chapters" | "callouts"> &
+    Partial<Pick<PlanExtras, "visuals" | "stock">>,
+): string {
+  return (
+    system((extras.chapters ? CHAPTERS_EFFECT : "") + (extras.callouts ? CALLOUTS_EFFECT : "")) +
+    (extras.visuals ? visualsSection(extras.stock ?? false) : "")
   );
+}
+
+/** How the planner proposes B-roll for each point: stock footage when a key allows it, a web
+ * capture of a page named, or a motion-graphics card. */
+function visualsSection(stock: boolean): string {
+  const kinds = [
+    ...(stock
+      ? [
+          "stock: real footage of the thing named, when it is a physical thing, place or scene \
+(the Sun, a satellite, a server room, a city at night). Give a search query in English of two \
+to four plain words for a stock footage library; the footage must show the thing itself, not \
+a person at a computer.",
+        ]
+      : []),
+    "web: the real page of a product, model, project, paper or organisation the speaker names, \
+captured and zoomed into. Give its own address (https://…), one you are sure exists, such as a \
+product's home page or a model's page on Hugging Face, never a search page or a guessed deep \
+link, and the words on that page to zoom into exactly as the page writes them (its name, a \
+heading, a number), or empty for its first screen.",
+    "card: an animated motion-graphics card, for what has no footage: a number, a list, a \
+comparison, a process, a definition, a quote. Give the card and its params as a JSON object, \
+text in the speaker's language. Never invent a number, a result or a quote: a card shows only \
+what the speaker says or what is common knowledge about a thing they name.",
+  ];
+  const list = cardIds
+    .map(
+      (id) => `- ${id}: ${cards[id].purpose} ${cards[id].whenToUse} Example params: \
+${JSON.stringify(cards[id].example)}`,
+    )
+    .join("\n");
+  return `
+
+## Visuals
+
+The edit cuts away from the speaker to show what they talk about, at a creator's pace: about \
+one visual every 6 to 10 seconds of the edit, on the points that carry it (a tool, product or \
+organisation named, a number, a list, a comparison, a process), never on every sentence, and \
+never two in a row on one point. Give each on the line and the words it lands on, exactly as \
+they appear in the line: code cuts to it as the first of those words is said and back to the \
+speaker a few seconds later, picks a full-frame or split-screen layout and leaves out what \
+does not fit. Prefer, in this order:
+${kinds.map((kind, i) => `${i + 1}. ${kind}`).join("\n")}
+An opening that names a tool, a product or an organisation can show it from its first word.
+
+Cards, with their params as JSON objects like the examples:
+${list}
+Icons are Lucide names, only these: ${iconNames.join(", ")}. Logos only these brands, and \
+only for the brand named: ${logoNames.join(", ")}. Leave out a param you have nothing for.
+
+sfx: a sound only on a visible action, and none for most visuals: tap when a logo or a number \
+lands, click for a small piece of UI (a search, a chat, a terminal), paper for a document or a \
+list, tone for a check, stop for an X or a wrong way. Never whoosh on a cut.`;
 }
 
 const CHAPTERS_EFFECT = `
@@ -279,14 +344,42 @@ const PEOPLE = {
 } as const;
 
 /** What a plan may hold besides the edit itself: a music choice when tracks are offered, a title
- * for a long edit, chapters for one of two minutes or more, lower thirds when names are given and
- * callouts when a file has a screen recording. */
+ * for a long edit, chapters for one of two minutes or more, lower thirds when names are given,
+ * callouts when a file has a screen recording and visuals for a rich edit, stock footage among
+ * them when a key allows it. */
 export interface PlanExtras {
   music: boolean;
   title: boolean;
   chapters: boolean;
   people: boolean;
   callouts: boolean;
+  visuals?: boolean;
+  stock?: boolean;
+}
+
+/** The visuals in the plan's schema, stock footage only when it can be searched. */
+function visualsSchema(stock: boolean) {
+  return {
+    type: "array",
+    items: {
+      type: "object",
+      additionalProperties: false,
+      required: ["source", "line", "text", "kind", "query", "url", "focus", "card", "params", "sfx", "reason"], // biome-ignore format: one line
+      properties: {
+        source: { type: "string" },
+        line: { type: "integer" },
+        text: { type: "string", description: "The words it lands on, as in the line." },
+        kind: { type: "string", enum: stock ? ["stock", "web", "card"] : ["web", "card"] },
+        query: { type: "string", description: "stock: the search, in English; else empty." },
+        url: { type: "string", description: "web: the page's address; else empty." },
+        focus: { type: "string", description: "web: the words on the page to zoom into, or empty." }, // biome-ignore format: one line
+        card: { type: "string", enum: ["", ...cardIds], description: "card: which; else empty." },
+        params: { type: "string", description: "card: its params as a JSON object; else empty." },
+        sfx: { type: "string", enum: ["none", ...SFX_WISHES] },
+        reason: { type: "string" },
+      },
+    },
+  } as const;
 }
 
 /** The plan's schema, with the extras offered. */
@@ -321,6 +414,10 @@ export function planSchema(extras: PlanExtras): Record<string, unknown> {
   if (extras.callouts) {
     required.push("callouts");
     properties.callouts = CALLOUTS;
+  }
+  if (extras.visuals) {
+    required.push("visuals");
+    properties.visuals = visualsSchema(extras.stock ?? false);
   }
   return { ...PLAN_SCHEMA, required, properties };
 }
@@ -358,6 +455,8 @@ export interface Decisions {
   people?: { name: string; role: string; source: string; line: number }[];
   /** Present when a file has a screen recording: what to point at, and where it is named. */
   callouts?: CalloutWish[];
+  /** Present for a rich edit: what to show over each point. */
+  visuals?: VisualWish[];
 }
 
 /** What the request asks for after the cached transcripts; `music` lists the tracks offered. */

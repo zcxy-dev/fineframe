@@ -1,5 +1,5 @@
 // The keys the page saves, against stand-ins for Anthropic's and OpenRouter's APIs on this
-// machine.
+// machine, and for Pexels' and Pixabay's in place of fetch.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -7,7 +7,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { mock, test } from "node:test";
 import { promisify } from "node:util";
 
 const dir = await mkdtemp(join(tmpdir(), "web-key-"));
@@ -18,6 +18,8 @@ const env = join(dir, ".env");
 process.env.VIDEO_EDITOR_ENV_FILE = env;
 delete process.env.ANTHROPIC_API_KEY;
 delete process.env.OPENROUTER_API_KEY;
+delete process.env.PEXELS_API_KEY;
+delete process.env.PIXABAY_API_KEY;
 
 // Anthropic as far as the check sees it: one model lookup, answered by the key it is sent.
 const asked: { path?: string; key?: string }[] = [];
@@ -69,8 +71,13 @@ const put = (body: unknown, headers: Record<string, string> = {}) =>
     }),
   );
 const status = async () =>
-  (await route.GET()).json() as Promise<{ set: boolean; openrouter: boolean }>;
-const none = { set: false, openrouter: false };
+  (await route.GET()).json() as Promise<{
+    set: boolean;
+    openrouter: boolean;
+    pexels: boolean;
+    pixabay: boolean;
+  }>;
+const none = { set: false, openrouter: false, pexels: false, pixabay: false };
 
 test("with no key, the page is told to ask for one", async () => {
   assert.deepEqual(await status(), none);
@@ -102,7 +109,7 @@ test("a working key is saved for its owner alone, beside what .env holds, and ne
   asked.length = 0;
   const response = await put({ key: "  sk-ant-good\n" });
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { set: true, openrouter: false });
+  assert.deepEqual(await response.json(), { ...none, set: true });
   // Checked with a model lookup, which costs nothing.
   assert.deepEqual(asked, [{ path: "/v1/models/claude-opus-5-5", key: "sk-ant-good" }]);
   assert.equal(await readFile(env, "utf8"), "# Mine\nOTHER=1\nANTHROPIC_API_KEY=sk-ant-good\n");
@@ -117,7 +124,7 @@ test("a working key is saved for its owner alone, beside what .env holds, and ne
   }
   assert.equal(await readKey(), "sk-ant-good");
   const shown = JSON.stringify(await status());
-  assert.equal(shown, '{"set":true,"openrouter":false}');
+  assert.equal(shown, '{"set":true,"openrouter":false,"pexels":false,"pixabay":false}');
 });
 
 test("an OpenRouter key is checked with OpenRouter and saved beside the Anthropic one", async () => {
@@ -132,7 +139,7 @@ test("an OpenRouter key is checked with OpenRouter and saved beside the Anthropi
   asked.length = 0;
   const response = await put({ key: "sk-or-good", service: "openrouter" });
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { set: true, openrouter: true });
+  assert.deepEqual(await response.json(), { ...none, set: true, openrouter: true });
   assert.deepEqual(asked, [{ path: "/api/v1/key", key: "Bearer sk-or-good" }]);
   assert.equal(
     await readFile(env, "utf8"),
@@ -148,12 +155,66 @@ test("an OpenRouter key is checked with OpenRouter and saved beside the Anthropi
   assert.equal((await put({ key: "sk-or-good", service: "other" })).status, 400);
 });
 
+test("the optional Pexels and Pixabay keys are checked with one free search each and saved", async () => {
+  // Pexels takes the key in a header, Pixabay in the address; each answers a key it does not
+  // know as it does: 401 and 400.
+  const searched: string[] = [];
+  const fetched = mock.method(globalThis, "fetch", async (input: string, init?: RequestInit) => {
+    const url = new URL(input);
+    const key =
+      url.hostname === "api.pexels.com"
+        ? new Headers(init?.headers).get("authorization")
+        : url.searchParams.get("key");
+    searched.push(`${url.origin}${url.pathname} ${key}`);
+    const good = key === "pexels-good" || key === "1-pixabay-good";
+    return new Response("{}", { status: good ? 200 : url.hostname === "pixabay.com" ? 400 : 401 });
+  });
+  try {
+    for (const [key, service, pattern] of [
+      [
+        "pexels-wrong",
+        "pexels",
+        /Pexels did not accept this key\. Copy it again from pexels\.com\/api/,
+      ],
+      ["1-pixabay-wrong", "pixabay", /Pixabay did not accept this key/],
+      ["two words", "pexels", /Paste the whole key/],
+      ["", "pixabay", /Paste the whole key/],
+    ] as const) {
+      const response = await put({ key, service });
+      assert.equal(response.status, 400, key);
+      assert.match(((await response.json()) as { error: string }).error, pattern);
+    }
+    searched.length = 0;
+    assert.equal((await put({ key: "pexels-good", service: "pexels" })).status, 200);
+    const response = await put({ key: "1-pixabay-good", service: "pixabay" });
+    assert.deepEqual(await response.json(), {
+      set: true,
+      openrouter: true,
+      pexels: true,
+      pixabay: true,
+    });
+    assert.deepEqual(searched, [
+      "https://api.pexels.com/v1/search pexels-good",
+      "https://pixabay.com/api/videos/ 1-pixabay-good",
+    ]);
+  } finally {
+    fetched.mock.restore();
+  }
+  assert.equal(
+    await readFile(env, "utf8"),
+    "# Mine\nOTHER=1\nANTHROPIC_API_KEY=sk-ant-good\nOPENROUTER_API_KEY=sk-or-good\n" +
+      "PEXELS_API_KEY=pexels-good\nPIXABAY_API_KEY=1-pixabay-good\n",
+  );
+  assert.equal(await readKey("pexels"), "pexels-good");
+  assert.equal(await readKey("pixabay"), "1-pixabay-good");
+});
+
 test("the saved key wins over the server's environment, which counts without one", async () => {
   process.env.ANTHROPIC_API_KEY = "sk-ant-from-env";
   assert.equal(await readKey(), "sk-ant-good");
   await rm(env);
   assert.equal(await readKey(), "sk-ant-from-env");
-  assert.deepEqual(await status(), { set: true, openrouter: false });
+  assert.deepEqual(await status(), { ...none, set: true });
   delete process.env.ANTHROPIC_API_KEY;
   delete process.env.OPENROUTER_API_KEY;
 });

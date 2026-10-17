@@ -7,16 +7,18 @@ import { parseLength } from "../edit/length.ts";
 import { isLookId, lookIds } from "../looks.ts";
 import { totalUsage } from "./claude.ts";
 import { type Aspect, LENGTH_RANGE, PlanError, plan } from "./plan.ts";
+import { VISUALS, type Visuals } from "./visuals.ts";
 
 const usage = `Usage: pnpm --filter @video-editor/engine plan <index.json | folder>... \\
     --length <seconds> --aspect <9:16 | 1:1 | 16:9> [--music <music.json | folder>]... \\
-    [--look <${[...lookIds, "none"].join(" | ")}>] -o <project.json>
+    [--look <${[...lookIds, "none"].join(" | ")}>] [--visuals <rich | minimal>] -o <project.json>
 
 A folder stands for every *.index.json and index.json in it; each index's source file sits
 next to it. The length is ${LENGTH_RANGE[0]} to ${LENGTH_RANGE[1]} s, written as 90, 90s, 5m, 1:30 or 1h.
 --music offers tracks analysed with vework analyze-music (a folder stands for every
 *.music.json in it); Claude picks the one that fits the content, or none.
-The look over the edit is clean unless --look names another, or none.
+The look over the edit is clean unless --look names another, or none. --visuals is rich unless
+given: B-roll on the edit's points, as pnpm edit --visuals says; minimal shows none.
 Claude plans the edit: ANTHROPIC_API_KEY comes from the environment or from the git-ignored
 .env at the repository root.`;
 
@@ -27,6 +29,7 @@ const { values, positionals } = parseArgs({
     aspect: { type: "string", short: "a" },
     music: { type: "string", multiple: true, short: "m" },
     look: { type: "string" },
+    visuals: { type: "string" },
     output: { type: "string", short: "o" },
     help: { type: "boolean", short: "h" },
   },
@@ -50,6 +53,11 @@ if (look !== "none" && !isLookId(look)) {
   console.error(`plan: error: the look is ${[...lookIds, "none"].join(", ")}, not ${look}`);
   process.exit(2);
 }
+const visuals = values.visuals ?? "rich";
+if (!VISUALS.includes(visuals as Visuals)) {
+  console.error(`plan: error: --visuals is rich or minimal, not ${visuals}`);
+  process.exit(2);
+}
 const env = new URL("../../../../.env", import.meta.url);
 if (!process.env.ANTHROPIC_API_KEY && existsSync(env)) process.loadEnvFile(env);
 
@@ -62,6 +70,7 @@ try {
     aspect,
     music: (values.music ?? []).map((input) => resolve(here, input)),
     look: look === "none" ? null : { id: look, intensity: 1 },
+    visuals: visuals as Visuals,
     out: resolve(here, values.output),
     onProgress: (message) => process.stderr.write(`${message}\n`),
   });

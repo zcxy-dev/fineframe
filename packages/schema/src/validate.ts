@@ -168,6 +168,9 @@ function projectProblems(project: Project): string[] {
     source(`/audio/music/${i}/source`, music.source, ["audio"]);
     range(`/audio/music/${i}`, music.in, music.out);
   }
+  for (const [i, sfx] of (project.audio.sfx ?? []).entries()) {
+    source(`/audio/sfx/${i}/source`, sfx.source, ["audio"]);
+  }
   for (const [i, dropped] of (project.plan?.dropped ?? []).entries()) {
     source(`/plan/dropped/${i}/source`, dropped.source);
     range(`/plan/dropped/${i}`, dropped.in, dropped.out);

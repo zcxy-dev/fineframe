@@ -7,7 +7,7 @@ import { EDGE_FADE_SAMPLES } from "../pieces.ts";
 import type { SourceFacts } from "../sources.ts";
 import { type Timeline, ticksToSamples } from "../timeline.ts";
 import { fades, silence, soundClock, span } from "./audio.ts";
-import { brollSound, brollTiming, mix, overlay, placement } from "./broll.ts";
+import { brollSound, brollTiming, mix, overlay, panelRect, placement } from "./broll.ts";
 import { QUIET, RAW_AUDIO, RAW_VIDEO } from "./encode.ts";
 import { openSource } from "./inputs.ts";
 import { overlayInput, overlayTiming } from "./overlays.ts";
@@ -34,13 +34,14 @@ function inputs(timeline: Timeline) {
 }
 
 /** The piece's picture, written to stdout as raw frames. `overlays` are the rendered files of
- * `timeline.overlays`, in its order; `luts` the .cube file of each clip's match and look, by
- * lutKey. */
+ * `timeline.overlays`, in its order, and `cards` those of `timeline.cards`; `luts` the .cube
+ * file of each clip's match and look, by lutKey. */
 export function pieceVideo(
   piece: Piece,
   timeline: Timeline,
   overlays: string[] = [],
   luts: ReadonlyMap<string, string> = new Map(),
+  cards: string[] = [],
 ): string[] {
   const lut = (grade: Grade | undefined) => {
     const key = lutKey(grade);
@@ -86,6 +87,18 @@ export function pieceVideo(
     ];
     graph.push(`[${index}:v]${chain.join(",")}[b${j}]`, `${base}[b${j}]${overlay(at)}[o${j}]`);
     base = `[o${j}]`;
+  }
+  for (const [k, layer] of piece.cards.entries()) {
+    const file = cards[layer.clip.index];
+    if (!file) throw new Error(`/cards/${layer.clip.index}: has no rendered file`);
+    const index = opened.add(["-i", file]);
+    const { card } = layer.clip;
+    const at = placement(card.placement === "panel" ? panelRect(output.aspect) : undefined, output);
+    graph.push(
+      `[${index}:v]${overlayTiming(layer, fps).slice(0, -1).join(",")},format=yuv420p[c${k}]`,
+      `${base}[c${k}]${overlay(at)}[d${k}]`,
+    );
+    base = `[d${k}]`;
   }
   for (const [k, layer] of piece.overlays.entries()) {
     const file = overlays[layer.clip.index];

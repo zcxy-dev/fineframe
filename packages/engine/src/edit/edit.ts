@@ -23,6 +23,7 @@ import {
 import type { MusicInput } from "../plan/music.ts";
 import { type Aspect, LENGTH_RANGE, type PlanInput, plan } from "../plan/plan.ts";
 import { MAX_REVIEW_PASSES, review } from "../plan/review.ts";
+import type { Visuals } from "../plan/visuals.ts";
 import { render } from "../render.ts";
 import { fingerprintOf } from "../sources.ts";
 import {
@@ -65,6 +66,9 @@ export interface EditOptions {
   music?: string[];
   /** The licence of every track without its own `<name>.txt`, such as "CC0 1.0". */
   musicLicense?: string;
+  /** `rich` (the default) shows B-roll on the edit's points: cards, web captures and, with
+   * PEXELS_API_KEY or PIXABAY_API_KEY, stock footage; `minimal` none. */
+  visuals?: Visuals;
   /** Each progress line, as `pnpm edit` prints them: the last is `done` or `error`. */
   onProgress?: (line: Progress) => void;
   /** Lines for a person: what the analysis prints besides its progress, and the review's
@@ -104,7 +108,8 @@ const CHECK_SHARE = 0.3;
  * Edits footage to a finished video: analyses each file (or takes its index from the cache),
  * plans the edit to `length`, renders it, then reviews every cut and renders the fixes, at most
  * MAX_REVIEW_PASSES times. Writes the video, `<name>.project.json` that renders it again, the
- * captions as `<name>.srt`, `edit_cuts.json` and, with music, its licences in `<name>.music.txt`.
+ * captions as `<name>.srt`, `edit_cuts.json`, with music its licences in `<name>.music.txt` and,
+ * with B-roll or sound effects that carry a credit, their credits in `<name>.broll.txt`.
  *
  * Progress goes to `onProgress` as lines of progress.schema.json, ending in `done` or `error`.
  * A failure also throws; an EditError or PlanError means the inputs cannot make this edit, and
@@ -130,8 +135,8 @@ export async function edit(options: EditOptions): Promise<EditResult> {
   try {
     const result = await steps(options, report, spent);
     const { video, captions } = result.outputs;
-    const { music } = result.outputs;
-    const message = `Finished: ${result.seconds.toFixed(1)} s at ${options.aspect} in ${basename(video)}${captions ? `, captions in ${basename(captions)}` : ""}${music ? `, the music's licences in ${basename(music)}` : ""}`;
+    const { music, broll } = result.outputs;
+    const message = `Finished: ${result.seconds.toFixed(1)} s at ${options.aspect} in ${basename(video)}${captions ? `, captions in ${basename(captions)}` : ""}${music ? `, the music's licences in ${basename(music)}` : ""}${broll ? `, the B-roll's credits in ${basename(broll)}` : ""}`;
     const claude = costByStage(spent);
     emit(
       validateProgress({ stage: "done", fraction: 1, message, claude, outputs: result.outputs }),
@@ -321,6 +326,7 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
           .filter((line) => line && !line.startsWith("#")),
         claude,
         ...(options.quality ? { quality: options.quality } : {}),
+        ...(options.visuals ? { visuals: options.visuals } : {}),
         onProgress: (message) => planProgress(message),
       }),
     );
@@ -368,6 +374,7 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
         project: rendered.project,
         ...(rendered.captions ? { captions: rendered.captions } : {}),
         ...(rendered.music ? { music: rendered.music } : {}),
+        ...(rendered.broll ? { broll: rendered.broll } : {}),
       },
       seconds: rendered.seconds,
       timings,
