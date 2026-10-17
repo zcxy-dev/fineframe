@@ -604,6 +604,44 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
   const covered = broll.map((clip) => ({ start: clip.start, duration: clip.out - clip.in }));
   let joined = 0;
   const cuts = clips.slice(0, -1).map((clip) => (joined += clip.out - clip.in));
+  // Where the picture changes shot: where a source's own shot changes, and at a cut to another
+  // source or another of its shots, not at a jump cut inside one shot.
+  const transitionsAt = (source: string) => (state.sources.get(source)?.index?.transitions ?? []).map((t) => secondsToTicks(t.start)); // biome-ignore format: one line
+  const shotOf = (source: string, t: number) => transitionsAt(source).filter((s) => s <= t).length;
+  let at = 0;
+  const changes = clips.flatMap((clip, i) => {
+    const offset = at;
+    at += clip.out - clip.in;
+    const next = clips[i + 1];
+    const cut = next && (next.source !== clip.source || shotOf(clip.source, clip.out - 1) !== shotOf(next.source, next.in)); // biome-ignore format: one line
+    const inside = transitionsAt(clip.source).filter((t) => t > clip.in && t < clip.out);
+    return [...inside.map((t) => offset + t - clip.in), ...(cut ? [at] : [])];
+  });
+  // Where someone on screen talks, as the index's faces found it, through pauses under 0.5 s and
+  // jump cuts; all of a clip whose source has no faces found, as nothing says otherwise.
+  const through = (spans: { start: number; end: number }[]) => {
+    const joined: { start: number; end: number }[] = [];
+    for (const span of [...spans].sort((a, b) => a.start - b.start)) {
+      const last = joined.at(-1);
+      if (last && span.start - last.end < secondsToTicks(0.5))
+        last.end = Math.max(last.end, span.end);
+      else joined.push({ ...span });
+    }
+    return joined;
+  };
+  at = 0;
+  const speaking = through(
+    clips.flatMap((clip) => {
+      const offset = at;
+      at += clip.out - clip.in;
+      const framing = state.sources.get(clip.source)?.index?.framing;
+      if (!framing) return [{ start: offset, end: at }];
+      const talks = framing.shots.flatMap((shot) => shot.speakers.map((s) => ({ start: secondsToTicks(s.start), end: secondsToTicks(s.end) }))); // biome-ignore format: one line
+      return through(talks)
+        .filter((t) => t.end > clip.in && t.start < clip.out)
+        .map((t) => ({ start: offset + Math.max(t.start, clip.in) - clip.in, end: offset + Math.min(t.end, clip.out) - clip.in })); // biome-ignore format: one line
+    }),
+  );
   // Each clip framed for the output's shape on the faces its source's index found.
   const framed = <C extends { source: string; in: number; out: number }>(clip: C): C => {
     const index = state.sources.get(clip.source)?.index;
@@ -622,7 +660,7 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
     const rect = await calloutRect(source, main, located, span.from, span.duration, size, state.stills); // biome-ignore format: one line
     if (rect) placed.set(wishKey(wish), rect);
   }
-  const overlays = plannedOverlays(state, words, lengthOf(clips), covered, cuts, placed);
+  const overlays = plannedOverlays(state, words, lengthOf(clips), covered, cuts, placed, changes, speaking); // biome-ignore format: one line
   let project: Project = {
     version: 1,
     output: {
