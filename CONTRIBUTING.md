@@ -1,6 +1,6 @@
 # Contributing
 
-Plans and open work are [GitHub issues](https://github.com/zcxy-dev/video-editor/issues).
+Plans and open work are [GitHub issues](https://github.com/zcxy-dev/video-editor/issues). Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Setup
 
