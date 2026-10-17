@@ -90,6 +90,7 @@ import {
   type Visuals,
   visualKey,
   visualParts,
+  visualPath,
 } from "./visuals.ts";
 
 export type Aspect = Project["output"]["aspect"];
@@ -742,7 +743,7 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
       ? plannedOverlays(state, words, edit, [...covered, ...shown], cuts, placed, changes, speaking, shown) // biome-ignore format: one line
       : first;
   const output = { aspect: state.aspect, width, height };
-  const parts = await visualParts(visuals, output, path);
+  const parts = await visualParts(visuals, output, (file) => visualPath(folder, file));
   sources.push(...parts.sources);
   let project: Project = {
     version: 1,

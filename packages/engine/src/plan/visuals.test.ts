@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { writeFile } from "node:fs/promises";
-import { join, relative, sep } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { test } from "node:test";
 import { panelShare } from "@video-editor/effects";
 import { validateProject } from "@video-editor/schema";
@@ -24,6 +24,7 @@ import {
   type VisualWish,
   visualKey,
   visualParts,
+  visualPath,
   wishProblem,
 } from "./visuals.ts";
 
@@ -342,7 +343,7 @@ test("placed visuals become cards, B-roll with credits and an occasional sound",
       at(10, 12, image, "panel", "none"),
     ],
     output,
-    (file) => relative(dir, file).split(sep).join("/"),
+    (file) => visualPath(dir, file),
   );
   assert.deepEqual(
     parts.cards.map((c) => [c.card, c.start / SECOND, c.duration / SECOND, c.placement]),
@@ -376,4 +377,19 @@ test("placed visuals become cards, B-roll with credits and an occasional sound",
     cards: parts.cards,
     audio: { ...main.audio, sfx: parts.sfx },
   });
+});
+
+test("a visual on another drive than the project is copied beside it, so its path stays relative", async (t) => {
+  const dir = await scratch(t, "visual-path-");
+  const asset = join(dir, "cache", "tap.ogg");
+  const out = join(dir, "out");
+  await mkdir(join(dir, "cache"), { recursive: true });
+  await writeFile(asset, "sound");
+  assert.equal(await visualPath(out, asset), "../cache/tap.ogg");
+  // On Windows, relative() between drives gives back an absolute path.
+  const otherDrive = (_from: string, to: string) => to;
+  const copied = await visualPath(out, asset, otherDrive);
+  assert.match(copied, /^visuals\/[0-9a-f]{8}-tap\.ogg$/);
+  assert.equal(await readFile(join(out, copied), "utf8"), "sound");
+  assert.equal(await visualPath(out, asset, otherDrive), copied);
 });

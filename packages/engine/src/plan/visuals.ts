@@ -4,8 +4,8 @@
 
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { basename, isAbsolute, join, relative, sep } from "node:path";
 import { cardProblems, cards, isCardId, panelShare } from "@video-editor/effects";
 import {
   type BrollClip,
@@ -493,12 +493,33 @@ export function placeVisuals(
   return placed;
 }
 
+/**
+ * A visual's path in a project written to `folder`: relative to it, or, when no relative path
+ * reaches it (another drive on Windows, where relative() gives back an absolute path), the path
+ * of a copy kept beside the project in `visuals/`.
+ */
+export async function visualPath(
+  folder: string,
+  file: string,
+  relativeTo: (from: string, to: string) => string = relative,
+): Promise<string> {
+  const path = relativeTo(folder, file);
+  if (!isAbsolute(path)) return path.split(sep).join("/");
+  const name = `${createHash("sha256").update(file).digest("hex").slice(0, 8)}-${basename(file)}`;
+  const copy = join(folder, "visuals", name);
+  if (!existsSync(copy)) {
+    await mkdir(join(folder, "visuals"), { recursive: true });
+    await copyFile(file, copy);
+  }
+  return `visuals/${name}`;
+}
+
 /** What the placed visuals add to the project: B-roll and the sources it shows, cards and sound
  * effects, each source with its credit. Ids start with `visual-`. */
 export async function visualParts(
   placed: readonly PlacedVisual[],
   output: Pick<Project["output"], "aspect" | "width" | "height">,
-  folderPath: (file: string) => string,
+  folderPath: (file: string) => string | Promise<string>,
 ): Promise<{
   sources: Project["sources"][number][];
   broll: BrollClip[];
@@ -515,7 +536,7 @@ export async function visualParts(
     if (known) return known;
     const id = `visual-${ids.size + 1}`;
     ids.set(path, id);
-    sources.push({ id, kind, path: folderPath(path), fingerprint: await fingerprintOf(path), credit: projectCredit(credit) }); // biome-ignore format: one line
+    sources.push({ id, kind, path: await folderPath(path), fingerprint: await fingerprintOf(path), credit: projectCredit(credit) }); // biome-ignore format: one line
     return id;
   };
   let lastSound = -Infinity;

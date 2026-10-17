@@ -1314,8 +1314,10 @@ test("a split screen: a card in the panel, the speaker in step below it, a sound
   });
   const picture = await grey(result.video, 64, 36);
   assert.equal(picture.length, 90);
+  // Within 3 levels: Apple silicon's FFmpeg build rounds a flat grey up to 2.2 levels away from
+  // the Linux and Intel builds, in one half of a frame where the other half matches.
   const near = (actual: number, expected: number, at: string) =>
-    assert.ok(Math.abs(actual - expected) <= 2, `${at}: luma ${actual}, expected ${expected}`);
+    assert.ok(Math.abs(actual - expected) <= 3, `${at}: luma ${actual}, expected ${expected}`);
   for (const [n, frame] of picture.entries()) {
     const top = frame[4 * 64 + 32] ?? 0;
     const bottom = frame[30 * 64 + 32] ?? 0;
