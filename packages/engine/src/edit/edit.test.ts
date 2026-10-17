@@ -470,6 +470,18 @@ process.exit(1);
     edit({ ...options, inputs: [join(folder, "talk.mp4")], worker: { ...worker, version: "2" } }),
     (error: Error) => error instanceof EditError && /: 找不到模型$/.test(error.message),
   );
+
+  // A worker that dies without saying why, as a crash or the system ending it would: the step
+  // it reached and how it ended say what is known.
+  await writeFile(script, `process.stderr.write("vework: aligning 1/8\\n");\nprocess.exit(3);\n`);
+  await assert.rejects(
+    edit({ ...options, inputs: [join(folder, "talk.mp4")], worker: { ...worker, version: "3" } }),
+    (error: Error) =>
+      error instanceof EditError &&
+      /the analysis failed: it stopped while aligning 1\/8 and exited with code 3$/.test(
+        error.message,
+      ),
+  );
 });
 
 test("lines while the review fixes the plan belong to the check", async (t) => {

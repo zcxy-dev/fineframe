@@ -154,6 +154,19 @@ export async function cachedIndex(
   return index;
 }
 
+/** Why vework ended when it printed no error: its last line, or the step it was on, and how it
+ * ended. A crash or the system stopping it (out of memory, say) leaves only these; on Windows a
+ * crash's exit code is an NTSTATUS, shown in hex as Windows documents them. */
+function stopped(lastLine: string, code: number | null, signal: NodeJS.Signals | null): string {
+  const ended =
+    signal !== null
+      ? `was stopped by ${signal}`
+      : `exited with code ${code !== null && code > 255 ? `0x${code.toString(16).toUpperCase()}` : code}`;
+  const step = lastLine.match(/^vework: (.*)$/)?.[1];
+  if (step) return `it stopped while ${step} and ${ended}`;
+  return lastLine.trim() ? `${lastLine.trim()} (it ${ended})` : `it ${ended}`;
+}
+
 /** The licence a track is used under, as its music index records it. */
 export type License = MusicIndex["license"];
 
@@ -277,7 +290,7 @@ async function vework(
         return;
       }
       await rm(partial, { recursive: true, force: true });
-      const why = error ?? (lastLine.trim() || `it exited with ${signal ?? code}`);
+      const why = error ?? stopped(lastLine, code, signal);
       fail(new EditError(`${file.given}: the analysis failed: ${why}`));
     });
   });
