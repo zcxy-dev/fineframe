@@ -1409,6 +1409,13 @@
   text-decoration: line-through;
 }
 
+/* Selected for a cut, but kept: no pause to cut at beside it inside the selection. */
+.word[data-state="kept"] {
+  text-decoration: underline dotted;
+  text-decoration-color: var(--muted);
+  text-underline-offset: 3px;
+}
+
 .word[data-state="gone"] {
   background: var(--danger-soft);
   color: var(--danger);

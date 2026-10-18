@@ -656,12 +656,12 @@ export class Jobs {
     const job = await this.#finished(id);
     const { project, path } = await this.#project(job, job.current ?? 1);
     try {
-      const { length, removed, notes } = revise(
+      const { length, removed, notes, outside } = revise(
         project,
         revision,
         await wordsFor(revision, project, path),
       );
-      return { length, removed, notes };
+      return { length, removed, notes, outside };
     } catch (error) {
       throw new JobError((error as Error).message, 400);
     }

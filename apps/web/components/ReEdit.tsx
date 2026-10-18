@@ -39,6 +39,8 @@ const EMPTY: Draft = { cuts: [], words: {}, titles: {}, remove: [] };
 interface Landed {
   removed: [number, number][];
   length: number;
+  /** Words a cut takes beyond the selection, by the cut's index, where none of its pauses fit. */
+  outside: { range: number; words: string }[];
 }
 
 type Word = EditView["lines"][number]["words"][number] & { line: number; word: number };
@@ -50,12 +52,10 @@ const seconds = (ticks: number) => (ticks / TICKS).toFixed(2);
 export function ReEdit({
   job,
   onJob,
-  onReplan,
 }: {
   job: Job;
   /** Called with the job as the server has it after a request changed it. */
   onJob: (job: Job) => void;
-  onReplan: () => void;
 }) {
   const [view, setView] = useState<EditView | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY);
@@ -222,8 +222,8 @@ export function ReEdit({
         <h3 className={styles.sectionTitle}>Transcript</h3>
         <p className={styles.help}>
           Click a word, then Shift-click another to select the words between. Delete them, or fix a
-          single caption word. Each cut moves to the nearest pause, so no word is cut through; ✂
-          marks where it lands.
+          single caption word. Each cut moves to a pause inside your selection, so no word is cut
+          through; ✂ marks where it lands, and selected words a dotted line marks stay.
         </p>
         {words.length === 0 ? (
           <p className={styles.help}>This edit has no captions to show.</p>
@@ -247,7 +247,9 @@ export function ReEdit({
                         : gone(word)
                           ? "gone"
                           : inCut(g)
-                            ? "cut"
+                            ? landed
+                              ? "kept"
+                              : "cut"
                             : fixed !== undefined
                               ? "fixed"
                               : undefined;
@@ -266,7 +268,11 @@ export function ReEdit({
                           type="button"
                           className={styles.word}
                           data-state={state}
-                          title={`${seconds(word.start)}–${seconds(word.end)} s`}
+                          title={
+                            state === "kept"
+                              ? "Kept: no pause to cut at beside it inside the selection"
+                              : `${seconds(word.start)}–${seconds(word.end)} s`
+                          }
                           onClick={(event) =>
                             setSelection(event.shiftKey && selection ? [selection[0], g] : [g, g])
                           }
@@ -323,6 +329,13 @@ export function ReEdit({
                   Cut “
                   {said(words.slice(a, b + 1).map((word) => draft.words[key(word)] ?? word.text))}”
                   {span && ` · lands ${seconds(span[0])}–${seconds(span[1])} s`}{" "}
+                  {landed?.outside
+                    .filter((extra) => extra.range === i)
+                    .map((extra) => (
+                      <span key={extra.words} className={styles.warning}>
+                        No pause inside your selection, so this cut also removes: {extra.words}
+                      </span>
+                    ))}
                   <button
                     type="button"
                     className={styles.inlineButton}
@@ -497,9 +510,6 @@ export function ReEdit({
           another music track cannot be changed here: Claude plans the edit again from the same
           footage, whose analysis is kept, so it takes a minute or two and one more plan.
         </p>
-        <button type="button" className={styles.button} onClick={onReplan} disabled={!view.footage}>
-          Re-plan…
-        </button>
       </div>
 
       {error && (

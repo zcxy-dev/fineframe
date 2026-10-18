@@ -491,7 +491,7 @@ export function Editor() {
             {status === "done" && job ? (
               <>
                 <Player job={job} />
-                <ReEdit job={job} onJob={update} onReplan={() => {}} />
+                <ReEdit job={job} onJob={update} />
               </>
             ) : (
               job && <RunView job={job} />

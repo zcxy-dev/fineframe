@@ -138,22 +138,37 @@ test("a range that starts inside one word and ends inside the next lands in the 
   assert.equal(length, s(8) - (to - from));
 });
 
-test("an edge between two words said without a pause moves to the nearest pause", () => {
-  // w3 runs straight into w4 and w4 into w5; the other gaps take a cut.
+/** The test words, with w4 said straight after w3 and, with `both`, w5 straight after w4. */
+function joinedSources(both: boolean): Map<string, PlaceSource> {
   const joined = words.map((word, k) =>
-    k === 4 ? { ...word, start: 1.9 } : k === 5 ? { ...word, start: 2.4 } : word,
+    k === 4 ? { ...word, start: 1.9 } : both && k === 5 ? { ...word, start: 2.4 } : word,
   );
-  const sources = new Map<string, PlaceSource>(
+  return new Map(
     ["a", "b"].map((id) => [id, { id, words: joined, duration: 60, frameTicks: FRAME }]),
   );
-  // Only w4's middle is asked for: the cut takes w3 and w5 with it, the nearest edges in pauses.
-  const { notes, removed } = cutEdit(edit(), [[s(2.1), s(2.2)]], sources);
-  assert.match(notes[0] ?? "", /: w3 w4 w5$/);
+}
+
+test("an edge with no pause moves inward, keeping a word asked for rather than taking one more", () => {
+  // w4 to w6 asked for; w3 runs straight into w4, so the cut starts in the pause after w4.
+  const { notes, removed, outside } = cutEdit(edit(), [[s(2.0), s(3.3)]], joinedSources(false));
+  assert.match(notes[0] ?? "", /: w5 w6$/);
+  assert.deepEqual(outside, []);
   const [from, to] = removed[0] as [number, number];
-  assert.ok(from >= s((joined[2] as Word).end + MARGIN));
-  assert.ok(to <= s((joined[6] as Word).start - MARGIN));
+  assert.ok(from >= s((words[4] as Word).end + MARGIN), "w4 stays");
+  assert.ok(to <= s((words[7] as Word).start - MARGIN));
   // An edge already in a pause stays where it is: w1 alone goes.
-  assert.match(cutEdit(edit(), [[s(0.6), s(0.9)]], sources).notes[0] ?? "", /: w1$/);
+  assert.match(cutEdit(edit(), [[s(0.6), s(0.9)]], joinedSources(false)).notes[0] ?? "", /: w1$/);
+});
+
+test("a stretch with no pause inside grows out to the nearest ones, and says what it took", () => {
+  // Only w4 asked for, said without a pause on either side: w3 and w5 go with it.
+  const { notes, removed, outside } = cutEdit(edit(), [[s(2.1), s(2.2)]], joinedSources(true));
+  assert.match(notes[0] ?? "", /: w3 w4 w5$/);
+  assert.deepEqual(outside, [{ range: 0, words: "w3 … w5" }]);
+  assert.match(notes[1] ?? "", /no pause a cut fits in inside it, so it also takes: w3 … w5/);
+  const [from, to] = removed[0] as [number, number];
+  assert.ok(from >= s((words[2] as Word).end + MARGIN));
+  assert.ok(to <= s((words[6] as Word).start - MARGIN));
 });
 
 test("a cut over a whole clip drops it and the captions on it", () => {

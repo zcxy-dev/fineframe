@@ -53,6 +53,9 @@ export interface RevisionResult {
   removed: [number, number][];
   /** What the cuts took out, for a person to check. */
   notes: string[];
+  /** The words a cut took beyond those asked for, by its index in `cuts`, where no pause a cut
+   * fits in lay inside its stretch. */
+  outside: { range: number; words: string }[];
 }
 
 /** The output of `project` with `revision` applied. Every index in it is into `project` as
@@ -114,7 +117,7 @@ export function revise(
   }
   if (revision.remove?.length) out = removeAll(out, revision.remove);
   if (!revision.cuts?.length) {
-    return { project: out, length: editLength(out), removed: [], notes: [] };
+    return { project: out, length: editLength(out), removed: [], notes: [], outside: [] };
   }
   const cut = cutEdit(out, revision.cuts, sources);
   cut.project.output = {
@@ -125,7 +128,13 @@ export function revise(
   // start leaves over at its far end, beside a cut the edit already had.
   const cuts = revision.cuts;
   const removed = cut.removed.filter(([a, b]) => cuts.some(([x, y]) => a < y && b > x));
-  return { project: cut.project, length: cut.length, removed, notes: cut.notes };
+  return {
+    project: cut.project,
+    length: cut.length,
+    removed,
+    notes: cut.notes,
+    outside: cut.outside,
+  };
 }
 
 /** What `removeAll` can take out, with a line for a person to tell each apart. */
