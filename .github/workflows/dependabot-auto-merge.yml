@@ -1,5 +1,6 @@
-# Every Dependabot update that is not a major version, in every ecosystem, merges itself
-# once the required checks pass. Major updates stay open for a person.
+# Every Dependabot update that is not a major version merges itself once the required checks
+# pass, except GitHub Actions updates (which edit workflows). Those and major updates stay open
+# for review (owner decision 2026-10-18).
 name: Dependabot auto-merge
 
 on: pull_request
@@ -20,14 +21,13 @@ jobs:
       # A merge made with GITHUB_TOKEN starts no workflow on main; the App's token does,
       # so main's CI runs on Dependabot updates too.
       - id: app-token
-        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major' && steps.metadata.outputs.package-ecosystem != 'github_actions'
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: Iv23liGHSk5KypxJ5KoF
           private-key: ${{ secrets.DEPENDABOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
-          permission-workflows: write
       - if: steps.app-token.outcome == 'success'
         run: gh pr merge --auto --squash "$PR_URL"
         env:
