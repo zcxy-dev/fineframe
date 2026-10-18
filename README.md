@@ -57,7 +57,7 @@ A single web page drives it: drop the files, pick the length and aspect ratio, p
 - **Speech and pauses:** [Silero VAD](https://github.com/snakers4/silero-vad) finds where someone speaks.
 - **Loudness and audio events:** EBU R128 loudness, and laughter, applause and music from the [CED](https://github.com/RicherMans/CED) tagger ([details](worker/README.md#media-index)).
 - **Faces and who speaks:** [YuNet](https://huggingface.co/opencv/face_detection_yunet) faces tracked through each shot, and who speaks when ([details](worker/README.md#faces-and-speakers)).
-- **Long sources:** frames and speech stream through the analysis, so a 2-hour source fits in a few GB ([shots](worker/README.md#media-index), [voice](worker/README.md#voice)).
+- **Long sources:** frames and speech stream through the analysis, so a source's length barely changes its memory; the speech model sets the peak ([sizes](#which-speech-model-runs), [shots](worker/README.md#media-index), [voice](worker/README.md#voice)).
 - **Transcript:** [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) keeps mixed Mandarin and English mixed, in Taiwan Traditional Chinese with [OpenCC](https://github.com/BYVoid/OpenCC), timed word by word, locally or on OpenRouter ([details](worker/README.md#word-timings)).
 - **Transcript correction** (opt-in): Claude fixes misheard names, terms and homophones, and only edits that keep every spoken word apply ([details](worker/README.md#transcript-correction)).
 - **Plan:** [Claude plans the edit](packages/engine/README.md#planning) and checks every cut; code cuts between words to the length asked ([measurements](packages/engine/MEASUREMENTS.md#planner-measurements)).
