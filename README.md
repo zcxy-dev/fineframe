@@ -94,7 +94,7 @@ From the source, for development and the command line; to only use the editor, [
 
 ```bash
 git clone https://github.com/zcxy-dev/fineframe.git
-cd video-editor
+cd fineframe
 mise run start
 ```
 
