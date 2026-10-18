@@ -2,8 +2,8 @@
 #
 #   uv run --no-project --with pillow==13.0.0 python brand/icons.py
 #
-# icon-1024.png is icon.svg rendered in Chrome; 16, 32 and 128 px come from their own
-# pixel-aligned versions rather than from scaling it down.
+# icon-1024.png is icon.svg rendered in Chrome, and icon-128.png its render at 128 px; 16 and
+# 32 px come from their own pixel-aligned versions rather than from scaling it down.
 import io
 import struct
 from pathlib import Path
@@ -39,7 +39,7 @@ def ico(path: Path, sizes: list[int]) -> None:
 # electron-builder's places: the Linux set in icons/, then macOS's and Windows' own files.
 assets = repo / "apps" / "desktop" / "assets"
 (assets / "icons").mkdir(parents=True, exist_ok=True)
-for size in (16, 32, 48, 64, 128, 256, 512, 1024):
+for size in (16, 32, 48, 64, 128, 256, 512):
     (assets / "icons" / f"{size}x{size}.png").write_bytes(png(size))
 
 ICNS = [

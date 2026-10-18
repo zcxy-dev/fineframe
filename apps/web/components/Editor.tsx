@@ -346,7 +346,7 @@ export function Editor() {
     <div className={styles.shell}>
       <header className={styles.header}>
         <span className={styles.brand}>
-          <Image src="/icon.svg" width={32} height={32} alt="" />
+          <Image src="/icon.svg" width={32} height={32} alt="" loading="eager" />
           Fineframe
         </span>
         {keySet !== null && (

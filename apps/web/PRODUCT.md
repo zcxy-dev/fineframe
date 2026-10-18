@@ -26,7 +26,7 @@ The edit is made end to end with no timeline to touch: analysis, planning, rende
 - Analysis and rendering run on the person's machine; what is sent out is listed in `SECURITY.md`.
 
 ## Brand Commitments
-The name is "Fineframe". Its icon is in `brand/`, with the wordmark in Archivo SemiExpanded; the page shows the 32 px version (`public/icon.svg`) beside the name, and `app/favicon.ico` holds the 16 and 32 px ones. The current dark interface is the incumbent look and is kept.
+The name is "Fineframe". Its icon is in the repository's `brand/` folder, with the wordmark in Archivo SemiExpanded; the page shows the 32 px version (`public/icon.svg`) beside the name, and `app/favicon.ico` holds the 16 and 32 px ones. The current dark interface is the incumbent look and is kept.
 
 ## Evidence on Hand
 The README's example frames and videos from a CC BY 3.0 interview (release `v0.2.0`). No testimonials, customers or usage numbers exist; none may be invented.
