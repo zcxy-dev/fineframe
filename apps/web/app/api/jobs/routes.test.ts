@@ -44,6 +44,7 @@ const editRoute = await import("./[id]/edit/route.ts");
 const previewRoute = await import("./[id]/preview/route.ts");
 const versionsRoute = await import("./[id]/versions/route.ts");
 const versionRoute = await import("./[id]/versions/[n]/route.ts");
+const replanRoute = await import("./[id]/replan/route.ts");
 
 test.after(() => rm(root, { recursive: true, force: true }));
 
@@ -503,4 +504,69 @@ test("a finished edit changes as versions, the newest three keeping their videos
     ctx({ id, n: "2" }),
   );
   assert.equal(back.status, 200, "a kept video needs no footage");
+});
+
+test("a re-plan makes a new version from the same footage, at another length, aspect or music", async () => {
+  delete process.env.FAKE_RENDER_FAIL;
+  const { body: created } = await create([
+    { path: "d.mp4", size: 2 },
+    { path: "music/one.mp3", size: 2 },
+    { path: "music/two.mp3", size: 2 },
+  ]);
+  const id = created.id;
+  for (const index of [0, 1, 2]) {
+    assert.equal((await put(id, index, new Uint8Array(2))).status, 200);
+  }
+  assert.equal((await start(id)).status, 200);
+  const read = async () => (await (await jobRoute.GET(new Request(url), ctx({ id }))).json()) as Job;
+  const until = async (done: (job: Job) => boolean) => {
+    for (;;) {
+      const job = await read();
+      if (done(job)) return job;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  };
+  await until((job) => job.status === "done");
+  const replan = (choice: object) =>
+    replanRoute.POST(
+      new Request(`${url}/${id}/replan`, { method: "POST", body: JSON.stringify(choice) }),
+      ctx({ id }),
+    );
+
+  assert.equal((await replan({ length: 5, aspect: "1:1", music: "auto" })).status, 400);
+  assert.equal((await replan({ length: 30, aspect: "4:3", music: "auto" })).status, 400);
+  const other = await replan({ length: 30, aspect: "1:1", music: "music/three.mp3" });
+  assert.equal(other.status, 400, "only a track the edit was offered");
+
+  const response = await replan({
+    length: 30,
+    aspect: "1:1",
+    music: "music/two.mp3",
+    // A leading "-" must not read as one of the command's own options.
+    instructions: " -Open with the demo. ",
+  });
+  assert.equal(response.status, 200);
+  assert.equal(((await response.json()) as Job).render?.version, 2);
+  const job = await until((each) => each.render === undefined);
+  assert.equal(job.current, 2);
+  const version = job.versions?.[1];
+  assert.equal(version?.aspect, "1:1");
+  assert.equal(version?.length, 30);
+  assert.match(version?.summary ?? "", /30 s, 1:1, two\.mp3, with instructions/);
+  assert.ok(Math.abs((version?.claude ?? 0) - 0.082) < 1e-9, "what the plan cost");
+  const args = JSON.parse(await readFile(join(root, id, "args.json"), "utf8")) as string[];
+  assert.deepEqual(args.slice(args.indexOf("--length"), args.indexOf("--length") + 4), [
+    "--length",
+    "30",
+    "--aspect",
+    "1:1",
+  ]);
+  assert.equal(args[args.indexOf("-o") + 1], join("out", "edit-v2.mp4"));
+  assert.deepEqual(
+    args.filter((arg, i) => args[i - 1] === "--music"),
+    [join("footage", "music", "two.mp3")],
+  );
+  assert.ok(args.includes("--instructions=-Open with the demo."));
+  // The page plays the track the new version chose.
+  assert.deepEqual(job.result?.music, ["music/two.mp3"]);
 });

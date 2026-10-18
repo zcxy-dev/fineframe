@@ -15,6 +15,8 @@ export interface Version {
   from?: number;
   /** Its length in seconds. */
   seconds?: number;
+  /** What Claude cost to plan it again, in US dollars; absent for a version no plan made. */
+  claude?: number;
   /** The length and aspect it was planned for, when a re-plan changed them from the edit's. */
   length?: number;
   aspect?: "9:16" | "1:1" | "16:9";

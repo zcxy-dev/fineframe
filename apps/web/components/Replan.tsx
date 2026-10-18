@@ -1,22 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { Job } from "../lib/jobs.ts";
+import type { Job, ReplanChoice } from "../lib/jobs.ts";
 import { formatLength } from "../lib/settings.ts";
 import styles from "./editor.module.css";
 import { AlertIcon } from "./icons.tsx";
 
-const LENGTHS = [15, 30, 60, 180, 600] as const;
+const LENGTHS = [15, 30, 60, 180, 600];
 const ASPECTS = ["9:16", "1:1", "16:9"] as const;
-
-/** What a re-plan changes; one more field, such as what to tell Claude, goes here and in
- * Jobs.replan. */
-export interface ReplanChoice {
-  length: number;
-  aspect: (typeof ASPECTS)[number];
-  /** A track offered to the edit by its path, "auto" for Claude to choose again, or "none". */
-  music: string;
-}
 
 /** Plans the edit again from the same footage, as a new version. */
 export function Replan({
@@ -30,11 +21,15 @@ export function Replan({
 }) {
   const shown = job.versions?.find((version) => version.n === (job.current ?? 1));
   const tracks = job.files.filter((file) => file.use === "music").map((file) => file.path);
+  const planned = shown?.length ?? job.settings.length;
+  // Each field is one entry of the choice, which Jobs.replan takes as it is.
   const [choice, setChoice] = useState<ReplanChoice>({
-    length: shown?.length ?? job.settings.length,
+    length: planned,
     aspect: shown?.aspect ?? job.settings.aspect,
     music: "auto",
+    instructions: "",
   });
+  const lengths = LENGTHS.includes(planned) ? LENGTHS : [...LENGTHS, planned].sort((a, b) => a - b);
   const [error, setError] = useState<string | null>(null);
   const start = async () => {
     setError(null);
@@ -61,7 +56,7 @@ export function Replan({
       <div className={styles.field}>
         <span className={styles.label}>Length</span>
         <div className={styles.chips}>
-          {LENGTHS.map((seconds) => (
+          {lengths.map((seconds) => (
             <button
               key={seconds}
               type="button"
@@ -108,6 +103,18 @@ export function Replan({
           </select>
         </label>
       )}
+      <label className={styles.field}>
+        <span className={styles.label}>
+          Tell Claude what to change <span className={styles.labelHint}>Optional</span>
+        </span>
+        <textarea
+          className={styles.textarea}
+          maxLength={2000}
+          placeholder={"Open with the demo\nPut back the part about pricing\nEnd on the question"}
+          value={choice.instructions}
+          onChange={(event) => setChoice({ ...choice, instructions: event.target.value })}
+        />
+      </label>
       {error && (
         <p className={styles.error} role="alert">
           <AlertIcon width={16} height={16} />

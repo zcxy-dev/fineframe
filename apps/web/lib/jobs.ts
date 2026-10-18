@@ -31,7 +31,15 @@ import { readKey, type Service, VARIABLES } from "./key.ts";
 import { safeRelativePath } from "./paths.ts";
 import { FOOTAGE_KEPT } from "./retention.ts";
 import { type Run, runEdit } from "./runner.ts";
-import { DEFAULT_CAPTIONS, type FileEntry, type Role, roleOf, type Settings } from "./settings.ts";
+import {
+  DEFAULT_CAPTIONS,
+  type FileEntry,
+  formatLength,
+  LENGTH_RANGE,
+  type Role,
+  roleOf,
+  type Settings,
+} from "./settings.ts";
 import { type Version, versionFiles, videosToPrune } from "./versions.ts";
 
 export type Stage = "analyze" | "plan" | "render" | "check";
@@ -94,6 +102,57 @@ export interface Job {
     message: string;
     error?: string;
   };
+}
+
+/** What a re-plan changes, as the page asks for it. */
+export interface ReplanChoice {
+  length: number;
+  aspect: Settings["aspect"];
+  /** A track the edit was offered, by its path, "auto" for Claude to choose among them again,
+   * or "none". */
+  music: string;
+  /** What the user asks of the new plan, in their words. */
+  instructions?: string;
+}
+
+/** The longest instructions, as `pnpm edit --instructions` takes them. */
+const INSTRUCTIONS_MAX = 2000;
+
+/** A re-plan as the page sends it, or what is wrong with it. */
+export function checkReplan(value: unknown): ReplanChoice | string {
+  const choice = (value ?? {}) as Partial<ReplanChoice>;
+  const [shortest, longest] = LENGTH_RANGE;
+  if (
+    typeof choice.length !== "number" ||
+    !Number.isFinite(choice.length) ||
+    choice.length < shortest ||
+    choice.length > longest
+  ) {
+    return `The length is ${shortest} s to ${longest / 3600} h`;
+  }
+  if (!["9:16", "1:1", "16:9"].includes(choice.aspect as string)) {
+    return "The aspect is 9:16, 1:1 or 16:9";
+  }
+  if (typeof choice.music !== "string" || !choice.music) return "Say which music to use";
+  const instructions = typeof choice.instructions === "string" ? choice.instructions.trim() : "";
+  if (instructions.length > INSTRUCTIONS_MAX) {
+    return `Tell Claude what to change in at most ${INSTRUCTIONS_MAX} characters`;
+  }
+  return {
+    length: choice.length,
+    aspect: choice.aspect as Settings["aspect"],
+    music: choice.music,
+    ...(instructions ? { instructions } : {}),
+  };
+}
+
+/** What one plan of an edit is for: its length, aspect, the music offered and what the user
+ * asks of it. */
+interface EditPlan {
+  length: number;
+  aspect: Settings["aspect"];
+  music: JobFile[];
+  instructions?: string;
 }
 
 /** What the re-edit panel shows of one version, in output ticks. */
@@ -425,37 +484,11 @@ export class Jobs {
     job.status = "running";
     job.started = Date.now();
     const dir = this.#dir(job);
-    const { length, aspect, style, names, terms = [], musicLicense, visuals } = job.settings;
-    const footage = (file: JobFile) => join("footage", file.path);
+    const { length, aspect } = job.settings;
     const music = job.files.filter((file) => file.use === "music");
-    const args = [
-      ...job.files.filter((file) => file.use !== "music").map(footage),
-      "--length",
-      String(length),
-      "--aspect",
-      aspect,
-      "--look",
-      style,
-      `--visuals=${visuals}`,
-      ...["--quality", job.settings.quality ?? "best"],
-      ...(job.settings.correct ? ["--correct"] : []),
-      ...["--captions", job.settings.captions ?? DEFAULT_CAPTIONS],
-      "-o",
-      VIDEO,
-      ...music.flatMap((file) => ["--music", footage(file)]),
-      // Joined, so a licence starting with "-" is not read as an option.
-      ...(music.length > 0 && musicLicense ? [`--music-license=${musicLicense}`] : []),
-      ...(job.settings.asr === "cloud" ? ["--asr", "cloud"] : []),
-    ];
+    let args: string[];
     try {
-      for (const [option, list] of [
-        ["names", names],
-        ["terms", terms],
-      ] as const) {
-        if (list.length === 0) continue;
-        await writeFile(join(dir, `${option}.txt`), `${list.join("\n")}\n`);
-        args.push(`--${option}`, `${option}.txt`);
-      }
+      args = await this.#editArgs(job, { length, aspect, music }, VIDEO);
       await this.#save(job);
     } catch (error) {
       job.status = "error";
@@ -478,6 +511,42 @@ export class Jobs {
       .then(({ code }) => this.#finish(job, code, log))
       .catch((error: Error) => this.#finish(job, null, [...log, error.message]));
     return job;
+  }
+
+  /** `pnpm edit`'s arguments for `job` planned as `plan` says, writing to `output`, and the
+   * names and terms files they name, written into the job's folder. */
+  async #editArgs(job: Job, plan: EditPlan, output: string): Promise<string[]> {
+    const { style, names, terms = [], musicLicense, visuals } = job.settings;
+    const footage = (file: JobFile) => join("footage", file.path);
+    const args = [
+      ...job.files.filter((file) => file.use !== "music").map(footage),
+      "--length",
+      String(plan.length),
+      "--aspect",
+      plan.aspect,
+      "--look",
+      style,
+      `--visuals=${visuals}`,
+      ...["--quality", job.settings.quality ?? "best"],
+      ...(job.settings.correct ? ["--correct"] : []),
+      ...["--captions", job.settings.captions ?? DEFAULT_CAPTIONS],
+      "-o",
+      output,
+      ...plan.music.flatMap((file) => ["--music", footage(file)]),
+      // Joined, so a licence or instructions starting with "-" are not read as options.
+      ...(plan.music.length > 0 && musicLicense ? [`--music-license=${musicLicense}`] : []),
+      ...(plan.instructions ? [`--instructions=${plan.instructions}`] : []),
+      ...(job.settings.asr === "cloud" ? ["--asr", "cloud"] : []),
+    ];
+    for (const [option, list] of [
+      ["names", names],
+      ["terms", terms],
+    ] as const) {
+      if (list.length === 0) continue;
+      await writeFile(join(this.#dir(job), `${option}.txt`), `${list.join("\n")}\n`);
+      args.push(`--${option}`, `${option}.txt`);
+    }
+    return args;
   }
 
   /** The keys an edit with `settings` needs, and the optional stock footage ones it can use, as
@@ -707,6 +776,94 @@ export class Jobs {
     return job;
   }
 
+  /** Plans the edit again from the same footage, its analysis cached, as the next version: at
+   * another length or aspect, with other music, or with what the user asks of it. The version
+   * shown stays until the new one is done. */
+  async replan(id: string, choice: ReplanChoice): Promise<Job> {
+    const job = await this.#finished(id);
+    const keys = await this.#requireKeys(job.settings);
+    this.#refuseWhileRunning();
+    this.#requireFootage(job);
+    const offered = job.files.filter((file) => file.use === "music");
+    const music =
+      choice.music === "auto"
+        ? offered
+        : choice.music === "none"
+          ? []
+          : offered.filter((file) => file.path === choice.music);
+    if (choice.music !== "auto" && choice.music !== "none" && music.length === 0) {
+      throw new JobError("That music track is not one this edit was offered", 400);
+    }
+    const versions = this.#versions(job);
+    const n = Math.max(...versions.map((version) => version.n)) + 1;
+    // Busy from here, before the next await, so a second request at the same moment is refused.
+    job.render = { version: n, fresh: true, fraction: 0, message: "Planning again" };
+    const files = versionFiles(n);
+    let args: string[];
+    try {
+      args = await this.#editArgs(
+        job,
+        {
+          length: choice.length,
+          aspect: choice.aspect,
+          music,
+          ...(choice.instructions ? { instructions: choice.instructions } : {}),
+        },
+        files.video,
+      );
+    } catch (error) {
+      delete job.render;
+      throw error;
+    }
+    const version: Version = {
+      n,
+      created: Date.now(),
+      summary: [
+        `Planned again: ${formatLength(choice.length)}, ${choice.aspect}`,
+        ...(choice.music === "none"
+          ? ["no music"]
+          : choice.music === "auto"
+            ? []
+            : [choice.music.split("/").at(-1) as string]),
+        ...(choice.instructions ? ["with instructions"] : []),
+      ].join(", "),
+      from: job.current ?? 1,
+      video: false,
+      length: choice.length,
+      aspect: choice.aspect,
+    };
+    versions.push(version);
+    const log: string[] = [];
+    let failed: string | undefined;
+    const run = runEdit({
+      command: this.#command,
+      args,
+      cwd: this.#dir(job),
+      env: keys,
+      onProgress: (line) => {
+        if (line.claude) {
+          const { plan, check } = line.claude;
+          if (plan.dollars !== null && check.dollars !== null) {
+            version.claude = plan.dollars + check.dollars;
+          }
+        }
+        if (line.stage === "error") failed = line.message;
+        if (line.stage === "done" || line.stage === "error" || !job.render) return;
+        job.render.fraction = Math.max(job.render.fraction, line.fraction);
+        job.render.message = line.message;
+        this.#emit(job);
+      },
+      onLog: (line) => log.push(line),
+    });
+    this.#runs.set(job.id, run);
+    await this.#save(job);
+    this.#emit(job);
+    void run.exited
+      .then(({ code }) => this.#rendered(job, n, code, log, failed))
+      .catch((error: Error) => this.#rendered(job, n, null, [...log, error.message], failed));
+    return job;
+  }
+
   /** Shows version `n`, rendering it again from its record when its video was not kept. */
   async show(id: string, n: number): Promise<Job> {
     const job = await this.#finished(id);
@@ -771,7 +928,14 @@ export class Jobs {
       .catch((error: Error) => this.#rendered(job, n, null, [...log, error.message]));
   }
 
-  async #rendered(job: Job, n: number, code: number | null, log: readonly string[]) {
+  async #rendered(
+    job: Job,
+    n: number,
+    code: number | null,
+    log: readonly string[],
+    /** Why it failed, when the command said so on its own terms. */
+    failed?: string,
+  ) {
     this.#runs.delete(job.id);
     const stopped = this.#stopped.delete(job.id);
     const render = job.render;
@@ -792,11 +956,13 @@ export class Jobs {
       delete job.render;
     } else if (render) {
       const reason = [...log].reverse().find((line) => line.startsWith("render: error: "));
-      const error = reason
-        ? reason.slice("render: error: ".length)
-        : stopped
-          ? "The render was stopped"
-          : `The render stopped unexpectedly${code === null ? "" : ` (exit code ${code})`}`;
+      const error = failed
+        ? failed
+        : reason
+          ? reason.slice("render: error: ".length)
+          : stopped
+            ? "The render was stopped"
+            : `The render stopped unexpectedly${code === null ? "" : ` (exit code ${code})`}`;
       if (render.fresh) {
         job.versions = versions.filter((each) => each.n !== n);
         await rm(join(dir, versionFiles(n).project), { force: true });
