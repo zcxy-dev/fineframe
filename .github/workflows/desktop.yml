@@ -70,7 +70,7 @@ jobs:
         run: |
           dmg=$(ls apps/desktop/dist/*.dmg)
           hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/app" "$dmg"
-          node apps/desktop/scripts/smoke.ts "$RUNNER_TEMP/app/Video Editor.app/Contents/MacOS/Video Editor" \
+          node apps/desktop/scripts/smoke.ts "$RUNNER_TEMP/app/Fineframe.app/Contents/MacOS/Fineframe" \
             --shots "$RUNNER_TEMP/shots"
           hdiutil detach "$RUNNER_TEMP/app"
       # Installed silently for this user, as the installer does when opened, then run from there.
@@ -82,7 +82,7 @@ jobs:
           installer=$(ls apps/desktop/dist/*.exe)
           powershell -NoProfile -Command "Start-Process -Wait -FilePath '$installer' -ArgumentList '/S'"
           programs="$(cygpath -u "$LOCALAPPDATA")/Programs"
-          app=$(find "$programs" -maxdepth 3 -name 'Video Editor.exe' | head -1)
+          app=$(find "$programs" -maxdepth 3 -name 'Fineframe.exe' | head -1)
           if [ -z "$app" ]; then find "$programs" -maxdepth 3 | head -50; exit 1; fi
           app=$(cygpath -w "$app")
           echo "installed at $app"
@@ -143,7 +143,7 @@ jobs:
           (cd installers && sha256sum -- * > SHA256SUMS)
           if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft \
-              --verify-tag --title "Video Editor $version" \
+              --verify-tag --title "Fineframe $version" \
               --notes "Installers for macOS (Apple silicon), Windows and Linux. They are not signed yet: the README says how to open the app the first time (https://github.com/$GITHUB_REPOSITORY#install)."
           fi
           gh release upload "$GITHUB_REF_NAME" installers/* --repo "$GITHUB_REPOSITORY" --clobber

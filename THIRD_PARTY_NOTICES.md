@@ -138,6 +138,10 @@ The installers are not signed with an Apple Developer ID or a Windows code-signi
 
 Simple Icons' logos are brands' trademarks, which its CC0 dedication does not cover: an edit may show a logo to refer to its brand, as the brand's guidelines allow, and not to suggest that the brand endorses the video. A few logos carry their own licence in Simple Icons' data; the lookup reports it, and each logo's credit carries the trademark note. Tabler's `brand-*` icons are logos too.
 
+### Wordmark
+
+The wordmark (`brand/wordmark.svg`, `brand/wordmark-on-dark.svg`) sets "Fineframe" in [Archivo](https://github.com/Omnibus-Type/Archivo) SemiExpanded by Omnibus-Type, under the [SIL Open Font License 1.1](https://openfontlicense.org). Its letters are outlined into paths: no font file is in the repository or the app.
+
 ### B-roll from the web
 
 Stock footage comes from [Pexels](https://www.pexels.com/license/) and [Pixabay](https://pixabay.com/service/license-summary/) under their own licences, through each one's API with the user's own key; each clip's credit names its creator and links to its page. A web capture shows someone else's page, whose owner keeps every right in it; its credit names the page.
@@ -148,7 +152,7 @@ The ONNX export's model card states Apache-2.0. The same weights are published o
 
 ### ASCEND
 
-The benchmark's transcription corpus (`vebench ascend`) is built from ASCEND: "ASCEND: A Spontaneous Chinese-English Dataset for Code-switching in Multi-turn Conversation" by Holy Lovenia, Samuel Cahyawijaya, Genta Indra Winata, Peng Xu, Xu Yan, Zihan Liu, Rita Frieske, Tiezheng Yu, Wenliang Dai, Elham J. Barezi, Qifeng Chen, Xiaojuan Ma, Bertram E. Shi and Pascale Fung (LREC 2022, [arXiv:2112.06223](https://arxiv.org/abs/2112.06223)), published by CAiRE on [Hugging Face](https://huggingface.co/datasets/CAiRE/ASCEND) under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). `vebench ascend` joins a sample of its test utterances into clips and converts their transcripts to Taiwan Traditional Chinese; the clips and transcripts it writes are adaptations under the same licence, kept in the git-ignored corpus folder. Transcripts of four such clips were committed by mistake in an intermediate commit of [#65](https://github.com/zcxy-dev/video-editor/pull/65) and removed before it merged; that commit stays visible in the pull request's history, under the same licence and with this attribution. The authors do not endorse this project.
+The benchmark's transcription corpus (`vebench ascend`) is built from ASCEND: "ASCEND: A Spontaneous Chinese-English Dataset for Code-switching in Multi-turn Conversation" by Holy Lovenia, Samuel Cahyawijaya, Genta Indra Winata, Peng Xu, Xu Yan, Zihan Liu, Rita Frieske, Tiezheng Yu, Wenliang Dai, Elham J. Barezi, Qifeng Chen, Xiaojuan Ma, Bertram E. Shi and Pascale Fung (LREC 2022, [arXiv:2112.06223](https://arxiv.org/abs/2112.06223)), published by CAiRE on [Hugging Face](https://huggingface.co/datasets/CAiRE/ASCEND) under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). `vebench ascend` joins a sample of its test utterances into clips and converts their transcripts to Taiwan Traditional Chinese; the clips and transcripts it writes are adaptations under the same licence, kept in the git-ignored corpus folder. Transcripts of four such clips were committed by mistake in an intermediate commit of [#65](https://github.com/zcxy-dev/fineframe/pull/65) and removed before it merged; that commit stays visible in the pull request's history, under the same licence and with this attribution. The authors do not endorse this project.
 
 ### Training data
 
@@ -156,7 +160,7 @@ A model's licence covers its weights, not the data it was trained on. Some of th
 
 ## README example
 
-The example edits at the top of the README are made from footage the project does not own. Their frames and videos are assets of the [v0.2.0 release](https://github.com/zcxy-dev/video-editor/releases/tag/v0.2.0), not files in this repository, and are shared under the footage's licence.
+The example edits at the top of the README are made from footage the project does not own. Their frames and videos are assets of the [v0.2.0 release](https://github.com/zcxy-dev/fineframe/releases/tag/v0.2.0), not files in this repository, and are shared under the footage's licence.
 
 - **Footage:** "[Why NASA and IBM made a new AI model that predicts the Sun's damaging flares](https://www.youtube.com/watch?v=KWMoF97C1Ds)" by IBM Research, published 20 August 2025, with Mike Murphy and Johannes Schmude of IBM Research, licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). The edits shorten it to 60 s at 9:16 and 90 s at 16:9, reframe and grade it, process its sound and add music, captions, name cards and keyword highlights. Neither IBM Research nor the people in it endorse this project.
 - **Music:** in the 9:16 edit, "3 am West End" by statusq, dedicated to the public domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) ([source](https://commons.wikimedia.org/wiki/File:Statusq_-_3_am_West_End.opus)); in the 16:9 edit, "Cool Vibes" by Kevin MacLeod ([incompetech.com](https://incompetech.com)), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

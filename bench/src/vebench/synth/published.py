@@ -9,7 +9,7 @@ import urllib.request
 from pathlib import Path
 
 URL = (
-    "https://github.com/zcxy-dev/video-editor/releases/download/"
+    "https://github.com/zcxy-dev/fineframe/releases/download/"
     "corpus-synthetic-seed0-v1/synthetic-seed0.tar.gz"
 )
 SHA256 = "09783e95e719a6f4805b786de976f3780976a04ed3e1bb36474a4e2f5b9fe9d9"

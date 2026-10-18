@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/zcxy-dev/video-editor/blob/main/packages/schema/project.schema.json",
+  "$id": "https://github.com/zcxy-dev/fineframe/blob/main/packages/schema/project.schema.json",
   "title": "Project",
   "description": "One edit, complete enough to render the same video again from this file and the source files. Every position or length on a timeline is integer ticks, 120 000 per second; processing parameters carry their unit in their name (attackMs, gainDb). Paths are relative to the project file.",
   "type": "object",

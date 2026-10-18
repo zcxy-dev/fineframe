@@ -34,8 +34,8 @@ synth = [
 ]
 
 [project.urls]
-Repository = "https://github.com/zcxy-dev/video-editor"
-Issues = "https://github.com/zcxy-dev/video-editor/issues"
+Repository = "https://github.com/zcxy-dev/fineframe"
+Issues = "https://github.com/zcxy-dev/fineframe/issues"
 
 [project.scripts]
 vebench = "vebench.cli:main"

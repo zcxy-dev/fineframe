@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/zcxy-dev/video-editor/blob/main/packages/schema/music-index.schema.json",
+  "$id": "https://github.com/zcxy-dev/fineframe/blob/main/packages/schema/music-index.schema.json",
   "title": "MusicIndex",
   "description": "What `vework analyze-music` found in one music track, and the licence it is used under: the facts the planner picks and fits music from. Times are seconds from the file's time zero, the container's start time, as in the media index.",
   "type": "object",

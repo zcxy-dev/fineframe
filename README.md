@@ -1,37 +1,37 @@
-# video-editor
+# Fineframe
 
 **A fully automatic video editor, in development.** The goal: drop in your footage, choose a length and an aspect ratio, and get back a finished video, cut, captioned, framed, graded and animated, with no manual steps. It is built for Mandarin, English and speech that switches between them. Captions come out in Taiwan Traditional Chinese.
 
-[![CI](https://github.com/zcxy-dev/video-editor/actions/workflows/ci.yml/badge.svg)](https://github.com/zcxy-dev/video-editor/actions/workflows/ci.yml)
+[![CI](https://github.com/zcxy-dev/fineframe/actions/workflows/ci.yml/badge.svg)](https://github.com/zcxy-dev/fineframe/actions/workflows/ci.yml)
 [![License: proprietary](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
 
 > **Status:** the analysis worker, the planner, the renderer with its captions and effect templates, the `pnpm edit` command that runs them from footage to a finished video, the web page in front of it, the desktop app for Apple silicon Macs, Windows and Linux that runs the page with nothing else to install, the agent skill that changes a finished edit by conversation, and the benchmark work today.
 
-![Six frames from a 60-second 9:16 edit of an interview about Surya, an AI model that forecasts solar flares: name cards for the interviewer and the researcher, close-ups framed on whoever speaks, "solar flare" and "data" highlighted, and captions lit word by word](https://github.com/zcxy-dev/video-editor/releases/download/v0.2.0/example-edit-9x16.jpg)
+![Six frames from a 60-second 9:16 edit of an interview about Surya, an AI model that forecasts solar flares: name cards for the interviewer and the researcher, close-ups framed on whoever speaks, "solar flare" and "data" highlighted, and captions lit word by word](https://github.com/zcxy-dev/fineframe/releases/download/v0.2.0/example-edit-9x16.jpg)
 
-*A 60-second 9:16 edit made by `pnpm edit` with no manual steps from IBM Research's 19-minute interview "[Why NASA and IBM made a new AI model that predicts the Sun's damaging flares](https://www.youtube.com/watch?v=KWMoF97C1Ds)" ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)), cut, reframed, captioned and named on screen ([watch it](https://github.com/zcxy-dev/video-editor/releases/download/v0.2.0/example-edit-60s-9x16.mp4), [16:9 version](https://github.com/zcxy-dev/video-editor/releases/download/v0.2.0/example-edit-90s-16x9.mp4), [credits](THIRD_PARTY_NOTICES.md#readme-example)).*
+*A 60-second 9:16 edit made by `pnpm edit` with no manual steps from IBM Research's 19-minute interview "[Why NASA and IBM made a new AI model that predicts the Sun's damaging flares](https://www.youtube.com/watch?v=KWMoF97C1Ds)" ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)), cut, reframed, captioned and named on screen ([watch it](https://github.com/zcxy-dev/fineframe/releases/download/v0.2.0/example-edit-60s-9x16.mp4), [16:9 version](https://github.com/zcxy-dev/fineframe/releases/download/v0.2.0/example-edit-90s-16x9.mp4), [credits](THIRD_PARTY_NOTICES.md#readme-example)).*
 
 ## Install
 
-The desktop app needs nothing else installed: no Node, no Python, no command line. Download the installer for your computer from the [latest release](https://github.com/zcxy-dev/video-editor/releases/latest):
+The desktop app needs nothing else installed: no Node, no Python, no command line. Download the installer for your computer from the [latest release](https://github.com/zcxy-dev/fineframe/releases/latest):
 
 | Computer | Installer |
 |---|---|
-| Mac with Apple silicon (M1 or later) | `Video-Editor-<version>-mac-arm64.dmg` |
-| Windows 10 or 11 (x64) | `Video-Editor-<version>-win-x64.exe` |
-| Linux (x86-64) | `Video-Editor-<version>-linux-x86_64.AppImage` |
+| Mac with Apple silicon (M1 or later) | `Fineframe-<version>-mac-arm64.dmg` |
+| Windows 10 or 11 (x64) | `Fineframe-<version>-win-x64.exe` |
+| Linux (x86-64) | `Fineframe-<version>-linux-x86_64.AppImage` |
 
 Macs with an Intel processor are not supported: PyTorch and ONNX Runtime, which the analysis runs on, no longer publish builds for them.
 
-**macOS.** Open the DMG and drag Video Editor into Applications. The app is not yet signed with an Apple Developer ID, so the first time you open it, macOS says it cannot check the app for malicious software and offers only Done or Move to Trash. Choose Done, then open **System Settings → Privacy & Security**, scroll to Security, and choose **Open Anyway** next to the message about Video Editor; confirm with your password. macOS remembers the choice, and later launches open normally. Each release's `SHA256SUMS` lets you check the file you downloaded, and `gh attestation verify <file> --repo zcxy-dev/video-editor` checks that GitHub Actions built it from this repository.
+**macOS.** Open the DMG and drag Fineframe into Applications. The app is not yet signed with an Apple Developer ID, so the first time you open it, macOS says it cannot check the app for malicious software and offers only Done or Move to Trash. Choose Done, then open **System Settings → Privacy & Security**, scroll to Security, and choose **Open Anyway** next to the message about Fineframe; confirm with your password. macOS remembers the choice, and later launches open normally. Each release's `SHA256SUMS` lets you check the file you downloaded, and `gh attestation verify <file> --repo zcxy-dev/fineframe` checks that GitHub Actions built it from this repository.
 
-**Windows.** Open the installer: it installs Video Editor for your user alone, with no administrator needed, and opens it. The installer is not yet signed with a code-signing certificate, so Microsoft Defender SmartScreen may show "Windows protected your PC". Choose **More info**, check that the app is Video Editor, then choose **Run anyway**.
+**Windows.** Open the installer: it installs Fineframe for your user alone, with no administrator needed, and opens it. The installer is not yet signed with a code-signing certificate, so Microsoft Defender SmartScreen may show "Windows protected your PC". Choose **More info**, check that the app is Fineframe, then choose **Run anyway**.
 
-**Linux.** Make the AppImage executable (`chmod +x Video-Editor-*.AppImage`) and run it. AppImages need FUSE 2: on Ubuntu 24.04, `sudo apt install libfuse2t64`.
+**Linux.** Make the AppImage executable (`chmod +x Fineframe-*.AppImage`) and run it. AppImages need FUSE 2: on Ubuntu 24.04, `sudo apt install libfuse2t64`.
 
 **The first time it opens,** the app asks for your [Anthropic API key](https://console.anthropic.com/settings/keys) and checks it; Claude plans each edit and checks its cuts, about US$0.05 to 0.20 an edit, more for long ones. Meanwhile it installs the analysis once, about 2 GB of Python and PyTorch, with its progress in the window. The first edit then downloads what it needs on first use, each with its own bar: the speech model ([sizes](#which-speech-model-runs)), FFmpeg and the effects renderer. On a computer with less than 12 GB of memory, too little for the speech model, speech is heard on OpenRouter instead, with your [OpenRouter API key](https://openrouter.ai/settings/keys), for about US$0.03 an hour of footage; the app says so, and either can be chosen.
 
-The keys stay on your computer, in a file only your user can read, in the app's folder (`~/Library/Application Support/Video Editor` on macOS, `%APPDATA%\Video Editor` on Windows, `~/.config/Video Editor` on Linux), with the Python it installed. The models and edits are in `.cache\video-editor` and `.cache\huggingface` in your user folder (`~/.cache/…` on macOS and Linux). To remove the app entirely, uninstall or delete it and delete those folders. The app does not update itself yet: install a newer version over it, and the keys and downloads stay. How the app is built: [`apps/desktop`](apps/desktop/README.md).
+The keys stay on your computer, in a file only your user can read, in the app's folder (`~/Library/Application Support/Fineframe` on macOS, `%APPDATA%\Fineframe` on Windows, `~/.config/Fineframe` on Linux), with the Python it installed. The models and edits are in `.cache\video-editor` and `.cache\huggingface` in your user folder (`~/.cache/…` on macOS and Linux). To remove the app entirely, uninstall or delete it and delete those folders. The app does not update itself yet: install a newer version over it, and the keys and downloads stay. Releases up to 0.3.0 were called Video Editor: Fineframe does not replace it and asks for the key again, since that app's folder is `Video Editor`; uninstall it and delete that folder. How the app is built: [`apps/desktop`](apps/desktop/README.md).
 
 ## Design
 
@@ -93,8 +93,8 @@ From the source, for development and the command line; to only use the editor, [
 - An [Anthropic API key](https://console.anthropic.com/settings/keys): Claude plans the edit and checks its cuts ([cost](#install)).
 
 ```bash
-git clone https://github.com/zcxy-dev/video-editor.git
-cd video-editor
+git clone https://github.com/zcxy-dev/fineframe.git
+cd fineframe
 mise run start
 ```
 

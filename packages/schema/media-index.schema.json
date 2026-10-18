@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/zcxy-dev/video-editor/blob/main/packages/schema/media-index.schema.json",
+  "$id": "https://github.com/zcxy-dev/fineframe/blob/main/packages/schema/media-index.schema.json",
   "title": "MediaIndex",
   "description": "What `vework analyze` found in one source file: the facts the editing engine plans from. Times are seconds from the file's time zero, the container's start time, not raw stream timestamps.",
   "type": "object",
