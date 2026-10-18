@@ -13,6 +13,7 @@ import { Finish } from "./eta.ts";
 import type { FixKind } from "./fixes.ts";
 import { readKey, type Service, VARIABLES } from "./key.ts";
 import { safeRelativePath } from "./paths.ts";
+import { FOOTAGE_KEPT } from "./retention.ts";
 import { type Run, runEdit } from "./runner.ts";
 import { DEFAULT_CAPTIONS, type FileEntry, type Role, roleOf, type Settings } from "./settings.ts";
 
@@ -104,6 +105,52 @@ const PROJECT = join("out", "edit.project.json");
 const BROLL = join("out", "edit.broll.txt");
 /** stderr lines kept with a failed edit, for a person to read in edit.log. */
 const LOG = "edit.log";
+
+/** What the project list shows of an edit. */
+export interface ProjectSummary {
+  id: string;
+  created: number;
+  status: Status;
+  length: number;
+  aspect: Settings["aspect"];
+  /** Its first video's path, to tell projects apart. */
+  name: string;
+  /** Bytes its folder takes on disk. */
+  bytes: number;
+  /** Whether its footage is still kept, which editing it again needs. */
+  footage: boolean;
+}
+
+/** The ids of the jobs whose footage goes so that only the newest `keep` with footage keep
+ * theirs. A running edit reads its footage, so it keeps it and counts among them; a cancelled
+ * one has none left. */
+export function footageToPrune(
+  jobs: readonly Pick<Job, "id" | "created" | "status">[],
+  keep: number,
+): string[] {
+  const held = jobs
+    .filter((job) => job.status === "running" || job.status === "done" || job.status === "error")
+    .sort((a, b) => b.created - a.created);
+  const kept = new Set(held.slice(0, keep).map((job) => job.id));
+  for (const job of held) if (job.status === "running") kept.add(job.id);
+  return jobs.filter((job) => !kept.has(job.id)).map((job) => job.id);
+}
+
+/** Bytes the files under `path` take; 0 for one that is gone. */
+async function diskUsage(path: string): Promise<number> {
+  const entries = await readdir(path, { withFileTypes: true, recursive: true }).catch(() => []);
+  const sizes = await Promise.all(
+    entries
+      .filter((entry) => entry.isFile())
+      .map((entry) =>
+        stat(join(entry.parentPath, entry.name)).then(
+          (info) => info.size,
+          () => 0,
+        ),
+      ),
+  );
+  return sizes.reduce((sum, size) => sum + size, 0);
+}
 
 export class Jobs {
   readonly #root: string;
@@ -199,15 +246,17 @@ export class Jobs {
     return job;
   }
 
-  /** Each earlier job's footage, which only its own edit reads; its outputs stay. */
+  /** The footage of all but the newest projects, with the one about to be created making
+   * FOOTAGE_KEPT; their outputs stay. One whose files were still arriving cannot go on: the
+   * browser no longer has them. */
   async #prune(): Promise<void> {
     for (const job of this.#jobs.values()) {
-      if (job.status === "running") continue;
-      if (job.status === "uploading") {
-        job.status = "cancelled";
-        await this.#save(job);
-      }
-      await rm(join(this.#dir(job), "footage"), { recursive: true, force: true });
+      if (job.status !== "uploading") continue;
+      job.status = "cancelled";
+      await this.#save(job);
+    }
+    for (const id of footageToPrune([...this.#jobs.values()], FOOTAGE_KEPT - 1)) {
+      await rm(join(this.#root, id, "footage"), { recursive: true, force: true });
     }
   }
 
@@ -226,6 +275,35 @@ export class Jobs {
       if (!latest || job.created > latest.created) latest = job;
     }
     return latest;
+  }
+
+  /** Every project, newest first, with the disk space its folder takes. */
+  async list(): Promise<ProjectSummary[]> {
+    await this.#loaded;
+    const jobs = [...this.#jobs.values()].sort((a, b) => b.created - a.created);
+    return Promise.all(
+      jobs.map(async (job) => ({
+        id: job.id,
+        created: job.created,
+        status: job.status,
+        length: job.settings.length,
+        aspect: job.settings.aspect,
+        name: job.files.find((file) => file.use === "video")?.path ?? "",
+        bytes: await diskUsage(this.#dir(job)),
+        footage: existsSync(join(this.#dir(job), "footage")),
+      })),
+    );
+  }
+
+  /** Deletes a project's folder: its footage, outputs and settings. */
+  async remove(id: string): Promise<void> {
+    const job = await this.get(id);
+    if (job.status === "running") {
+      throw new JobError("This edit is running; cancel it before deleting it", 409);
+    }
+    this.#jobs.delete(job.id);
+    this.#listeners.delete(job.id);
+    await rm(this.#dir(job), { recursive: true, force: true });
   }
 
   /** Writes the request body as the job's file `index`, which must arrive whole. */

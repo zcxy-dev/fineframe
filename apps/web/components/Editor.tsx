@@ -24,6 +24,7 @@ import styles from "./editor.module.css";
 import { Footage, type Item } from "./Footage.tsx";
 import { AlertIcon, CaptionsIcon, CheckIcon, DownloadIcon, LockIcon, Mark } from "./icons.tsx";
 import { KeyDialog } from "./KeyDialog.tsx";
+import { Projects } from "./Projects.tsx";
 import { Player, ResultSummary } from "./ResultView.tsx";
 import { DownloadView, RunView } from "./RunView.tsx";
 import { type Choices, chosenLength, type Machine, SettingsPanel } from "./SettingsPanel.tsx";
@@ -302,6 +303,12 @@ export function Editor() {
     );
   };
 
+  const open = async (id: string) => {
+    const response = await fetch(`/api/jobs/${encodeURIComponent(id)}`);
+    const job = (await response.json()) as Job & { error?: string };
+    setPhase(response.ok ? { kind: "job", job } : { kind: "compose", error: job.error });
+  };
+
   const job = phase.kind === "compose" ? null : phase.job;
   const status = phase.kind === "job" ? phase.job.status : null;
 
@@ -371,6 +378,7 @@ export function Editor() {
                 setSkipped(0);
               }}
             />
+            {phase.kind === "compose" && <Projects onOpen={(id) => void open(id)} />}
           </div>
 
           <aside className={`${styles.card} ${styles.panel}`} aria-label="Settings">
