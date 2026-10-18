@@ -27,9 +27,9 @@ test("only the newest projects keep their footage, and a running edit keeps its 
     job("d", 4, "done"),
     job("e", 5, "done"),
   ];
-  // A cancelled edit has no footage to keep, so it takes no place among the newest.
+  // A failed or cancelled edit cannot be edited again, so it takes no place among the newest.
   assert.deepEqual(footageToPrune(jobs, 2), ["a", "b", "c"]);
-  assert.deepEqual(footageToPrune(jobs, 4), ["c"]);
+  assert.deepEqual(footageToPrune(jobs, 4), ["b", "c"]);
   assert.deepEqual(footageToPrune([job("r", 1, "running"), job("n", 2, "done")], 1), []);
   assert.deepEqual(footageToPrune(jobs, 0), ["a", "b", "c", "d", "e"]);
 });

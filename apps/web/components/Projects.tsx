@@ -55,7 +55,7 @@ export function Projects({ onOpen }: { onOpen: (id: string) => void }) {
           <h2 className={styles.filesTitle}>Projects</h2>
           <p className={styles.filesMeta}>
             {shown.length} {shown.length === 1 ? "project" : "projects"} · {formatBytes(total)} on
-            disk · the newest {FOOTAGE_KEPT} keep their footage for editing again
+            disk · the newest {FOOTAGE_KEPT} finished keep their footage for editing again
           </p>
         </div>
       </div>

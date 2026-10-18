@@ -121,15 +121,15 @@ export interface ProjectSummary {
   footage: boolean;
 }
 
-/** The ids of the jobs whose footage goes so that only the newest `keep` with footage keep
- * theirs. A running edit reads its footage, so it keeps it and counts among them; a cancelled
- * one has none left. */
+/** The ids of the jobs whose footage goes so that only the newest `keep` finished edits keep
+ * theirs, to be edited again. A running edit reads its footage, so it keeps it and counts among
+ * them; a failed or cancelled one cannot be edited again, as the page sends the footage anew. */
 export function footageToPrune(
   jobs: readonly Pick<Job, "id" | "created" | "status">[],
   keep: number,
 ): string[] {
   const held = jobs
-    .filter((job) => job.status === "running" || job.status === "done" || job.status === "error")
+    .filter((job) => job.status === "running" || job.status === "done")
     .sort((a, b) => b.created - a.created);
   const kept = new Set(held.slice(0, keep).map((job) => job.id));
   for (const job of held) if (job.status === "running") kept.add(job.id);
@@ -298,8 +298,8 @@ export class Jobs {
   /** Deletes a project's folder: its footage, outputs and settings. */
   async remove(id: string): Promise<void> {
     const job = await this.get(id);
-    if (job.status === "running") {
-      throw new JobError("This edit is running; cancel it before deleting it", 409);
+    if (job.status === "running" || job.status === "uploading") {
+      throw new JobError("This edit is under way; cancel it before deleting it", 409);
     }
     this.#jobs.delete(job.id);
     this.#listeners.delete(job.id);

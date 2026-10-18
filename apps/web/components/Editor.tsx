@@ -304,9 +304,13 @@ export function Editor() {
   };
 
   const open = async (id: string) => {
-    const response = await fetch(`/api/jobs/${encodeURIComponent(id)}`);
-    const job = (await response.json()) as Job & { error?: string };
-    setPhase(response.ok ? { kind: "job", job } : { kind: "compose", error: job.error });
+    try {
+      const response = await fetch(`/api/jobs/${encodeURIComponent(id)}`);
+      const job = (await response.json()) as Job & { error?: string };
+      setPhase(response.ok ? { kind: "job", job } : { kind: "compose", error: job.error });
+    } catch {
+      setPhase({ kind: "compose", error: "The project could not be opened" });
+    }
   };
 
   const job = phase.kind === "compose" ? null : phase.job;
