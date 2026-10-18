@@ -5,6 +5,15 @@ import { defaultAsr, setup } from "../../../lib/setup.ts";
 
 export const dynamic = "force-dynamic";
 
+/** Every project, newest first, with the disk space each takes. */
+export async function GET(): Promise<Response> {
+  try {
+    return Response.json(await jobs().list());
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
 /** A new edit: its settings and the files the page will send. */
 export async function POST(request: Request): Promise<Response> {
   try {

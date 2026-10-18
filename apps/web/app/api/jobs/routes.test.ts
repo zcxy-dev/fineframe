@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import type { Job } from "../../../lib/jobs.ts";
+import type { Job, ProjectSummary } from "../../../lib/jobs.ts";
 
 const root = await mkdtemp(join(tmpdir(), "web-jobs-"));
 const hold = join(root, "hold");
@@ -36,6 +36,7 @@ const videoRoute = await import("./[id]/video/route.ts");
 const captionsRoute = await import("./[id]/captions/route.ts");
 const brollRoute = await import("./[id]/broll/route.ts");
 const rememberedRoute = await import("../remembered/route.ts");
+const removeRoute = await import("./[id]/remove/route.ts");
 
 test.after(() => rm(root, { recursive: true, force: true }));
 
@@ -350,4 +351,25 @@ test("the Pexels and Pixabay keys the page saved go to an edit with rich visuals
   };
   assert.equal(await passed("rich"), "pexels-saved 1-pixabay");
   assert.equal(await passed("minimal"), " ");
+});
+
+test("the project list shows each edit's disk usage, and deleting one removes its folder", async () => {
+  const listed = async () => (await (await jobsRoute.GET()).json()) as ProjectSummary[];
+  const before = await listed();
+  assert.ok(before.length >= 2);
+  for (let i = 1; i < before.length; i++) {
+    assert.ok((before[i - 1] as ProjectSummary).created >= (before[i] as ProjectSummary).created);
+  }
+  const done = before.find((project) => project.status === "done") as ProjectSummary;
+  assert.ok(done.bytes >= 1000, "the video counts");
+  assert.equal(done.footage, true);
+
+  const remove = (id: string, headers: Record<string, string> = {}) =>
+    removeRoute.POST(new Request(`${url}/${id}/remove`, { method: "POST", headers }), ctx({ id }));
+  const foreign = await remove(done.id, { origin: "https://elsewhere.example" });
+  assert.equal(foreign.status, 403);
+  assert.equal((await remove(done.id)).status, 204);
+  assert.equal(existsSync(join(root, done.id)), false);
+  assert.ok(!(await listed()).some((project) => project.id === done.id));
+  assert.equal((await remove(done.id)).status, 404);
 });
