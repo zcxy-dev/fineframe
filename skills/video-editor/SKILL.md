@@ -24,7 +24,7 @@ mkdir -p out && pnpm -s edit footage/ --length 60s --aspect 9:16 -o out/edit.mp4
 ```
 
 - Footage: files or folders of video and still images. `--length` is 15 s to 1 h (`60s`, `90`, `3m`, `1:30`); `--aspect` is `9:16`, `1:1` or `16:9`.
-- Options are in `pnpm edit --help`. Ask before using music the user has not said they have the right to use. Stock footage needs a free `PEXELS_API_KEY` or `PIXABAY_API_KEY` in `.env`; without either, B-roll comes from cards and pages.
+- Options are in `pnpm edit --help`. What the user wants of the story ("open with the demo", "keep the part about pricing") goes to Claude as `--instructions "<their words>"`. Ask before using music the user has not said they have the right to use. Stock footage needs a free `PEXELS_API_KEY` or `PIXABAY_API_KEY` in `.env`; without either, B-roll comes from cards and pages.
 - The first edit of new footage analyses it, about twice the footage's length on a CPU: run it in the background and follow its stderr. Later edits of the same footage start at the plan and take a minute or two. Claude's cost per edit is in the README's [Install](../../README.md#install) section.
 - Done when the last line of `out/progress.jsonl` has `"stage": "done"`. An `"error"` line carries the reason; the stderr says what to change.
 
@@ -43,7 +43,7 @@ The next change starts from the newest version (`edit-v2.project.json`, then `-v
 
 ## What needs a new plan
 
-These change what the planner chose, so say so to the user and run `pnpm edit` again with the new options, to a new output name such as `out/edit-90s.mp4`; the analysis is cached, so it takes a minute or two and one more Claude plan:
+These change what the planner chose, so say so to the user and run `pnpm edit` again with the new options, to a new output name such as `out/edit-90s.mp4`; the analysis is cached, so it takes a minute or two and one more Claude plan. Claude decides the story order and what to keep again, so pass what the user asked for, such as which part to put back or move, as `--instructions "<their words>"`:
 
 - A different length beyond ±5 % of the planned one, or a different aspect.
 - Putting back something the plan left out, reordering the story, or other footage.

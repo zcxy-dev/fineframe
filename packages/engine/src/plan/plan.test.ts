@@ -165,7 +165,16 @@ test("Claude's effects become overlays timed on the speech, one at a time and on
   const { claude, requests } = recordedClaude({ plan: [decisions] });
   const out = join(dir, "edit", "project.json");
   const names = ["林語安", "王大同", "video editor"];
-  const edit = await plan({ inputs: [dir], length: 60, aspect: "9:16", out, claude, names });
+  const instructions = "  Open with the demo.\nLeave out the pricing.  ";
+  const edit = await plan({
+    inputs: [dir],
+    length: 60,
+    aspect: "9:16",
+    out,
+    claude,
+    names,
+    instructions,
+  });
 
   const request = requests[0] ?? assert.fail("no request");
   assert.deepEqual((request.schema.required as string[]).slice(-3), ["title", "people", "visuals"]);
@@ -174,6 +183,11 @@ test("Claude's effects become overlays timed on the speech, one at a time and on
   assert.match(
     asked,
     /Names the user gave, of people and terms said in the footage: 林語安; 王大同; video editor\./,
+  );
+  // What the user asked, in their words, set apart from the request.
+  assert.match(
+    asked,
+    /in their own words;.*\n<instructions>\nOpen with the demo\.\nLeave out the pricing\.\n<\/instructions>/,
   );
 
   const overlays = edit.project.overlays ?? [];
@@ -423,7 +437,15 @@ test("an edit that comes out short asks once more, then fails with the reason", 
   const { claude, requests } = recordedClaude({ plan: [thin, thin] });
   const names = ["林語安"];
   await assert.rejects(
-    plan({ inputs: [index], length: 15, aspect: "9:16", out: join(dir, "p.json"), claude, names }),
+    plan({
+      inputs: [index],
+      length: 15,
+      aspect: "9:16",
+      out: join(dir, "p.json"),
+      claude,
+      names,
+      instructions: "Keep the joke.",
+    }),
     // At the shortest length, the way out is more footage.
     (error: Error) =>
       error instanceof PlanError &&
@@ -436,6 +458,7 @@ test("an edit that comes out short asks once more, then fails with the reason", 
     textOf(requests[1], 1),
     /Names the user gave, of people and terms said in the footage: 林語安\./,
   );
+  assert.match(textOf(requests[1], 1), /<instructions>\nKeep the joke\.\n<\/instructions>/);
 });
 
 test("B-roll from a file without speech covers the line it was placed over", async (t) => {
