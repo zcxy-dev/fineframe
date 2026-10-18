@@ -1,8 +1,9 @@
 // Stands in for `pnpm edit` in tests: records its arguments, prints progress lines (a model's
 // download among them, and one going back, as a stage may report), waits while $FAKE_EDIT_HOLD
 // names a file that exists, then writes the outputs and the done line with what Claude cost, with
-// the schema's example project playing the first --music track and, with --visuals=rich, the B-roll credits. It
-// fails unless ANTHROPIC_API_KEY is $FAKE_EDIT_KEY, and records the OpenRouter key it was given in
+// the schema's example project (with a lower third and a keyword as the planner writes them)
+// playing the first --music track and, with --visuals=rich, the B-roll credits. It fails unless
+// ANTHROPIC_API_KEY is $FAKE_EDIT_KEY, and records the OpenRouter key it was given in
 // openrouter.txt and the Pexels and Pixabay ones in stock.txt.
 // $FAKE_EDIT_NO_CAPTIONS leaves the captions file empty, as the engine does when no speech is kept.
 import { existsSync } from "node:fs";
@@ -45,6 +46,12 @@ const example = JSON.parse(
     "utf8",
   ),
 );
+// The example's overlays are only shaped like overlays; these are templates the planner uses.
+const [person, word] = example.overlays as { start: number; duration: number }[];
+example.overlays = [
+  { ...person, template: "lower-third", params: { name: "王小明", role: "Host" } },
+  { ...word, template: "keyword", params: { text: "Claude" } },
+];
 const music = example.sources.find((source: { kind: string }) => source.kind === "audio");
 if (track) music.path = relative(dirname(out), track);
 else {

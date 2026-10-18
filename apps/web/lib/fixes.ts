@@ -34,13 +34,13 @@ const FIXES: [FixKind, RegExp, string, string][] = [
     "disk",
     /no space left on device|ENOSPC|disk is full/i,
     "The disk is full.",
-    "Free some space, then start the edit again. The speech model takes about 3.5 GB on its first use, and each edit's files a few times its footage; deleting older projects frees theirs.",
+    "Free some space, then start the edit again. Speech recognition needs about 3.5 GB the first time, and each edit's files take a few times the size of its footage; deleting older projects frees theirs.",
   ],
   [
     "file",
     /invalid data found|not an image FFmpeg can read|moov atom not found|no video stream|unsupported codec|could not open/i,
     "One of the files can't be read.",
-    "It may be damaged, still copying, or in a format FFmpeg does not know. Leave it out, or convert it to MP4 (H.264), and start again.",
+    "It may be damaged, still copying, or in a format Fineframe can't read. Leave it out, or convert it to MP4, and start again.",
   ],
   [
     "missing",
