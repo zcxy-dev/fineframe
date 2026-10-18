@@ -11,7 +11,8 @@
     "./estimate": "./src/plan/estimate.ts",
     "./length": "./src/edit/length.ts",
     "./looks": "./src/looks.ts",
-    "./media": "./src/edit/media.ts"
+    "./media": "./src/edit/media.ts",
+    "./revise": "./src/revise.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

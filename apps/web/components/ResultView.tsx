@@ -14,7 +14,7 @@ export function Player({ job }: { job: Job }) {
         {/* biome-ignore lint/a11y/useMediaCaption: the captions are burned into the picture. */}
         <video
           className={styles.video}
-          src={`${base}/video`}
+          src={`${base}/video?v=${job.current ?? 1}`}
           controls
           playsInline
           preload="metadata"
@@ -27,17 +27,18 @@ export function Player({ job }: { job: Job }) {
 /** The video's length, read from its header. */
 function useVideoLength(job: Job): number | null {
   const [seconds, setSeconds] = useState<number | null>(null);
+  const version = job.current ?? 1;
   useEffect(() => {
     const probe = document.createElement("video");
     probe.preload = "metadata";
     probe.onloadedmetadata = () => setSeconds(probe.duration);
-    probe.src = `/api/jobs/${job.id}/video`;
+    probe.src = `/api/jobs/${job.id}/video?v=${version}`;
     return () => {
       probe.onloadedmetadata = null;
       probe.removeAttribute("src");
       probe.load();
     };
-  }, [job.id]);
+  }, [job.id, version]);
   return seconds;
 }
 

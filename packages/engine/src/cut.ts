@@ -12,7 +12,14 @@ import {
   validateMediaIndex,
   type Word,
 } from "@video-editor/schema";
-import { endOnFrame, MARGIN, type PlacedClip, type PlaceSource, placeClips } from "./plan/place.ts";
+import {
+  cuttableAfter,
+  endOnFrame,
+  MARGIN,
+  type PlacedClip,
+  type PlaceSource,
+  placeClips,
+} from "./plan/place.ts";
 import { joinWords } from "./plan/text.ts";
 import { gridTicks } from "./sources.ts";
 
@@ -32,6 +39,12 @@ export interface CutResult {
   length: number;
   /** What was taken out, for a person to check: the words, and what moved or went with them. */
   notes: string[];
+  /** The stretches of the old edit that no longer play, in its output ticks, in order: where
+   * each cut landed once moved into the pauses. */
+  removed: [number, number][];
+  /** The words a cut took beyond those asked for, by the range it came from, where no pause a
+   * cut fits in lay inside that range. */
+  outside: { range: number; words: string }[];
 }
 
 /** The words, length and frame grid of every analysed source on the main track, from the media
@@ -58,8 +71,11 @@ export async function placeSources(
 /**
  * Takes `ranges` (output ticks, [from, to)) out of the edit. A word goes when its middle falls
  * in a range, and a clip goes when a range covers it or none of its words is left. Where words
- * go from inside a clip, the clip splits around them, and each new end is placed in the pause
- * beside the words kept, as the planner places cuts, so no cut falls inside a word. Captions,
+ * go from inside a clip, each edge of what goes moves to a pause a cut fits in: inward first,
+ * keeping some words asked for rather than taking one not asked for, and outward only when
+ * none lies inside (`outside` says which words that took). The clip splits around them, each
+ * new end placed in that pause as the planner places cuts, so no cut falls inside a word or
+ * between two words said without a pause. Captions,
  * overlays, B-roll, cards, music, sound effects and the planner's emphasis move with the speech
  * they were on; a caption word that went is taken out of its line, and an overlay, B-roll clip or
  * card whose whole time went goes too. B-roll of a source the main track plays, the speaker beside
@@ -80,6 +96,7 @@ export function cutEdit(
   };
   const seconds = (ticks: number) => (ticks / TICKS_PER_SECOND).toFixed(2);
   const notes: string[] = [];
+  const outside: CutResult["outside"] = [];
 
   const main: Clip[] = [];
   const kept: Kept[] = [];
@@ -115,14 +132,29 @@ export function cutEdit(
     const words = (source?.words ?? []).flatMap((word, index) =>
       mid(word) >= clip.in && mid(word) < clip.out ? [index] : [],
     );
-    const gone = words.filter((index) => inRange(at(mid(source?.words[index] as Word))));
-    if (!source || gone.length === 0) {
+    const asked = words.filter((index) => inRange(at(mid(source?.words[index] as Word))));
+    if (!source || asked.length === 0) {
       place(clip, start);
       continue;
     }
+    const { gone, beyond } = toPauses(words, new Set(asked), source);
     const said = (list: number[]) =>
       joinWords(list.map((index) => source.words[index]?.text ?? ""));
     notes.push(`Cut from /main/${i}, ${seconds(start)}–${seconds(end)} s: ${said(gone)}`);
+    for (const run of beyond) {
+      const t = at(mid(source.words[run.first] as Word));
+      const range = ranges.findIndex(([a, b]) => t >= a && t < b);
+      const [a, b] = ranges[range] as readonly [number, number];
+      // What it took before the stretch and after it, apart.
+      const text = [run.before, run.after]
+        .filter((list) => list.length > 0)
+        .map(said)
+        .join(" … ");
+      outside.push({ range, words: text });
+      notes.push(
+        `${seconds(a)}–${seconds(b)} s has no pause a cut fits in inside it, so it also takes: ${text}`,
+      );
+    }
     // Runs of the words left, each played by a clip of its own whose ends next to the words cut
     // are placed as the planner places a cut; a pause inside a run stays as it was.
     const runs: number[][] = [];
@@ -312,7 +344,55 @@ export function cutEdit(
       ...(emphasis ? { emphasis } : {}),
     };
   }
-  return { project: out, length, notes };
+  const removed: [number, number][] = [];
+  let from = 0;
+  for (const [a, b] of covered) {
+    if (a > from) removed.push([from, a]);
+    from = Math.max(from, b);
+  }
+  if (position > from) removed.push([from, position]);
+  return { project: out, length, notes, removed, outside };
+}
+
+/** The words to take out of a clip that plays `words` (source indices, ascending, one after
+ * another) once each edge of the runs in `asked` sits in a pause a cut fits in. An edge between
+ * two words said without one moves inward first, to the nearest pause inside the run, so no word
+ * goes that was not asked for, though some asked for may stay; only a run with no such pause
+ * inside grows outward to the nearest pauses, and `beyond` lists the words that took before it
+ * and after it, by the run's first word asked for. The clip's own ends are cuts already. */
+function toPauses(
+  words: readonly number[],
+  asked: ReadonlySet<number>,
+  source: PlaceSource,
+): { gone: number[]; beyond: { first: number; before: number[]; after: number[] }[] } {
+  const n = words.length;
+  // Edge b lies before words[b]; 0 and n are the clip's ends.
+  const fits = (b: number) => b === 0 || b === n || cuttableAfter(source, words[b - 1] as number);
+  const gone = new Set<number>();
+  const beyond: { first: number; before: number[]; after: number[] }[] = [];
+  for (let p = 0; p < n; p++) {
+    if (!asked.has(words[p] as number)) continue;
+    let q = p;
+    while (q + 1 < n && asked.has(words[q + 1] as number)) q++;
+    // Inside the run, each edge keeps at least one word between them.
+    let first = p;
+    while (first <= q && !fits(first)) first++;
+    let last = q + 1;
+    while (last > first && first <= q && !fits(last)) last--;
+    if (first > q || last <= first) {
+      // No pause inside: out to the nearest on each side.
+      first = p;
+      while (!fits(first)) first--;
+      last = q + 1;
+      while (!fits(last)) last++;
+    }
+    for (let r = first; r < last; r++) gone.add(words[r] as number);
+    const before = words.slice(first, p);
+    const after = words.slice(q + 1, last);
+    if (before.length + after.length > 0) beyond.push({ first: words[p] as number, before, after });
+    p = q;
+  }
+  return { gone: words.filter((index) => gone.has(index)), beyond };
 }
 
 /** A caption line's text without the words a cut took out (a null shift): each word is found in

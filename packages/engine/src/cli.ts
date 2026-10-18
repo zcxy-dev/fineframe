@@ -14,8 +14,9 @@ Renders the edit a project.json describes, without analysing or planning again, 
   -o, --output   the video
       --cut      takes a stretch of the edit out, as times in the video it describes: seconds
                  or minutes:seconds, such as 12.5-15 or 1:02-1:04.5. The words said in it go,
-                 every cut lands in a pause, and captions, overlays, B-roll and music move up
-                 with the speech. What went is printed; the edit as cut is <name>.project.json
+                 every cut moves to a pause inside it (or, with none, the nearest outside, as
+                 stderr says), and captions, overlays, B-roll and music move up with the
+                 speech. What went is printed; the edit as cut is <name>.project.json
       --retarget makes the cut edit's length the one it is planned for, for a cut that takes
                  it outside 5 % of that, which otherwise fails`;
 

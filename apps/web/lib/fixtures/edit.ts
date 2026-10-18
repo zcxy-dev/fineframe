@@ -1,12 +1,12 @@
 // Stands in for `pnpm edit` in tests: records its arguments, prints progress lines (a model's
 // download among them, and one going back, as a stage may report), waits while $FAKE_EDIT_HOLD
 // names a file that exists, then writes the outputs and the done line with what Claude cost, with
-// a project that plays the first --music track and, with --visuals=rich, the B-roll credits. It
+// the schema's example project playing the first --music track and, with --visuals=rich, the B-roll credits. It
 // fails unless ANTHROPIC_API_KEY is $FAKE_EDIT_KEY, and records the OpenRouter key it was given in
 // openrouter.txt and the Pexels and Pixabay ones in stock.txt.
 // $FAKE_EDIT_NO_CAPTIONS leaves the captions file empty, as the engine does when no speech is kept.
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, relative } from "node:path";
 
 const args = process.argv.slice(2);
@@ -38,14 +38,20 @@ await mkdir(dirname(out), { recursive: true });
 await writeFile(out, Buffer.alloc(1000, 7));
 const project = out.replace(/\.mp4$/, ".project.json");
 const track = args.includes("--music") ? args[args.indexOf("--music") + 1] : undefined;
-// Only what the page reads of a project: the music it plays and where each source is.
-await writeFile(
-  project,
-  JSON.stringify({
-    sources: track ? [{ id: "m0", kind: "audio", path: relative(dirname(out), track) }] : [],
-    audio: { music: track ? [{ source: "m0", start: 0 }] : [] },
-  }),
+// The schema's example project, playing the first track offered or no music.
+const example = JSON.parse(
+  await readFile(
+    new URL("../../../../packages/schema/examples/project.example.json", import.meta.url),
+    "utf8",
+  ),
 );
+const music = example.sources.find((source: { kind: string }) => source.kind === "audio");
+if (track) music.path = relative(dirname(out), track);
+else {
+  example.sources = example.sources.filter((source: unknown) => source !== music);
+  delete example.audio.music;
+}
+await writeFile(project, JSON.stringify(example));
 const captions = out.replace(/\.mp4$/, ".srt");
 await writeFile(
   captions,
