@@ -36,6 +36,7 @@ BUDGET_SHARE = 0.2
 ADDS = "adds words that were not transcribed"
 REMOVES = "removes transcribed words"
 SCRIPT = "writes words in another script"
+UNSURE = "Claude was not sure of it"
 # English hesitations; the editor cuts them by their timings, so no merge may swallow one.
 FILLERS = frozenset({"ah", "eh", "er", "erm", "hm", "hmm", "mm", "uh", "uhm", "um"})
 
@@ -74,21 +75,23 @@ Each change you return
 included, with enough of the surrounding text that it occurs only once in the chunk.
 - corrected: the same text with the misheard words fixed.
 - reason: one short English sentence naming the misheard word and the evidence for the fix.
+- sure: true when the context, the glossary or the sound makes the fix clear; false when it is \
+a guess. Only sure changes are applied, so a guess changes nothing.
 Return no changes when the chunk needs none; that is the usual case.
 
 Examples
 
 Chunk: 我們在來看下一個例子。
 Change: original "我們在來看", corrected "我們再來看", reason "在 should be its homophone 再 \
-(again)."
+(again).", sure true
 
 Glossary: Kubernetes. Chunk: 我們把服務部署到 cooper netties 上面。
 Change: original "cooper netties", corrected "Kubernetes", reason "The glossary term Kubernetes, \
-heard as two English words."
+heard as two English words.", sure true
 
 Glossary: 林佳穎. Chunk: 今天的來賓是林家穎。
 Change: original "林家穎", corrected "林佳穎", reason "The glossary name 林佳穎; 家 and 佳 sound \
-alike."
+alike.", sure true
 
 Chunk: 嗯，那個，我們我們先看一下 the the result。
 No changes: the fillers and the repeated words were spoken."""
@@ -104,8 +107,9 @@ SCHEMA = {
                     "original": {"type": "string"},
                     "corrected": {"type": "string"},
                     "reason": {"type": "string"},
+                    "sure": {"type": "boolean"},
                 },
-                "required": ["original", "corrected", "reason"],
+                "required": ["original", "corrected", "reason", "sure"],
                 "additionalProperties": False,
             },
         }
@@ -180,8 +184,15 @@ def correct(
             entries = [(chunk["text"], chunk["text"], "", reply)]
         else:
             proposed = [(c["original"], to_traditional(c["corrected"]), c["reason"]) for c in reply]
-            texts[i], verdicts = apply(chunk["text"], [(o, c) for o, c, _ in proposed])
-            entries = [(*p, v) for p, v in zip(proposed, verdicts, strict=True)]
+            sure = [
+                (o, c) for (o, c, _), change in zip(proposed, reply, strict=True) if change["sure"]
+            ]
+            texts[i], applied = apply(chunk["text"], sure)
+            verdicts = iter(applied)
+            entries = [
+                (*p, next(verdicts) if change["sure"] else UNSURE)
+                for p, change in zip(proposed, reply, strict=True)
+            ]
         records += [
             {
                 "start": chunk["start"],

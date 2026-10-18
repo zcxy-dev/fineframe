@@ -86,7 +86,7 @@ The Latin error rates rest on 71 English words. Once the host was quiet, the who
 <!-- /results -->
 
 - **The default stays as it is.** On the same clips the 1.7B model makes 1.4 points fewer errors, most of them English words, but peaks at 15.2 GB against 9.6, more than a computer the page already turns to cloud speech on has ([how much](../README.md#install)); it remains the default with a CUDA GPU only.
-- **`--correct` gained 0.14 points.** Of its three applied corrections, 異星 → 異性 was right, `dream` → `jump` was as wrong as before (`gym` was said) and 分析 → 份析 made a word that does not exist; Claude's own reasons for the last two were "Not confident enough; placeholder" and "Uncertain." ([#64](https://github.com/zcxy-dev/video-editor/issues/64)).
+- **`--correct` gained 0.14 points,** applying only the edits Claude is sure of ([#64](https://github.com/zcxy-dev/video-editor/issues/64)): 異星 → 異性, which was right. It recorded five guesses without applying them, among them 分析 → 份析, which an earlier run applied, making a word that does not exist.
 
 - **Why Qwen3-ASR-1.7B:** it is the cheapest of the models that handle mixed Mandarin and English, more accurate than the local CPU default, and it gives the same text for the same audio every time.
 - **Scribe v2** read more words right, but not reliably. Run again on `talk-a1`, it dropped a 嗯, which the editor cuts by its timings, and heard a chunk of speech as the audio-event tag `[موسيقى]` ("music" in Arabic), for 4.82 % MER against 2.24 % the first time. `--asr-model elevenlabs/scribe-v2` picks it.
@@ -110,6 +110,7 @@ uv run --env-file ../.env vework analyze talk.mp4 -o talk.index.json --correct -
   - No word changes script: Chinese stays Chinese and English stays English.
   - Nothing else is added or removed: not fillers or repeats, which the editor cuts by their timings, and not symbols that are read out, such as `%` or `$`.
   - A proposal that changes more than a small share of a chunk's words is a rewrite, not a fix.
+  - Claude marks each proposal sure or not; a guess is recorded but not applied ([#64](https://github.com/zcxy-dev/video-editor/issues/64)).
 
   Proposals are converted to Taiwan Traditional Chinese before they are checked.
 - **Everything is recorded.** `corrections` in the index lists every proposal with Claude's reason and, for a rejected one, why it was rejected, so wrong corrections can be found when measuring.

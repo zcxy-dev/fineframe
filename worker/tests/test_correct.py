@@ -34,12 +34,10 @@ class FakeClaude:
         if changes == "refusal":
             details = SimpleNamespace(category="general_harms")
             return SimpleNamespace(stop_reason="refusal", stop_details=details, content=[])
+        # A change is (original, corrected, reason), and sure unless a fourth item says not.
+        fields = ("original", "corrected", "reason", "sure")
         text = json.dumps(
-            {
-                "changes": [
-                    dict(zip(("original", "corrected", "reason"), c, strict=True)) for c in changes
-                ]
-            }
+            {"changes": [dict(zip(fields, (*c, True)[:4], strict=True)) for c in changes]}
         )
         blocks = [
             SimpleNamespace(type="thinking", thinking=""),
@@ -272,7 +270,9 @@ def test_api_errors_fail_with_a_message(monkeypatch):
 
 def api(sent):
     """The real SDK client, answered by a fake Claude API that records each request."""
-    reply = {"changes": [{"original": "在來", "corrected": "再來", "reason": "homophone"}]}
+    reply = {
+        "changes": [{"original": "在來", "corrected": "再來", "reason": "homophone", "sure": True}]
+    }
     message = {
         "id": "msg_1", "type": "message", "role": "assistant", "model": correct.MODEL,
         "content": [{"type": "thinking", "thinking": "", "signature": "s"},
@@ -353,3 +353,17 @@ def test_claude_fixes_a_glossary_term_without_adding_words():
     assert all(len(correct.tokenize(t)) <= len(correct.tokenize(c["text"]))
                for t, c in zip(texts, chunks, strict=True))  # fmt: skip
     assert any(r["rejected"] is None for r in records)
+
+
+def test_a_change_claude_is_unsure_of_is_recorded_but_not_applied(monkeypatch):
+    # The three corrections ASCEND's sample got (#64): the unsure two are guesses.
+    proposals = [
+        ("異星", "異性", "異星 is a homophone of 異性, which fits meeting people.", True),
+        ("dream打那個", "jump打那個", "Not confident enough; placeholder", False),
+        ("很分析的", "很份析的", "Uncertain.", False),
+    ]
+    use(monkeypatch, FakeClaude(lambda text: proposals))
+    chunks = [chunk(0, 5, "認識一些異星。那你現在會不會去dream打那個壁球？說剛才很分析的那種。")]
+    texts, records = correct.correct(chunks, correct.Settings("talk"))
+    assert texts == ["認識一些異性。那你現在會不會去dream打那個壁球？說剛才很分析的那種。"]
+    assert [r["rejected"] for r in records] == [None, correct.UNSURE, correct.UNSURE]
