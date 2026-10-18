@@ -411,7 +411,7 @@ export function Editor() {
             {phase.kind === "compose" && <Projects onOpen={(id) => void open(id)} />}
           </div>
 
-          <aside className={`${styles.card} ${styles.panel}`} aria-label="Settings">
+          <aside className={`${styles.card} ${styles.panel} ${styles.dock}`} aria-label="Settings">
             <SettingsPanel
               choices={choices}
               onChange={setChoices}
@@ -495,7 +495,7 @@ export function Editor() {
           </aside>
         </main>
       ) : (
-        <main className={styles.layout}>
+        <main className={styles.layout} data-status={status ?? undefined}>
           <div className={styles.main}>
             {status === "done" && job ? (
               <>
@@ -535,17 +535,19 @@ function Running({ job, onCancel }: { job: Job; onCancel: () => void }) {
   return (
     <>
       <Summary job={job} />
-      <button
-        type="button"
-        className={sure ? `${styles.button} ${styles.danger}` : styles.button}
-        onClick={() => (sure ? onCancel() : setSure(true))}
-      >
-        {sure ? "Stop the edit? Click again" : "Cancel"}
-      </button>
-      <p className={styles.help}>
-        You can close this page: the edit keeps going, and the page shows it again when you come
-        back.
-      </p>
+      <div className={styles.block}>
+        <button
+          type="button"
+          className={sure ? `${styles.button} ${styles.danger}` : styles.button}
+          onClick={() => (sure ? onCancel() : setSure(true))}
+        >
+          {sure ? "Stop the edit? Click again" : "Cancel"}
+        </button>
+        <p className={styles.help}>
+          You can close this page: the edit keeps going, and the page shows it again when you come
+          back.
+        </p>
+      </div>
     </>
   );
 }
@@ -554,33 +556,37 @@ function Done({ job, onJob, onNew }: { job: Job; onJob: (job: Job) => void; onNe
   const base = `/api/jobs/${job.id}`;
   return (
     <>
-      <div>
-        <h2 className={styles.panelTitle}>Your edit is ready</h2>
-        <ResultSummary job={job} />
-      </div>
-      <div className={styles.downloads}>
-        <a className={styles.primary} href={`${base}/video?download`} download>
-          <DownloadIcon width={18} height={18} />
-          Download MP4
-        </a>
-        {job.result?.captions && (
-          <a className={styles.button} href={`${base}/captions?download`} download>
-            <CaptionsIcon width={18} height={18} />
-            Download captions (SRT)
-          </a>
-        )}
-        {job.result?.broll && (
-          <a className={styles.button} href={`${base}/broll?download`} download>
+      <div className={styles.block}>
+        <div>
+          <h2 className={styles.panelTitle}>Your edit is ready</h2>
+          <ResultSummary job={job} />
+        </div>
+        <div className={styles.downloads}>
+          <a className={styles.primary} href={`${base}/video?download`} download>
             <DownloadIcon width={18} height={18} />
-            Download B-roll credits (TXT)
+            Download MP4
           </a>
-        )}
+          {job.result?.captions && (
+            <a className={styles.button} href={`${base}/captions?download`} download>
+              <CaptionsIcon width={18} height={18} />
+              Download captions (SRT)
+            </a>
+          )}
+          {job.result?.broll && (
+            <a className={styles.button} href={`${base}/broll?download`} download>
+              <DownloadIcon width={18} height={18} />
+              Download B-roll credits (TXT)
+            </a>
+          )}
+        </div>
       </div>
       <Versions job={job} onJob={onJob} />
       <Summary job={job} />
-      <button type="button" className={styles.linkButton} onClick={onNew}>
-        Make another edit
-      </button>
+      <div className={styles.block}>
+        <button type="button" className={styles.linkButton} onClick={onNew}>
+          Make another edit
+        </button>
+      </div>
     </>
   );
 }
@@ -598,7 +604,7 @@ function Failed({
   const fix = !cancelled && job.error ? fixFor(job.error) : null;
   const spent = job.claude ? dollarsOf(job.claude) : null;
   return (
-    <>
+    <div className={styles.block}>
       <div>
         <h2 className={styles.panelTitle}>
           {cancelled ? "The edit was cancelled" : "The edit could not be finished"}
@@ -627,7 +633,7 @@ function Failed({
       <button type="button" className={styles.primary} onClick={onBack}>
         Back to the footage
       </button>
-    </>
+    </div>
   );
 }
 

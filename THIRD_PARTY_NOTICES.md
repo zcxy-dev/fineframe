@@ -63,6 +63,7 @@ Models that come inside a package: the TransNetV2 weights in transnetv2-pytorch,
 | [@fontsource/noto-sans-tc](https://fontsource.org/fonts/noto-sans-tc) | OFL-1.1 | effects, web page |
 | [@fontsource/jetbrains-mono](https://fontsource.org/fonts/jetbrains-mono) | OFL-1.1 | effects, the cards' terminal and code |
 | [@fontsource-variable/inter](https://fontsource.org/fonts/inter) | OFL-1.1 | web page |
+| [@fontsource-variable/archivo](https://fontsource.org/fonts/archivo) | OFL-1.1 | web page, the wordmark and titles |
 | [next](https://nextjs.org) | MIT | web page |
 | [typescript](https://www.typescriptlang.org) | Apache-2.0 | development |
 | [@biomejs/biome](https://biomejs.dev) | MIT OR Apache-2.0 | development |
@@ -140,7 +141,7 @@ Simple Icons' logos are brands' trademarks, which its CC0 dedication does not co
 
 ### Wordmark
 
-The wordmark (`brand/wordmark.svg`, `brand/wordmark-on-dark.svg`) sets "Fineframe" in [Archivo](https://github.com/Omnibus-Type/Archivo) SemiExpanded by Omnibus-Type, under the [SIL Open Font License 1.1](https://openfontlicense.org). Its letters are outlined into paths: no font file is in the repository or the app.
+The wordmark (`brand/wordmark.svg`, `brand/wordmark-on-dark.svg`) sets "Fineframe" in [Archivo](https://github.com/Omnibus-Type/Archivo) SemiExpanded by Omnibus-Type, under the [SIL Open Font License 1.1](https://openfontlicense.org). Its letters are outlined into paths there. The web page sets the name beside the icon, its titles and its section headings in the same face, from @fontsource-variable/archivo (listed above).
 
 ### B-roll from the web
 
