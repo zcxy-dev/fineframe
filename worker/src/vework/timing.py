@@ -1,6 +1,7 @@
 """Word edges finer than the forced aligner's grid, read from the audio around each one."""
 
 from bisect import bisect_right
+from itertools import pairwise
 
 import numpy as np
 
@@ -17,11 +18,21 @@ STEP = 0.0025  # where the level is read, every 2.5 ms
 WINDOW = 0.02
 # A pause edge is where the level stands this far above the quietest point of the pause.
 RISE_DB = 10.0
+# A gap between two words is silence: within this much of the source's level where Silero hears
+# no speech. The dip between two syllables said together stays well above it. On the synthetic
+# corpus 6 dB leaves 2 gaps a cut fits in on a word's quiet tail, 10 dB 10 (worker/README.md).
+PAUSE_DB = 6.0
+DIGITAL_SILENCE = -90.0  # dB; zeros read as -100
 MIN_LENGTH = 0.02  # no edge moves closer than this to the next one
 
 
 def refine(
-    words: list[dict], samples: np.ndarray, speech: list[dict], end: float, rate: int = RATE
+    words: list[dict],
+    samples: np.ndarray,
+    speech: list[dict],
+    end: float,
+    rate: int = RATE,
+    floor: float | None = None,
 ) -> list[dict]:
     """Move each edge the aligner reported to where the audio puts it inside its grid cell.
 
@@ -33,9 +44,14 @@ def refine(
     - a start after a pause goes to where the sound rises out of the pause;
     - an end before a pause goes to where the sound falls back into it.
     The audio decides every move; a pause edge stays where the cell shows none.
-    Edges only move later and stop short of the next edge and of `end`, where the next chunk's
-    words may start, so words keep their order and never overlap; an edge inside a speech
-    segment stays inside it.
+    These moves are only later and stop short of the next edge and of `end`, where the next
+    chunk's words may start, so words keep their order and never overlap; an edge inside a
+    speech segment stays inside it.
+
+    Then each gap left between two words shrinks to the silence in it (see `_close`), so a cut
+    in a gap never lands on sound: the end before it moves later and the start after it
+    earlier, neither past the other. `floor` is `noise_floor(samples, speech)`, passed in when
+    refining many chunks of one source.
     """
     groups = _groups(words)
     times = [words[i][key] for i, key in (group[0] for group in groups)]
@@ -70,7 +86,49 @@ def refine(
             continue  # zero-length words alone in a pause: nothing to read an edge from
         for i, key in group:
             words[i][key] = round(float(moved), 3)
+    silence = (noise_floor(samples, speech, rate) if floor is None else floor) + PAUSE_DB
+    for before, after in pairwise(words):
+        if after["start"] > before["end"]:
+            _close(before, after, samples, silence, rate)
     return words
+
+
+def noise_floor(samples: np.ndarray, speech: list[dict], rate: int = RATE) -> float:
+    """The source's level where Silero hears no speech: the median, read every 10 ms, of the
+    time that is not digital silence, which a muted intro would otherwise drag far below the
+    room between the words. With no such time, its quietest level."""
+    times = np.arange(0.0, len(samples) / rate, 0.01)
+    if not len(times):
+        return DIGITAL_SILENCE
+    # A minute at a time: _level holds float64 copies of the samples it reads.
+    level = np.concatenate(
+        [_level(samples, part, rate) for part in np.array_split(times, len(times) // 6000 + 1)]
+    )
+    pause = level > DIGITAL_SILENCE
+    for seg in speech:
+        pause &= (times < seg["start"]) | (times >= seg["end"])
+    return float(np.median(level[pause]) if pause.any() else level.min())
+
+
+def _close(before: dict, after: dict, samples: np.ndarray, silence: float, rate: int) -> None:
+    """Shrink the gap between two words to its longest silent stretch, the sound on either side
+    of it going to the word on that side: the aligner leaves gaps where the speaker made none,
+    and times a word after the pause that follows it. A gap with no silence at all closes at
+    its quietest point, the dip between the two words' syllables."""
+    t = np.arange(before["end"], after["start"], STEP)
+    level = _level(samples, t, rate)
+    quiet = level < silence
+    if not quiet.any():
+        before["end"] = after["start"] = round(float(t[int(np.argmin(level))]), 3)
+        return
+    # The longest run of quiet steps: [first, last].
+    edges = np.flatnonzero(np.diff(np.concatenate([[0], quiet.astype(int), [0]])))
+    runs = edges.reshape(-1, 2)
+    first, stop = runs[int(np.argmax(runs[:, 1] - runs[:, 0]))]
+    # A run reaching the gap's end leaves the start where it is: the step grid stops short of it.
+    before["end"] = round(float(t[first]), 3)
+    if stop < len(t):
+        after["start"] = round(float(t[stop]), 3)
 
 
 def _groups(words: list[dict]) -> list[list[tuple[int, str]]]:

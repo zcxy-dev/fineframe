@@ -289,6 +289,7 @@ def transcribe_chunks(
 
     if chunks and align is None:
         align = _aligner(half=True)
+    floor = timing.noise_floor(samples, speech)
     for n, chunk in enumerate(chunks, 1):
         progress(f"aligning {n}/{len(chunks)}")
         start, end, text, language = chunk["start"], chunk["end"], chunk["text"], chunk["language"]
@@ -299,7 +300,7 @@ def transcribe_chunks(
         ]
         words = repair_durations(attach_punctuation(text, items))
         # After the repair: a word the aligner gave no time would read as a pause around it.
-        words = timing.refine(words, samples, speech, end)
+        words = timing.refine(words, samples, speech, end, floor=floor)
         yield {"start": start, "end": end, "language": language, "text": text, "words": words}
 
 
