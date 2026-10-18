@@ -165,9 +165,9 @@ export async function startServer(
 }
 
 /**
- * Stops `child` with everything it started. On macOS and Linux its whole process group is asked
- * to stop, and made to after a few seconds; the server stops a running edit's own group as it
- * exits. On Windows, taskkill stops the tree.
+ * Stops `child` with everything it started, returning once all of it is gone. On macOS and
+ * Linux its whole process group is asked to stop, and made to after a few seconds; the server
+ * stops a running edit's own group as it exits. On Windows, taskkill stops the tree.
  */
 async function stopTree(child: ChildProcess, exited: Promise<unknown>): Promise<void> {
   const pid = child.pid;
@@ -187,10 +187,23 @@ async function stopTree(child: ChildProcess, exited: Promise<unknown>): Promise<
       // Already gone.
     }
   };
+  // The server exiting is not enough: what it started may still be shutting down.
+  const groupGone = async (ms: number) => {
+    for (let waited = 0; waited < ms; waited += 50) {
+      try {
+        process.kill(-pid, 0);
+      } catch {
+        return true;
+      }
+      await sleep(50);
+    }
+    return false;
+  };
   signal("SIGTERM");
   const stopped = await Promise.race([exited.then(() => true), sleep(5000).then(() => false)]);
-  if (!stopped) {
+  if (!stopped || !(await groupGone(5000))) {
     signal("SIGKILL");
     await exited;
+    await groupGone(5000);
   }
 }
