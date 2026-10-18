@@ -1,13 +1,18 @@
 # Engine measurements
 
-How the engine's behaviour, described in the [README](README.md), measures on the [synthetic corpus](../../bench/README.md#synthetic-corpus) and on openly licensed footage. Times are on the [reference machine](../../bench/README.md#reference-machine).
+How the engine's behaviour, described in the [README](README.md), measures on the [synthetic corpus](../../bench/README.md#synthetic-corpus) and on openly licensed footage. Times are on the [reference machine](../../bench/README.md#reference-machine). The edit table's synthetic rows and the planner table are measured with rich visuals, the default, without stock footage; every other measurement here was made before rich visuals and holds for `--visuals minimal`.
 
 ## Edit measurements
 
-Each row is one `pnpm edit` run with the real API on the reference machine, shared with other jobs (load average 8 to 10). Every file was analysed with the 0.6B speech model and no transcript correction; the analysis time is from the first edit of that footage, the rest from a later one that found the indexes cached. The synthetic group comes from the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0); the other two are openly licensed web recordings whose transcripts nobody has corrected yet, so their cuts are checked against the words as the analysis timed them. `vebench edit` scores each project and `vebench render` each video. Measured before rich visuals; these hold for `--visuals minimal`.
+Each row is one `pnpm edit` run with the real API on the reference machine. Every file was analysed with the 0.6B speech model and no transcript correction. The table mixes two kinds of row, as its Visuals column says:
+
+- **The two synthetic rows** come from the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0), edited at 5dc8da9 with rich visuals, without stock footage (no Pexels or Pixabay key), and `--quality best`, one edit at a time. Rich visuals here are motion-graphics cards, with the icons and logos in them and their sound effects; Claude asked for no web capture. The first edit found the clips analysed by the [planner runs](#planner-measurements), which analysed the three in 3.2 min, all at once; the second analysed them again, since a names file changes the analysis.
+- **The two real rows** are openly licensed web recordings whose transcripts nobody has corrected yet, so their cuts are checked against the words as the analysis timed them. They were measured before rich visuals, with what is now `--visuals minimal`, on the machine shared with other jobs (load average 8 to 10); their analysis time is from the first edit of that footage, the rest from a later one that found the indexes cached.
+
+`vebench edit` scores each project and `vebench render` each video.
 
 ```bash
-pnpm -s edit bench/synthetic/chat-b{1,2,3}/source.mp4 --length 60s --aspect 9:16 \
+PEXELS_API_KEY= PIXABAY_API_KEY= pnpm -s edit bench/synthetic/chat-b{1,2,3}/source.mp4 --length 60s --aspect 9:16 \
   -o bench/synthetic/chat-b1/runs/edit-60s/output.mp4 > progress.jsonl
 cd bench
 uv run vebench edit --project synthetic/chat-b1/runs/edit-60s/output.project.json
@@ -15,51 +20,60 @@ uv run vebench render --media synthetic/chat-b1/runs/edit-60s/output.mp4 \
   --cuts synthetic/chat-b1/runs/edit-60s/edit_cuts.json
 ```
 
-| Footage | Asked | Made | Cuts inside words | Dead air ≥ 1 s | Clicks, drift | Analysis | Plan, render, check | Claude |
-|---|---|---|---|---|---|---|---|---|
-| chat-b: synthetic conversation, 3 clips, 6.7 min | 60 s, 9:16 | 61.8 s (+2.9 %) | 0 of 10 | 0 | 0 of 4, 0.0 ms | 7.9 min for 2 of the clips | 25 s, 9 s, 7 s | $0.10 |
-| chat-b again, with the corpus's three synthetic tracks (`--music`, stated CC0) and a names file naming the guest (`--names`) | 60 s, 9:16 | 60.2 s (+0.3 %) | 0 of 10 | 0 | 0 of 4, 0.0 ms | 11.0 min for the 3 clips | 28 s, 35 s, 8 s | $0.10 |
-| Two-person interview, 5 clips from three cameras, 11.9 min | 60 s, 9:16 | 60.6 s (+1.0 %) | 0 of 4 | 0 | 0 of 2, 0.0 ms | 23.9 min | 29 s, 28 s, 5 s | $0.10 |
-| Live talks with slides, 3 clips, 8.8 min | 5 min, 16:9 | 301.5 s (+0.5 %) | 0 of 57 | 0 | 0 of 28, 0.0 ms | 16.0 min | 52 s, 60 s, 21 s | $0.13 |
+<!-- results:engine-edit -->
+| Footage | Visuals | Asked | Made | Cuts inside words | Dead air ≥ 1 s | Clicks, drift | Analysis | Plan, render, check | Claude |
+|---|---|---|---|---|---|---|---|---|---|
+| chat-b: synthetic conversation, 3 clips, 6.7 min | rich, without stock footage: 5 cards, 29 % of the edit | 60 s, 9:16 | 58.9 s (-1.8 %) | 0 of 12 | 0 | 0 of 5, 0.0 ms | from the cache | 44 s, 57 s, 8 s | $0.19 |
+| chat-b again, with the corpus's three synthetic tracks (`--music`, stated CC0) and a names file naming the guest (`--names`) | rich, without stock footage: 5 cards, 29 % of the edit | 60 s, 9:16 | 59.3 s (-1.2 %) | 0 of 12 | 0 | 0 of 5, 0.0 ms | 9.9 min for the 3 clips and 3 tracks | 58 s, 44 s, 8 s | $0.20 |
+| Two-person interview, 5 clips from three cameras, 11.9 min | minimal, measured before rich visuals | 60 s, 9:16 | 60.6 s (+1.0 %) | 0 of 4 | 0 | 0 of 2, 0.0 ms | 23.9 min | 29 s, 28 s, 5 s | $0.10 |
+| Live talks with slides, 3 clips, 8.8 min | minimal, measured before rich visuals | 5 min, 16:9 | 301.5 s (+0.5 %) | 0 of 57 | 0 | 0 of 28, 0.0 ms | 16.0 min | 52 s, 60 s, 21 s | $0.13 |
+<!-- /results -->
 
-- **Music and effects:** in the second chat-b edit Claude chose the 96 BPM track, which plays under the whole edit with the voice 20.9 dB over it while anyone talks (15.3 dB in the quietest 5 %, `vebench mix` on the render's stems); it showed the guest's name in a lower third and popped three keywords; the sound measures -13.9 LUFS at -3.3 dBTP. It was rendered before punch-ins could enlarge footage past its own detail, so it has none.
-- **Time:** the analysis takes about twice the footage's length and is nearly all of a first edit: shot detection about a fifth of it, faces an eighth, transcribing and aligning the rest. Another edit of the same footage starts at the plan and took 41 s to 2.3 min here.
+- **Music and effects:** in the second chat-b edit Claude chose the 96 BPM track, which plays from 1.9 s to the end with the voice 21.0 dB over it while anyone talks (15.0 dB in the quietest 5 %, `vebench mix` on the stems of the same project rendered again), and its one join does not click; it showed the guest's name and role in a lower third, popped two keywords and pushed in on 3 of the 6 clips, at most 1.19 times; the sound measures -13.9 LUFS at -3.1 dBTP.
+- **Visuals:** each synthetic edit cuts to 5 full-frame cards (a checklist, a list, a comparison, and a search and a highlighted line in the first, two highlighted lines in the second), 3.0 to 3.5 s each and 29 % of the edit, with a soft sound on 2 or 3 of them; the captions carry on over them.
+- **Cost:** $0.19 and $0.20, against $0.10 for the same edits before rich visuals: the plan, $0.17 and $0.19, is most of it, as rich visuals make Claude write more (*Cost* under the planner's table).
+- **Time:** the second chat-b edit analysed its 6.7 min of footage and 3.7 min of music in 9.9 min; on its own, without the names, the footage took 3.2 min, all three clips at once. Shot detection takes about a fifth of an analysis, faces an eighth, transcribing and aligning the rest. Another edit of the same footage starts at the plan and took 1.8 min here with rich visuals; 41 s to 2.3 min without.
 - **Pictures:** in the 9:16 edits the crop follows whoever is on screen, and cuts to the listener's shot with the source. The interview's cuts join two answers inside one camera's shot, so they show as jump cuts; the talks cut between the host and the speaker at a pause.
-- **Captions:** on the synthetic edit, each caption appears within 23 ms of its first word's true start at the median and 118 ms at the 95th percentile, and stays up about 0.4 s past its last word.
+- **Captions:** on the synthetic edit measured before rich visuals, each caption appears within 23 ms of its first word's true start at the median and 118 ms at the 95th percentile, and stays up about 0.4 s past its last word. This was not measured again.
 
 ## Planner measurements
 
-These runs use the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0), each clip analysed with `vework analyze` and no transcript correction. Each footage was planned, rendered and reviewed at each length its speech allows: the two groups at 16:9, the single clips at 9:16 except the screen recording. The baseline keeps every clip whole, in file order, cut off at the target. `vebench edit` scores both, and `vebench render` the planner's renders.
+These runs use the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0), each clip analysed at 5dc8da9 with the 0.6B speech model and no transcript correction. Each footage was planned, rendered and reviewed at each length its speech allows, with rich visuals, without stock footage (no Pexels or Pixabay key), and `--quality best`, one edit at a time: the two groups at 16:9, the single clips at 9:16 except the screen recording. The baseline keeps every clip whole, in file order, cut off at the target. `vebench edit` scores both, and `vebench render` the planner's renders.
 
 ```bash
 # Each clip is analysed once into the index cache, then read from it
-node scripts/plan-corpus.ts ../../bench/synthetic --group talk-a --lengths 30,60,300 --naive  # --live-claude the first time
+PEXELS_API_KEY= PIXABAY_API_KEY= node --env-file=../../.env scripts/plan-corpus.ts ../../bench/synthetic \
+  --group talk-a --lengths 30,60,300 --naive --system rich --live-claude
 cd ../../bench && uv run vebench report synthetic/
 ```
 
-| Footage | Target | Length error, naive / planner | Cuts inside words: naive / planned → reviewed | Fillers cut | Retakes right | Dead air ≥ 1 s, naive / planner | Clicks, drift | Claude |
-|---|---|---|---|---|---|---|---|---|
-| talk-a (3 clips, 7.0 min) | 30 s | +0.0 % / +2.7 % | 0 / 0 → 0 of 6 | 1 of 1 | – | 1 (2 s) / 0 | 0 of 2, 0.0 ms | $0.06 |
-| talk-a (3 clips, 7.0 min) | 60 s | +0.0 % / -2.3 % | 1 / 0 → 0 of 12 | 2 of 3 | 1 of 1 | 1 (2 s) / 0 | 0 of 5, 0.0 ms | $0.07 |
-| talk-a (3 clips, 7.0 min) | 300 s | +0.0 % / -0.5 % | 1 / 1 → 0 of 28 | 1 of 19 | 3 of 3 | 12 (25 s) / 0 | 0 of 13, 0.0 ms | $0.12 |
-| chat-b (3 clips, 6.7 min) | 30 s | +0.0 % / +3.6 % | 0 / 0 → 0 of 4 | 2 of 4 | – | 1 (1 s) / 0 | 0 of 1, 0.0 ms | $0.07 |
-| chat-b (3 clips, 6.7 min) | 60 s | +0.0 % / +0.4 % | 0 / 0 → 0 of 10 | 1 of 7 | – | 3 (8 s) / 0 | 0 of 4, 0.0 ms | $0.06 |
-| chat-b (3 clips, 6.7 min) | 300 s | +0.0 % / -0.5 % | 1 / 0 → 0 of 48 | 3 of 22 | 3 of 3 | 13 (30 s) / 0 | 0 of 23, 0.0 ms | $0.11 |
-| talk-a2 (2.4 min) | 30 s | +0.0 % / -3.1 % | 0 / 0 → 0 of 6 | 0 of 3 | – | 2 (3 s) / 0 | 0 of 2, 0.0 ms | $0.06 |
-| talk-a2 (2.4 min) | 60 s | +0.0 % / -3.2 % | 0 / 0 → 0 of 6 | 0 of 4 | – | 3 (5 s) / 0 | 0 of 2, 0.0 ms | $0.06 |
-| talk-a3 (2.1 min) | 30 s | +0.0 % / -0.1 % | 1 / 0 → 0 of 6 | 0 of 1 | 1 of 1 | 2 (3 s) / 0 | 0 of 2, 0.0 ms | $0.06 |
-| talk-a3 (2.1 min) | 60 s | +0.0 % / +0.9 % | 1 / 0 → 0 of 6 | 0 of 3 | 1 of 1 | 3 (4 s) / 0 | 0 of 2, 0.0 ms | $0.05 |
-| phone-c (77 s, 9:16) | 30 s | +0.0 % / -2.7 % | 1 / 0 → 0 of 10 | 2 of 5 | 1 of 1 | 2 (7 s) / 0 | 0 of 4, 0.0 ms | $0.07 |
-| phone-c (77 s, 9:16) | 60 s | +0.0 % / +3.8 % | 0 / 0 → 0 of 8 | 0 of 7 | 1 of 1 | 4 (11 s) / 0 | 0 of 3, 0.0 ms | $0.03 |
-| screen-d (75 s) | 30 s | +0.0 % / -0.4 % | 0 / 0 → 0 of 12 | 1 of 2 | 1 of 1 | 1 (2 s) / 0 | 0 of 5, 0.0 ms | $0.06 |
-| screen-d (75 s) | 60 s | +0.0 % / +2.1 % | 1 / 0 → 0 of 6 | 0 of 5 | 1 of 1 | 2 (6 s) / 0 | 0 of 2, 0.0 ms | $0.02 |
+<!-- results:engine-planner -->
+| Footage | Target | Length error, naive / planner | Cuts inside words: naive / planned → reviewed | Fillers cut | Retakes right | Dead air ≥ 1 s, naive / planner | Clicks, drift | Cards (share of the edit) | Claude |
+|---|---|---|---|---|---|---|---|---|---|
+| talk-a (3 clips, 7.0 min) | 30 s | +0.0 % / -2.3 % | 0 / 0 → 0 of 8 | 1 of 1 | 1 of 1 | 1 (2 s) / 0 | 0 of 3, 0.0 ms | 4 (47 %) | $0.15 |
+| talk-a (3 clips, 7.0 min) | 60 s | +0.0 % / +1.9 % | 1 / 0 → 0 of 12 | 3 of 3 | 1 of 1 | 1 (2 s) / 0 | 0 of 5, 0.0 ms | 7 (37 %) | $0.12 |
+| talk-a (3 clips, 7.0 min) | 300 s | +0.0 % / -0.6 % | 1 / 0 → 0 of 22 | 0 of 18 | 2 of 2 | 12 (25 s) / 0 | 0 of 10, 0.0 ms | 18 (19 %) | $0.49 |
+| chat-b (3 clips, 6.7 min) | 30 s | +0.0 % / +0.0 % | 0 / 0 → 0 of 4 | 2 of 4 | – | 1 (1 s) / 0 | 0 of 1, 0.0 ms | 3 (35 %) | $0.13 |
+| chat-b (3 clips, 6.7 min) | 60 s | +0.0 % / -0.2 % | 0 / 0 → 0 of 10 | 1 of 7 | – | 3 (8 s) / 0 | 0 of 4, 0.0 ms | 4 (23 %) | $0.13 |
+| chat-b (3 clips, 6.7 min) | 300 s | +0.0 % / +0.0 % | 1 / 0 → 0 of 48 | 0 of 24 | 3 of 3 | 13 (30 s) / 0 | 0 of 23, 0.0 ms | 20 (22 %) | $0.50 |
+| talk-a2 (2.4 min) | 30 s | +0.0 % / -0.4 % | 0 / 0 → 0 of 6 | 1 of 2 | – | 2 (3 s) / 0 | 0 of 2, 0.0 ms | 4 (42 %) | $0.12 |
+| talk-a2 (2.4 min) | 60 s | +0.0 % / -2.1 % | 0 / 0 → 0 of 6 | 0 of 4 | – | 3 (5 s) / 0 | 0 of 2, 0.0 ms | 6 (32 %) | $0.11 |
+| talk-a3 (2.1 min) | 30 s | +0.0 % / +0.0 % | 1 / 0 → 0 of 6 | 0 of 1 | 1 of 1 | 2 (3 s) / 0 | 0 of 2, 0.0 ms | 2 (23 %) | $0.16 |
+| talk-a3 (2.1 min) | 60 s | +0.0 % / -0.9 % | 1 / 0 → 0 of 8 | 1 of 4 | 1 of 1 | 3 (4 s) / 0 | 0 of 3, 0.0 ms | 4 (23 %) | $0.21 |
+| phone-c (77 s, 9:16) | 30 s | +0.0 % / +0.9 % | 1 / 0 → 0 of 12 | 3 of 6 | 1 of 1 | 2 (7 s) / 0 | 0 of 5, 0.0 ms | 2 (20 %) | $0.11 |
+| phone-c (77 s, 9:16) | 60 s | +0.0 % / -0.4 % | 0 / 0 → 0 of 8 | 0 of 7 | 1 of 1 | 4 (11 s) / 0 | 0 of 3, 0.0 ms | 5 (28 %) | $0.12 |
+| screen-d (75 s) | 30 s | +0.0 % / -1.3 % | 0 / 0 → 0 of 8 | 0 of 2 | 1 of 1 | 1 (2 s) / 0 | 0 of 3, 0.0 ms | 3 (31 %) | $0.13 |
+| screen-d (75 s) | 60 s | +0.0 % / +1.3 % | 1 / 0 → 0 of 6 | 0 of 5 | 1 of 1 | 2 (6 s) / 0 | 0 of 2, 0.0 ms | 5 (29 %) | $0.13 |
+<!-- /results -->
 
-- **Length:** all 14 edits land within ±5 %, 1.9 % off on average and 3.8 % at most.
-- **Cuts inside words:** none of 168 after review. As planned, one of 170 was: the index put 0.18 s of silence between 呃 and 講 where the speaker left none, so the cut after the removed filler clipped 講 by 115 ms. The review heard it in the strip and put the filler back. In a separate check, the review passed a cut 30 ms before a word and caught one 100 ms into it.
+- **Length:** all 14 edits land within ±5 %, 0.9 % off on average and 2.3 % at most.
+- **Cuts inside words:** none of 162 as planned, none of 164 after review; the baseline's cut at the target falls inside a word in 7 of 14 edits. When these 14 edits were measured before rich visuals and before the analysis shrank each gap between two words to the silence in it (*Word gaps* below), one of 170 planned cuts was inside a word: the index put 0.18 s of silence between 呃 and 講 where the speaker left none, so the cut after the removed filler clipped 講 by 115 ms, and the review put the filler back. In a separate check, the review passed a cut 30 ms before a word and caught one 100 ms into it.
 - **Retakes:** the kept take was the right one in all 13 groups the edits used.
-- **Dead air:** none left, against 50 silences of a second or more in the baseline.
-- **Fillers:** recall is low, 13 of 86, and precision 1 of 1. Claude marked 38 of the 86 as fillers, some the speech model had written as other characters (您大家好 for 嗯，大家好); code cut those it could. The synthetic voice runs each filler straight into the next word: the median gap after one is 0 s, and only 2 of 69 leave the 0.13 s a cut needs. Whether real speech leaves more room is not measured yet.
-- **Cost:** $0.90 for all 14 edits, $0.02 to $0.12 each. Planning is most of it: $0.05 to $0.07 for the first plan of a footage at high effort, and $0.02 to $0.10 for later ones, which read the cached transcripts. The 84 cut checks cost $0.025 together, and the 9 escalated to Opus $0.11.
+- **Dead air:** none left, against 50 silences of a second or more, 108 s in all, in the baseline.
+- **Fillers:** recall is low, 12 of 88; no other word was cut between clips. The synthetic voice runs each filler straight into the next word: the median gap after one is 0 s, and only 2 of 69 leave the 0.13 s a cut needs. Whether real speech leaves more room is not measured yet.
+- **Visuals:** the 14 edits cut to 87 full-frame cards of 14 kinds, the most a highlighted line (21), a checklist (13) or a before and after (11), with icons, 7 logo cards and 31 soft sounds. Cards fill 19 to 47 % of an edit, more in the short edits than the long; the planner left out the cards whose lines were cut, or that came too close to the one before. Claude asked for no web capture.
+- **Cost:** $2.62 for all 14 edits, $0.11 to $0.50 each, against $0.90 and $0.02 to $0.12 before rich visuals. Planning is 90 % of it: Opus writes 3,100 to 7,200 tokens for a 30 or 60 s plan and 16,000 to 17,600 for a 300 s one, so a plan costs $0.11 to $0.20, and $0.39 and $0.42 at 300 s. The cached prefix, the instructions and the packed transcripts, is 9,500 to 13,600 tokens; three plans read it from the plan before. The 112 cut checks cost $0.028 together, and the 17 escalated to Opus $0.24. One review changed an edit: chat-b at 300 s, twice, before its third pass found nothing to change.
+- **Earlier comparisons:** every bullet below was measured before rich visuals, with what is now `--visuals minimal`.
 - **With effects:** the talk-a and chat-b edits were planned, rendered and reviewed again at 30, 60 and 300 s, with the code before the planner placed effects and after it, on the same indexes. Lengths stay within ±5 % (0.5 to 3.6 % off before, 0.5 to 4.1 % after), retakes stay right (8 of 8 both times) and no dead air is left; renders have 0 clicks and 0.0 ms of drift. Each edit now carries one to three keyword pops a minute, and the two 300 s edits open on a title. Cuts inside words, after review: 1 of 110 before and 2 of 114 after. Both are the index's timing, as above: a gap it heard between two words the speaker joined. One is the 115 ms cut into 講 in both runs. The other is new: a cut the review moved, 28 ms into 個. The analysis now closes that gap (*Word gaps* below).
 - **With callouts:** on six frames of the synthetic screen recording screen-d, each where a thing on screen is named, `claude-haiku-5-5` boxed the API key, model and output folder fields and the Save button at 0.98 to 1.00 intersection over union with the generator's truth (`truth/regions.json`), answered not found for an `edit` command the terminal never shows, and boxed the timecodes of a scrolling editor, which the stillness check then rejects. Each request costs $0.0002: about 1,600 tokens in, for a 1280 × 720 frame. screen-d was planned four times at 45 s and 16:9 on the same index. Each time, Claude asked for the same three callouts: the API key field, the length in the terminal command and the subtitle file's timecodes. The length was never found and the timecodes were left out as moving. The API key callout, on target at 0.977 IoU (`vebench edit`), played in both edits planned with callouts running on across a jump cut. Finding the things cost $0.0008 in three requests the first time, then $0.0002, $0.0003 and nothing, as the cache answered, on top of plans of $0.036 to $0.062. Every edit lands within ±5 % (at most 0.07 % off), with no cut inside a word, the retake chosen right and no dead air, and the render with its callout has 0 clicks and 0.0 ms of drift. At 9:16 the same field was found but left out: the still middle crop of a 16:9 screen shows a third of its width.
 - **Nearest length:** the talk-a and chat-b edits were planned, rendered and reviewed again at 15, 30, 60 and 300 s, with the fit that took the first length within ±5 % and with the one that aims for the target, replaying the same plans from Claude. Length off, on average and at most: 2.6 and 2.7 % → 1.6 and 1.6 % at 15 s, 2.7 and 3.5 % → 1.8 and 2.8 % at 30 s, 1.4 and 2.1 % → 0.4 and 0.8 % at 60 s, 1.7 and 2.3 % → 0.0 % at 300 s. A short edit stays a little off where its lines, 2 to 4 s each, allow nothing nearer, and the breath moves a 30 s edit by only about 0.3 s. Both fits leave the same cut inside a word, 1 of 120 (the 115 ms into 講), and have 0 clicks at 52 cuts and 0.0 ms of drift. talk-a3 alone is still too short for 15 s after two requests, and the planner now says to add footage.
@@ -70,7 +84,7 @@ cd ../../bench && uv run vebench report synthetic/
 
 ## Quality measurements
 
-The talk-a and chat-b groups were planned, rendered and reviewed at 60 and 300 s, at 9:16 and 16:9, twice each, at both qualities: 32 edits, from indexes of the 720p corpus (seed 0) that `vework analyze` wrote at 277effa. `best` here is the code before `--quality` existed, which sends the same requests.
+The talk-a and chat-b groups were planned, rendered and reviewed at 60 and 300 s, at 9:16 and 16:9, twice each, at both qualities: 32 edits, from indexes of the 720p corpus (seed 0) that `vework analyze` wrote at 277effa. `best` here is the code before `--quality` existed, which sends the same requests. They were measured before rich visuals, with what is now `--visuals minimal`, so their costs are those of edits without them.
 
 ```bash
 node scripts/plan-corpus.ts <corpus> --group talk-a --group chat-b --lengths 60,300 \
@@ -123,7 +137,7 @@ cd ../../bench && uv run vebench report synthetic/
 
 ## Changing an edit
 
-Measured on a 60 s 9:16 edit of the [synthetic](../../bench/README.md#synthetic-corpus) conversation chat-b (seed 0) with music, a lower third and two keywords: a fresh agent with only the skill made three versions from what a person would say, twice. It cut the 4.1 s segment about clicks at the joins with `--cut 29.14-32.72` and `--retarget`, fixed a misheard caption (能比如說 to 嗯　比如說) and added a title, shortened to end where the first keyword starts. The planned edit rendered in 32 s on the reference machine; the agents' renders took 39 s to 2.8 min, with other renders running beside them. By hand, one more cut took a sentence out of the middle of a clip (`--cut 43.56-47.56 --retarget`), which split it in the pauses on either side, and two more versions covered the other recipes: a lower third's role, a keyword removed and one added, a chapter, the music 3 dB down, then no music, the `warm` look and the `sweep` captions. `vebench report` on all of them:
+Measured before rich visuals, with what is now `--visuals minimal`, on a 60 s 9:16 edit of the [synthetic](../../bench/README.md#synthetic-corpus) conversation chat-b (seed 0) with music, a lower third and two keywords: a fresh agent with only the skill made three versions from what a person would say, twice. It cut the 4.1 s segment about clicks at the joins with `--cut 29.14-32.72` and `--retarget`, fixed a misheard caption (能比如說 to 嗯　比如說) and added a title, shortened to end where the first keyword starts. The planned edit rendered in 32 s on the reference machine; the agents' renders took 39 s to 2.8 min, with other renders running beside them. By hand, one more cut took a sentence out of the middle of a clip (`--cut 43.56-47.56 --retarget`), which split it in the pauses on either side, and two more versions covered the other recipes: a lower third's role, a keyword removed and one added, a chapter, the music 3 dB down, then no music, the `warm` look and the `sweep` captions. `vebench report` on all of them:
 
 | Version | Length | Cuts inside words | Clicks, drift |
 |---|---|---|---|
