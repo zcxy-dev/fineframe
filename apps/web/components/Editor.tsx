@@ -17,9 +17,9 @@ import {
   formatLength,
   namesFrom,
   roleOf,
-  styleName,
 } from "../lib/settings.ts";
 import type { SetupState } from "../lib/setup.ts";
+import { dollarsOf, summaryRows } from "../lib/summary.ts";
 import styles from "./editor.module.css";
 import { Footage, type Item } from "./Footage.tsx";
 import { AlertIcon, CaptionsIcon, CheckIcon, DownloadIcon, LockIcon, Mark } from "./icons.tsx";
@@ -587,7 +587,7 @@ function Failed({
 }) {
   const cancelled = job.status === "cancelled";
   const fix = !cancelled && job.error ? fixFor(job.error) : null;
-  const spent = job.claude ? total(job.claude) : null;
+  const spent = job.claude ? dollarsOf(job.claude) : null;
   return (
     <>
       <div>
@@ -623,47 +623,7 @@ function Failed({
 }
 
 function Summary({ job }: { job: Job }) {
-  const videos = job.files.filter((file) => file.use === "video").length;
-  const photos = job.files.filter((file) => file.use === "image").length;
-  const offered = job.files.filter((file) => file.use === "music").length;
-  const rows: [string, string][] = [
-    ["Length", formatLength(job.settings.length)],
-    ["Aspect", job.settings.aspect],
-    ["Style", styleName(job.settings.style)],
-    ["Speech", job.settings.asr === "cloud" ? "OpenRouter" : "On this computer"],
-    // Edits from before the setting had none.
-    ...(job.settings.visuals
-      ? [["Visuals", job.settings.visuals === "rich" ? "Rich" : "Minimal"] as [string, string]]
-      : []),
-    [
-      "Footage",
-      `${videos} ${videos === 1 ? "video" : "videos"}${photos ? `, ${photos} ${photos === 1 ? "photo" : "photos"}` : ""}`,
-    ],
-  ];
-  if (offered > 0) {
-    // Claude picks one of the tracks offered, or none; the page knows which once it is done.
-    const played = job.result?.music;
-    rows.push([
-      "Music",
-      played
-        ? played.length > 0
-          ? played.map((path) => path.split("/").at(-1)).join(", ")
-          : "None chosen"
-        : `${offered} ${offered === 1 ? "track" : "tracks"} offered`,
-    ]);
-  }
-  if (job.settings.names.length > 0) {
-    // Edits from before terms had their own list counted both here.
-    rows.push([
-      job.settings.terms ? "Names" : "Names and terms",
-      String(job.settings.names.length),
-    ]);
-  }
-  if (job.settings.terms?.length) rows.push(["Terms", String(job.settings.terms.length)]);
-  if (job.claude) {
-    rows.push(["Claude, planning", formatDollars(job.claude.plan.dollars)]);
-    rows.push(["Claude, checking cuts", formatDollars(job.claude.check.dollars)]);
-  }
+  const rows = summaryRows(job);
   return (
     <dl className={styles.summary}>
       {rows.map(([name, value]) => (
@@ -713,12 +673,6 @@ function SetupView({ setup, onRetry }: { setup: Setup; onRetry: () => void }) {
 async function retrySetup(): Promise<Setup> {
   const response = await fetch("/api/setup", { method: "POST" });
   return (await response.json()) as Setup;
-}
-
-/** What Claude cost in all; null when a price is unknown. */
-function total(cost: NonNullable<Job["claude"]>): number | null {
-  const { plan, check } = cost;
-  return plan.dollars === null || check.dollars === null ? null : plan.dollars + check.dollars;
 }
 
 /** Sends a file as a request body, reporting the bytes sent; fetch cannot report them. */

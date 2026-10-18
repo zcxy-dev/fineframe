@@ -4,9 +4,11 @@ import { lookIds } from "@video-editor/engine/looks";
 import type { Revision } from "@video-editor/engine/revise";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import type { EditView, Job } from "../lib/jobs.ts";
-import { formatClock } from "../lib/settings.ts";
+import { formatClock, formatDollars } from "../lib/settings.ts";
+import { dollarsOf } from "../lib/summary.ts";
 import styles from "./editor.module.css";
 import { AlertIcon } from "./icons.tsx";
+import { Replan } from "./Replan.tsx";
 
 /** Ticks in a second, as project.json counts time. */
 const TICKS = 120_000;
@@ -58,6 +60,7 @@ export function ReEdit({
   onJob: (job: Job) => void;
 }) {
   const [view, setView] = useState<EditView | null>(null);
+  const [replanning, setReplanning] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [selection, setSelection] = useState<[number, number] | null>(null);
   const [landed, setLanded] = useState<Landed | null>(null);
@@ -510,6 +513,18 @@ export function ReEdit({
           another music track cannot be changed here: Claude plans the edit again from the same
           footage, whose analysis is kept, so it takes a minute or two and one more plan.
         </p>
+        {replanning ? (
+          <Replan job={job} onJob={onJob} onClose={() => setReplanning(false)} />
+        ) : (
+          <button
+            type="button"
+            className={styles.button}
+            onClick={() => setReplanning(true)}
+            disabled={!view.footage || rendering !== null}
+          >
+            Re-plan…
+          </button>
+        )}
       </div>
 
       {error && (
@@ -643,6 +658,7 @@ export function Versions({ job, onJob }: { job: Job; onJob: (job: Job) => void }
               <span className={styles.fileMeta}>
                 {new Date(version.created).toLocaleString()}
                 {version.seconds !== undefined && ` · ${formatClock(version.seconds)}`}
+                {version.claude && ` · Claude ${formatDollars(dollarsOf(version.claude))}`}
                 {" · "}
                 {version.summary}
                 {busy && job.render?.version === version.n

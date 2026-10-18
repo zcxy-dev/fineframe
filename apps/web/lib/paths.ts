@@ -1,3 +1,5 @@
+import type { Job } from "./jobs.ts";
+
 /**
  * A dropped file's path inside what was dropped, made safe to write under a job's footage
  * folder: forward slashes, no empty or `.` segments. Null for a path that could leave the folder
@@ -18,7 +20,19 @@ export function safeRelativePath(path: string): string | null {
   return segments.join("/");
 }
 
-/** A name for a download: the edit's length and aspect, which tell two edits apart. */
-export function downloadName(length: number, aspect: string, extension: string): string {
+/** The length and aspect the version shown was planned for, which a re-plan may have changed
+ * from the edit's. */
+export function shownPlan(job: Job): { length: number; aspect: Job["settings"]["aspect"] } {
+  const shown = job.versions?.find((version) => version.n === (job.current ?? 1));
+  return {
+    length: shown?.length ?? job.settings.length,
+    aspect: shown?.aspect ?? job.settings.aspect,
+  };
+}
+
+/** A name for a download: the length and aspect of the version shown, which tell two edits
+ * apart. */
+export function downloadName(job: Job, extension: string): string {
+  const { length, aspect } = shownPlan(job);
   return `edit-${Math.round(length)}s-${aspect.replace(":", "x")}.${extension}`;
 }
