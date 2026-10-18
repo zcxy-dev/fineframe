@@ -22,13 +22,14 @@ import {
 } from "../lib/settings.ts";
 import type { SetupState } from "../lib/setup.ts";
 import { dollarsOf, summaryRows } from "../lib/summary.ts";
+import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
 import { Footage, type Item } from "./Footage.tsx";
-import { AlertIcon, CaptionsIcon, CheckIcon, DownloadIcon, LockIcon } from "./icons.tsx";
+import { CaptionsIcon, CheckIcon, DownloadIcon, LockIcon } from "./icons.tsx";
 import { KeyDialog } from "./KeyDialog.tsx";
 import { Projects } from "./Projects.tsx";
 import { ReEdit, Versions } from "./ReEdit.tsx";
-import { Player, ResultSummary } from "./ResultView.tsx";
+import { Player, ResultSummary, useVideoLength } from "./ResultView.tsx";
 import { DownloadView, RunView } from "./RunView.tsx";
 import { type Choices, chosenLength, type Machine, SettingsPanel } from "./SettingsPanel.tsx";
 
@@ -78,6 +79,8 @@ export function Editor() {
   });
   const [phase, setPhase] = useState<Phase>({ kind: "compose" });
   const upload = useRef<XMLHttpRequest | null>(null);
+  // The finished edit's player, which the re-edit's shortcuts play and step.
+  const video = useRef<HTMLVideoElement>(null);
   // Whether the server has an Anthropic key, an OpenRouter one and the optional stock footage
   // ones (never the keys); null until it says.
   const [keys, setKeys] = useState<Keys | null>(null);
@@ -242,7 +245,9 @@ export function Editor() {
                 ? "Say under which licence you use the music"
                 : null));
 
-  const start = async () => {
+  /** Sends the footage and starts the edit; `instructions` are what the box holds unless a
+   * retry gives the failed edit's own. */
+  const start = async (instructions = choices.instructions) => {
     if (blocked || !("seconds" in length)) return;
     if (keySet === false) {
       setAsking("anthropic");
@@ -270,7 +275,7 @@ export function Editor() {
             correct: choices.correct,
             captions: choices.captions,
             // Nothing asked, nothing sent: the request is the same as without the box.
-            ...(choices.instructions.trim() ? { instructions: choices.instructions.trim() } : {}),
+            ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
           },
           files: used.map((item) => ({ path: item.path, size: item.file.size })),
         }),
@@ -424,10 +429,7 @@ export function Editor() {
               onAddStock={setAsking}
             />
             {phase.kind === "compose" && phase.error && (
-              <p className={styles.error} role="alert">
-                <AlertIcon width={16} height={16} />
-                {phase.error}
-              </p>
+              <ErrorNote message={phase.error} fallback="The edit could not be started." />
             )}
             {phase.kind === "uploading" ? (
               <div className={styles.uploading}>
@@ -499,8 +501,8 @@ export function Editor() {
           <div className={styles.main}>
             {status === "done" && job ? (
               <>
-                <Player job={job} />
-                <ReEdit job={job} onJob={update} />
+                <Player job={job} video={video} />
+                <ReEdit job={job} onJob={update} video={video} />
               </>
             ) : (
               job && <RunView job={job} />
@@ -515,6 +517,17 @@ export function Editor() {
               <Failed
                 job={job}
                 onBack={() => setPhase({ kind: "compose" })}
+                onRetry={
+                  blocked === null
+                    ? () => {
+                        // The footage is still here: the same edit again, as it was asked for.
+                        const asked = job.settings.instructions ?? "";
+                        setChoices((current) => ({ ...current, instructions: asked }));
+                        setPhase({ kind: "compose" });
+                        void start(asked);
+                      }
+                    : null
+                }
                 onReplaceKey={(service) => setAsking(service)}
               />
             )}
@@ -554,12 +567,13 @@ function Running({ job, onCancel }: { job: Job; onCancel: () => void }) {
 
 function Done({ job, onJob, onNew }: { job: Job; onJob: (job: Job) => void; onNew: () => void }) {
   const base = `/api/jobs/${job.id}`;
+  const seconds = useVideoLength(job);
   return (
     <>
       <div className={styles.block}>
         <div>
           <h2 className={styles.panelTitle}>Your edit is ready</h2>
-          <ResultSummary job={job} />
+          <ResultSummary job={job} seconds={seconds} />
         </div>
         <div className={styles.downloads}>
           <a className={styles.primary} href={`${base}/video?download`} download>
@@ -581,7 +595,7 @@ function Done({ job, onJob, onNew }: { job: Job; onJob: (job: Job) => void; onNe
         </div>
       </div>
       <Versions job={job} onJob={onJob} />
-      <Summary job={job} />
+      <Summary job={job} actual={seconds} />
       <div className={styles.block}>
         <button type="button" className={styles.linkButton} onClick={onNew}>
           Make another edit
@@ -594,51 +608,75 @@ function Done({ job, onJob, onNew }: { job: Job; onJob: (job: Job) => void; onNe
 function Failed({
   job,
   onBack,
+  onRetry,
   onReplaceKey,
 }: {
   job: Job;
   onBack: () => void;
+  /** Starts the same edit again from the footage still in the page; null when it is gone. */
+  onRetry: (() => void) | null;
   onReplaceKey: (service: "anthropic" | "openrouter") => void;
 }) {
   const cancelled = job.status === "cancelled";
   const fix = !cancelled && job.error ? fixFor(job.error) : null;
   const spent = job.claude ? dollarsOf(job.claude) : null;
+  // The step that fixes it first, then trying again, then the footage; the first is primary.
+  const actions = [
+    fix?.kind === "key" && { label: "Replace the API key", run: () => onReplaceKey("anthropic") },
+    fix?.kind === "openrouter" && {
+      label: "Replace the OpenRouter key",
+      run: () => onReplaceKey("openrouter"),
+    },
+    fix?.kind === "credit" && {
+      label: "Add credit",
+      href: "https://console.anthropic.com/settings/billing",
+    },
+    onRetry && fix?.kind !== "file" && { label: "Try again", run: onRetry },
+    {
+      label: fix?.kind === "file" ? "Change the footage" : "Back to the footage",
+      run: onBack,
+    },
+  ].filter((action) => action !== false && action !== null);
   return (
     <div className={styles.block}>
-      <div>
-        <h2 className={styles.panelTitle}>
-          {cancelled ? "The edit was cancelled" : "The edit could not be finished"}
-        </h2>
-      </div>
+      <h2 className={styles.panelTitle}>
+        {cancelled ? "The edit was cancelled" : "The edit could not be finished"}
+      </h2>
       {!cancelled && (
-        <p className={styles.error} role="alert">
-          <AlertIcon width={16} height={16} />
-          {job.error ?? "Something went wrong"}
-        </p>
+        <ErrorNote
+          message={job.error ?? "Something went wrong"}
+          fallback="The edit stopped before it finished."
+        />
       )}
-      {fix && <p className={styles.fix}>{fix.text}</p>}
       {spent !== null && spent !== 0 && (
         <p className={styles.help}>Claude cost {formatDollars(spent)} before the edit stopped.</p>
       )}
-      {fix?.kind === "key" && (
-        <button type="button" className={styles.button} onClick={() => onReplaceKey("anthropic")}>
-          Replace the API key
-        </button>
-      )}
-      {fix?.kind === "openrouter" && (
-        <button type="button" className={styles.button} onClick={() => onReplaceKey("openrouter")}>
-          Replace the OpenRouter key
-        </button>
-      )}
-      <button type="button" className={styles.primary} onClick={onBack}>
-        Back to the footage
-      </button>
+      <div className={styles.actions}>
+        {actions.map((action, i) => {
+          const className = i === 0 ? styles.primary : styles.button;
+          return "href" in action ? (
+            <a
+              key={action.label}
+              className={className}
+              href={action.href}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {action.label}
+            </a>
+          ) : (
+            <button key={action.label} type="button" className={className} onClick={action.run}>
+              {action.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function Summary({ job }: { job: Job }) {
-  const rows = summaryRows(job);
+function Summary({ job, actual }: { job: Job; actual?: number | null }) {
+  const rows = summaryRows(job, actual);
   return (
     <dl className={styles.summary}>
       {rows.map(([name, value]) => (
@@ -667,15 +705,14 @@ function SetupView({ setup, onRetry }: { setup: Setup; onRetry: () => void }) {
         </p>
       </div>
       {setup.state === "failed" ? (
-        <>
-          <p className={styles.error} role="alert">
-            <AlertIcon width={16} height={16} />
-            {setup.error}
-          </p>
+        <ErrorNote
+          message={setup.error ?? "Something went wrong"}
+          fallback="The download or the install stopped."
+        >
           <button type="button" className={styles.button} onClick={onRetry}>
             Try again
           </button>
-        </>
+        </ErrorNote>
       ) : setup.download ? (
         <DownloadView download={setup.download} />
       ) : (

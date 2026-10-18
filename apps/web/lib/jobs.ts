@@ -170,6 +170,8 @@ export interface EditView {
   length: number;
   /** Whether the footage is kept, which every change needs. */
   footage: boolean;
+  /** Frames a second, for stepping the player one frame. */
+  fps: number;
   lines: { text: string; words: { text: string; start: number; end: number }[] }[];
   removables: ReturnType<typeof removables>;
   /** Titles and lower thirds, whose text can change, by their index in the overlays. */
@@ -720,6 +722,7 @@ export class Jobs {
     return {
       version,
       length: editLength(project),
+      fps: project.output.fps.num / project.output.fps.den,
       footage: existsSync(join(this.#dir(job), "footage")),
       lines: (project.captions?.lines ?? []).map((line) => ({
         text: line.text,

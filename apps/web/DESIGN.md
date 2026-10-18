@@ -121,7 +121,7 @@ Tokens live in `app/globals.css`; `components/editor.module.css` uses them. The 
 
 ## Layout
 
-A full-height grid: a 44px top bar, then the main pane and a 360px inspector (320px below 1024px) with its own scroll and the primary action pinned at its foot. Sections inside a pane are divided by hairlines with 20–24px padding. Spacing comes from the 4px scale in `app/globals.css`. Below 720px the panes stack, the inspector after the work, and on a finished edit the result and its downloads come before the re-edit.
+A full-height grid: a 44px top bar, then the main pane and a 360px inspector (320px below 1024px) with its own scroll and the primary action pinned at its foot. Sections inside a pane are divided by hairlines with 20–24px padding. Spacing comes from the 4px scale in `app/globals.css`. Below 720px the panes stack, the inspector after the work; a finished edit's result and downloads come before the re-edit, and a failed edit's reason and next steps before its stages.
 
 ## Elevation & Depth
 
