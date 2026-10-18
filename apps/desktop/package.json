@@ -1,12 +1,12 @@
 {
   "name": "@video-editor/desktop",
   "version": "0.3.0",
-  "productName": "Video Editor",
+  "productName": "Fineframe",
   "private": true,
   "description": "A fully automatic video editor",
   "license": "UNLICENSED",
   "author": "zcxy-dev",
-  "homepage": "https://github.com/zcxy-dev/video-editor",
+  "homepage": "https://github.com/zcxy-dev/fineframe",
   "type": "module",
   "main": "src/main.ts",
   "scripts": {

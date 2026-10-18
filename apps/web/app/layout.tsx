@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { BACKGROUND, backgroundCss } from "../lib/theme.ts";
 
 export const metadata: Metadata = {
-  title: "Video editor",
+  title: "Fineframe",
   description: "Drop in footage, choose a length and an aspect, and get back a finished video.",
 };
 

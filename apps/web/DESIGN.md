@@ -1,5 +1,5 @@
 ---
-name: Video Editor
+name: Fineframe
 description: Drop in footage, choose a length and an aspect, and get back a finished video.
 colors:
   bg: "#0b0b0d"
@@ -65,7 +65,7 @@ components:
     rounded: "{rounded.md}"
 ---
 
-# Design System: Video Editor
+# Design System: Fineframe
 
 ## Overview
 

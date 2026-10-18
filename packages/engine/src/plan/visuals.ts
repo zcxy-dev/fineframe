@@ -704,8 +704,7 @@ function sfxCredit(path: string, source: string): Credit {
   const name = path.split(/[\\/]/).at(-1) ?? path;
   return {
     what: `Sound effect ${name}, from ${source.replace(/\s*\(.*\)$/, "")}`,
-    source:
-      url ?? "https://github.com/zcxy-dev/video-editor/blob/main/packages/engine/scripts/sfx.ts",
+    source: url ?? "https://github.com/zcxy-dev/fineframe/blob/main/packages/engine/scripts/sfx.ts",
     license: SFX_LICENSE,
     by: null,
   };

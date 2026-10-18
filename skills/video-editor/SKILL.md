@@ -1,6 +1,6 @@
 ---
 name: video-editor
-description: Edits footage into a finished, captioned video with the open-source video-editor (zcxy-dev/video-editor), then changes the finished edit by conversation. Use when asked to edit, cut down or caption footage with it, or to change one of its edits (an edit.project.json): drop or trim a part, fix a caption, change the title, a lower third, a keyword or chapter, a card or B-roll, the music or the look.
+description: Edits footage into a finished, captioned video with Fineframe (zcxy-dev/fineframe), then changes the finished edit by conversation. Use when asked to edit, cut down or caption footage with it, or to change one of its edits (an edit.project.json): drop or trim a part, fix a caption, change the title, a lower third, a keyword or chapter, a card or B-roll, the music or the look.
 ---
 
 # video-editor

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/zcxy-dev/video-editor/blob/main/packages/schema/progress.schema.json",
+  "$id": "https://github.com/zcxy-dev/fineframe/blob/main/packages/schema/progress.schema.json",
   "title": "Progress",
   "description": "One line of `pnpm edit` progress.",
   "oneOf": [{ "$ref": "#/$defs/StageProgress" }, { "$ref": "#/$defs/DoneProgress" }],

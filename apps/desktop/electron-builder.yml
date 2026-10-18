@@ -1,9 +1,9 @@
 # Installers: `pnpm -C apps/desktop dist` on each system builds that system's own.
-appId: io.github.zcxy-dev.video-editor
-productName: Video Editor
-# The installed folder's name on Windows (Programs\video-editor), rather than the package's.
+appId: app.fineframe.desktop
+productName: Fineframe
+# The installed folder's name on Windows (Programs\fineframe), rather than the package's.
 extraMetadata:
-  name: video-editor
+  name: fineframe
 copyright: Copyright © zcxy-dev
 directories:
   output: dist
@@ -12,13 +12,14 @@ files:
   - package.json
   - src/**/*.ts
   - "!src/**/*.test.ts"
+  - assets/icons/512x512.png
 # From build/ itself: electron-builder leaves out the node_modules at the top of a folder it
 # copies, which editor/'s are.
 extraResources:
   - from: build
     to: .
     filter: ["editor/**/*", "bin/**/*"]
-artifactName: Video-Editor-${version}-${os}-${arch}.${ext}
+artifactName: Fineframe-${version}-${os}-${arch}.${ext}
 publish: null
 mac:
   target: dmg
@@ -39,6 +40,6 @@ nsis:
   runAfterFinish: true
 linux:
   target: AppImage
-  executableName: video-editor
+  executableName: fineframe
   category: AudioVideo
   synopsis: A fully automatic video editor

@@ -103,12 +103,3 @@ export const PlusIcon = (props: SVGProps<SVGSVGElement>) => (
     <path d="M12 5v14M5 12h14" />
   </Icon>
 );
-
-/** The page's mark: a frame of film with a cut through it. */
-export const Mark = () => (
-  <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
-    <rect width="32" height="32" rx="8" fill="var(--accent)" />
-    <path d="M11 9.5v13l11-6.5z" fill="var(--accent-ink)" />
-    <path d="M16 6v20" stroke="var(--accent)" strokeWidth="2.4" />
-  </svg>
-);

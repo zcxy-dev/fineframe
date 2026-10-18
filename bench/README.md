@@ -118,7 +118,7 @@ uv run vebench synth synthetic/ --seed 0
 ```
 
 `vebench synthetic` downloads seed 0 as the
-[`corpus-synthetic-seed0-v1`](https://github.com/zcxy-dev/video-editor/releases/tag/corpus-synthetic-seed0-v1)
+[`corpus-synthetic-seed0-v1`](https://github.com/zcxy-dev/fineframe/releases/tag/corpus-synthetic-seed0-v1)
 release publishes it, checks its SHA-256 and unpacks it, so every machine measures on the same
 files; measurements use it. `vebench synth` writes 16 minutes of clips and 85 MB to
 `bench/synthetic/`, which git ignores, in 5 to 7 minutes on the

@@ -1,6 +1,7 @@
 "use client";
 
 import { estimateCost } from "@video-editor/engine/estimate";
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Picked } from "../lib/collect.ts";
 import { durationOf } from "../lib/collect.ts";
@@ -23,7 +24,7 @@ import type { SetupState } from "../lib/setup.ts";
 import { dollarsOf, summaryRows } from "../lib/summary.ts";
 import styles from "./editor.module.css";
 import { Footage, type Item } from "./Footage.tsx";
-import { AlertIcon, CaptionsIcon, CheckIcon, DownloadIcon, LockIcon, Mark } from "./icons.tsx";
+import { AlertIcon, CaptionsIcon, CheckIcon, DownloadIcon, LockIcon } from "./icons.tsx";
 import { KeyDialog } from "./KeyDialog.tsx";
 import { Projects } from "./Projects.tsx";
 import { ReEdit, Versions } from "./ReEdit.tsx";
@@ -345,8 +346,8 @@ export function Editor() {
     <div className={styles.shell}>
       <header className={styles.header}>
         <span className={styles.brand}>
-          <Mark />
-          Video editor
+          <Image src="/icon.svg" width={32} height={32} alt="" />
+          Fineframe
         </span>
         {keySet !== null && (
           <button type="button" className={styles.keyButton} onClick={() => setAsking("anthropic")}>

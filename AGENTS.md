@@ -1,4 +1,4 @@
-# Video editor
+# Fineframe
 
 ## Never compromise
 - Every rule in [CONTRIBUTING.md](CONTRIBUTING.md#rules).

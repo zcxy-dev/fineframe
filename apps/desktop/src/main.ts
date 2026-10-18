@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { app, BrowserWindow, dialog, nativeTheme, shell } from "electron";
 import { type Places, type Server, startServer } from "./server.ts";
 
-const NAME = "Video Editor";
+const NAME = "Fineframe";
 app.setName(NAME);
 
 /** Packaged, the editor and uv are in the app's resources; from a clone, the repository is the
@@ -46,6 +46,11 @@ async function open(): Promise<void> {
     height: 860,
     minWidth: 880,
     minHeight: 600,
+    // Linux takes the window's icon from the window itself; macOS and Windows from the app's.
+    icon:
+      process.platform === "linux"
+        ? fileURLToPath(new URL("../assets/icons/512x512.png", import.meta.url))
+        : undefined,
     // The page's own background, dark unless the system is light.
     backgroundColor: nativeTheme.shouldUseDarkColors ? BACKGROUND.dark : BACKGROUND.light,
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
