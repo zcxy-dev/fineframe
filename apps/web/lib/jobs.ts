@@ -219,6 +219,8 @@ export class Jobs {
   /** Jobs whose render was stopped, until it exits. */
   readonly #stopped = new Set<string>();
   readonly #listeners = new Map<string, Set<(job: Job) => void>>();
+  /** Each job's latest write of job.json, which the next one waits for. */
+  readonly #saving = new Map<string, Promise<void>>();
   readonly #loaded: Promise<void>;
 
   constructor(options: JobsOptions) {
@@ -361,11 +363,18 @@ export class Jobs {
   /** Deletes a project's folder: its footage, outputs and settings. */
   async remove(id: string): Promise<void> {
     const job = await this.get(id);
-    if (job.status === "running" || job.status === "uploading") {
+    if (
+      job.status === "running" ||
+      job.status === "uploading" ||
+      (job.render !== undefined && !job.render.error)
+    ) {
       throw new JobError("This edit is under way; cancel it before deleting it", 409);
     }
     this.#jobs.delete(job.id);
     this.#listeners.delete(job.id);
+    // A write still under way would put job.json back into the folder deleted.
+    await this.#saving.get(job.id)?.catch(() => {});
+    this.#saving.delete(job.id);
     await rm(this.#dir(job), { recursive: true, force: true });
   }
 
@@ -769,17 +778,21 @@ export class Jobs {
     const versions = this.#versions(job);
     const version = versions.find((each) => each.n === n);
     const dir = this.#dir(job);
+    // The render reads as finished only once everything it changes is settled and saved, so
+    // no one sees it done with the version it made not yet shown.
     if (code === 0 && version && existsSync(join(dir, versionFiles(n).video))) {
-      delete job.render;
-      version.video = true;
       const { project } = await this.#project(job, n);
+      version.video = true;
       version.seconds = editLength(project) / TICKS_PER_SECOND;
       job.current = n;
       await this.#settle(job, n);
       await this.#keepVideos(job);
+      const { render: _, ...done } = job;
+      await this.#save(done);
+      delete job.render;
     } else if (render) {
       const reason = [...log].reverse().find((line) => line.startsWith("render: error: "));
-      render.error = reason
+      const error = reason
         ? reason.slice("render: error: ".length)
         : stopped
           ? "The render was stopped"
@@ -789,8 +802,11 @@ export class Jobs {
         await rm(join(dir, versionFiles(n).project), { force: true });
       }
       await writeFile(join(dir, LOG), `${log.join("\n")}\n`);
+      await this.#save({ ...job, render: { ...render, error } });
+      render.error = error;
+    } else {
+      await this.#save(job);
     }
-    await this.#save(job);
     this.#emit(job);
   }
 
@@ -853,11 +869,20 @@ export class Jobs {
     return join(this.#root, job.id);
   }
 
+  /** Writes job.json whole as `job` is now, one write at a time per job in the order asked, so
+   * an older state never lands over a newer one. */
   async #save(job: Job): Promise<void> {
     const path = join(this.#dir(job), "job.json");
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(`${path}.tmp`, JSON.stringify(job));
-    await rename(`${path}.tmp`, path);
+    const text = JSON.stringify(job);
+    const write = (this.#saving.get(job.id) ?? Promise.resolve())
+      .catch(() => {})
+      .then(async () => {
+        await mkdir(dirname(path), { recursive: true });
+        await writeFile(`${path}.tmp`, text);
+        await rename(`${path}.tmp`, path);
+      });
+    this.#saving.set(job.id, write);
+    return write;
   }
 }
 
