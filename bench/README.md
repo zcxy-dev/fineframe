@@ -108,7 +108,8 @@ A run's `speakers.json` has the same shape, without `visible`, naming people by 
 
 `vebench synth` generates a corpus whose truth is known exactly, because every word, cut and
 beat in it was placed by the generator. It needs no footage or permission to publish, and
-stands in until the hand-checked corpus exists.
+stands in for real footage: no hand-checked corpus of it exists, and the measurements that would
+need one (word timings, framing, captions and edits on real clips) are not made.
 
 ```bash
 uv run vebench synthetic synthetic/    # the published seed-0 corpus, 64 MB
