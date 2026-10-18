@@ -22,8 +22,8 @@ export interface Worker {
 export interface AnalysisOptions {
   /** Claude corrects the transcript before its words are timed. */
   correct: boolean;
-  /** Names and terms said in the footage, one per line: they bias the speech model and guide
-   * the correction. */
+  /** Names and terms said in the footage, one per line: they bias the local speech model and
+   * guide the correction. */
   names?: { path: string; text: string };
   /** Where the speech is heard: by the local model, or on OpenRouter with the user's key. */
   asr?: "local" | "cloud";
@@ -68,6 +68,14 @@ export function defaultCache(): string {
   return join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "video-editor", "indexes");
 }
 
+/** Whether the analysis uses the names: OpenRouter takes no context prompt, so cloud speech uses
+ * them only to guide the correction. */
+function namesUsed(
+  options: AnalysisOptions,
+): options is AnalysisOptions & Required<Pick<AnalysisOptions, "names">> {
+  return options.names !== undefined && (options.correct || options.asr !== "cloud");
+}
+
 /** The cached index's file name: the footage's SHA-256, then a hash of everything else the
  * index depends on, so the same file analysed another way, or by other code, is analysed again. */
 export function indexName(
@@ -78,7 +86,7 @@ export function indexName(
   const settings = JSON.stringify([
     worker.version,
     options.correct,
-    options.names?.text ?? null,
+    namesUsed(options) ? options.names.text : null,
     options.asr ?? "local",
   ]);
   const key = createHash("sha256").update(settings).digest("hex").slice(0, 16);
@@ -129,8 +137,8 @@ export function analyze(
   const extra: string[] = [];
   if (options.correct) extra.push("--correct");
   if (options.asr === "cloud") extra.push("--asr", "cloud");
-  if (options.names) {
-    // OpenRouter takes no context prompt; the names still guide the correction.
+  // vework refuses names it would not use.
+  if (namesUsed(options)) {
     extra.push("--glossary", options.names.path);
     if (options.asr !== "cloud") extra.push("--asr-context");
   }
