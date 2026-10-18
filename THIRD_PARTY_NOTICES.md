@@ -21,7 +21,7 @@ The project's own code is under the [MIT License](LICENSE). It uses the componen
 | [Lucide](https://lucide.dev) icons (`lucide-static` 1.50.0) | ISC; the icons drawn from Feather MIT, as its licence file lists them | npm registry tarball, SHA-256 checked; engine, on the first icon lookup |
 | [Tabler Icons](https://tabler.io/icons) (`@tabler/icons` 3.48.0), outline style | MIT | npm registry tarball, SHA-256 checked; engine, on the first icon lookup |
 | [Simple Icons](https://simpleicons.org) (`simple-icons` 16.33.0) | CC0-1.0, except the logos its data gives another licence (see [notes](#icons-and-logos)) | npm registry tarball, SHA-256 checked; engine, on the first logo lookup |
-| [ASCEND](https://huggingface.co/datasets/CAiRE/ASCEND) test split, 200 utterances and their transcripts | CC BY-SA 4.0 | Hugging Face's dataset viewer, pinned revision and SHA-256 per utterance; `vebench ascend` only, written into the git-ignored corpus folder |
+| [ASCEND](https://huggingface.co/datasets/CAiRE/ASCEND) test split, 200 utterances and their transcripts | CC BY-SA 4.0 (see [notes](#ascend)) | Hugging Face's dataset viewer, pinned revision and SHA-256 per utterance; `vebench ascend` only, written into the git-ignored corpus folder |
 | [Kokoro-82M-v1.1-zh](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh) weights and voices | Apache-2.0 | Hugging Face, pinned revision; benchmark `synth` extra only |
 
 ### Python packages, installed by uv (direct dependencies)
@@ -145,6 +145,10 @@ Stock footage comes from [Pexels](https://www.pexels.com/license/) and [Pixabay]
 ### CED-Base
 
 The ONNX export's model card states Apache-2.0. The same weights are published on Zenodo under CC-BY-4.0, and the CED training code is GPL-3.0. The project uses the Hugging Face export under its stated licence.
+
+### ASCEND
+
+The benchmark's transcription corpus (`vebench ascend`) is built from ASCEND: "ASCEND: A Spontaneous Chinese-English Dataset for Code-switching in Multi-turn Conversation" by Holy Lovenia, Samuel Cahyawijaya, Genta Indra Winata, Peng Xu, Xu Yan, Zihan Liu, Rita Frieske, Tiezheng Yu, Wenliang Dai, Elham J. Barezi, Qifeng Chen, Xiaojuan Ma, Bertram E. Shi and Pascale Fung (LREC 2022, [arXiv:2112.06223](https://arxiv.org/abs/2112.06223)), published by CAiRE on [Hugging Face](https://huggingface.co/datasets/CAiRE/ASCEND) under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). `vebench ascend` joins a sample of its test utterances into clips and converts their transcripts to Taiwan Traditional Chinese; the clips and transcripts it writes are adaptations under the same licence, kept in the git-ignored corpus folder. Transcripts of four such clips were committed by mistake in an intermediate commit of [#65](https://github.com/zcxy-dev/video-editor/pull/65) and removed before it merged; that commit stays visible in the pull request's history, under the same licence and with this attribution. The authors do not endorse this project.
 
 ### Training data
 
