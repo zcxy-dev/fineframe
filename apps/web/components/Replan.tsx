@@ -48,10 +48,8 @@ export function Replan({
   return (
     <div className={styles.replan}>
       <p className={styles.help}>
-        Claude plans the edit again from the same footage: it decides the story order and what to
-        keep anew, so it may reorder, put back or leave out other parts than this version. The
-        analysis is kept, so it takes a minute or two and one more plan. It becomes a new version;
-        this one stays in the list.
+        Claude decides the story order and what to keep again, so it may reorder, put back or leave
+        out other parts than this version. It becomes a new version; this one stays in the list.
       </p>
       <div className={styles.field}>
         <span className={styles.label}>Length</span>
