@@ -19,8 +19,9 @@ WINDOW = 0.02
 # A pause edge is where the level stands this far above the quietest point of the pause.
 RISE_DB = 10.0
 # A gap between two words is silence: within this much of the source's level where Silero hears
-# no speech. The dip between two syllables said together stays well above it.
-PAUSE_DB = 10.0
+# no speech. The dip between two syllables said together stays well above it. On the synthetic
+# corpus 6 dB leaves 2 gaps a cut fits in on a word's quiet tail, 10 dB 10 (worker/README.md).
+PAUSE_DB = 6.0
 DIGITAL_SILENCE = -90.0  # dB; zeros read as -100
 MIN_LENGTH = 0.02  # no edge moves closer than this to the next one
 
