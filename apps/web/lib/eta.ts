@@ -76,10 +76,10 @@ export class Finish {
   }
 }
 
-/** Time left in words, rounded more coarsely the longer it is: under a minute, about 4 min,
+/** Time left in words, rounded more coarsely the longer it is: less than a minute, about 4 min,
  * 25 min, 1 h 5 min. */
 export function formatEstimate(seconds: number): string {
-  if (seconds < 60) return "Under a minute left";
+  if (seconds < 60) return "Less than a minute left";
   const minutes = Math.round(seconds / 60);
   if (minutes < 10) return `About ${minutes} min left`;
   const rounded = Math.round(minutes / 5) * 5;

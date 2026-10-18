@@ -105,7 +105,7 @@ test("a download's wait moves the finish by as long, without changing the rate",
 });
 
 test("the time left reads more roughly the longer it is", () => {
-  assert.equal(formatEstimate(40), "Under a minute left");
+  assert.equal(formatEstimate(40), "Less than a minute left");
   assert.equal(formatEstimate(4 * 60 + 20), "About 4 min left");
   assert.equal(formatEstimate(23 * 60), "About 25 min left");
   assert.equal(formatEstimate(64 * 60), "About 1 h 5 min left");
