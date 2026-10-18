@@ -3,7 +3,7 @@
 import type { ClaudeCost } from "@video-editor/schema";
 import type { Job } from "./jobs.ts";
 import { shownPlan } from "./paths.ts";
-import { formatDollars, formatLength, type Style, styleName } from "./settings.ts";
+import { formatClock, formatDollars, formatLength, type Style, styleName } from "./settings.ts";
 
 /** What Claude cost in all; null when a price is unknown. */
 export function dollarsOf(cost: ClaudeCost): number | null {
@@ -11,8 +11,9 @@ export function dollarsOf(cost: ClaudeCost): number | null {
   return plan.dollars === null || check.dollars === null ? null : plan.dollars + check.dollars;
 }
 
-/** The summary's rows, name and value, for the version shown. */
-export function summaryRows(job: Job): [string, string][] {
+/** The summary's rows, name and value, for the version shown, whose video is `actual` seconds
+ * long once the page knows. */
+export function summaryRows(job: Job, actual?: number | null): [string, string][] {
   const shown = job.versions?.find((version) => version.n === (job.current ?? 1));
   const first = !shown || shown.n === 1;
   const { length, aspect } = shownPlan(job);
@@ -22,7 +23,7 @@ export function summaryRows(job: Job): [string, string][] {
   const photos = job.files.filter((file) => file.use === "image").length;
   const offered = job.files.filter((file) => file.use === "music").length;
   const rows: [string, string][] = [
-    ["Length", formatLength(length)],
+    ["Length", `Target ${formatLength(length)}${actual ? ` · Actual ${formatClock(actual)}` : ""}`],
     ["Aspect", aspect],
     ["Style", styleName(look)],
     // Edits from before the setting had none.

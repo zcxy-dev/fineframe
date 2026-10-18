@@ -466,6 +466,11 @@ test("a finished edit changes as versions, the newest three keeping their videos
   assert.equal(view.version, 1);
   assert.equal(view.captions, "bold");
   assert.ok(view.lines.length > 0);
+  // Each overlay, card and B-roll clip by what it is and what it shows, never a template's id.
+  assert.deepEqual(
+    view.removables.map((item) => item.label),
+    ["Lower third: 王小明", "Keyword: Claude", "B-roll: screen.mp4"],
+  );
   // The example project names analyses that are not there, which a cut needs: it says so.
   const preview = await previewRoute.POST(
     new Request(`${url}/${id}/preview`, {

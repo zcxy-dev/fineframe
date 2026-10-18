@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
-import { AlertIcon, LockIcon } from "./icons.tsx";
+import { LockIcon } from "./icons.tsx";
 
 /** What the dialog says for each service's key. */
 const TEXT = {
@@ -134,10 +135,7 @@ export function KeyDialog({ service, open, replacing, onClose, onSaved }: Props)
           />
         </div>
         {state.error && (
-          <p className={styles.error} role="alert">
-            <AlertIcon width={16} height={16} />
-            {state.error}
-          </p>
+          <ErrorNote message={state.error} fallback="The key could not be checked." />
         )}
         <div className={styles.dialogActions}>
           <button type="button" className={styles.button} onClick={() => dialog.current?.close()}>

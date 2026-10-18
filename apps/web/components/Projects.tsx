@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ProjectSummary } from "../lib/jobs.ts";
 import { FOOTAGE_KEPT } from "../lib/retention.ts";
 import { formatBytes, formatLength } from "../lib/settings.ts";
+import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
 import { FilmIcon } from "./icons.tsx";
 
@@ -59,11 +60,7 @@ export function Projects({ onOpen }: { onOpen: (id: string) => void }) {
           </p>
         </div>
       </div>
-      {error && (
-        <p className={styles.error} role="alert">
-          {error}
-        </p>
-      )}
+      {error && <ErrorNote message={error} fallback="The project could not be deleted." />}
       <ul className={styles.fileList}>
         {shown.map((project) => (
           <li key={project.id} className={styles.project}>

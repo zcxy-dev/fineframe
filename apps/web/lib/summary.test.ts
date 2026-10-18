@@ -48,7 +48,7 @@ const row = (rows: [string, string][], name: string) => rows.find(([each]) => ea
 
 test("the summary is the shown version's: its length, aspect, look, captions and cost", () => {
   const replanned = summaryRows(job(3));
-  assert.equal(row(replanned, "Length"), "30 s");
+  assert.equal(row(replanned, "Length"), "Target 30 s");
   assert.equal(row(replanned, "Aspect"), "1:1");
   assert.equal(row(replanned, "Style"), "Film");
   assert.equal(row(replanned, "Captions"), "Boxed");
@@ -65,7 +65,7 @@ test("the summary is the shown version's: its length, aspect, look, captions and
   assert.equal(row(reedited, "Claude"), "None: changed without a new plan");
 
   const first = summaryRows(job(1));
-  assert.equal(row(first, "Length"), "1 min");
+  assert.equal(row(first, "Length"), "Target 1 min");
   assert.equal(row(first, "Style"), "Warm");
   assert.equal(row(first, "Captions"), "Bold");
   assert.equal(row(first, "Claude, planning"), "$0.19");
@@ -83,4 +83,9 @@ test("the summary says the edit was planned with instructions, for version 1 onl
   assert.equal(row(summaryRows(asked(1)), "Planned"), "With instructions");
   assert.equal(row(summaryRows(asked(3)), "Planned"), undefined);
   assert.equal(row(summaryRows(job(1)), "Planned"), undefined);
+});
+
+test("the summary tells the length asked for from the length the video came out at", () => {
+  assert.equal(row(summaryRows(job(1), 30.4), "Length"), "Target 1 min · Actual 0:30");
+  assert.equal(row(summaryRows(job(3), 31), "Length"), "Target 30 s · Actual 0:31");
 });

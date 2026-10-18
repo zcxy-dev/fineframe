@@ -2,12 +2,21 @@
 
 import { lookIds } from "@video-editor/engine/looks";
 import type { Revision } from "@video-editor/engine/revise";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type RefObject,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { EditView, Job } from "../lib/jobs.ts";
 import { formatClock, formatDollars } from "../lib/settings.ts";
 import { dollarsOf } from "../lib/summary.ts";
+import { spacedWords } from "../lib/transcript.ts";
+import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
-import { AlertIcon } from "./icons.tsx";
 import { Replan } from "./Replan.tsx";
 
 /** Ticks in a second, as project.json counts time. */
@@ -19,6 +28,13 @@ const CAPTION_STYLES = [
   { id: "sweep", name: "Sweep" },
   { id: "boxed", name: "Boxed" },
 ] as const;
+/** A word's state, as a screen reader says it after the word. */
+const STATE_NAMES: Record<string, string> = {
+  cut: "to cut",
+  kept: "kept: no pause to cut at",
+  gone: "cut",
+  fixed: "fixed",
+};
 const PARAM_NAMES: Record<string, string> = {
   text: "Title",
   subtitle: "Subtitle",
@@ -54,14 +70,22 @@ const seconds = (ticks: number) => (ticks / TICKS).toFixed(2);
 export function ReEdit({
   job,
   onJob,
+  video,
 }: {
   job: Job;
   /** Called with the job as the server has it after a request changed it. */
   onJob: (job: Job) => void;
+  /** The player, which Space plays and the arrow keys step. */
+  video: RefObject<HTMLVideoElement | null>;
 }) {
   const [view, setView] = useState<EditView | null>(null);
   const [replanning, setReplanning] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY);
+  // The drafts before each change, for Ctrl+Z.
+  const [history, setHistory] = useState<Draft[]>([]);
+  // The transcript's one word in the tab order; the arrow keys move it.
+  const [cursor, setCursor] = useState(0);
+  const transcript = useRef<HTMLFieldSetElement>(null);
   const [selection, setSelection] = useState<[number, number] | null>(null);
   const [landed, setLanded] = useState<Landed | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +96,8 @@ export function ReEdit({
   useEffect(() => {
     let live = true;
     setDraft(EMPTY);
+    setHistory([]);
+    setCursor(0);
     setSelection(null);
     setLanded(null);
     void fetch(`/api/jobs/${job.id}/edit?v=${current}`)
@@ -86,6 +112,15 @@ export function ReEdit({
       live = false;
     };
   }, [job.id, current]);
+
+  // The shortcuts, on the whole page while the re-edit shows; the handler is this render's. They
+  // are heard before the player's own controls, which would seek or play as well.
+  const keys = useRef<(event: KeyboardEvent) => void>(() => {});
+  useEffect(() => {
+    const listen = (event: KeyboardEvent) => keys.current(event);
+    document.addEventListener("keydown", listen, true);
+    return () => document.removeEventListener("keydown", listen, true);
+  }, []);
 
   const words = useMemo<Word[]>(
     () =>
@@ -138,9 +173,14 @@ export function ReEdit({
   }, [cuts, job.id]);
 
   if (!view) {
+    keys.current = () => {};
     return (
       <section className={`${styles.card} ${styles.reedit}`} aria-label="Change the edit">
-        {error ? <p className={styles.error}>{error}</p> : <p className={styles.help}>Loading…</p>}
+        {error ? (
+          <ErrorNote message={error} fallback="This edit's changes could not be loaded." />
+        ) : (
+          <p className={styles.help}>Loading…</p>
+        )}
       </section>
     );
   }
@@ -192,6 +232,19 @@ export function ReEdit({
       .then(onJob)
       .catch(() => {});
 
+  /** Makes `next` the draft, keeping this one for Ctrl+Z. */
+  const change = (next: Draft) => {
+    setHistory([...history, draft]);
+    setDraft(next);
+  };
+  const undo = () => {
+    const last = history.at(-1);
+    if (!last) return false;
+    setHistory(history.slice(0, -1));
+    setDraft(last);
+    return true;
+  };
+
   const deleteSelection = () => {
     if (!selection) return;
     // Overlapping and touching cuts become one.
@@ -203,11 +256,70 @@ export function ReEdit({
       if (last && a <= last[1] + 1) last[1] = Math.max(last[1], b);
       else next.push([a, b]);
     }
-    setDraft({ ...draft, cuts: next });
+    change({ ...draft, cuts: next });
     setSelection(null);
   };
   const single = selection && from === to ? (words[from] as Word) : null;
+
+  keys.current = (event) => {
+    const target = event.target as HTMLElement;
+    // Typing in a field keeps every key for the field, its own undo included.
+    if (event.defaultPrevented || event.altKey || target.closest("input, textarea, select")) return;
+    const player = video.current;
+    const handled = () => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z") {
+      if (undo()) handled();
+      return;
+    }
+    if (event.ctrlKey || event.metaKey) return;
+    if (event.key === " " && player) {
+      // A button other than a transcript word keeps Space to press it.
+      if (target.closest("button, a, summary") && !target.closest("[data-word]")) return;
+      handled();
+      if (player.paused) void player.play();
+      else player.pause();
+    } else if ((event.key === "Delete" || event.key === "Backspace") && selection) {
+      handled();
+      deleteSelection();
+    } else if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && target === player) {
+      handled();
+      player.pause();
+      const frame = 1 / view.fps;
+      const t = player.currentTime + (event.key === "ArrowLeft" ? -frame : frame);
+      player.currentTime = Math.min(Math.max(0, t), player.duration || t);
+    }
+  };
+
+  /** Moves the transcript's focus to word `g`, extending the selection with Shift. */
+  const moveTo = (g: number, extend: boolean) => {
+    const next = Math.min(Math.max(0, g), words.length - 1);
+    setCursor(next);
+    if (extend) setSelection([selection?.[0] ?? cursor, next]);
+    transcript.current?.querySelector<HTMLElement>(`[data-word="${next}"]`)?.focus();
+  };
+  const onTranscriptKey = (event: ReactKeyboardEvent) => {
+    const word = words[cursor];
+    const step: Record<string, number | undefined> = {
+      ArrowLeft: cursor - 1,
+      ArrowRight: cursor + 1,
+      Home: 0,
+      End: words.length - 1,
+      // The first word of the line before or after.
+      ArrowUp: word ? (offsets[word.line - 1] ?? 0) : 0,
+      ArrowDown: word ? (offsets[word.line + 1] ?? words.length - 1) : 0,
+    };
+    const to = step[event.key];
+    if (to === undefined) return;
+    event.preventDefault();
+    moveTo(to, event.shiftKey);
+  };
   const key = (word: Word) => `${word.line}:${word.word}`;
+  // Where a line's text puts a space between two of its words.
+  const spaced = view.lines.map(spacedWords);
+  const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 
   return (
     <section className={`${styles.card} ${styles.reedit}`} aria-label="Change the edit">
@@ -223,10 +335,30 @@ export function ReEdit({
 
       <div className={styles.section}>
         <h3 className={styles.sectionTitle}>Transcript</h3>
-        <p className={styles.help}>
+        <p className={styles.help} id={`${job.id}-transcript-help`}>
           Click a word, then Shift-click another to select the words between. Delete them, or fix a
           single caption word. Each cut moves to a pause inside your selection, so no word is cut
           through; ✂ marks where it lands, and selected words a dotted line marks stay.
+        </p>
+        <p className={styles.keys}>
+          <span>
+            <kbd>Space</kbd> play or pause
+          </span>
+          <span>
+            <kbd>←</kbd>
+            <kbd>→</kbd> move between words, with <kbd>Shift</kbd> to select
+          </span>
+          <span>
+            <kbd>Delete</kbd> cut the selected words
+          </span>
+          <span>
+            <kbd>{mac ? "⌘" : "Ctrl"}</kbd>
+            <kbd>Z</kbd> undo the last change
+          </span>
+          <span>
+            <kbd>←</kbd>
+            <kbd>→</kbd> one frame, in the player
+          </span>
         </p>
         {words.length === 0 ? (
           <p className={styles.help}>This edit has no captions to show.</p>
@@ -237,7 +369,13 @@ export function ReEdit({
               asked={revision.cuts ?? []}
               landed={landed?.removed ?? []}
             />
-            <div className={styles.transcript}>
+            <fieldset
+              ref={transcript}
+              className={styles.transcript}
+              aria-label="Transcript"
+              aria-describedby={`${job.id}-transcript-help`}
+              onKeyDown={onTranscriptKey}
+            >
               {view.lines.map((line, l) => (
                 <p key={line.words[0]?.start ?? line.text} className={styles.transcriptLine}>
                   {line.words.map((_, w) => {
@@ -258,6 +396,7 @@ export function ReEdit({
                               : undefined;
                     return (
                       <Fragment key={key(word)}>
+                        {spaced[l]?.[w] && " "}
                         {marksBefore(g).map((t) => (
                           <span
                             key={t}
@@ -271,6 +410,10 @@ export function ReEdit({
                           type="button"
                           className={styles.word}
                           data-state={state}
+                          data-word={g}
+                          tabIndex={g === cursor ? 0 : -1}
+                          aria-pressed={state === "selected"}
+                          onFocus={() => setCursor(g)}
                           title={
                             state === "kept"
                               ? "Kept: no pause to cut at beside it inside the selection"
@@ -281,6 +424,9 @@ export function ReEdit({
                           }
                         >
                           {fixed ?? word.text}
+                          {state && state !== "selected" && (
+                            <span className={styles.visuallyHidden}> ({STATE_NAMES[state]})</span>
+                          )}
                         </button>
                       </Fragment>
                     );
@@ -292,7 +438,7 @@ export function ReEdit({
                   ✂
                 </span>
               ))}
-            </div>
+            </fieldset>
           </>
         )}
         {selection && (
@@ -312,7 +458,7 @@ export function ReEdit({
                   const words = { ...draft.words };
                   if (text === single.text) delete words[key(single)];
                   else words[key(single)] = text;
-                  setDraft({ ...draft, words });
+                  change({ ...draft, words });
                   setSelection(null);
                 }}
               />
@@ -342,9 +488,7 @@ export function ReEdit({
                   <button
                     type="button"
                     className={styles.inlineButton}
-                    onClick={() =>
-                      setDraft({ ...draft, cuts: draft.cuts.filter((_, j) => j !== i) })
-                    }
+                    onClick={() => change({ ...draft, cuts: draft.cuts.filter((_, j) => j !== i) })}
                   >
                     Undo
                   </button>
@@ -375,7 +519,7 @@ export function ReEdit({
                       if (event.target.value === (title.params[name] ?? "")) delete params[name];
                       const titles = { ...draft.titles, [title.index]: params };
                       if (Object.keys(params).length === 0) delete titles[title.index];
-                      setDraft({ ...draft, titles });
+                      change({ ...draft, titles });
                     }}
                   />
                 </label>
@@ -405,7 +549,7 @@ export function ReEdit({
                 onChange={(event) => {
                   const gainDb = Number(event.target.value);
                   const { music: _, ...rest } = draft;
-                  setDraft(gainDb === 0 ? rest : { ...draft, music: { gainDb } });
+                  change(gainDb === 0 ? rest : { ...draft, music: { gainDb } });
                 }}
               />
             </label>
@@ -415,7 +559,7 @@ export function ReEdit({
                 checked={draft.music === "remove"}
                 onChange={(event) => {
                   const { music: _, ...rest } = draft;
-                  setDraft(event.target.checked ? { ...draft, music: "remove" } : rest);
+                  change(event.target.checked ? { ...draft, music: "remove" } : rest);
                 }}
               />
               Remove the music
@@ -437,7 +581,7 @@ export function ReEdit({
               aria-pressed={(draft.look ?? view.look) === look}
               onClick={() => {
                 const { look: _, ...rest } = draft;
-                setDraft(look === view.look ? rest : { ...draft, look });
+                change(look === view.look ? rest : { ...draft, look });
               }}
             >
               {look[0]?.toUpperCase()}
@@ -459,7 +603,7 @@ export function ReEdit({
                 aria-pressed={(draft.captions ?? view.captions) === style.id}
                 onClick={() => {
                   const { captions: _, ...rest } = draft;
-                  setDraft(style.id === view.captions ? rest : { ...draft, captions: style.id });
+                  change(style.id === view.captions ? rest : { ...draft, captions: style.id });
                 }}
               >
                 <span className={styles.captionPreview} data-style={style.id} aria-hidden="true">
@@ -489,7 +633,7 @@ export function ReEdit({
                     type="button"
                     className={styles.inlineButton}
                     onClick={() =>
-                      setDraft({
+                      change({
                         ...draft,
                         remove: removed
                           ? draft.remove.filter((each) => each !== id)
@@ -527,17 +671,9 @@ export function ReEdit({
         )}
       </div>
 
-      {error && (
-        <p className={styles.error} role="alert">
-          <AlertIcon width={16} height={16} />
-          {error}
-        </p>
-      )}
+      {error && <ErrorNote message={error} fallback="The changes could not be made." />}
       {job.render?.error && (
-        <p className={styles.error} role="alert">
-          <AlertIcon width={16} height={16} />
-          {job.render.error}
-        </p>
+        <ErrorNote message={job.render.error} fallback="The new version could not be rendered." />
       )}
       {rendering ? (
         <div className={styles.uploading} aria-live="polite">
@@ -682,11 +818,7 @@ export function Versions({ job, onJob }: { job: Job; onJob: (job: Job) => void }
       <p className={styles.help}>
         The newest 3 versions keep their video; an older one renders again from its record.
       </p>
-      {error && (
-        <p className={styles.error} role="alert">
-          {error}
-        </p>
-      )}
+      {error && <ErrorNote message={error} fallback="That version could not be shown." />}
     </div>
   );
 }

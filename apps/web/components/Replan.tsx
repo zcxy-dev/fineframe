@@ -3,8 +3,8 @@
 import { useState } from "react";
 import type { Job, ReplanChoice } from "../lib/jobs.ts";
 import { formatLength } from "../lib/settings.ts";
+import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
-import { AlertIcon } from "./icons.tsx";
 
 const LENGTHS = [15, 30, 60, 180, 600];
 const ASPECTS = ["9:16", "1:1", "16:9"] as const;
@@ -116,12 +116,7 @@ export function Replan({
           onChange={(event) => setChoice({ ...choice, instructions: event.target.value })}
         />
       </label>
-      {error && (
-        <p className={styles.error} role="alert">
-          <AlertIcon width={16} height={16} />
-          {error}
-        </p>
-      )}
+      {error && <ErrorNote message={error} fallback="The edit could not be planned again." />}
       <div className={styles.toolbar}>
         <button
           type="button"
