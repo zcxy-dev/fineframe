@@ -15,10 +15,10 @@
 // system's voice: `say` on macOS, the speech synthesizer .NET ships on Windows, espeak-ng on Linux.
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { _electron as electron, type Page } from "playwright-core";
@@ -50,6 +50,19 @@ const SENTENCES = [
 const work = await mkdtemp(join(tmpdir(), "video-editor-smoke-"));
 // The app's own folders and caches start empty, so every first-use download happens.
 const home = { XDG_CONFIG_HOME: join(work, "config"), XDG_CACHE_HOME: join(work, "cache") };
+/** The files under `dir`, three levels deep, to say what a cache holds when a check fails. */
+const contents = (dir: string, depth = 3): string => {
+  if (!existsSync(dir)) return `${dir} does not exist`;
+  const names: string[] = [];
+  const walk = (at: string, left: number) => {
+    for (const entry of readdirSync(at, { withFileTypes: true })) {
+      names.push(join(at, entry.name).slice(dir.length + 1));
+      if (entry.isDirectory() && left > 1) walk(join(at, entry.name), left - 1);
+    }
+  };
+  walk(dir, depth);
+  return names.join(", ") || "nothing";
+};
 /** Whether the app's own cache holds a download whose folder starts with `prefix`. */
 const fetched = (prefix: string) => {
   const dir = join(home.XDG_CACHE_HOME, "video-editor");
@@ -143,8 +156,15 @@ function planFor(packed: string, schema: Schema): unknown {
     segments.push({ source, first: n, last: n, priority: Math.min(5, Math.ceil(n / 2)), reason });
     if (emphasis.length === 0) {
       const words = (numbered[2] as string).replace(/[⟨⟩]/g, "").split(/\s+/);
-      const keyword = [...words].sort((a, b) => b.length - a.length)[0]?.replace(/\W/g, "") ?? "";
+      // The longest word a keyword pop can show (the catalog's 12 characters at most): chunks
+      // are heard in the order they arrive, not said, so line 1 may be any of the sentences.
+      const keyword =
+        words
+          .map((word) => word.replace(/\W/g, ""))
+          .filter((word) => word.length <= 12)
+          .sort((a, b) => b.length - a.length)[0] ?? "";
       emphasis.push({ source, line: n, text: words.slice(0, 3).join(" "), keyword, reason });
+      say(`asked to pop "${keyword}" on line ${n}: ${numbered[2]}`);
     }
   }
   return { ...decisions, content: "A short spoken test.", segments, emphasis };
@@ -466,6 +486,25 @@ async function makeEdit(): Promise<string[]> {
   say(
     `the edit is ${seconds.toFixed(2)} s, captions ${job.result?.captions ? "written" : "missing"}`,
   );
+  // Where the page keeps the job's edit (apps/web/lib/jobs.ts).
+  const projectPath = join(
+    homedir(),
+    ".cache",
+    "video-editor",
+    "jobs",
+    job.id,
+    "out",
+    "edit.project.json",
+  );
+  if (existsSync(projectPath)) {
+    const project = JSON.parse(await readFile(projectPath, "utf8")) as {
+      overlays?: { template: string; start: number; params: { text?: string } }[];
+    };
+    const overlays = (project.overlays ?? []).map(
+      (o) => `${o.template} "${o.params.text ?? ""}" at ${o.start}`,
+    );
+    say(`overlays in the edit: ${overlays.join(", ") || "none"}`);
+  }
   const playing = await playInPage(page);
   await shot(page, "6-playing");
   say(
@@ -486,7 +525,8 @@ async function makeEdit(): Promise<string[]> {
     !downloads.has("FFmpeg") &&
       !fetched("ffmpeg-") &&
       "FFmpeg was neither shown downloading nor downloaded",
-    !downloads.has("Chrome Headless Shell") && "Chrome Headless Shell's download was not shown",
+    !downloads.has("Chrome Headless Shell") &&
+      `Chrome Headless Shell's download was not shown; the effects cache holds: ${contents(join(home.XDG_CACHE_HOME, "video-editor", "effects"))}`,
     (playing.error || playing.width === 0 || playing.brightest < 32) &&
       "the window's player does not show the video",
   ].filter((problem): problem is string => typeof problem === "string");
@@ -506,11 +546,24 @@ const left = [...started].filter(alive);
 if (left.length > 0) {
   const listing =
     process.platform === "win32"
-      ? left.join(", ")
+      ? spawnSync(
+          "powershell",
+          [
+            "-NoProfile",
+            "-Command",
+            `Get-CimInstance Win32_Process | Where-Object { @(${left.join(",")}) -contains $_.ProcessId } | ForEach-Object { "$($_.ProcessId) (parent $($_.ParentProcessId)) $($_.CommandLine)" }`,
+          ],
+          { encoding: "utf8" },
+        ).stdout
       : spawnSync("ps", ["-o", "pid=,command=", "-p", left.join(",")], {
           encoding: "utf8",
         }).stdout;
-  problems.push(`still running after quitting:\n${listing}`);
+  // Whether they were only slow to go, or would have outlived the app.
+  await new Promise((done) => setTimeout(done, 10_000));
+  const later = left.filter(alive);
+  problems.push(
+    `still running after quitting:\n${listing}\n10 s later, ${later.length ? `still running: ${later.join(", ")}` : "all gone"}`,
+  );
 }
 if (
   await fetch(origin).then(
