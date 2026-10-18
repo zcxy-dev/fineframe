@@ -3,7 +3,7 @@ name = "vebench"
 version = "0.3.0"
 description = "Benchmark for automatic video editing: caption accuracy, word timing, shot detection, clicks, A/V drift and blind review"
 readme = "README.md"
-license = "MIT"
+license = "LicenseRef-Proprietary"
 keywords = ["benchmark", "asr", "subtitles", "shot-detection", "video-editing"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",

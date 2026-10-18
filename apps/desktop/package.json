@@ -4,7 +4,7 @@
   "productName": "Video Editor",
   "private": true,
   "description": "A fully automatic video editor",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "author": "zcxy-dev",
   "homepage": "https://github.com/zcxy-dev/video-editor",
   "type": "module",

@@ -3,7 +3,7 @@
 **A fully automatic video editor, in development.** The goal: drop in your footage, choose a length and an aspect ratio, and get back a finished video, cut, captioned, framed, graded and animated, with no manual steps. It is built for Mandarin, English and speech that switches between them. Captions come out in Taiwan Traditional Chinese.
 
 [![CI](https://github.com/zcxy-dev/video-editor/actions/workflows/ci.yml/badge.svg)](https://github.com/zcxy-dev/video-editor/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: proprietary](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
 
 > **Status:** the analysis worker, the planner, the renderer with its captions and effect templates, the `pnpm edit` command that runs them from footage to a finished video, the web page in front of it, the desktop app for Apple silicon Macs, Windows and Linux that runs the page with nothing else to install, the agent skill that changes a finished edit by conversation, and the benchmark work today.
 
@@ -154,7 +154,7 @@ The editor is built on these models and libraries: [Qwen3-ASR and Qwen3-ForcedAl
 
 ## License
 
-The project's code is [MIT](LICENSE). [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists every model, font and program it uses and every package it depends on directly, with its licence and how it reaches you, and keeps the notices of code adapted from other projects. Three of them need attention before commercial use or redistribution:
+The project's code is proprietary, all rights reserved ([LICENSE](LICENSE)). [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists every model, font and program it uses and every package it depends on directly, with its licence and how it reaches you, and keeps the notices of code adapted from other projects. Three of them need attention before commercial use or redistribution:
 
 - **Remotion**, which renders the effect templates, is source-available: free for individuals and companies of up to three employees, while larger companies need a [company licence](https://www.remotion.pro/license). This holds for the desktop app too.
 - **FFmpeg**: the builds the renderer downloads and the PyAV wheels the worker installs are GPL. Redistributing FFmpeg means meeting the GPL or shipping an LGPL build ([details](THIRD_PARTY_NOTICES.md#ffmpeg)); the desktop app's installers carry no FFmpeg, which downloads on first use ([details](THIRD_PARTY_NOTICES.md#desktop-installers)).
