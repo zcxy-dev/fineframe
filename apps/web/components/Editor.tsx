@@ -15,6 +15,7 @@ import {
   formatBytes,
   formatDollars,
   formatLength,
+  instructionsProblem,
   namesFrom,
   roleOf,
 } from "../lib/settings.ts";
@@ -72,6 +73,7 @@ export function Editor() {
     quality: "best",
     correct: false,
     captions: DEFAULT_CAPTIONS,
+    instructions: "",
   });
   const [phase, setPhase] = useState<Phase>({ kind: "compose" });
   const upload = useRef<XMLHttpRequest | null>(null);
@@ -234,9 +236,10 @@ export function Editor() {
             : "Add at least one video: the edit is cut from video"
           : "problem" in length
             ? length.problem
-            : music > 0 && !choices.musicLicense.trim()
-              ? "Say under which licence you use the music"
-              : null;
+            : (instructionsProblem(choices.instructions) ??
+              (music > 0 && !choices.musicLicense.trim()
+                ? "Say under which licence you use the music"
+                : null));
 
   const start = async () => {
     if (blocked || !("seconds" in length)) return;
@@ -265,6 +268,8 @@ export function Editor() {
             quality: choices.quality,
             correct: choices.correct,
             captions: choices.captions,
+            // Nothing asked, nothing sent: the request is the same as without the box.
+            ...(choices.instructions.trim() ? { instructions: choices.instructions.trim() } : {}),
           },
           files: used.map((item) => ({ path: item.path, size: item.file.size })),
         }),
@@ -294,6 +299,9 @@ export function Editor() {
       const started = await fetch(`/api/jobs/${created.id}/start`, { method: "POST" });
       const job = (await started.json()) as Job & { error?: string };
       if (!started.ok) throw new Error(job.error ?? "The edit did not start");
+      // What was asked of this edit is for its footage only; the next one starts empty. An edit
+      // that never started keeps it, to try again.
+      setChoices((current) => ({ ...current, instructions: "" }));
       setPhase({ kind: "job", job });
     } catch (error) {
       if ((error as Error).name === "AbortError") return;

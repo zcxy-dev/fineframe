@@ -74,3 +74,13 @@ test("the summary is the shown version's: its length, aspect, look, captions and
   const single = summaryRows({ ...job(1), versions: undefined, current: undefined });
   assert.equal(row(single, "Claude, all versions in total"), undefined);
 });
+
+test("the summary says the edit was planned with instructions, for version 1 only", () => {
+  const asked = (current: number) => {
+    const each = job(current);
+    return { ...each, settings: { ...each.settings, instructions: "Open with the goal" } };
+  };
+  assert.equal(row(summaryRows(asked(1)), "Planned"), "With instructions");
+  assert.equal(row(summaryRows(asked(3)), "Planned"), undefined);
+  assert.equal(row(summaryRows(job(1)), "Planned"), undefined);
+});

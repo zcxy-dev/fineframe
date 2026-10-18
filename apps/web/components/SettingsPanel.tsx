@@ -9,6 +9,8 @@ import {
   type Asr,
   CAPTION_STYLES,
   formatLength,
+  INSTRUCTIONS_MAX,
+  instructionsProblem,
   LENGTH_PRESETS,
   LENGTH_RANGE,
   lengthProblem,
@@ -45,6 +47,8 @@ export interface Choices {
   correct: boolean;
   /** The caption preset. */
   captions: string;
+  /** What the user tells Claude about this edit; never kept for the next. */
+  instructions: string;
 }
 
 /** This computer's memory, and how much the local speech model needs, from the server. */
@@ -118,6 +122,7 @@ export function SettingsPanel({
   const set = (changes: Partial<Choices>) => onChange({ ...choices, ...changes });
   const length = chosenLength(choices);
   const [shortest, longest] = LENGTH_RANGE;
+  const asked = instructionsProblem(choices.instructions);
   const tooLong = "seconds" in length && footageSeconds > 0 && length.seconds > footageSeconds;
 
   return (
@@ -204,6 +209,27 @@ export function SettingsPanel({
           ))}
         </div>
       </fieldset>
+
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor={`${id}-instructions`}>
+          Tell Claude what you want
+          <span className={styles.labelHint}>Optional</span>
+        </label>
+        <textarea
+          id={`${id}-instructions`}
+          className={styles.textarea}
+          rows={3}
+          placeholder={"Focus on the product demo\nLeave out the small talk at the start"}
+          aria-invalid={asked !== null}
+          aria-describedby={`${id}-instructions-help`}
+          value={choices.instructions}
+          onChange={(event) => set({ instructions: event.target.value })}
+        />
+        <p id={`${id}-instructions-help`} className={asked ? styles.warning : styles.help}>
+          {asked ??
+            `What to keep, leave out or open with, in up to ${INSTRUCTIONS_MAX} characters. Only for this edit: the next one starts empty.`}
+        </p>
+      </div>
 
       <fieldset className={styles.field}>
         <legend className={styles.label}>

@@ -36,6 +36,7 @@ import {
   type FileEntry,
   formatDollars,
   formatLength,
+  INSTRUCTIONS_MAX,
   LENGTH_RANGE,
   type Role,
   roleOf,
@@ -116,9 +117,6 @@ export interface ReplanChoice {
   /** What the user asks of the new plan, in their words. */
   instructions?: string;
 }
-
-/** The longest instructions, as `pnpm edit --instructions` takes them. */
-const INSTRUCTIONS_MAX = 2000;
 
 /** A re-plan as the page sends it, or what is wrong with it. */
 export function checkReplan(value: unknown): ReplanChoice | string {
@@ -494,11 +492,15 @@ export class Jobs {
     job.status = "running";
     job.started = Date.now();
     const dir = this.#dir(job);
-    const { length, aspect } = job.settings;
+    const { length, aspect, instructions } = job.settings;
     const music = job.files.filter((file) => file.use === "music");
     let args: string[];
     try {
-      args = await this.#editArgs(job, { length, aspect, music }, VIDEO);
+      args = await this.#editArgs(
+        job,
+        { length, aspect, music, ...(instructions ? { instructions } : {}) },
+        VIDEO,
+      );
       await this.#save(job);
     } catch (error) {
       job.status = "error";
@@ -692,7 +694,12 @@ export class Jobs {
   /** The versions of a finished edit, oldest first. */
   #versions(job: Job): Version[] {
     job.versions ??= [
-      { n: 1, created: job.finished ?? job.created, summary: "The edit", video: true },
+      {
+        n: 1,
+        created: job.finished ?? job.created,
+        summary: job.settings.instructions ? "The edit, with instructions" : "The edit",
+        video: true,
+      },
     ];
     return job.versions;
   }
