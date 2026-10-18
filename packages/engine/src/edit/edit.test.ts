@@ -323,7 +323,8 @@ test("cloud speech reaches the analysis without the context prompt, in an index 
   assert.equal(result.analyzed, 1);
   const calls = await analyses();
   assert.equal(calls.length, 2);
-  assert.deepEqual(calls[1]?.slice(4), ["--asr", "cloud", "--glossary", names]);
+  // vework refuses a glossary it would not use: OpenRouter takes no context prompt.
+  assert.deepEqual(calls[1]?.slice(4), ["--asr", "cloud"]);
 });
 
 test("inputs that cannot make the edit fail before any analysis, saying why", async (t) => {

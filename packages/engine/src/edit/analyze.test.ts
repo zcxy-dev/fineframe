@@ -4,7 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { cachedIndex, type Worker, workerVersion } from "./analyze.ts";
+import {
+  type AnalysisOptions,
+  cachedIndex,
+  indexName,
+  type Worker,
+  workerVersion,
+} from "./analyze.ts";
 
 const WORKER = fileURLToPath(new URL("../../../../worker/", import.meta.url));
 
@@ -73,4 +79,44 @@ test("a file analysed before is read from the cache, without running vework agai
   assert.equal(second, first);
   assert.equal((await readFile(first, "utf8")).trim(), "{}");
   assert.equal((await readFile(calls, "utf8")).trim().split("\n").length, 1);
+});
+
+test("the names reach vework only where it uses them, and key the index only there", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "names-"));
+  const source = join(dir, "talk.mp4");
+  await writeFile(source, "footage");
+  await writeFile(join(dir, "talk.index.json"), "{}");
+  const calls = join(dir, "vework.jsonl");
+  process.env.FAKE_VEWORK_LOG = calls;
+  const worker: Worker = {
+    command: [process.execPath, fileURLToPath(new URL("fixtures/vework.ts", import.meta.url))],
+    version: "test",
+  };
+  const file = { given: source, path: source, kind: "video" as const };
+  const names = { path: join(dir, "names.txt"), text: "Lin Chia-ying\n" };
+  const quiet = () => {};
+  const cases: [AnalysisOptions, string[]][] = [
+    // vework refuses a glossary it would not use: OpenRouter takes no context prompt.
+    [{ correct: false, asr: "cloud", names }, ["--asr", "cloud"]],
+    [
+      { correct: true, asr: "cloud", names },
+      ["--correct", "--asr", "cloud", "--glossary", names.path],
+    ],
+    [{ correct: false, names }, ["--glossary", names.path, "--asr-context"]],
+  ];
+  for (const [options, extra] of cases) {
+    await writeFile(calls, "");
+    await cachedIndex(worker, file, options, join(dir, "cache"), quiet, quiet);
+    const args: string[] = JSON.parse(await readFile(calls, "utf8"));
+    assert.deepEqual(args.slice(4), extra);
+  }
+  const fingerprint = { sha256: "0".repeat(64), bytes: 7 };
+  assert.equal(
+    indexName(worker, fingerprint, { correct: false, asr: "cloud", names }),
+    indexName(worker, fingerprint, { correct: false, asr: "cloud" }),
+  );
+  assert.notEqual(
+    indexName(worker, fingerprint, { correct: false, names }),
+    indexName(worker, fingerprint, { correct: false }),
+  );
 });
