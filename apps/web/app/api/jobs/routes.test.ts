@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import type { Job, ProjectSummary } from "../../../lib/jobs.ts";
+import type { EditView, Job, ProjectSummary } from "../../../lib/jobs.ts";
 
 const root = await mkdtemp(join(tmpdir(), "web-jobs-"));
 const hold = join(root, "hold");
@@ -16,6 +16,9 @@ process.env.VIDEO_EDITOR_EDIT_CLI = fileURLToPath(
   new URL("../../../lib/fixtures/edit.ts", import.meta.url),
 );
 process.env.FAKE_EDIT_HOLD = hold;
+process.env.VIDEO_EDITOR_RENDER_CLI = fileURLToPath(
+  new URL("../../../lib/fixtures/render.ts", import.meta.url),
+);
 // The key the page saved, which the edit gets over the server's own.
 const env = join(root, ".env");
 await writeFile(env, "ANTHROPIC_API_KEY=sk-ant-saved\n");
@@ -37,6 +40,10 @@ const captionsRoute = await import("./[id]/captions/route.ts");
 const brollRoute = await import("./[id]/broll/route.ts");
 const rememberedRoute = await import("../remembered/route.ts");
 const removeRoute = await import("./[id]/remove/route.ts");
+const editRoute = await import("./[id]/edit/route.ts");
+const previewRoute = await import("./[id]/preview/route.ts");
+const versionsRoute = await import("./[id]/versions/route.ts");
+const versionRoute = await import("./[id]/versions/[n]/route.ts");
 
 test.after(() => rm(root, { recursive: true, force: true }));
 
@@ -372,4 +379,128 @@ test("the project list shows each edit's disk usage, and deleting one removes it
   assert.equal(existsSync(join(root, done.id)), false);
   assert.ok(!(await listed()).some((project) => project.id === done.id));
   assert.equal((await remove(done.id)).status, 404);
+});
+
+test("a finished edit changes as versions, the newest three keeping their videos", async () => {
+  delete process.env.FAKE_EDIT_NO_CAPTIONS;
+  const { body: created } = await create([{ path: "c.mp4", size: 2 }]);
+  assert.equal((await put(created.id, 0, new Uint8Array(2))).status, 200);
+  assert.equal((await start(created.id)).status, 200);
+  const id = created.id;
+  const dir = join(root, id);
+  const read = async () =>
+    (await (await jobRoute.GET(new Request(url), ctx({ id }))).json()) as Job;
+  const until = async (done: (job: Job) => boolean) => {
+    for (;;) {
+      const job = await read();
+      if (done(job)) return job;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  };
+  await until((job) => job.status === "done");
+
+  const view = (await (
+    await editRoute.GET(new Request(`${url}/${id}/edit`), ctx({ id }))
+  ).json()) as EditView;
+  assert.equal(view.version, 1);
+  assert.equal(view.captions, "bold");
+  assert.ok(view.lines.length > 0);
+  // The example project names analyses that are not there, which a cut needs: it says so.
+  const preview = await previewRoute.POST(
+    new Request(`${url}/${id}/preview`, {
+      method: "POST",
+      body: JSON.stringify({ cuts: [[120_000, 240_000]] }),
+    }),
+    ctx({ id }),
+  );
+  assert.equal(preview.status, 400);
+
+  const apply = (captions: string) =>
+    versionsRoute.POST(
+      new Request(`${url}/${id}/versions`, {
+        method: "POST",
+        body: JSON.stringify({ revision: { captions }, summary: `captions ${captions}` }),
+      }),
+      ctx({ id }),
+    );
+  for (const [n, captions] of [
+    [2, "boxed"],
+    [3, "spotlight"],
+    [4, "sweep"],
+  ] as const) {
+    const response = await apply(captions);
+    assert.equal(response.status, 200);
+    assert.equal(((await response.json()) as Job).render?.version, n);
+    const job = await until((each) => each.render === undefined);
+    assert.equal(job.current, n);
+    const record = JSON.parse(await readFile(join(dir, "out", `edit-v${n}.project.json`), "utf8"));
+    assert.equal(record.captions.preset, captions);
+  }
+  // Version 1 keeps its record, not its video; the downloads are the version shown.
+  let job = await read();
+  assert.deepEqual(
+    job.versions?.map((version) => [version.n, version.video]),
+    [
+      [1, false],
+      [2, true],
+      [3, true],
+      [4, true],
+    ],
+  );
+  assert.equal(existsSync(join(dir, "out", "edit.mp4")), false);
+  const video = await videoRoute.GET(new Request(`${url}/${id}/video`), ctx({ id }));
+  assert.equal((await video.arrayBuffer()).byteLength, 500);
+
+  // Going back to it renders it again from its record.
+  const show = await versionRoute.POST(
+    new Request(`${url}/${id}/versions/1`, { method: "POST" }),
+    ctx({ id, n: "1" }),
+  );
+  assert.equal(show.status, 200);
+  job = await until((each) => each.render === undefined);
+  assert.equal(job.current, 1);
+  assert.ok(existsSync(join(dir, "out", "edit.mp4")));
+  // One already kept shows at once.
+  await versionRoute.POST(
+    new Request(`${url}/${id}/versions/3`, { method: "POST" }),
+    ctx({ id, n: "3" }),
+  );
+  assert.equal((await read()).current, 3);
+
+  // A render that fails says why and leaves no version behind.
+  process.env.FAKE_RENDER_FAIL = "1";
+  assert.equal((await apply("bold")).status, 200);
+  job = await until((each) => each.render?.error !== undefined);
+  delete process.env.FAKE_RENDER_FAIL;
+  assert.match(job.render?.error ?? "", /caption font/);
+  assert.equal(job.versions?.length, 4);
+  assert.equal(job.current, 3);
+  assert.equal(existsSync(join(dir, "out", "edit-v5.project.json")), false);
+
+  const bad = await versionsRoute.POST(
+    new Request(`${url}/${id}/versions`, {
+      method: "POST",
+      body: JSON.stringify({ revision: { cuts: [[1]] } }),
+    }),
+    ctx({ id }),
+  );
+  assert.equal(bad.status, 400);
+
+  // Without its footage, a project cannot change, and is left as it was.
+  await rm(join(dir, "footage"), { recursive: true });
+  const refused = await apply("bold");
+  assert.equal(refused.status, 409);
+  assert.match(((await refused.json()) as { error: string }).error, /footage was deleted/);
+  assert.equal((await read()).versions?.length, 4);
+  // Showing version 3 again took version 1's video: it cannot render again, a kept one shows.
+  const gone = await versionRoute.POST(
+    new Request(`${url}/${id}/versions/1`, { method: "POST" }),
+    ctx({ id, n: "1" }),
+  );
+  assert.equal(gone.status, 409);
+  const back = await versionRoute.POST(
+    new Request(`${url}/${id}/versions/2`, { method: "POST" }),
+    ctx({ id, n: "2" }),
+  );
+  assert.equal(back.status, 200, "a kept video needs no footage");
 });

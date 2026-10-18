@@ -8,7 +8,23 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
-import type { ClaudeCost, Progress, StageProgress } from "@video-editor/schema";
+import {
+  editLength,
+  OVERLAY_TEXT,
+  placeSources,
+  type Revision,
+  removables,
+  revise,
+} from "@video-editor/engine/revise";
+import {
+  type ClaudeCost,
+  loadJson,
+  type Progress,
+  type Project,
+  type StageProgress,
+  TICKS_PER_SECOND,
+  validateProject,
+} from "@video-editor/schema";
 import { Finish } from "./eta.ts";
 import type { FixKind } from "./fixes.ts";
 import { readKey, type Service, VARIABLES } from "./key.ts";
@@ -16,6 +32,7 @@ import { safeRelativePath } from "./paths.ts";
 import { FOOTAGE_KEPT } from "./retention.ts";
 import { type Run, runEdit } from "./runner.ts";
 import { DEFAULT_CAPTIONS, type FileEntry, type Role, roleOf, type Settings } from "./settings.ts";
+import { type Version, versionFiles, videosToPrune } from "./versions.ts";
 
 export type Stage = "analyze" | "plan" | "render" | "check";
 
@@ -63,6 +80,43 @@ export interface Job {
     broll?: boolean;
   };
   error?: string;
+  /** Each rendered version of a finished edit, oldest first; absent until the first Apply, when
+   * there is only the edit itself. */
+  versions?: Version[];
+  /** The version the page shows; 1 unless another was chosen. */
+  current?: number;
+  /** A version rendering, while it renders, or why it failed. */
+  render?: {
+    version: number;
+    /** A version being made, rather than an older one rendering again. */
+    fresh: boolean;
+    fraction: number;
+    message: string;
+    error?: string;
+  };
+}
+
+/** What the re-edit panel shows of one version, in output ticks. */
+export interface EditView {
+  version: number;
+  /** Ticks. */
+  length: number;
+  /** Whether the footage is kept, which every change needs. */
+  footage: boolean;
+  lines: { text: string; words: { text: string; start: number; end: number }[] }[];
+  removables: ReturnType<typeof removables>;
+  /** Titles and lower thirds, whose text can change, by their index in the overlays. */
+  titles: {
+    index: number;
+    template: "title" | "lower-third";
+    params: Record<string, string>;
+    /** The longest each text param may be. */
+    limits: Record<string, number>;
+  }[];
+  /** The music's level, by its first track; null without music. */
+  music: { gainDb: number } | null;
+  look: string;
+  captions: string | null;
 }
 
 /** A request the job cannot take in its state; the message is for the page, and `code` names
@@ -82,6 +136,8 @@ export interface JobsOptions {
   root: string;
   /** The edit command: a program and its first arguments. */
   command: readonly string[];
+  /** The render command, `pnpm render`'s: a program and its first arguments. */
+  renderCommand: readonly string[];
   /** The API key the edit uses for each service, read when an edit is created and started. */
   key: (service: Service) => Promise<string | undefined>;
 }
@@ -99,10 +155,7 @@ export function secondsLeft(
   return ((total - now.bytes) * elapsed) / arrived / 1000;
 }
 
-const VIDEO = join("out", "edit.mp4");
-const CAPTIONS = join("out", "edit.srt");
-const PROJECT = join("out", "edit.project.json");
-const BROLL = join("out", "edit.broll.txt");
+const VIDEO = versionFiles(1).video;
 /** stderr lines kept with a failed edit, for a person to read in edit.log. */
 const LOG = "edit.log";
 
@@ -155,6 +208,7 @@ async function diskUsage(path: string): Promise<number> {
 export class Jobs {
   readonly #root: string;
   readonly #command: readonly string[];
+  readonly #renderCommand: readonly string[];
   readonly #key: (service: Service) => Promise<string | undefined>;
   /** Where each running job's current download started, for its time left. */
   readonly #downloads = new Map<string, { name: string; at: number; bytes: number }>();
@@ -162,12 +216,15 @@ export class Jobs {
   readonly #finishes = new Map<string, Finish>();
   readonly #jobs = new Map<string, Job>();
   readonly #runs = new Map<string, Run>();
+  /** Jobs whose render was stopped, until it exits. */
+  readonly #stopped = new Set<string>();
   readonly #listeners = new Map<string, Set<(job: Job) => void>>();
   readonly #loaded: Promise<void>;
 
   constructor(options: JobsOptions) {
     this.#root = resolve(options.root);
     this.#command = options.command;
+    this.#renderCommand = options.renderCommand;
     this.#key = options.key;
     this.#loaded = this.#load();
   }
@@ -182,6 +239,12 @@ export class Jobs {
       if (job.status === "running" || job.status === "uploading") {
         job.status = "error";
         job.error = "The server stopped before this edit finished. Start it again.";
+        await this.#save(job);
+      }
+      if (job.render && !job.render.error) {
+        if (job.render.fresh)
+          job.versions = job.versions?.filter((v) => v.n !== job.render?.version);
+        job.render.error = "The server stopped before this version finished rendering";
         await this.#save(job);
       }
       this.#jobs.set(job.id, job);
@@ -439,6 +502,9 @@ export class Jobs {
     if ([...this.#jobs.values()].some((other) => other.status === "running")) {
       throw new JobError("Another edit is running; wait for it to finish or cancel it", 409);
     }
+    if ([...this.#jobs.values()].some((other) => other.render && !other.render.error)) {
+      throw new JobError("A version is rendering; wait for it to finish or stop it", 409);
+    }
   }
 
   #progress(job: Job, line: Progress): void {
@@ -506,14 +572,7 @@ export class Jobs {
       // The result is settled before the job reads as done, so the page never offers what is
       // not there.
       // Captions with no lines, when no speech is kept, are not worth a download.
-      const captions = await stat(join(dir, CAPTIONS)).catch(() => null);
-      job.result.captions = (captions?.size ?? 0) > 0;
-      if (job.result.broll) job.result.broll = existsSync(join(dir, BROLL));
-      if (job.files.some((file) => file.use === "music")) {
-        // Unknown, rather than none, when the project cannot be read.
-        const played = await playedMusic(dir).catch(() => null);
-        if (played) job.result.music = played;
-      }
+      await this.#settle(job, 1);
       job.status = "done";
     } else {
       job.status = "error";
@@ -524,9 +583,228 @@ export class Jobs {
     this.#emit(job);
   }
 
-  /** Stops a running edit, or drops one whose files are still arriving. */
+  /** What the page offers of version `n`, from its files: the captions, the B-roll credits and
+   * the music it plays. */
+  async #settle(job: Job, n: number): Promise<void> {
+    if (!job.result) return;
+    const dir = this.#dir(job);
+    const files = versionFiles(n);
+    // Captions with no lines, when no speech is kept, are not worth a download.
+    const captions = await stat(join(dir, files.captions)).catch(() => null);
+    job.result.captions = (captions?.size ?? 0) > 0;
+    job.result.broll = existsSync(join(dir, files.broll));
+    if (job.files.some((file) => file.use === "music")) {
+      // Unknown, rather than none, when the project cannot be read.
+      const played = await playedMusic(dir, files.project).catch(() => null);
+      if (played) job.result.music = played;
+      else delete job.result.music;
+    }
+  }
+
+  /** The versions of a finished edit, oldest first. */
+  #versions(job: Job): Version[] {
+    job.versions ??= [
+      { n: 1, created: job.finished ?? job.created, summary: "The edit", video: true },
+    ];
+    return job.versions;
+  }
+
+  async #project(job: Job, n: number): Promise<{ project: Project; path: string }> {
+    const path = join(this.#dir(job), versionFiles(n).project);
+    return { project: await loadJson(path, validateProject), path };
+  }
+
+  /** A finished edit's version `n` (the one shown unless given), with what can change in it. */
+  async view(id: string, n?: number): Promise<EditView> {
+    const job = await this.#finished(id);
+    const version = n ?? job.current ?? 1;
+    if (!this.#versions(job).some((each) => each.n === version)) {
+      throw new JobError("No such version", 404);
+    }
+    const { project } = await this.#project(job, version);
+    const firstLook = project.main.find((clip) => clip.grade?.look)?.grade?.look?.id;
+    return {
+      version,
+      length: editLength(project),
+      footage: existsSync(join(this.#dir(job), "footage")),
+      lines: (project.captions?.lines ?? []).map((line) => ({
+        text: line.text,
+        words: (line.words ?? []).map(({ text, start, end }) => ({ text, start, end })),
+      })),
+      removables: removables(project),
+      titles: (project.overlays ?? []).flatMap((overlay, index) =>
+        overlay.template === "title" || overlay.template === "lower-third"
+          ? [
+              {
+                index,
+                template: overlay.template,
+                params: stringParams(overlay.params),
+                limits: OVERLAY_TEXT[overlay.template],
+              },
+            ]
+          : [],
+      ),
+      music: project.audio.music?.[0] ? { gainDb: project.audio.music[0].gainDb ?? 0 } : null,
+      look: firstLook ?? "none",
+      captions: project.captions?.preset ?? null,
+    };
+  }
+
+  /** What `revision` would do to the version shown, without rendering it: where its cuts land
+   * and the length it leaves. */
+  async preview(id: string, revision: Revision) {
+    const job = await this.#finished(id);
+    const { project, path } = await this.#project(job, job.current ?? 1);
+    try {
+      const { length, removed, notes } = revise(
+        project,
+        revision,
+        await wordsFor(revision, project, path),
+      );
+      return { length, removed, notes };
+    } catch (error) {
+      throw new JobError((error as Error).message, 400);
+    }
+  }
+
+  /** Makes the next version from the one shown with `revision`, and renders it; the one shown
+   * stays until it is done. */
+  async revise(id: string, revision: Revision, summary: string): Promise<Job> {
+    const job = await this.#finished(id);
+    this.#refuseWhileRunning();
+    this.#requireFootage(job);
+    const from = job.current ?? 1;
+    const versions = this.#versions(job);
+    const n = Math.max(...versions.map((version) => version.n)) + 1;
+    const { project, path } = await this.#project(job, from);
+    let revised: Project;
+    try {
+      revised = revise(project, revision, await wordsFor(revision, project, path)).project;
+    } catch (error) {
+      throw new JobError((error as Error).message, 400);
+    }
+    // Beside the version it came from, so its relative paths still resolve.
+    const record = join(this.#dir(job), versionFiles(n).project);
+    await writeFile(record, `${JSON.stringify(revised, null, 2)}\n`);
+    versions.push({ n, created: Date.now(), summary, from, video: false });
+    this.#render(job, n, true);
+    return job;
+  }
+
+  /** Shows version `n`, rendering it again from its record when its video was not kept. */
+  async show(id: string, n: number): Promise<Job> {
+    const job = await this.#finished(id);
+    const version = this.#versions(job).find((each) => each.n === n);
+    if (!version) throw new JobError("No such version", 404);
+    if (version.video && existsSync(join(this.#dir(job), versionFiles(n).video))) {
+      job.current = n;
+      await this.#settle(job, n);
+      await this.#keepVideos(job);
+      await this.#save(job);
+      this.#emit(job);
+      return job;
+    }
+    this.#refuseWhileRunning();
+    this.#requireFootage(job);
+    this.#render(job, n, false);
+    return job;
+  }
+
+  async #finished(id: string): Promise<Job> {
+    const job = await this.get(id);
+    if (job.status !== "done") throw new JobError("Only a finished edit can change", 409);
+    return job;
+  }
+
+  /** Refuses a render without the footage it plays. */
+  #requireFootage(job: Job): void {
+    if (!existsSync(join(this.#dir(job), "footage"))) {
+      throw new JobError(
+        `This project's footage was deleted, as only the newest ${FOOTAGE_KEPT} keep theirs; ` +
+          "make a new edit from the footage instead",
+        409,
+      );
+    }
+  }
+
+  /** Renders version `n` from its record with \`pnpm render\`, in a process of its own as an
+   * edit runs, and shows it once done. */
+  #render(job: Job, n: number, fresh: boolean): void {
+    const files = versionFiles(n);
+    job.render = { version: n, fresh, fraction: 0, message: "Starting the render" };
+    const log: string[] = [];
+    const run = runEdit({
+      command: this.#renderCommand,
+      args: [files.project, "-o", files.video],
+      cwd: this.#dir(job),
+      onProgress: () => {},
+      onLog: (line) => {
+        log.push(line);
+        const match = line.match(/^(\d+)% (.*)$/);
+        if (!match || !job.render) return;
+        job.render.fraction = Math.max(job.render.fraction, Number(match[1]) / 100);
+        job.render.message = match[2] ?? "";
+        this.#emit(job);
+      },
+    });
+    this.#runs.set(job.id, run);
+    void this.#save(job);
+    this.#emit(job);
+    void run.exited
+      .then(({ code }) => this.#rendered(job, n, code, log))
+      .catch((error: Error) => this.#rendered(job, n, null, [...log, error.message]));
+  }
+
+  async #rendered(job: Job, n: number, code: number | null, log: readonly string[]) {
+    this.#runs.delete(job.id);
+    const stopped = this.#stopped.delete(job.id);
+    const render = job.render;
+    const versions = this.#versions(job);
+    const version = versions.find((each) => each.n === n);
+    const dir = this.#dir(job);
+    if (code === 0 && version && existsSync(join(dir, versionFiles(n).video))) {
+      delete job.render;
+      version.video = true;
+      const { project } = await this.#project(job, n);
+      version.seconds = editLength(project) / TICKS_PER_SECOND;
+      job.current = n;
+      await this.#settle(job, n);
+      await this.#keepVideos(job);
+    } else if (render) {
+      const reason = [...log].reverse().find((line) => line.startsWith("render: error: "));
+      render.error = reason
+        ? reason.slice("render: error: ".length)
+        : stopped
+          ? "The render was stopped"
+          : `The render stopped unexpectedly${code === null ? "" : ` (exit code ${code})`}`;
+      if (render.fresh) {
+        job.versions = versions.filter((each) => each.n !== n);
+        await rm(join(dir, versionFiles(n).project), { force: true });
+      }
+      await writeFile(join(dir, LOG), `${log.join("\n")}\n`);
+    }
+    await this.#save(job);
+    this.#emit(job);
+  }
+
+  /** Deletes the videos of versions no longer kept; their records stay. */
+  async #keepVideos(job: Job): Promise<void> {
+    const versions = this.#versions(job);
+    for (const n of videosToPrune(versions, job.current ?? 1)) {
+      await rm(join(this.#dir(job), versionFiles(n).video), { force: true });
+      const version = versions.find((each) => each.n === n);
+      if (version) version.video = false;
+    }
+  }
+
+  /** Stops a running edit or render, or drops an edit whose files are still arriving. */
   async cancel(id: string): Promise<Job> {
     const job = await this.get(id);
+    if (job.render && !job.render.error) {
+      this.#stopped.add(job.id);
+      this.#runs.get(job.id)?.stop();
+      return job;
+    }
     if (job.status !== "running" && job.status !== "uploading") return job;
     const wasRunning = job.status === "running";
     job.status = "cancelled";
@@ -543,7 +821,7 @@ export class Jobs {
   async output(id: string, kind: "video" | "captions" | "broll"): Promise<string | null> {
     const job = await this.get(id);
     if (job.status !== "done") return null;
-    const path = join(this.#dir(job), { video: VIDEO, captions: CAPTIONS, broll: BROLL }[kind]);
+    const path = join(this.#dir(job), versionFiles(job.current ?? 1)[kind]);
     return existsSync(path) ? path : null;
   }
 
@@ -576,10 +854,10 @@ export class Jobs {
   }
 }
 
-/** The music files the project in `dir` plays, in the order they first play, by their paths
+/** The music files the project `file` in `dir` plays, in the order they first play, by their paths
  * under footage/. */
-async function playedMusic(dir: string): Promise<string[]> {
-  const project = JSON.parse(await readFile(join(dir, PROJECT), "utf8")) as {
+async function playedMusic(dir: string, file: string): Promise<string[]> {
+  const project = JSON.parse(await readFile(join(dir, file), "utf8")) as {
     sources: { id: string; path: string }[];
     audio: { music?: { source: string; start: number }[] };
   };
@@ -591,6 +869,20 @@ async function playedMusic(dir: string): Promise<string[]> {
     return [path.split(sep).join("/")];
   });
   return [...new Set(paths)];
+}
+
+/** The words of the sources a revision's cuts need, read only when it has cuts. */
+async function wordsFor(revision: Revision, project: Project, path: string) {
+  return revision.cuts?.length ? placeSources(project, path) : new Map();
+}
+
+/** An overlay's text params, the ones the panel edits. */
+function stringParams(params: Record<string, unknown>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(params).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
 }
 
 function gigabytes(bytes: number): string {
@@ -613,6 +905,11 @@ export function jobs(): Jobs {
       process.execPath,
       process.env.VIDEO_EDITOR_EDIT_CLI ??
         resolve(process.cwd(), "../../packages/engine/src/edit/cli.ts"),
+    ],
+    renderCommand: [
+      process.execPath,
+      process.env.VIDEO_EDITOR_RENDER_CLI ??
+        resolve(process.cwd(), "../../packages/engine/src/cli.ts"),
     ],
   });
   return global.videoEditorJobs;

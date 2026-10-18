@@ -25,6 +25,7 @@ import { Footage, type Item } from "./Footage.tsx";
 import { AlertIcon, CaptionsIcon, CheckIcon, DownloadIcon, LockIcon, Mark } from "./icons.tsx";
 import { KeyDialog } from "./KeyDialog.tsx";
 import { Projects } from "./Projects.tsx";
+import { ReEdit, Versions } from "./ReEdit.tsx";
 import { Player, ResultSummary } from "./ResultView.tsx";
 import { DownloadView, RunView } from "./RunView.tsx";
 import { type Choices, chosenLength, type Machine, SettingsPanel } from "./SettingsPanel.tsx";
@@ -41,6 +42,11 @@ type Phase =
   | { kind: "job"; job: Job };
 
 const FINISHED: Job["status"][] = ["done", "error", "cancelled"];
+
+/** Whether the job is still changing: the edit runs, or a version of it renders. */
+function live(job: Job): boolean {
+  return !FINISHED.includes(job.status) || (job.render !== undefined && !job.render.error);
+}
 
 /** The edit the page shows goes in its address, so a reload or a bookmark opens it again. */
 function showInAddress(id: string | null): void {
@@ -149,8 +155,11 @@ export function Editor() {
     else if (phase.kind === "compose") showInAddress(null);
   }, [shown, phase.kind]);
 
-  // Live progress while the edit runs.
-  const watching = phase.kind === "job" && phase.job.status === "running" ? phase.job.id : null;
+  // Live progress while the edit runs, or a version of it renders.
+  const watching =
+    phase.kind === "job" && (phase.job.status === "running" || live(phase.job))
+      ? phase.job.id
+      : null;
   useEffect(() => {
     if (!watching) return;
     const events = new EventSource(`/api/jobs/${watching}/events`);
@@ -159,7 +168,7 @@ export function Editor() {
       setPhase((current) =>
         current.kind === "job" && current.job.id === job.id ? { kind: "job", job } : current,
       );
-      if (FINISHED.includes(job.status)) events.close();
+      if (!live(job)) events.close();
     };
     return () => events.close();
   }, [watching]);
@@ -312,6 +321,14 @@ export function Editor() {
       setPhase({ kind: "compose", error: "The project could not be opened" });
     }
   };
+
+  // The job as a request that changed it returned it, for the page to follow from there.
+  const update = (changed: Job) =>
+    setPhase((current) =>
+      current.kind === "job" && current.job.id === changed.id
+        ? { kind: "job", job: changed }
+        : current,
+    );
 
   const job = phase.kind === "compose" ? null : phase.job;
   const status = phase.kind === "job" ? phase.job.status : null;
@@ -471,12 +488,19 @@ export function Editor() {
       ) : (
         <main className={styles.layout}>
           <div className={styles.main}>
-            {status === "done" && job ? <Player job={job} /> : job && <RunView job={job} />}
+            {status === "done" && job ? (
+              <>
+                <Player job={job} />
+                <ReEdit job={job} onJob={update} onReplan={() => {}} />
+              </>
+            ) : (
+              job && <RunView job={job} />
+            )}
           </div>
           <aside className={`${styles.card} ${styles.panel}`} aria-label="The edit">
             {status === "running" && job && <Running job={job} onCancel={() => cancel(job)} />}
             {status === "done" && job && (
-              <Done job={job} onNew={() => setPhase({ kind: "compose" })} />
+              <Done job={job} onJob={update} onNew={() => setPhase({ kind: "compose" })} />
             )}
             {(status === "error" || status === "cancelled") && job && (
               <Failed
@@ -517,7 +541,7 @@ function Running({ job, onCancel }: { job: Job; onCancel: () => void }) {
   );
 }
 
-function Done({ job, onNew }: { job: Job; onNew: () => void }) {
+function Done({ job, onJob, onNew }: { job: Job; onJob: (job: Job) => void; onNew: () => void }) {
   const base = `/api/jobs/${job.id}`;
   return (
     <>
@@ -543,6 +567,7 @@ function Done({ job, onNew }: { job: Job; onNew: () => void }) {
           </a>
         )}
       </div>
+      <Versions job={job} onJob={onJob} />
       <Summary job={job} />
       <button type="button" className={styles.linkButton} onClick={onNew}>
         Make another edit

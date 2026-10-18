@@ -126,6 +126,36 @@ test("a cut inside a clip splits it in the pauses beside the words kept", () => 
   assert.deepEqual(project.audio.music?.[0], { ...edit().audio.music?.[0], out: s(17) });
 });
 
+test("a range that starts inside one word and ends inside the next lands in the pauses", () => {
+  // From inside w1 (0.6–0.9 s) to inside w2 (1.1–1.4 s): only w2's middle is in it.
+  const { removed, length } = cutEdit(edit(), [[s(0.8), s(1.3)]], sources);
+  assert.equal(removed.length, 1);
+  const [from, to] = removed[0] as [number, number];
+  // Clear of w1 and w3 by the margin the planner leaves, and covering all of w2.
+  assert.ok(from >= s((words[1] as Word).end + MARGIN), "not inside w1");
+  assert.ok(to <= s((words[3] as Word).start - MARGIN), "not inside w3");
+  assert.ok(from <= s((words[2] as Word).start) && to >= s((words[2] as Word).end));
+  assert.equal(length, s(8) - (to - from));
+});
+
+test("an edge between two words said without a pause moves to the nearest pause", () => {
+  // w3 runs straight into w4 and w4 into w5; the other gaps take a cut.
+  const joined = words.map((word, k) =>
+    k === 4 ? { ...word, start: 1.9 } : k === 5 ? { ...word, start: 2.4 } : word,
+  );
+  const sources = new Map<string, PlaceSource>(
+    ["a", "b"].map((id) => [id, { id, words: joined, duration: 60, frameTicks: FRAME }]),
+  );
+  // Only w4's middle is asked for: the cut takes w3 and w5 with it, the nearest edges in pauses.
+  const { notes, removed } = cutEdit(edit(), [[s(2.1), s(2.2)]], sources);
+  assert.match(notes[0] ?? "", /: w3 w4 w5$/);
+  const [from, to] = removed[0] as [number, number];
+  assert.ok(from >= s((joined[2] as Word).end + MARGIN));
+  assert.ok(to <= s((joined[6] as Word).start - MARGIN));
+  // An edge already in a pause stays where it is: w1 alone goes.
+  assert.match(cutEdit(edit(), [[s(0.6), s(0.9)]], sources).notes[0] ?? "", /: w1$/);
+});
+
 test("a cut over a whole clip drops it and the captions on it", () => {
   const { project, length } = cutEdit(edit(), [[s(4.95), s(8)]], sources);
   validateProject(project);
