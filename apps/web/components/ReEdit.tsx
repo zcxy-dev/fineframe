@@ -1,5 +1,6 @@
 "use client";
 
+import { lookIds } from "@video-editor/engine/looks";
 import type { Revision } from "@video-editor/engine/revise";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import type { EditView, Job } from "../lib/jobs.ts";
@@ -9,7 +10,7 @@ import { AlertIcon } from "./icons.tsx";
 
 /** Ticks in a second, as project.json counts time. */
 const TICKS = 120_000;
-const LOOKS = ["clean", "warm", "cool", "film", "none"] as const;
+const LOOKS = [...lookIds, "none"] as const;
 const CAPTION_STYLES = [
   { id: "bold", name: "Bold" },
   { id: "spotlight", name: "Spotlight" },
@@ -90,6 +91,15 @@ export function ReEdit({
       ) ?? [],
     [view],
   );
+  // Where each line's words start in the whole transcript.
+  const offsets = useMemo(() => {
+    let at = 0;
+    return (view?.lines ?? []).map((line) => {
+      const first = at;
+      at += line.words.length;
+      return first;
+    });
+  }, [view]);
   const revision = useMemo(() => toRevision(draft, words), [draft, words]);
 
   // Where the cuts land once moved into the pauses, asked again as they change.
@@ -228,7 +238,7 @@ export function ReEdit({
               {view.lines.map((line, l) => (
                 <p key={line.words[0]?.start ?? line.text} className={styles.transcriptLine}>
                   {line.words.map((_, w) => {
-                    const g = words.findIndex((word) => word.line === l && word.word === w);
+                    const g = (offsets[l] ?? 0) + w;
                     const word = words[g] as Word;
                     const fixed = draft.words[key(word)];
                     const state =

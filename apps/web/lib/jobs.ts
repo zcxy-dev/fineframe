@@ -676,16 +676,23 @@ export class Jobs {
     const from = job.current ?? 1;
     const versions = this.#versions(job);
     const n = Math.max(...versions.map((version) => version.n)) + 1;
-    const { project, path } = await this.#project(job, from);
-    let revised: Project;
+    // Busy from here, before the next await, so a second Apply at the same moment is refused.
+    job.render = { version: n, fresh: true, fraction: 0, message: "Preparing the changes" };
     try {
-      revised = revise(project, revision, await wordsFor(revision, project, path)).project;
+      const { project, path } = await this.#project(job, from);
+      let revised: Project;
+      try {
+        revised = revise(project, revision, await wordsFor(revision, project, path)).project;
+      } catch (error) {
+        throw new JobError((error as Error).message, 400);
+      }
+      // Beside the version it came from, so its relative paths still resolve.
+      const record = join(this.#dir(job), versionFiles(n).project);
+      await writeFile(record, `${JSON.stringify(revised, null, 2)}\n`);
     } catch (error) {
-      throw new JobError((error as Error).message, 400);
+      delete job.render;
+      throw error;
     }
-    // Beside the version it came from, so its relative paths still resolve.
-    const record = join(this.#dir(job), versionFiles(n).project);
-    await writeFile(record, `${JSON.stringify(revised, null, 2)}\n`);
     versions.push({ n, created: Date.now(), summary, from, video: false });
     this.#render(job, n, true);
     return job;
