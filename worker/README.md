@@ -126,16 +126,20 @@ Qwen3-ForcedAligner times words on an 80 ms grid and gives some characters no du
 - **After a pause:** where the level rises clearly above the pause.
 - **Before a pause:** where it falls back; if the sound lasts through the cell, the cell's end.
 
-Edges only move later, and never past their chunk, their Silero speech segment or the next edge, so words keep their order and never overlap. A pause edge stays put where the cell shows no rise or fall, and silence moves nothing.
+These moves are only later, and never past their chunk, their Silero speech segment or the next edge, so words keep their order and never overlap. A pause edge stays put where the cell shows no rise or fall, and silence moves nothing.
+
+Then each gap left between two words of a chunk shrinks to its longest stretch of silence: the level within 6 dB of the source's level where Silero hears no speech (the median of that time, digital silence aside). Sound on either side goes to the word beside it, so the end before the gap moves later and the start after it earlier; a gap with no silence at all closes at its quietest point, the dip between the two words. The aligner leaves gaps where the speaker made none, and sometimes times a word after the pause that follows it, leaving the word's sound in the gap before; the editor cuts in gaps, so a cut there landed inside a word ([#87](https://github.com/zcxy-dev/video-editor/issues/87)). On the synthetic corpus, gaps of at least 0.13 s, the shortest a cut fits in, whose cut room (40 ms in from each word) overlaps a true word fell from 31 of 405 to 2 of 379, both in silence the truth counts as part of a word; 10 dB left 10. Safe gaps rose from 374 to 377.
 
 **Measured** with `vebench report` on the [synthetic corpus](../bench/README.md#synthetic-corpus) (seed 0, all 8 clips, 3,597 timed words). No real speech with word timings checked by ear is available, so these are the only timing numbers; [ASCEND](../bench/README.md#ascend) has no word timings.
 
 | | Start error p50 / p95 | End error p50 / p95 | Start and end within 50 ms | Within 100 ms | MER |
 |---|---|---|---|---|---|
 | Aligner | 71 / 134 ms | 70 / 137 ms | 9.3 % | 61.9 % | 3.63 % |
-| Refined | 23 / 86 ms | 26 / 93 ms | 66.1 % | 92.9 % | 3.63 % |
+| Refined | 24 / 87 ms | 25 / 87 ms | 66.5 % | 93.4 % | 3.63 % |
 
-By kind of edge, on the same aligner output (median error, share within 50 ms):
+Before the gaps were shrunk, refining scored 23 / 86 ms, 26 / 93 ms, 66.1 % and 92.9 %.
+
+By kind of edge, on the same aligner output (median error, share within 50 ms), measured before the gaps were shrunk; shrinking them moves no kind's median by more than 1 ms or its share by more than a point:
 
 | Edges | Count | Aligner | Refined |
 |---|---|---|---|
