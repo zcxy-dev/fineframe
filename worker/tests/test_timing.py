@@ -118,3 +118,12 @@ def test_the_noise_floor_is_the_room_between_words_not_digital_silence():
     audio = tone((1.0, 1.5), length=5.0)
     audio[int(2.0 * RATE) :] = 0  # a muted end, longer than the room before the speech
     assert noise_floor(audio, [seg(0.97, 1.53)]) == pytest.approx(-80, abs=1)
+
+
+def test_a_gap_keeps_its_longest_silence_and_gives_the_sound_around_it_to_the_words():
+    # A breath-like sound at 1.00-1.05 splits the gap's silence into 0.90-1.00 and 1.05-1.30.
+    audio = tone((0.5, 0.9), (1.0, 1.05, 0.05), (1.3, 1.6))
+    words = [word("好", 0.48, 0.90), word("我", 1.30, 1.60)]
+    refine(words, audio, [seg(0.47, 1.63)], END)
+    assert words[0]["end"] == pytest.approx(1.05, abs=NEAR)
+    assert words[1]["start"] == pytest.approx(1.30, abs=NEAR)

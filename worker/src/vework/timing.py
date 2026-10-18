@@ -100,7 +100,10 @@ def noise_floor(samples: np.ndarray, speech: list[dict], rate: int = RATE) -> fl
     times = np.arange(0.0, len(samples) / rate, 0.01)
     if not len(times):
         return DIGITAL_SILENCE
-    level = _level(samples, times, rate)
+    # A minute at a time: _level holds float64 copies of the samples it reads.
+    level = np.concatenate(
+        [_level(samples, part, rate) for part in np.array_split(times, len(times) // 6000 + 1)]
+    )
     pause = level > DIGITAL_SILENCE
     for seg in speech:
         pause &= (times < seg["start"]) | (times >= seg["end"])
