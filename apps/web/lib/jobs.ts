@@ -41,6 +41,7 @@ import {
   roleOf,
   type Settings,
 } from "./settings.ts";
+import { dollarsOf } from "./summary.ts";
 import { type Version, versionFiles, videosToPrune } from "./versions.ts";
 
 export type Stage = "analyze" | "plan" | "render" | "check";
@@ -764,9 +765,9 @@ export class Jobs {
     const n = Math.max(...versions.map((version) => version.n)) + 1;
     // Busy from here, before the next await, so a second Apply at the same moment is refused.
     job.render = { version: n, fresh: true, fraction: 0, message: "Preparing the changes" };
+    let revised: Project;
     try {
       const { project, path } = await this.#project(job, from);
-      let revised: Project;
       try {
         revised = revise(project, revision, await wordsFor(revision, project, path)).project;
       } catch (error) {
@@ -779,7 +780,15 @@ export class Jobs {
       delete job.render;
       throw error;
     }
-    versions.push({ n, created: Date.now(), summary, from, video: false });
+    versions.push({
+      n,
+      created: Date.now(),
+      summary,
+      from,
+      video: false,
+      look: lookOf(revised),
+      ...(revised.captions ? { captions: revised.captions.preset } : {}),
+    });
     this.#render(job, n, true);
     return job;
   }
@@ -809,9 +818,14 @@ export class Jobs {
     job.render = { version: n, fresh: true, fraction: 0, message: "Planning again" };
     const files = versionFiles(n);
     let args: string[];
+    let kept: { look: string; captions?: string };
     try {
       // The look and caption style the version shown has, which the panel may have changed.
       const { project } = await this.#project(job, from);
+      kept = {
+        look: lookOf(project),
+        ...(project.captions ? { captions: project.captions.preset } : {}),
+      };
       args = await this.#editArgs(
         job,
         {
@@ -819,8 +833,7 @@ export class Jobs {
           aspect: choice.aspect,
           music,
           ...(choice.instructions ? { instructions: choice.instructions } : {}),
-          look: lookOf(project),
-          ...(project.captions ? { captions: project.captions.preset } : {}),
+          ...kept,
         },
         files.video,
       );
@@ -844,6 +857,7 @@ export class Jobs {
       video: false,
       length: choice.length,
       aspect: choice.aspect,
+      ...kept,
     };
     versions.push(version);
     const log: string[] = [];
@@ -854,12 +868,7 @@ export class Jobs {
       cwd: this.#dir(job),
       env: keys,
       onProgress: (line) => {
-        if (line.claude) {
-          const { plan, check } = line.claude;
-          if (plan.dollars !== null && check.dollars !== null) {
-            version.claude = plan.dollars + check.dollars;
-          }
-        }
+        if (line.claude) version.claude = line.claude;
         if (line.stage === "error") failed = line.message;
         if (line.stage === "done" || line.stage === "error" || !job.render) return;
         job.render.fraction = Math.max(job.render.fraction, line.fraction);
@@ -983,7 +992,7 @@ export class Jobs {
       await writeFile(join(dir, LOG), `${log.join("\n")}\n`);
       // What a plan cost before it failed, which its version, dropped, no longer shows.
       const told = version?.claude
-        ? `${error}. Claude cost ${formatDollars(version.claude)} before it stopped`
+        ? `${error}. Claude cost ${formatDollars(dollarsOf(version.claude))} before it stopped`
         : error;
       await this.#save({ ...job, render: { ...render, error: told } });
       render.error = told;

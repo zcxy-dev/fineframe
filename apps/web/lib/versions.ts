@@ -2,6 +2,7 @@
 // last, named as skills/video-editor names them (edit.mp4, then edit-v2.mp4, …).
 import { join } from "node:path";
 import type { Revision } from "@video-editor/engine/revise";
+import type { ClaudeCost } from "@video-editor/schema";
 import { VIDEOS_KEPT } from "./retention.ts";
 
 export interface Version {
@@ -15,8 +16,11 @@ export interface Version {
   from?: number;
   /** Its length in seconds. */
   seconds?: number;
-  /** What Claude cost to plan it again, in US dollars; absent for a version no plan made. */
-  claude?: number;
+  /** What Claude cost to plan it again; absent for a version no plan made. */
+  claude?: ClaudeCost;
+  /** Its look and caption style; absent for the edit itself, whose settings say them. */
+  look?: string;
+  captions?: string;
   /** The length and aspect it was planned for, when a re-plan changed them from the edit's. */
   length?: number;
   aspect?: "9:16" | "1:1" | "16:9";

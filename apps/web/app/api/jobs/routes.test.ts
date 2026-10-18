@@ -436,6 +436,8 @@ test("a finished edit changes as versions, the newest three keeping their videos
     assert.equal(job.current, n);
     const record = JSON.parse(await readFile(join(dir, "out", `edit-v${n}.project.json`), "utf8"));
     assert.equal(record.captions.preset, captions);
+    // The version keeps its caption style, which the summary shows.
+    assert.equal(job.versions?.at(-1)?.captions, captions);
   }
   // Version 1 keeps its record, not its video; the downloads are the version shown.
   let job = await read();
@@ -555,7 +557,10 @@ test("a re-plan makes a new version from the same footage, at another length, as
   assert.equal(version?.aspect, "1:1");
   assert.equal(version?.length, 30);
   assert.match(version?.summary ?? "", /30 s, 1:1, two\.mp3, with instructions/);
-  assert.ok(Math.abs((version?.claude ?? 0) - 0.082) < 1e-9, "what the plan cost");
+  assert.deepEqual(version?.claude, {
+    plan: { dollars: 0.07, requests: 1 },
+    check: { dollars: 0.012, requests: 9 },
+  });
   const args = JSON.parse(await readFile(join(root, id, "args.json"), "utf8")) as string[];
   assert.deepEqual(args.slice(args.indexOf("--length"), args.indexOf("--length") + 4), [
     "--length",
@@ -569,6 +574,8 @@ test("a re-plan makes a new version from the same footage, at another length, as
     [join("footage", "music", "two.mp3")],
   );
   assert.ok(args.includes("--instructions=-Open with the demo."));
+  assert.equal(version?.look, "clean");
+  assert.equal(version?.captions, "bold");
   // The look and caption style of the version shown, not the settings' warm look.
   assert.equal(args[args.indexOf("--look") + 1], "clean");
   assert.equal(args[args.indexOf("--captions") + 1], "bold");

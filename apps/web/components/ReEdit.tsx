@@ -5,6 +5,7 @@ import type { Revision } from "@video-editor/engine/revise";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import type { EditView, Job } from "../lib/jobs.ts";
 import { formatClock, formatDollars } from "../lib/settings.ts";
+import { dollarsOf } from "../lib/summary.ts";
 import styles from "./editor.module.css";
 import { AlertIcon } from "./icons.tsx";
 import { Replan } from "./Replan.tsx";
@@ -657,7 +658,7 @@ export function Versions({ job, onJob }: { job: Job; onJob: (job: Job) => void }
               <span className={styles.fileMeta}>
                 {new Date(version.created).toLocaleString()}
                 {version.seconds !== undefined && ` · ${formatClock(version.seconds)}`}
-                {version.claude !== undefined && ` · Claude ${formatDollars(version.claude)}`}
+                {version.claude && ` · Claude ${formatDollars(dollarsOf(version.claude))}`}
                 {" · "}
                 {version.summary}
                 {busy && job.render?.version === version.n
