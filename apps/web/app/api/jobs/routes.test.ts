@@ -35,6 +35,7 @@ const eventsRoute = await import("./[id]/events/route.ts");
 const videoRoute = await import("./[id]/video/route.ts");
 const captionsRoute = await import("./[id]/captions/route.ts");
 const brollRoute = await import("./[id]/broll/route.ts");
+const rememberedRoute = await import("../remembered/route.ts");
 
 test.after(() => rm(root, { recursive: true, force: true }));
 
@@ -44,7 +45,8 @@ const settings = {
   length: 60,
   aspect: "9:16",
   style: "warm",
-  names: ["王小明", "GPU"],
+  names: ["王小明"],
+  terms: ["GPU"],
   // A leading "-" must not read as one of the command's own options.
   musicLicense: "-CC0 1.0",
   // Whatever this computer's memory would choose.
@@ -104,6 +106,11 @@ test("bad input is refused, saying why", async () => {
     [{ settings: { ...settings, musicLicense: "CC0\nMIT" } }, video, /licence/],
     [{ settings: { ...settings, asr: "elsewhere" } }, video, /Speech is heard/],
     [{ settings: { ...settings, visuals: "loud" } }, video, /Visuals are rich or minimal/],
+    [{ settings: { ...settings, quality: "cheap" } }, video, /Quality is best or economy/],
+    [{ settings: { ...settings, correct: "yes" } }, video, /correction is on or off/],
+    [{ settings: { ...settings, captions: "comic" } }, video, /caption style is bold, spotlight/],
+    [{ settings: { ...settings, terms: "GPU" } }, video, /Terms are a list/],
+    [{ settings: { ...settings, terms: ["GPU\nTPU"] } }, video, /A term is one line/],
     [{ settings }, [], /Drop some footage/],
   ];
   for (const [body, files, pattern] of cases) {
@@ -135,6 +142,9 @@ test("an edit: files streamed in, one edit at a time, live progress, then the do
   const started = await start(job.id);
   assert.equal(started.status, 200);
   assert.equal(((await started.json()) as Job).status, "running");
+  // Its names and terms are offered again for the next edit, once it has started.
+  const remembered = await (await rememberedRoute.GET()).json();
+  assert.deepEqual(remembered, { names: ["王小明"], terms: ["GPU"] });
 
   // A second edit is refused before any of its footage is sent.
   const refused = await create([{ path: "b.mp4", size: 2 }]);
@@ -184,6 +194,8 @@ test("an edit: files streamed in, one edit at a time, live progress, then the do
     assert.ok((fractions[i] as number) >= (fractions[i - 1] as number), "the bar never goes back");
   }
   assert.ok(seen.some((each) => each.progress?.file === "footage/a.mp4"));
+  // The analysis's step shows while it is on it.
+  assert.ok(seen.some((each) => each.progress?.step === "transcribe"));
   // A model's download shows while it lasts; what Claude cost by stage shows once done.
   const download = seen.find((each) => each.download)?.download;
   assert.deepEqual(download && { ...download, secondsLeft: undefined }, {
@@ -203,13 +215,16 @@ test("an edit: files streamed in, one edit at a time, live progress, then the do
   assert.deepEqual(args, [
     ...[join("footage", "day 1", "a.mp4"), join("footage", "logo.png")],
     ...["--length", "60", "--aspect", "9:16", "--look", "warm", "--visuals=rich"],
+    // The advanced settings as they start: the best quality, no correction, bold captions.
+    ...["--quality", "best", "--captions", "bold"],
     ...["-o", join("out", "edit.mp4")],
     ...["--music", join("footage", "music", "song.mp3"), "--music-license=-CC0 1.0"],
-    ...["--names", "names.txt"],
+    ...["--names", "names.txt", "--terms", "terms.txt"],
   ]);
   // The page says which track the video plays, from the project the edit wrote.
   assert.deepEqual(seen.at(-1)?.result?.music, ["music/song.mp3"]);
-  assert.equal(await readFile(join(dir, "names.txt"), "utf8"), "王小明\nGPU\n");
+  assert.equal(await readFile(join(dir, "names.txt"), "utf8"), "王小明\n");
+  assert.equal(await readFile(join(dir, "terms.txt"), "utf8"), "GPU\n");
 
   // A reload finds it done, and the video plays in byte ranges or downloads whole.
   const reloaded = await jobRoute.GET(new Request(`${url}/${job.id}`), ctx({ id: job.id }));
@@ -289,6 +304,32 @@ test("speech heard on OpenRouter needs its key, which the edit gets with --asr c
   assert.equal((await latest()).result?.broll, false);
   const credits = await brollRoute.GET(new Request(`${url}/${job.id}/broll`), ctx({ id: job.id }));
   assert.equal(credits.status, 404);
+});
+
+test("the advanced settings reach the edit, and names or terms left empty are not passed", async () => {
+  const advanced = {
+    settings: {
+      ...settings,
+      musicLicense: undefined,
+      names: [],
+      quality: "economy",
+      correct: true,
+      captions: "sweep",
+    },
+  };
+  const { body: job } = await create([{ path: "e.mp4", size: 2 }], advanced);
+  assert.equal((await put(job.id, 0, new Uint8Array(2))).status, 200);
+  assert.equal((await start(job.id)).status, 200);
+  const latest = async () =>
+    (await (await jobRoute.GET(new Request(url), ctx({ id: job.id }))).json()) as Job;
+  while ((await latest()).status === "running") await new Promise((done) => setTimeout(done, 20));
+  const args = JSON.parse(await readFile(join(root, job.id, "args.json"), "utf8")) as string[];
+  const after = (option: string) => args[args.indexOf(option) + 1];
+  assert.equal(after("--quality"), "economy");
+  assert.ok(args.includes("--correct"));
+  assert.equal(after("--captions"), "sweep");
+  assert.ok(!args.includes("--names"));
+  assert.equal(after("--terms"), "terms.txt");
 });
 
 test("the Pexels and Pixabay keys the page saved go to an edit with rich visuals only", async () => {

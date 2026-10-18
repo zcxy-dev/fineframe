@@ -2,6 +2,7 @@
 import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { type ClaudeCost, type Progress, validateProgress } from "@video-editor/schema";
+import { PRESETS } from "../captions/presets.ts";
 import { isLookId, type LookId, lookIds } from "../looks.ts";
 import { ClaudeError, QUALITIES, type Quality } from "../plan/claude.ts";
 import { type Aspect, dollars, LENGTH_RANGE, PlanError } from "../plan/plan.ts";
@@ -11,11 +12,12 @@ import { EditError } from "./error.ts";
 import { parseLength } from "./length.ts";
 
 const [shortest, longest] = LENGTH_RANGE;
+const presets = Object.keys(PRESETS);
 const usage = `Usage: pnpm edit <footage folder or file>... --length <length> \\
-    --aspect <9:16 | 1:1 | 16:9> -o <out.mp4> [--names <terms.txt>] [--correct] \\
-    [--asr <local | cloud>] [--look <${[...lookIds, "none"].join(" | ")}>] \\
-    [--quality <best | economy>] [--visuals <rich | minimal>] \\
-    [--music <track or folder>]... [--music-license <licence>]
+    --aspect <9:16 | 1:1 | 16:9> -o <out.mp4> [--names <names.txt>] [--terms <terms.txt>] \\
+    [--correct] [--asr <local | cloud>] [--look <${[...lookIds, "none"].join(" | ")}>] \\
+    [--captions <${presets.join(" | ")}>] [--quality <best | economy>] \\
+    [--visuals <rich | minimal>] [--music <track or folder>]... [--music-license <licence>]
 
 Edits footage into a finished video within 5 % of the length asked. A folder stands for the
 files directly in it: videos to cut, and still images to show as B-roll.
@@ -23,15 +25,16 @@ files directly in it: videos to cut, and still images to show as B-roll.
   -l, --length   ${shortest} s to ${longest / 3600} h: 60s, 90, 3m, 1m30s, 1:30, 1h
   -a, --aspect   9:16, 1:1 or 16:9
   -o, --output   the video; <name>.project.json, <name>.srt and edit_cuts.json go beside it
-      --names    a text file of names and terms said in the footage, one per line, given to
-                 the speech model and to --correct; a person's name there can show in a
-                 lower third
+      --names    a text file of people's names said in the footage, one per line, given to
+                 the speech model and to --correct; a name there can show in a lower third
+      --terms    a text file of other words said in the footage, such as brands and jargon,
+                 one per line, given to the speech model and to --correct only
       --correct  have Claude correct each transcript before its words are timed
       --asr      where the speech is heard: local (default, the most accurate) or cloud, on
                  OpenRouter with OPENROUTER_API_KEY, for machines without 9 GB of memory to
                  spare; cloud sends the speech audio, never video
       --look     the look over the edit: clean unless another is named, or none
-      --quality  best plans with Claude Opus; economy with Claude Sonnet, for about half
+      --captions the caption style: bold unless another is named      --quality  best plans with Claude Opus; economy with Claude Sonnet, for about half
                  the cost. best unless given
       --visuals  rich (the default) cuts to B-roll on the edit's points: motion-graphics
                  cards, captures of the web pages named and, with PEXELS_API_KEY or
@@ -67,6 +70,8 @@ const parsed = (() => {
         aspect: { type: "string", short: "a" },
         output: { type: "string", short: "o" },
         names: { type: "string" },
+        terms: { type: "string" },
+        captions: { type: "string" },
         correct: { type: "boolean" },
         asr: { type: "string" },
         look: { type: "string" },
@@ -101,6 +106,9 @@ if (look !== "none" && !isLookId(look)) {
   fail(`the look is ${[...lookIds, "none"].join(", ")}, not ${look}`);
 }
 
+const captions = values.captions ?? "bold";
+if (!presets.includes(captions)) fail(`--captions is ${presets.join(", ")}, not ${captions}`);
+
 const quality = values.quality ?? "best";
 if (!QUALITIES.includes(quality as Quality)) {
   fail(`the quality is best or economy, not ${quality}`);
@@ -127,6 +135,8 @@ try {
     aspect,
     out: values.output as string,
     ...(values.names ? { names: values.names } : {}),
+    ...(values.terms ? { terms: values.terms } : {}),
+    captions,
     correct: values.correct ?? false,
     asr: asr as "local" | "cloud",
     look: look as LookId | "none",

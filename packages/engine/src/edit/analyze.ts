@@ -22,9 +22,9 @@ export interface Worker {
 export interface AnalysisOptions {
   /** Claude corrects the transcript before its words are timed. */
   correct: boolean;
-  /** Names and terms said in the footage, one per line: they bias the local speech model and
-   * guide the correction. */
-  names?: { path: string; text: string };
+  /** People's names and terms said in the footage, one per line: they bias the local speech
+   * model and guide the correction. */
+  glossary?: { path: string; text: string };
   /** Where the speech is heard: by the local model, or on OpenRouter with the user's key. */
   asr?: "local" | "cloud";
 }
@@ -68,12 +68,12 @@ export function defaultCache(): string {
   return join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "video-editor", "indexes");
 }
 
-/** Whether the analysis uses the names: OpenRouter takes no context prompt, so cloud speech uses
- * them only to guide the correction. */
-function namesUsed(
+/** Whether the analysis uses the glossary: OpenRouter takes no context prompt, so cloud speech
+ * uses it only to guide the correction. */
+function glossaryUsed(
   options: AnalysisOptions,
-): options is AnalysisOptions & Required<Pick<AnalysisOptions, "names">> {
-  return options.names !== undefined && (options.correct || options.asr !== "cloud");
+): options is AnalysisOptions & Required<Pick<AnalysisOptions, "glossary">> {
+  return options.glossary !== undefined && (options.correct || options.asr !== "cloud");
 }
 
 /** The cached index's file name: the footage's SHA-256, then a hash of everything else the
@@ -86,7 +86,7 @@ export function indexName(
   const settings = JSON.stringify([
     worker.version,
     options.correct,
-    namesUsed(options) ? options.names.text : null,
+    glossaryUsed(options) ? options.glossary.text : null,
     options.asr ?? "local",
   ]);
   const key = createHash("sha256").update(settings).digest("hex").slice(0, 16);
@@ -96,27 +96,36 @@ export function indexName(
 /** Where each of vework's steps starts, as a share of its run on an 8-core CPU, measured on 1080p
  * interviews and the synthetic corpus: shots take about a fifth, faces an eighth, and
  * transcribing and aligning the rest. */
-const STEPS: [RegExp, (n: number) => number][] = [
-  [/^probing/, () => 0],
-  [/^detecting shots/, () => 0],
-  [/^finding speech/, () => 0.2],
-  [/^measuring loudness/, () => 0.2],
-  [/^finding audio events/, () => 0.21],
-  [/^finding faces/, () => 0.22],
-  [/^removing noise from speech/, () => 0.34],
-  [/^transcribing (\d+)\/(\d+)/, (n) => 0.35 + 0.42 * n],
-  [/^correcting/, () => 0.77],
-  [/^aligning (\d+)\/(\d+)/, (n) => 0.77 + 0.23 * n],
+const STEPS: [RegExp, AnalysisStep, (n: number) => number][] = [
+  [/^probing/, "probe", () => 0],
+  [/^detecting shots/, "shots", () => 0],
+  [/^finding speech/, "speech", () => 0.2],
+  [/^measuring loudness/, "loudness", () => 0.2],
+  [/^finding audio events/, "events", () => 0.21],
+  [/^finding faces/, "faces", () => 0.22],
+  [/^removing noise from speech/, "denoise", () => 0.34],
+  [/^transcribing (\d+)\/(\d+)/, "transcribe", (n) => 0.35 + 0.42 * n],
+  [/^correcting/, "correct", () => 0.77],
+  [/^aligning (\d+)\/(\d+)/, "align", (n) => 0.77 + 0.23 * n],
   // analyze-music, which takes seconds rather than minutes.
-  [/^decoding/, () => 0],
-  [/^finding beats/, () => 0.1],
+  [/^decoding/, "music", () => 0],
+  [/^finding beats/, "music", () => 0.1],
 ];
 
 /** A model vework is downloading on its first use. */
 export type Download = NonNullable<StageProgress["download"]>;
 
-/** How far vework is through a file, what it is doing and any model it is downloading. */
-export type Report = (fraction: number, message: string, download?: Download) => void;
+/** The step of the analysis vework is on. */
+export type AnalysisStep = NonNullable<StageProgress["step"]>;
+
+/** How far vework is through a file, what it is doing, any model it is downloading and the step
+ * it is on. */
+export type Report = (
+  fraction: number,
+  message: string,
+  download?: Download,
+  step?: AnalysisStep,
+) => void;
 
 /**
  * Runs `vework analyze` on one file, writing its media index to `index`, and the denoised speech
@@ -137,9 +146,9 @@ export function analyze(
   const extra: string[] = [];
   if (options.correct) extra.push("--correct");
   if (options.asr === "cloud") extra.push("--asr", "cloud");
-  // vework refuses names it would not use.
-  if (namesUsed(options)) {
-    extra.push("--glossary", options.names.path);
+  // vework refuses a glossary it would not use.
+  if (glossaryUsed(options)) {
+    extra.push("--glossary", options.glossary.path);
     if (options.asr !== "cloud") extra.push("--asr-context");
   }
   return vework(worker, "analyze", file, index, extra, report, log);
@@ -227,6 +236,7 @@ async function vework(
     let lastLine = "";
     let failed = false;
     let reached = 0;
+    let on: AnalysisStep | undefined;
     const take = (line: string) => {
       if (!line.trim()) return;
       lastLine = line;
@@ -237,7 +247,7 @@ async function vework(
       if (downloading) {
         const [, name = "", bytes, total] = downloading;
         const download = { name, bytes: Number(bytes), total: Number(total) };
-        report(reached, `Downloading ${name}`, download);
+        report(reached, `Downloading ${name}`, download, on);
         return;
       }
       const step = said && !why ? STEPS.find(([pattern]) => pattern.test(said)) : undefined;
@@ -246,9 +256,10 @@ async function vework(
         return;
       }
       const [, n, of] = said.match(step[0]) ?? [];
-      const fraction = step[1](of ? (Number(n) - 1) / Number(of) : 0);
+      const fraction = step[2](of ? (Number(n) - 1) / Number(of) : 0);
       reached = fraction;
-      report(fraction, said.charAt(0).toUpperCase() + said.slice(1));
+      on = step[1];
+      report(fraction, said.charAt(0).toUpperCase() + said.slice(1), undefined, on);
     };
     // Each stream keeps its own unfinished line: Python buffers stdout when it is piped, so a
     // line can arrive in pieces with stderr's lines in between.

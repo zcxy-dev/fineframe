@@ -37,6 +37,21 @@ export interface StageProgress {
      */
     total: number;
   };
+  /**
+   * The analysis's step for the file named, in the order vework takes them: reading it, shots, speech (voice activity), loudness, audio events, faces, removing noise from the speech, transcribing, correcting the transcript and timing its words; music for a track's analysis. A step vework has nothing to do for is skipped.
+   */
+  step?:
+    | "probe"
+    | "shots"
+    | "speech"
+    | "loudness"
+    | "events"
+    | "faces"
+    | "denoise"
+    | "transcribe"
+    | "correct"
+    | "align"
+    | "music";
   claude?: ClaudeCost;
 }
 /**

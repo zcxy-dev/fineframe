@@ -313,6 +313,51 @@ test("names and correction reach the analysis, and an index made without them is
   assert.match(asked[0] ?? "", /said in the footage: video editor\./);
 });
 
+test("terms help the analysis hear the speech but never name a lower third", async (t) => {
+  const dir = await scratch(t, "edit-terms-");
+  const { options, analyses } = await footage(dir);
+  const names = join(dir, "names.txt");
+  await writeFile(names, "林語安\n");
+  const terms = join(dir, "terms.txt");
+  await writeFile(terms, "Remotion\n");
+  const { claude } = await recordedClaude();
+  const asked: string[] = [];
+  const listening: Claude = (request) => {
+    if (request.purpose === "plan") asked.push(JSON.stringify(request.content));
+    return claude(request);
+  };
+  await edit({ ...options, names, terms, claude: listening });
+  // vework reads one glossary, of both.
+  const [args] = await analyses();
+  const at = args?.indexOf("--glossary") ?? -1;
+  assert.deepEqual(args?.slice(at + 2), ["--asr-context"]);
+  assert.equal(await readFile(args?.[at + 1] ?? "", "utf8"), "林語安\nRemotion\n");
+  // The planner lists only the people.
+  assert.match(asked[0] ?? "", /said in the footage: 林語安\./);
+  assert.doesNotMatch(asked[0] ?? "", /Remotion/);
+
+  // Terms alone, heard on OpenRouter without correction, are not used: the index is the one an
+  // analysis without them wrote.
+  const cloud = { ...options, asr: "cloud" as const };
+  await edit(cloud);
+  const result = await edit({ ...cloud, terms });
+  assert.equal(result.cached, 1);
+  assert.deepEqual((await analyses()).at(-1)?.slice(4), ["--asr", "cloud"]);
+});
+
+test("the edit's captions take the style asked for, and each analysis step is named", async (t) => {
+  const dir = await scratch(t, "edit-captions-");
+  const { options, lines } = await footage(dir);
+  const result = await edit({ ...options, captions: "boxed" });
+  const project = await loadJson(result.outputs.project, validateProject);
+  assert.equal(project.captions?.preset, "boxed");
+  const steps = lines.flatMap((line) => ("step" in line && line.step ? [line.step] : []));
+  assert.deepEqual(
+    [...new Set(steps)],
+    ["probe", "shots", "speech", "loudness", "events", "faces", "denoise", "transcribe", "align"],
+  );
+});
+
 test("cloud speech reaches the analysis without the context prompt, in an index of its own", async (t) => {
   const dir = await scratch(t, "edit-cloud-");
   const { options, analyses } = await footage(dir);
@@ -583,6 +628,10 @@ test("the command reports arguments it cannot use as an error line too", async (
     [[".", "--length", "60", "--aspect", "9:16"], /-o/],
     [[".", "--length", "60", "--aspect", "9:16", "-o", "x.mp4", "--bogus"], /--bogus/],
     [[".", "--length", "60", "--aspect", "9:16", "-o", "x.mp4", "--look", "neon"], /neon/],
+    [
+      [".", "--length", "60", "--aspect", "9:16", "-o", "x.mp4", "--captions", "comic"],
+      /bold, spotlight, sweep, boxed, not comic/,
+    ],
   ] as const) {
     const { code, stdout } = await runCli([...args]);
     assert.equal(code, 2, args.join(" "));

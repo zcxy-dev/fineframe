@@ -111,7 +111,7 @@ const CHAPTER_SECONDS = 120;
 /** The most B-roll shown at once, in seconds, and its fade in and out. */
 const BROLL_MAX = 8;
 const BROLL_FADE = 0.25;
-/** The caption preset an edit starts with. */
+/** The caption preset an edit starts with unless another is asked for. */
 const CAPTION_PRESET = "bold";
 
 /**
@@ -134,8 +134,10 @@ export interface PlanOptions {
   music?: MusicInput[];
   /** The look over the whole edit (../looks.ts): DEFAULT_LOOK unless given, none with null. */
   look?: Look | null;
-  /** Names of people and terms said in the footage; a lower third shows only a name from these. */
+  /** Names of people said in the footage; a lower third shows only a name from these. */
   names?: string[];
+  /** The caption preset (../captions/presets.ts): CAPTION_PRESET unless given. */
+  captions?: string;
   /** The model that plans, and judges the cut checks a review doubts: best unless given. */
   quality?: Quality;
   /** `rich` (the default) shows B-roll on the edit's points, sourced from free web captures,
@@ -219,6 +221,8 @@ export interface PlanState {
   /** Each visual the planner proposed, sourced, by visualKey; null for one that could not be. */
   assets: Map<string, Asset | null>;
   look: Look | null;
+  /** The caption preset. */
+  captions: string;
   /** The model that answered the last planning request. */
   model: string;
   planCalls: number;
@@ -321,6 +325,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
     stills: new Map(),
     assets: new Map(),
     look: options.look === undefined ? DEFAULT_LOOK : options.look,
+    captions: options.captions ?? CAPTION_PRESET,
     model: PLAN_MODELS[options.quality ?? "best"],
     planCalls: 0,
     reviews: 0,
@@ -792,7 +797,7 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
     ...(broll.length > 0 ? { broll: broll.map(framed) } : {}),
     ...(overlays.length > 0 ? { overlays } : {}),
     captions: {
-      preset: CAPTION_PRESET,
+      preset: state.captions,
       srt: true,
       lines: captionLines(words, (source, i) => lineOf.get(`${source}:${i}`) ?? -1),
     },

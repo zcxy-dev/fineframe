@@ -1,16 +1,21 @@
 "use client";
 
-import { useId } from "react";
+import { rgba } from "@video-editor/effects/layout";
+import { PRESETS, type Preset } from "@video-editor/engine/captions";
+import { type CSSProperties, Fragment, useId } from "react";
 import {
   ASPECTS,
   type Aspect,
   type Asr,
+  CAPTION_STYLES,
   formatLength,
   LENGTH_PRESETS,
   LENGTH_RANGE,
   lengthProblem,
   MAX_LICENSE_LENGTH,
   parseLength,
+  QUALITIES,
+  type Quality,
   STYLE_TEXT,
   STYLES,
   type Style,
@@ -26,12 +31,20 @@ export interface Choices {
   custom: string;
   aspect: Aspect;
   style: Style;
+  /** People's names, one per line. */
   names: string;
+  /** Other words to hear right, one per line. */
+  terms: string;
   /** The licence the music is used under. */
   musicLicense: string;
   /** Where the speech is heard. */
   asr: Asr;
   visuals: Visuals;
+  quality: Quality;
+  /** Whether Claude corrects each transcript. */
+  correct: boolean;
+  /** The caption preset. */
+  captions: string;
 }
 
 /** This computer's memory, and how much the local speech model needs, from the server. */
@@ -57,6 +70,14 @@ const VISUALS_TEXT: Record<Visuals, { name: string; help: string }> = {
     help: "Claude adds B-roll to each point: motion-graphics cards, web pages, stock footage and logos, beside the speaker or full frame, with soft sound effects.",
   },
   minimal: { name: "Minimal", help: "Only the footage you dropped in, cut and captioned." },
+};
+
+const QUALITY_TEXT: Record<Quality, { name: string; help: string }> = {
+  best: { name: "Best", help: "Claude Opus plans the edit and judges the doubtful cuts." },
+  economy: {
+    name: "Economy",
+    help: "Claude Sonnet plans the edit and judges the doubtful cuts, for about half the cost.",
+  },
 };
 
 const ASPECT_LABELS: Record<Aspect, { name: string; hint: string }> = {
@@ -210,20 +231,39 @@ export function SettingsPanel({
 
       <div className={styles.field}>
         <label className={styles.label} htmlFor={`${id}-names`}>
-          Names and terms
+          People's names
           <span className={styles.labelHint}>Optional</span>
         </label>
         <textarea
           id={`${id}-names`}
           className={styles.textarea}
-          rows={3}
-          placeholder={"王小明\nGPU"}
+          rows={2}
+          placeholder={"王小明\nAlex Chen"}
           value={choices.names}
           onChange={(event) => set({ names: event.target.value })}
         />
         <p className={styles.help}>
-          One per line, spelled as the captions should show them. Helps the speech model hear names,
-          brands and jargon.
+          One per line, spelled as the captions should show them. Helps the speech model hear them,
+          and a lower third can show them.
+        </p>
+      </div>
+
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor={`${id}-terms`}>
+          Terms
+          <span className={styles.labelHint}>Optional</span>
+        </label>
+        <textarea
+          id={`${id}-terms`}
+          className={styles.textarea}
+          rows={2}
+          placeholder={"GPU\nRemotion"}
+          value={choices.terms}
+          onChange={(event) => set({ terms: event.target.value })}
+        />
+        <p className={styles.help}>
+          Brands, products and jargon, one per line. Only helps the speech model hear them; never
+          shown as a name. Both lists are kept for your next edit.
         </p>
       </div>
 
@@ -301,6 +341,73 @@ export function SettingsPanel({
         )}
       </fieldset>
 
+      <details className={styles.advanced}>
+        <summary className={styles.advancedSummary}>Advanced settings</summary>
+        <div className={styles.advancedBody}>
+          <fieldset className={styles.field}>
+            <legend className={styles.label}>Quality</legend>
+            <div className={styles.chips}>
+              {QUALITIES.map((quality) => (
+                <button
+                  key={quality}
+                  type="button"
+                  className={styles.chip}
+                  aria-pressed={choices.quality === quality}
+                  onClick={() => set({ quality })}
+                >
+                  {QUALITY_TEXT[quality].name}
+                </button>
+              ))}
+            </div>
+            <p className={styles.help}>{QUALITY_TEXT[choices.quality].help}</p>
+          </fieldset>
+
+          <fieldset className={styles.field}>
+            <legend className={styles.label}>Transcript correction</legend>
+            <div className={styles.chips}>
+              {[false, true].map((correct) => (
+                <button
+                  key={String(correct)}
+                  type="button"
+                  className={styles.chip}
+                  aria-pressed={choices.correct === correct}
+                  onClick={() => set({ correct })}
+                >
+                  {correct ? "On" : "Off"}
+                </button>
+              ))}
+            </div>
+            <p className={styles.help}>
+              Claude reads each transcript with your names and terms and fixes what the speech model
+              misheard, before its words are timed. Adds a Claude cost.
+            </p>
+          </fieldset>
+
+          <fieldset className={styles.field}>
+            <legend className={styles.label}>Caption style</legend>
+            <div className={styles.captionStyles}>
+              {CAPTION_STYLES.map((captions) => (
+                <label key={captions} className={styles.captionStyle}>
+                  <input
+                    type="radio"
+                    name={`${id}-captions`}
+                    className={styles.radio}
+                    value={captions}
+                    checked={choices.captions === captions}
+                    onChange={() => set({ captions })}
+                  />
+                  <CaptionPreview preset={PRESETS[captions] as Preset} />
+                  <span className={styles.aspectName}>
+                    {`${captions[0]?.toUpperCase()}${captions.slice(1)}`}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <p className={styles.help}>{PRESETS[choices.captions]?.description}.</p>
+          </fieldset>
+        </div>
+      </details>
+
       {music > 0 && (
         <div className={styles.field}>
           <label className={styles.label} htmlFor={`${id}-license`}>
@@ -322,5 +429,81 @@ export function SettingsPanel({
         </div>
       )}
     </>
+  );
+}
+
+/** The words a preview shows; the second is being spoken. */
+const SAMPLE = ["Every", "word", "on", "time"];
+
+/** A caption preset drawn with CSS from its own values, over a dark frame: an approximation of
+ * what libass draws, to choose by. */
+function CaptionPreview({ preset }: { preset: Preset }) {
+  const em = (value: number) => `${value}em`;
+  const shadows = [
+    preset.shadow &&
+      `0 ${em(preset.shadow.offset)} ${em(preset.shadow.blur)} ${rgba(preset.shadow.color, preset.shadow.opacity)}`,
+    preset.glow && `0 0 ${em(preset.glow.blur)} ${rgba(preset.glow.color, preset.glow.opacity)}`,
+  ].filter(Boolean);
+  const text: CSSProperties = {
+    color: preset.text,
+    fontWeight: preset.weight,
+    fontSize: em(preset.scale),
+    letterSpacing: em(preset.tracking),
+    ...(shadows.length > 0 ? { textShadow: shadows.join(", ") } : {}),
+    // A stroke drawn under the fill, as libass draws its border outside the glyph.
+    ...(preset.stroke
+      ? {
+          WebkitTextStroke: `${em(preset.stroke.width * 2)} ${preset.stroke.color}`,
+          paintOrder: "stroke fill",
+        }
+      : {}),
+    ...(preset.plate
+      ? {
+          background: rgba(preset.plate.color, preset.plate.opacity),
+          padding: `${em(preset.plate.padY)} ${em(preset.plate.padX)}`,
+          borderRadius: em(preset.plate.radius),
+        }
+      : {}),
+  };
+  const active: CSSProperties = preset.pill
+    ? {
+        color: preset.active,
+        background: preset.pill.color,
+        padding: `${em(preset.pill.padY)} ${em(preset.pill.padX)}`,
+        borderRadius: em(preset.pill.radius),
+        WebkitTextStroke: "0",
+      }
+    : preset.sweep
+      ? { position: "relative", display: "inline-block" }
+      : { color: preset.active };
+  return (
+    <span className={styles.captionFrame} aria-hidden="true">
+      <span className={styles.captionText} style={text}>
+        {SAMPLE.map((word, i) => (
+          <Fragment key={word}>
+            {i > 0 && " "}
+            <span
+              style={
+                i === 1
+                  ? active
+                  : i > 1 && preset.upcoming < 1
+                    ? { opacity: preset.upcoming }
+                    : preset.sweep && i === 0
+                      ? { color: preset.active }
+                      : undefined
+              }
+            >
+              {word}
+              {i === 1 && preset.sweep && (
+                // Part of the way through the word, as the colour sweeps.
+                <span className={styles.captionSweep} style={{ color: preset.active }}>
+                  {word}
+                </span>
+              )}
+            </span>
+          </Fragment>
+        ))}
+      </span>
+    </span>
   );
 }
