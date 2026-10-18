@@ -27,7 +27,7 @@ def write(root: Path = ROOT, check: bool = False) -> list[str]:
         doc = root / table["doc"]
         text = changed.get(doc) or doc.read_text(encoding="utf-8")
         marker = re.compile(
-            rf"(<!-- results:{re.escape(path.stem)} -->\n)(?:.*?\n)?(<!-- /results -->)", re.S
+            rf"(<!-- results:{re.escape(path.stem)} -->\n)(?:.*?\n)??(<!-- /results -->)", re.S
         )
         if not marker.search(text):
             raise ValueError(f"{table['doc']} has no <!-- results:{path.stem} --> block")
