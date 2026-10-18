@@ -497,8 +497,10 @@ export function planRequest(options: {
   chapters?: boolean;
   /** Names the user gave, which lower thirds may show. */
   names?: readonly string[];
+  /** What the user asks of this edit, in their words. */
+  instructions?: string;
 }): string {
-  const { target, aspect, short, speech, music, title, chapters, names } = options;
+  const { target, aspect, short, speech, music, title, chapters, names, instructions } = options;
   const kind = short
     ? "a short edit: the strongest self-contained moments"
     : "a long edit: the whole story";
@@ -506,19 +508,31 @@ export function planRequest(options: {
     `Make ${kind}.`,
     `Target length: ${target.toFixed(0)} s (±5 %), aspect ${aspect}.`,
     `The files hold ${speech.toFixed(0)} s of speech before fillers and pauses are removed.`,
-    ...asks(title, chapters, names),
+    ...asks(title, chapters, names, instructions),
     ...(music ? ["", music] : []),
   ].join("\n");
 }
 
-/** The lines asking for a title and chapters and listing the names, in every request for the
- * plan. */
-function asks(title?: boolean, chapters?: boolean, names?: readonly string[]): string[] {
+/** The lines asking for a title and chapters, listing the names and passing on what the user
+ * asks, in every request for the plan. */
+function asks(
+  title?: boolean,
+  chapters?: boolean,
+  names?: readonly string[],
+  instructions?: string,
+): string[] {
   return [
     ...(title ? ["Give the video a title over its opening."] : []),
     ...(chapters ? ["Divide the video into chapters."] : []),
     ...(names?.length
       ? [`Names the user gave, of people and terms said in the footage: ${names.join("; ")}.`]
+      : []),
+    ...(instructions
+      ? [
+          "What the user asks of this edit, in their own words; follow it as far as the footage, " +
+            "the target length and the rules above allow:",
+          `<instructions>\n${instructions}\n</instructions>`,
+        ]
       : []),
   ];
 }
@@ -528,10 +542,16 @@ export function moreRequest(
   previous: Decisions,
   length: number,
   target: number,
-  extras: { music?: string; title?: boolean; chapters?: boolean; names?: readonly string[] } = {},
+  extras: {
+    music?: string;
+    title?: boolean;
+    chapters?: boolean;
+    names?: readonly string[];
+    instructions?: string;
+  } = {},
 ): string {
-  const { music, title, chapters, names } = extras;
-  const asked = asks(title, chapters, names);
+  const { music, title, chapters, names, instructions } = extras;
+  const asked = asks(title, chapters, names, instructions);
   return [
     `Your selection below lasts ${length.toFixed(1)} s once code removed its fillers and pauses, \
 short of the ${target.toFixed(0)} s target.`,

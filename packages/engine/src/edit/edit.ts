@@ -61,6 +61,9 @@ export interface EditOptions {
   terms?: string;
   /** The caption preset (../captions/presets.ts): bold unless given. */
   captions?: string;
+  /** What the user asks of this edit, in their words, such as "open with the demo" or "keep
+   * the part about pricing", passed on to the planner. */
+  instructions?: string;
   /** Claude corrects each transcript before its words are timed. */
   correct?: boolean;
   /** Where the speech is heard: by the local model (the default), or on OpenRouter with the
@@ -350,6 +353,7 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
           .map((line) => line.trim())
           .filter((line) => line && !line.startsWith("#")),
         ...(options.captions ? { captions: options.captions } : {}),
+        ...(options.instructions ? { instructions: options.instructions } : {}),
         claude,
         ...(options.quality ? { quality: options.quality } : {}),
         ...(options.visuals ? { visuals: options.visuals } : {}),

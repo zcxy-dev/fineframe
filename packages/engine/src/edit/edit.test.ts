@@ -185,6 +185,21 @@ test("a footage folder becomes the video, its project, its captions and progress
   assert.ok(thirdProject.main.every((clip) => clip.grade?.look?.id === "warm"));
 });
 
+test("what the user asks of the edit reaches the plan", async (t) => {
+  const dir = await scratch(t, "edit-instructions-");
+  const { options } = await footage(dir);
+  const { claude } = await recordedClaude();
+  const asked: string[] = [];
+  const listening: Claude = async (request) => {
+    if (request.purpose === "plan") {
+      asked.push(request.content.map((part) => (part.type === "text" ? part.text : "")).join("\n"));
+    }
+    return claude(request);
+  };
+  await edit({ ...options, claude: listening, instructions: "Open with the demo." });
+  assert.match(asked[0] ?? "", /<instructions>\nOpen with the demo\.\n<\/instructions>/);
+});
+
 test("an economy edit plans with Sonnet, and each review pass says what its checks cost", async (t) => {
   const dir = await scratch(t, "edit-economy-");
   const { options, lines } = await footage(dir);

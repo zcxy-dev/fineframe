@@ -13,11 +13,15 @@ import { parseLength } from "./length.ts";
 
 const [shortest, longest] = LENGTH_RANGE;
 const presets = Object.keys(PRESETS);
+/** The longest --instructions: a few sentences, not a script. */
+const INSTRUCTIONS_MAX = 2000;
 const usage = `Usage: pnpm edit <footage folder or file>... --length <length> \\
     --aspect <9:16 | 1:1 | 16:9> -o <out.mp4> [--names <names.txt>] [--terms <terms.txt>] \\
-    [--correct] [--asr <local | cloud>] [--look <${[...lookIds, "none"].join(" | ")}>] \\
-    [--captions <${presets.join(" | ")}>] [--quality <best | economy>] \\
-    [--visuals <rich | minimal>] [--music <track or folder>]... [--music-license <licence>]
+    [--correct] [--instructions <text>] [--asr <local | cloud>] \\
+    [--look <${[...lookIds, "none"].join(" | ")}>] \\
+    [--captions <${presets.join(" | ")}>] \\
+    [--quality <best | economy>] [--visuals <rich | minimal>] \\
+    [--music <track or folder>]... [--music-license <licence>]
 
 Edits footage into a finished video within 5 % of the length asked. A folder stands for the
 files directly in it: videos to cut, and still images to show as B-roll.
@@ -30,11 +34,17 @@ files directly in it: videos to cut, and still images to show as B-roll.
       --terms    a text file of other words said in the footage, such as brands and jargon,
                  one per line, given to the speech model and to --correct only
       --correct  have Claude correct each transcript before its words are timed
+      --instructions
+                 what you want of the edit, in your own words, such as "open with the demo"
+                 or "leave out the pricing": Claude follows it as far as the footage and the
+                 length allow, for a first edit and for one planned again; at most
+                 ${INSTRUCTIONS_MAX} characters
       --asr      where the speech is heard: local (default, the most accurate) or cloud, on
                  OpenRouter with OPENROUTER_API_KEY, for machines without 9 GB of memory to
                  spare; cloud sends the speech audio, never video
       --look     the look over the edit: clean unless another is named, or none
-      --captions the caption style: bold unless another is named      --quality  best plans with Claude Opus; economy with Claude Sonnet, for about half
+      --captions the caption style: bold unless another is named
+      --quality  best plans with Claude Opus; economy with Claude Sonnet, for about half
                  the cost. best unless given
       --visuals  rich (the default) cuts to B-roll on the edit's points: motion-graphics
                  cards, captures of the web pages named and, with PEXELS_API_KEY or
@@ -72,6 +82,7 @@ const parsed = (() => {
         names: { type: "string" },
         terms: { type: "string" },
         captions: { type: "string" },
+        instructions: { type: "string" },
         correct: { type: "boolean" },
         asr: { type: "string" },
         look: { type: "string" },
@@ -114,6 +125,11 @@ if (!QUALITIES.includes(quality as Quality)) {
   fail(`the quality is best or economy, not ${quality}`);
 }
 
+const instructions = values.instructions?.trim();
+if (instructions !== undefined && instructions.length > INSTRUCTIONS_MAX) {
+  fail(`--instructions takes at most ${INSTRUCTIONS_MAX} characters, not ${instructions.length}`);
+}
+
 const visuals = values.visuals ?? "rich";
 if (!VISUALS.includes(visuals as Visuals)) fail(`--visuals is rich or minimal, not ${visuals}`);
 
@@ -137,6 +153,7 @@ try {
     ...(values.names ? { names: values.names } : {}),
     ...(values.terms ? { terms: values.terms } : {}),
     captions,
+    ...(instructions ? { instructions } : {}),
     correct: values.correct ?? false,
     asr: asr as "local" | "cloud",
     look: look as LookId | "none",

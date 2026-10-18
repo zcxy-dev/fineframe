@@ -138,6 +138,8 @@ export interface PlanOptions {
   names?: string[];
   /** The caption preset (../captions/presets.ts): CAPTION_PRESET unless given. */
   captions?: string;
+  /** What the user asks of this edit, in their words, passed on in every planning request. */
+  instructions?: string;
   /** The model that plans, and judges the cut checks a review doubts: best unless given. */
   quality?: Quality;
   /** `rich` (the default) shows B-roll on the edit's points, sourced from free web captures,
@@ -193,6 +195,8 @@ export interface PlanState {
   musicListing: string;
   /** Names a lower third may show. */
   names: string[];
+  /** What the user asks of this edit, in their words; empty when nothing. */
+  instructions: string;
   /** What the plan was asked for besides the edit. */
   extras: PlanExtras;
   fps: FrameRate;
@@ -291,6 +295,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
 
   const short = options.length < SHORT_SHARE * speech;
   const names = (options.names ?? []).map((name) => name.trim()).filter(Boolean);
+  const instructions = options.instructions?.trim() ?? "";
   const state: PlanState = {
     length: options.length,
     aspect: options.aspect,
@@ -301,6 +306,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
     music,
     musicListing: music.size > 0 ? describeMusic(music.values()) : "",
     names,
+    instructions,
     extras: {
       music: music.size > 0,
       title: !short && options.length >= TITLE_SECONDS,
@@ -341,6 +347,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
     title: state.extras.title,
     chapters: state.extras.chapters,
     names,
+    instructions,
   });
   progress(`Planning ${state.short ? "a short" : "a long"} edit with ${state.planModel}`);
   await decide(state, request);
@@ -546,7 +553,13 @@ async function assemble(state: PlanState): Promise<Assembly> {
     }
     state.progress(`The edit lasts ${seconds.toFixed(1)} s; asking for more material`);
     const { title, chapters } = state.extras;
-    const extras = { music: state.musicListing, title, chapters, names: state.names };
+    const extras = {
+      music: state.musicListing,
+      title,
+      chapters,
+      names: state.names,
+      instructions: state.instructions,
+    };
     await decide(state, moreRequest(state.decisions, seconds, state.length, extras));
     extra++;
   }
