@@ -27,7 +27,7 @@ for (const bytes of [0, 4000]) {
   const download = { name: model, bytes, total: 4000 };
   say({ stage: "analyze", fraction: 0, message: `Downloading ${model}`, file, download });
 }
-say({ stage: "analyze", fraction: 0.1, message: "Transcribing", file });
+say({ stage: "analyze", fraction: 0.1, message: "Transcribing", file, step: "transcribe" });
 process.stderr.write("vework: transcribing\n");
 const hold = process.env.FAKE_EDIT_HOLD;
 while (hold && existsSync(hold)) await new Promise((done) => setTimeout(done, 20));

@@ -7,7 +7,9 @@ import { durationOf } from "../lib/collect.ts";
 import { fixFor } from "../lib/fixes.ts";
 import type { Job } from "../lib/jobs.ts";
 import type { Service } from "../lib/key.ts";
+import type { Remembered } from "../lib/remembered.ts";
 import {
+  DEFAULT_CAPTIONS,
   DEFAULT_STYLE,
   DEFAULT_VISUALS,
   formatBytes,
@@ -56,9 +58,13 @@ export function Editor() {
     aspect: "9:16",
     style: DEFAULT_STYLE,
     names: "",
+    terms: "",
     musicLicense: "",
     asr: "local",
     visuals: DEFAULT_VISUALS,
+    quality: "best",
+    correct: false,
+    captions: DEFAULT_CAPTIONS,
   });
   const [phase, setPhase] = useState<Phase>({ kind: "compose" });
   const upload = useRef<XMLHttpRequest | null>(null);
@@ -77,6 +83,20 @@ export function Editor() {
         setKeys(found);
         if (!found.set) setAsking("anthropic");
       })
+      .catch(() => {});
+  }, []);
+
+  // The names and terms of the last edit, unless the owner has typed some already.
+  useEffect(() => {
+    void fetch("/api/remembered")
+      .then((response) => response.json() as Promise<Remembered>)
+      .then((found) =>
+        setChoices((choices) => ({
+          ...choices,
+          names: choices.names || found.names.join("\n"),
+          terms: choices.terms || found.terms.join("\n"),
+        })),
+      )
       .catch(() => {});
   }, []);
 
@@ -228,9 +248,13 @@ export function Editor() {
             aspect: choices.aspect,
             style: choices.style,
             names: namesFrom(choices.names),
+            terms: namesFrom(choices.terms),
             ...(music > 0 ? { musicLicense: choices.musicLicense.trim() } : {}),
             asr: choices.asr,
             visuals: choices.visuals,
+            quality: choices.quality,
+            correct: choices.correct,
+            captions: choices.captions,
           },
           files: used.map((item) => ({ path: item.path, size: item.file.size })),
         }),
@@ -592,8 +616,13 @@ function Summary({ job }: { job: Job }) {
     ]);
   }
   if (job.settings.names.length > 0) {
-    rows.push(["Names and terms", String(job.settings.names.length)]);
+    // Edits from before terms had their own list counted both here.
+    rows.push([
+      job.settings.terms ? "Names" : "Names and terms",
+      String(job.settings.names.length),
+    ]);
   }
+  if (job.settings.terms?.length) rows.push(["Terms", String(job.settings.terms.length)]);
   if (job.claude) {
     rows.push(["Claude, planning", formatDollars(job.claude.plan.dollars)]);
     rows.push(["Claude, checking cuts", formatDollars(job.claude.check.dollars)]);

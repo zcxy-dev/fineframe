@@ -1,4 +1,5 @@
 // What the page asks for, checked the same way in the browser and on the server.
+import { PRESETS } from "@video-editor/engine/captions";
 import { LENGTH_RANGE, parseLength } from "@video-editor/engine/length";
 import { LOOKS, type LookId, lookIds } from "@video-editor/engine/looks";
 import { kindOf } from "@video-editor/engine/media";
@@ -11,7 +12,8 @@ export type Aspect = (typeof ASPECTS)[number];
 /** Seconds: a short, two social lengths, and two longer edits. Any other length is typed. */
 export const LENGTH_PRESETS = [15, 30, 60, 180, 600] as const;
 
-/** Names and terms are a hint for the speech model; a few hundred is far more than it reads. */
+/** Names and terms are each a hint for the speech model; a few hundred is far more than it
+ * reads. */
 const MAX_NAMES = 200;
 const MAX_NAME_LENGTH = 100;
 export const MAX_LICENSE_LENGTH = 200;
@@ -41,17 +43,33 @@ export const VISUALS = ["rich", "minimal"] as const;
 export type Visuals = (typeof VISUALS)[number];
 export const DEFAULT_VISUALS: Visuals = "rich";
 
+/** The model that plans (`--quality`): Claude Opus, or Claude Sonnet for about half the cost. */
+export const QUALITIES = ["best", "economy"] as const;
+export type Quality = (typeof QUALITIES)[number];
+
+/** The captions' look (`--captions`): one of the engine's caption presets. */
+export const CAPTION_STYLES = Object.keys(PRESETS);
+export const DEFAULT_CAPTIONS = "bold";
+
 export interface Settings {
   /** Seconds, LENGTH_RANGE inclusive. */
   length: number;
   aspect: Aspect;
   style: Style;
-  /** Names and terms said in the footage, spelled as the captions should show them. */
+  /** People's names said in the footage, spelled as the captions should show them; a lower
+   * third may show one. */
   names: string[];
+  /** Other words said in the footage, such as brands and jargon: only for hearing them. Edits
+   * from before the field had none. */
+  terms?: string[];
   /** The licence the music is used under, such as "CC0 1.0"; needed when there is music. */
   musicLicense?: string;
   asr: Asr;
   visuals: Visuals;
+  /** Edits from before the advanced settings had none of these: best, uncorrected and bold. */
+  quality?: Quality;
+  correct?: boolean;
+  captions?: string;
 }
 
 /** A file as the page offers it: its path inside what was dropped, and its size in bytes. */
@@ -81,7 +99,11 @@ export function namesFrom(text: string): string[] {
 /** The settings in `input`, or why they cannot make an edit; `asr` unless it says otherwise. */
 export function checkSettings(input: unknown, asr: Asr = "local"): Settings | string {
   if (typeof input !== "object" || input === null) return "No settings";
-  const { length, aspect, style, names, musicLicense, visuals } = input as Record<string, unknown>;
+  const { length, aspect, style, names, terms, musicLicense, visuals } = input as Record<
+    string,
+    unknown
+  >;
+  const { quality, correct, captions } = input as Record<string, unknown>;
   const heard = (input as Record<string, unknown>).asr ?? asr;
   if (!ASRS.includes(heard as Asr)) return `Speech is heard ${ASRS.join(" or ")}`;
   if (typeof length !== "number") return "No length";
@@ -92,13 +114,27 @@ export function checkSettings(input: unknown, asr: Asr = "local"): Settings | st
   if (!STYLES.includes(chosen as Style)) return `The style is ${STYLES.join(", ")}`;
   const shown = visuals ?? DEFAULT_VISUALS;
   if (!VISUALS.includes(shown as Visuals)) return `Visuals are ${VISUALS.join(" or ")}`;
-  const list = names ?? [];
-  if (!Array.isArray(list) || list.some((name) => typeof name !== "string")) {
-    return "Names are a list of text";
+  const chosenQuality = quality ?? "best";
+  if (!QUALITIES.includes(chosenQuality as Quality)) return `Quality is ${QUALITIES.join(" or ")}`;
+  if (typeof (correct ?? false) !== "boolean") return "Transcript correction is on or off";
+  const chosenCaptions = captions ?? DEFAULT_CAPTIONS;
+  if (!CAPTION_STYLES.includes(chosenCaptions as string)) {
+    return `The caption style is ${CAPTION_STYLES.join(", ")}`;
   }
-  if (list.length > MAX_NAMES) return `At most ${MAX_NAMES} names and terms`;
-  if (list.some((name: string) => name.length > MAX_NAME_LENGTH || /[\r\n]/.test(name))) {
-    return `A name or term is one line of at most ${MAX_NAME_LENGTH} characters`;
+  const lists: Record<"names" | "terms", string[]> = { names: [], terms: [] };
+  for (const [key, value] of [
+    ["names", names],
+    ["terms", terms],
+  ] as const) {
+    const list = value ?? [];
+    if (!Array.isArray(list) || list.some((item) => typeof item !== "string")) {
+      return `${key === "names" ? "Names" : "Terms"} are a list of text`;
+    }
+    if (list.length > MAX_NAMES) return `At most ${MAX_NAMES} ${key}`;
+    if (list.some((item: string) => item.length > MAX_NAME_LENGTH || /[\r\n]/.test(item))) {
+      return `A ${key === "names" ? "name" : "term"} is one line of at most ${MAX_NAME_LENGTH} characters`;
+    }
+    lists[key] = list;
   }
   const license = musicLicense ?? "";
   if (typeof license !== "string") return "The music's licence is text";
@@ -109,10 +145,14 @@ export function checkSettings(input: unknown, asr: Asr = "local"): Settings | st
     length,
     aspect: aspect as Aspect,
     style: chosen as Style,
-    names: list as string[],
+    names: lists.names,
+    terms: lists.terms,
     ...(license.trim() ? { musicLicense: license.trim() } : {}),
     asr: heard as Asr,
     visuals: shown as Visuals,
+    quality: chosenQuality as Quality,
+    correct: (correct ?? false) as boolean,
+    captions: chosenCaptions as string,
   };
 }
 

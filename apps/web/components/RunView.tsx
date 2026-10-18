@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatEstimate } from "../lib/eta.ts";
 import type { Job, Stage } from "../lib/jobs.ts";
 import { formatBytes, formatClock, formatLength } from "../lib/settings.ts";
 import styles from "./editor.module.css";
@@ -13,6 +14,22 @@ const STAGE_TEXT: Record<Stage, { name: string; doing: string; what: string }> =
   check: { name: "Check", doing: "Checking", what: "Every cut reviewed and fixed" },
 };
 const ORDER: Stage[] = ["analyze", "plan", "render", "check"];
+
+type Step = NonNullable<NonNullable<Job["progress"]>["step"]>;
+
+/** The analysis's steps for one file, in the order vework takes them. */
+const STEPS: { step: Step; name: string }[] = [
+  { step: "probe", name: "Reading the file" },
+  { step: "shots", name: "Shots" },
+  { step: "speech", name: "Voice activity" },
+  { step: "loudness", name: "Loudness" },
+  { step: "events", name: "Audio events" },
+  { step: "faces", name: "Faces and speakers" },
+  { step: "denoise", name: "Speech clean-up" },
+  { step: "transcribe", name: "Transcript" },
+  { step: "correct", name: "Transcript correction" },
+  { step: "align", name: "Word timing" },
+];
 
 /** Seconds since `start`, kept current while `running`. */
 function useElapsed(start: number | undefined, end: number | undefined, running: boolean) {
@@ -53,6 +70,7 @@ export function RunView({ job }: { job: Job }) {
             <span className={styles.percentSign}>%</span>
           </span>
           <span className={styles.elapsed}>{formatClock(elapsed)} elapsed</span>
+          {running && job.finish !== undefined && <TimeLeft finish={job.finish} />}
         </div>
       </div>
 
@@ -104,7 +122,91 @@ export function RunView({ job }: { job: Job }) {
           );
         })}
       </ol>
+
+      <AnalysisSteps job={job} />
     </section>
+  );
+}
+
+/** The time left at the rate the edit has gone, counting down between its lines. */
+function TimeLeft({ finish }: { finish: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <span className={styles.elapsed} title="Estimated from how fast the edit has gone so far">
+      {formatEstimate((finish - now) / 1000)} (approximate)
+    </span>
+  );
+}
+
+/** The analysis's steps for the file it is on: done, running or still to come. A step vework
+ * had nothing to do for, such as faces in a file without picture, counts as done once it is
+ * passed. */
+function AnalysisSteps({ job }: { job: Job }) {
+  const running = job.status === "running";
+  const stage = job.progress?.stage;
+  const analysing = stage === "analyze";
+  const at = analysing ? STEPS.findIndex(({ step }) => step === job.progress?.step) : -1;
+  const passed = stage !== undefined && stage !== "analyze";
+  const failed = job.status === "error" && analysing;
+  const music = job.progress?.step === "music";
+  const shown = STEPS.filter(({ step }) => step !== "correct" || job.settings.correct);
+  return (
+    <div className={styles.substeps}>
+      <p className={styles.substepsHead}>
+        Analyse
+        {analysing && job.progress?.file && (
+          <span className={styles.substepsFile}>
+            {music ? "Music: " : ""}
+            {job.progress.file}
+          </span>
+        )}
+      </p>
+      <ul className={styles.substepList}>
+        {shown.map(({ step, name }) => {
+          const index = STEPS.findIndex((each) => each.step === step);
+          const state =
+            passed || (at >= 0 && index < at)
+              ? "done"
+              : index === at
+                ? failed
+                  ? "failed"
+                  : running
+                    ? "active"
+                    : "pending"
+                : "pending";
+          const count =
+            state === "active" && (step === "transcribe" || step === "align")
+              ? job.progress?.message.match(/(\d+\/\d+)/)?.[1]
+              : undefined;
+          return (
+            <li key={step} className={styles.substep} data-state={state}>
+              <span className={styles.substepDot}>
+                {state === "done" ? (
+                  <CheckIcon width={10} height={10} />
+                ) : state === "failed" ? (
+                  <AlertIcon width={10} height={10} />
+                ) : null}
+              </span>
+              <span>{name}</span>
+              {count && <span className={styles.substepCount}>{count}</span>}
+              <span className={styles.visuallyHidden}>
+                {state === "active"
+                  ? ", running"
+                  : state === "done"
+                    ? ", done"
+                    : state === "failed"
+                      ? ", failed"
+                      : ", pending"}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 

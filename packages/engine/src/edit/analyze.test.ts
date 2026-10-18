@@ -81,7 +81,7 @@ test("a file analysed before is read from the cache, without running vework agai
   assert.equal((await readFile(calls, "utf8")).trim().split("\n").length, 1);
 });
 
-test("the names reach vework only where it uses them, and key the index only there", async () => {
+test("the glossary reaches vework only where it uses it, and keys the index only there", async () => {
   const dir = await mkdtemp(join(tmpdir(), "names-"));
   const source = join(dir, "talk.mp4");
   await writeFile(source, "footage");
@@ -93,16 +93,17 @@ test("the names reach vework only where it uses them, and key the index only the
     version: "test",
   };
   const file = { given: source, path: source, kind: "video" as const };
-  const names = { path: join(dir, "names.txt"), text: "Lin Chia-ying\n" };
+  const glossary = { path: join(dir, "glossary.txt"), text: "Lin Chia-ying\nRemotion\n" };
   const quiet = () => {};
   const cases: [AnalysisOptions, string[]][] = [
     // vework refuses a glossary it would not use: OpenRouter takes no context prompt.
-    [{ correct: false, asr: "cloud", names }, ["--asr", "cloud"]],
+    [{ correct: false, asr: "cloud", glossary }, ["--asr", "cloud"]],
     [
-      { correct: true, asr: "cloud", names },
-      ["--correct", "--asr", "cloud", "--glossary", names.path],
+      { correct: true, asr: "cloud", glossary },
+      ["--correct", "--asr", "cloud", "--glossary", glossary.path],
     ],
-    [{ correct: false, names }, ["--glossary", names.path, "--asr-context"]],
+    [{ correct: false, glossary }, ["--glossary", glossary.path, "--asr-context"]],
+    [{ correct: true, glossary }, ["--correct", "--glossary", glossary.path, "--asr-context"]],
   ];
   for (const [options, extra] of cases) {
     await writeFile(calls, "");
@@ -112,11 +113,15 @@ test("the names reach vework only where it uses them, and key the index only the
   }
   const fingerprint = { sha256: "0".repeat(64), bytes: 7 };
   assert.equal(
-    indexName(worker, fingerprint, { correct: false, asr: "cloud", names }),
+    indexName(worker, fingerprint, { correct: false, asr: "cloud", glossary }),
     indexName(worker, fingerprint, { correct: false, asr: "cloud" }),
   );
   assert.notEqual(
-    indexName(worker, fingerprint, { correct: false, names }),
+    indexName(worker, fingerprint, { correct: true, asr: "cloud", glossary }),
+    indexName(worker, fingerprint, { correct: true, asr: "cloud" }),
+  );
+  assert.notEqual(
+    indexName(worker, fingerprint, { correct: false, glossary }),
     indexName(worker, fingerprint, { correct: false }),
   );
 });

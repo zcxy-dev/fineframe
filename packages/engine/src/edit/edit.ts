@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import {
   type ClaudeCost,
@@ -28,6 +29,7 @@ import { render } from "../render.ts";
 import { fingerprintOf } from "../sources.ts";
 import {
   type AnalysisOptions,
+  type AnalysisStep,
   analyze,
   analyzeMusic,
   type Download,
@@ -51,8 +53,14 @@ export interface EditOptions {
   aspect: Aspect;
   /** The video to write. `<name>.project.json`, `<name>.srt` and `edit_cuts.json` go beside it. */
   out: string;
-  /** A UTF-8 file of names and terms said in the footage, one per line. */
+  /** A UTF-8 file of people's names said in the footage, one per line: they help the speech
+   * model and the correction hear them, and a lower third may show them. */
   names?: string;
+  /** A UTF-8 file of terms said in the footage, one per line, such as brands and jargon: they
+   * only help the speech model and the correction hear them. */
+  terms?: string;
+  /** The caption preset (../captions/presets.ts): bold unless given. */
+  captions?: string;
   /** Claude corrects each transcript before its words are timed. */
   correct?: boolean;
   /** Where the speech is heard: by the local model (the default), or on OpenRouter with the
@@ -118,7 +126,7 @@ const CHECK_SHARE = 0.3;
 export async function edit(options: EditOptions): Promise<EditResult> {
   const emit = options.onProgress ?? (() => {});
   let last = 0;
-  const report: Reporter = (stage, fraction, message, file, download) => {
+  const report: Reporter = (stage, fraction, message, file, download, step) => {
     last = Math.max(last, Math.min(1, Math.round(fraction * 10_000) / 10_000));
     emit(
       validateProgress({
@@ -127,6 +135,7 @@ export async function edit(options: EditOptions): Promise<EditResult> {
         message,
         ...(file ? { file } : {}),
         ...(download ? { download } : {}),
+        ...(step ? { step } : {}),
       }),
     );
   };
@@ -156,6 +165,7 @@ type Reporter = (
   message: string,
   file?: string,
   download?: Download,
+  step?: AnalysisStep,
 ) => void;
 
 /** Downloads' progress as progress lines, for each at most one every quarter of a second and
@@ -220,12 +230,15 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
   if (videos.length === 0) throw new EditError("No video among the inputs to cut the edit from");
   const analysis: AnalysisOptions = { correct: options.correct ?? false };
   if (options.asr === "cloud") analysis.asr = "cloud";
-  if (options.names) {
-    const text = await readFile(options.names, "utf8").catch((error: Error) => {
-      throw new EditError(`${options.names}: cannot read the names file (${error.message})`);
+  const read = async (path: string | undefined, what: string) => {
+    if (!path) return undefined;
+    const text = await readFile(path, "utf8").catch((error: Error) => {
+      throw new EditError(`${path}: cannot read the ${what} file (${error.message})`);
     });
-    analysis.names = { path: resolve(options.names), text };
-  }
+    return { path: resolve(path), text };
+  };
+  const names = await read(options.names, "names");
+  const terms = await read(options.terms, "terms");
   const tracks = await collectMusic(options.music ?? [], options.musicLicense);
   // Images are only decoded, which is quick: a bad one fails before the long analysis.
   for (const file of files.filter((f) => f.kind === "image")) await checkImage(file);
@@ -248,6 +261,18 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
   await ffmpeg((bytes, total) => download("FFmpeg", bytes, total));
   const worker = options.worker ?? (await localWorker());
   const cache = options.cache ?? defaultCache();
+  // vework reads one glossary: the names or the terms as given, or both together in a file of
+  // the cache named by what it holds.
+  if (names && terms) {
+    const text = `${names.text.trimEnd()}\n${terms.text.trimEnd()}\n`;
+    const hash = createHash("sha256").update(text).digest("hex").slice(0, 16);
+    const path = join(cache, `glossary-${hash}.txt`);
+    await mkdir(cache, { recursive: true });
+    await writeFile(path, text);
+    analysis.glossary = { path, text };
+  } else if (names ?? terms) {
+    analysis.glossary = names ?? terms;
+  }
 
   // One file at a time: the speech model alone fills most of a 16 GB machine.
   report("analyze", 0, `Reading ${files.length === 1 ? "the file" : `${files.length} files`}`);
@@ -262,7 +287,7 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
       if (existsSync(path)) report("analyze", 0, "Analysed before", file.given);
       else {
         const step = (_: number, message: string, download?: Download) =>
-          report("analyze", 0, message, file.given, download);
+          report("analyze", 0, message, file.given, download, "music");
         await analyzeMusic(worker, file, path, license, step, log);
       }
       music.push({ index: path, source: file.path });
@@ -283,8 +308,8 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
       }
       // Empty files leave nothing pending; the analysis then fails on them.
       const span = pending > 0 ? (share * index.bytes) / pending : 0;
-      const step = (fraction: number, message: string, download?: Download) =>
-        report("analyze", at + fraction * span, message, file.given, download);
+      const step = (fraction: number, message: string, download?: Download, on?: AnalysisStep) =>
+        report("analyze", at + fraction * span, message, file.given, download, on);
       await analyze(worker, file, index.path, analysis, step, log);
       at += span;
     }
@@ -319,11 +344,12 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
           ? { look: options.look === "none" ? null : { id: options.look, intensity: 1 } }
           : {}),
         music,
-        // The names file also lists the people a lower third may name. It is the worker's
-        // glossary, where blank lines and lines starting with # are not names.
-        names: (analysis.names?.text.split(/\r?\n/) ?? [])
+        // The people a lower third may name, never the terms. The names file is in the
+        // glossary's format, where blank lines and lines starting with # are not names.
+        names: (names?.text.split(/\r?\n/) ?? [])
           .map((line) => line.trim())
           .filter((line) => line && !line.startsWith("#")),
+        ...(options.captions ? { captions: options.captions } : {}),
         claude,
         ...(options.quality ? { quality: options.quality } : {}),
         ...(options.visuals ? { visuals: options.visuals } : {}),

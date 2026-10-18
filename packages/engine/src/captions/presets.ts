@@ -2,7 +2,7 @@
 // areas they share. Lengths are in ems of the caption face, so a preset looks the same at every
 // output size; the aspect sets the em.
 
-import { COLORS } from "@video-editor/effects";
+import { COLORS } from "@video-editor/effects/layout";
 import type { Project } from "@video-editor/schema";
 import type { Weight } from "./fonts.ts";
 

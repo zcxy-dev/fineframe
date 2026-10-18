@@ -8,12 +8,13 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
-import type { ClaudeCost, Progress } from "@video-editor/schema";
+import type { ClaudeCost, Progress, StageProgress } from "@video-editor/schema";
+import { Finish } from "./eta.ts";
 import type { FixKind } from "./fixes.ts";
 import { readKey, type Service, VARIABLES } from "./key.ts";
 import { safeRelativePath } from "./paths.ts";
 import { type Run, runEdit } from "./runner.ts";
-import { type FileEntry, type Role, roleOf, type Settings } from "./settings.ts";
+import { DEFAULT_CAPTIONS, type FileEntry, type Role, roleOf, type Settings } from "./settings.ts";
 
 export type Stage = "analyze" | "plan" | "render" | "check";
 
@@ -37,8 +38,17 @@ export interface Job {
   finished?: number;
   /** When each stage began and ended, in epoch milliseconds. */
   stages: Partial<Record<Stage, { start: number; end?: number }>>;
-  /** The latest line of a stage. */
-  progress?: { stage: Stage; fraction: number; message: string; file?: string };
+  /** The latest line of a stage, with the analysis's step for the file it names. */
+  progress?: {
+    stage: Stage;
+    fraction: number;
+    message: string;
+    file?: string;
+    step?: StageProgress["step"];
+  };
+  /** When the edit will likely finish, in epoch milliseconds, at the rate it has gone so far;
+   * once there is enough to go on. */
+  finish?: number;
   /** A model downloading on its first use, while it downloads. */
   download?: { name: string; bytes: number; total: number; secondsLeft?: number };
   /** What Claude cost, by stage, once the edit is done or failed after a request. */
@@ -101,6 +111,8 @@ export class Jobs {
   readonly #key: (service: Service) => Promise<string | undefined>;
   /** Where each running job's current download started, for its time left. */
   readonly #downloads = new Map<string, { name: string; at: number; bytes: number }>();
+  /** Each running job's estimate of when it finishes. */
+  readonly #finishes = new Map<string, Finish>();
   readonly #jobs = new Map<string, Job>();
   readonly #runs = new Map<string, Run>();
   readonly #listeners = new Map<string, Set<(job: Job) => void>>();
@@ -263,7 +275,7 @@ export class Jobs {
     job.status = "running";
     job.started = Date.now();
     const dir = this.#dir(job);
-    const { length, aspect, style, names, musicLicense, visuals } = job.settings;
+    const { length, aspect, style, names, terms = [], musicLicense, visuals } = job.settings;
     const footage = (file: JobFile) => join("footage", file.path);
     const music = job.files.filter((file) => file.use === "music");
     const args = [
@@ -275,6 +287,9 @@ export class Jobs {
       "--look",
       style,
       `--visuals=${visuals}`,
+      ...["--quality", job.settings.quality ?? "best"],
+      ...(job.settings.correct ? ["--correct"] : []),
+      ...["--captions", job.settings.captions ?? DEFAULT_CAPTIONS],
       "-o",
       VIDEO,
       ...music.flatMap((file) => ["--music", footage(file)]),
@@ -283,9 +298,13 @@ export class Jobs {
       ...(job.settings.asr === "cloud" ? ["--asr", "cloud"] : []),
     ];
     try {
-      if (names.length > 0) {
-        await writeFile(join(dir, "names.txt"), `${names.join("\n")}\n`);
-        args.push("--names", "names.txt");
+      for (const [option, list] of [
+        ["names", names],
+        ["terms", terms],
+      ] as const) {
+        if (list.length === 0) continue;
+        await writeFile(join(dir, `${option}.txt`), `${list.join("\n")}\n`);
+        args.push(`--${option}`, `${option}.txt`);
       }
       await this.#save(job);
     } catch (error) {
@@ -380,7 +399,15 @@ export class Jobs {
         fraction: Math.max(job.progress?.fraction ?? 0, line.fraction),
         message: line.message,
         ...(line.file ? { file: line.file } : {}),
+        ...(line.step ? { step: line.step } : {}),
       };
+      let finish = this.#finishes.get(job.id);
+      if (!finish) {
+        finish = new Finish(job.settings.length);
+        this.#finishes.set(job.id, finish);
+      }
+      const estimate = finish.update(now, job.progress.fraction, stage, job.download !== undefined);
+      if (estimate !== undefined) job.finish = Math.round(estimate);
     }
     this.#emit(job);
   }
@@ -388,7 +415,9 @@ export class Jobs {
   async #finish(job: Job, code: number | null, log: readonly string[]): Promise<void> {
     this.#runs.delete(job.id);
     this.#downloads.delete(job.id);
+    this.#finishes.delete(job.id);
     delete job.download;
+    delete job.finish;
     const now = Date.now();
     job.finished = now;
     for (const stage of Object.values(job.stages)) stage.end ??= now;
@@ -491,7 +520,7 @@ function gigabytes(bytes: number): string {
 }
 
 /** Where jobs go unless VIDEO_EDITOR_JOBS says otherwise: beside the engine's own cache. */
-function defaultRoot(): string {
+export function defaultRoot(): string {
   return process.env.VIDEO_EDITOR_JOBS ?? join(homedir(), ".cache", "video-editor", "jobs");
 }
 

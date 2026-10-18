@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./broll": "./src/broll/index.ts",
+    "./captions": "./src/captions/presets.ts",
     "./claude": "./src/plan/claude.ts",
     "./estimate": "./src/plan/estimate.ts",
     "./length": "./src/edit/length.ts",
