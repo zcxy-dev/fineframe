@@ -120,6 +120,12 @@ test("bad input is refused, saying why", async () => {
     [{ settings: { ...settings, captions: "comic" } }, video, /caption style is bold, spotlight/],
     [{ settings: { ...settings, terms: "GPU" } }, video, /Terms are a list/],
     [{ settings: { ...settings, terms: ["GPU\nTPU"] } }, video, /A term is one line/],
+    [{ settings: { ...settings, instructions: 5 } }, video, /What you tell Claude is text/],
+    [
+      { settings: { ...settings, instructions: "x".repeat(2001) } },
+      video,
+      /Tell Claude what you want in at most 2000 characters, not 2001/,
+    ],
     [{ settings }, [], /Drop some footage/],
   ];
   for (const [body, files, pattern] of cases) {
@@ -339,6 +345,60 @@ test("the advanced settings reach the edit, and names or terms left empty are no
   assert.equal(after("--captions"), "sweep");
   assert.ok(!args.includes("--names"));
   assert.equal(after("--terms"), "terms.txt");
+});
+
+test("what the user tells Claude goes to the first edit's plan only, and is not remembered", async () => {
+  delete process.env.FAKE_RENDER_FAIL;
+  const one = (instructions: string) =>
+    create([{ path: "g.mp4", size: 2 }], {
+      settings: { ...settings, musicLicense: undefined, instructions },
+    });
+  // Trimmed, up to 2000 characters; only spaces is nothing asked.
+  const longest = await one(` ${"x".repeat(2000)} `);
+  assert.equal(longest.response.status, 201);
+  assert.equal(longest.body.settings.instructions, "x".repeat(2000));
+  assert.ok(!("instructions" in (await one("  \n ")).body.settings));
+
+  // A leading "-" must not read as one of the command's own options.
+  const { body: created } = await one(" -Open with the goal.\nLeave out the small talk. ");
+  const id = created.id;
+  assert.equal((await put(id, 0, new Uint8Array(2))).status, 200);
+  assert.equal((await start(id)).status, 200);
+  const read = async () =>
+    (await (await jobRoute.GET(new Request(url), ctx({ id }))).json()) as Job;
+  const until = async (done: (job: Job) => boolean) => {
+    for (;;) {
+      const job = await read();
+      if (done(job)) return job;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  };
+  await until((job) => job.status === "done");
+  const argsOf = async () =>
+    JSON.parse(await readFile(join(root, id, "args.json"), "utf8")) as string[];
+  const first = await argsOf();
+  assert.deepEqual(
+    first.filter((arg) => arg.startsWith("--instructions")),
+    ["--instructions=-Open with the goal.\nLeave out the small talk."],
+  );
+  // The next edit's box starts empty: only the names and terms are kept for it.
+  assert.deepEqual(await (await rememberedRoute.GET()).json(), {
+    names: ["王小明"],
+    terms: ["GPU"],
+  });
+
+  // A re-plan asks only what its own box says, and version 1 says it had instructions.
+  const replanned = await replanRoute.POST(
+    new Request(`${url}/${id}/replan`, {
+      method: "POST",
+      body: JSON.stringify({ length: 30, aspect: "1:1", music: "auto" }),
+    }),
+    ctx({ id }),
+  );
+  assert.equal(replanned.status, 200);
+  const job = await until((each) => each.render === undefined);
+  assert.equal(job.versions?.[0]?.summary, "The edit, with instructions");
+  assert.ok(!(await argsOf()).some((arg) => arg.startsWith("--instructions")));
 });
 
 test("the Pexels and Pixabay keys the page saved go to an edit with rich visuals only", async () => {

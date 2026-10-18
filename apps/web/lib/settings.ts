@@ -18,6 +18,9 @@ const MAX_NAMES = 200;
 const MAX_NAME_LENGTH = 100;
 export const MAX_LICENSE_LENGTH = 200;
 
+/** The longest instructions, as `pnpm edit --instructions` takes them. */
+export const INSTRUCTIONS_MAX = 2000;
+
 /** The edit's style: one of the engine's looks, or the footage's own colour. */
 export type Style = LookId | "none";
 export const STYLES: readonly Style[] = [...lookIds, "none"];
@@ -70,6 +73,8 @@ export interface Settings {
   quality?: Quality;
   correct?: boolean;
   captions?: string;
+  /** What the user asks of the edit, in their words, trimmed; absent when they ask nothing. */
+  instructions?: string;
 }
 
 /** A file as the page offers it: its path inside what was dropped, and its size in bytes. */
@@ -85,6 +90,14 @@ export function lengthProblem(length: number): string | null {
   if (length < shortest) return `The shortest edit is ${formatLength(shortest)}`;
   if (length > longest) return `The longest edit is ${formatLength(longest)}`;
   return null;
+}
+
+/** Why `text` cannot be what the user tells Claude, or null when it can. */
+export function instructionsProblem(text: string): string | null {
+  const length = text.trim().length;
+  return length > INSTRUCTIONS_MAX
+    ? `Tell Claude what you want in at most ${INSTRUCTIONS_MAX} characters, not ${length}`
+    : null;
 }
 
 /** The lines of a names field that hold a name, trimmed, without repeats. */
@@ -103,7 +116,7 @@ export function checkSettings(input: unknown, asr: Asr = "local"): Settings | st
     string,
     unknown
   >;
-  const { quality, correct, captions } = input as Record<string, unknown>;
+  const { quality, correct, captions, instructions } = input as Record<string, unknown>;
   const heard = (input as Record<string, unknown>).asr ?? asr;
   if (!ASRS.includes(heard as Asr)) return `Speech is heard ${ASRS.join(" or ")}`;
   if (typeof length !== "number") return "No length";
@@ -141,6 +154,10 @@ export function checkSettings(input: unknown, asr: Asr = "local"): Settings | st
   if (license.length > MAX_LICENSE_LENGTH || /[\r\n]/.test(license)) {
     return `The music's licence is one line of at most ${MAX_LICENSE_LENGTH} characters`;
   }
+  const asked = instructions ?? "";
+  if (typeof asked !== "string") return "What you tell Claude is text";
+  const tooLong = instructionsProblem(asked);
+  if (tooLong) return tooLong;
   return {
     length,
     aspect: aspect as Aspect,
@@ -153,6 +170,7 @@ export function checkSettings(input: unknown, asr: Asr = "local"): Settings | st
     quality: chosenQuality as Quality,
     correct: (correct ?? false) as boolean,
     captions: chosenCaptions as string,
+    ...(asked.trim() ? { instructions: asked.trim() } : {}),
   };
 }
 

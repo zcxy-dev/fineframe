@@ -56,6 +56,8 @@ export function summaryRows(job: Job): [string, string][] {
     ]);
   }
   if (job.settings.terms?.length) rows.push(["Terms", String(job.settings.terms.length)]);
+  // A re-plan's instructions are named in its version's summary instead.
+  if (first && job.settings.instructions) rows.push(["Planned", "With instructions"]);
   // What this version cost: the edit's plan, a re-plan's, or nothing for a change made without
   // one.
   const cost = first ? job.claude : shown?.claude;

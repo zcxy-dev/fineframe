@@ -15,6 +15,7 @@ import {
   formatBytes,
   formatDollars,
   formatLength,
+  instructionsProblem,
   namesFrom,
   roleOf,
 } from "../lib/settings.ts";
@@ -72,6 +73,7 @@ export function Editor() {
     quality: "best",
     correct: false,
     captions: DEFAULT_CAPTIONS,
+    instructions: "",
   });
   const [phase, setPhase] = useState<Phase>({ kind: "compose" });
   const upload = useRef<XMLHttpRequest | null>(null);
@@ -234,9 +236,10 @@ export function Editor() {
             : "Add at least one video: the edit is cut from video"
           : "problem" in length
             ? length.problem
-            : music > 0 && !choices.musicLicense.trim()
-              ? "Say under which licence you use the music"
-              : null;
+            : (instructionsProblem(choices.instructions) ??
+              (music > 0 && !choices.musicLicense.trim()
+                ? "Say under which licence you use the music"
+                : null));
 
   const start = async () => {
     if (blocked || !("seconds" in length)) return;
@@ -265,6 +268,8 @@ export function Editor() {
             quality: choices.quality,
             correct: choices.correct,
             captions: choices.captions,
+            // Nothing asked, nothing sent: the request is the same as without the box.
+            ...(choices.instructions.trim() ? { instructions: choices.instructions.trim() } : {}),
           },
           files: used.map((item) => ({ path: item.path, size: item.file.size })),
         }),
@@ -282,6 +287,8 @@ export function Editor() {
         setPhase({ kind: "compose", error: created.error ?? "The server refused the edit" });
         return;
       }
+      // What was asked of this edit is for its footage only; the next one starts empty.
+      setChoices((current) => ({ ...current, instructions: "" }));
       const total = used.reduce((sum, item) => sum + item.file.size, 0);
       let sent = 0;
       setPhase({ kind: "uploading", job: created, sent, total, file: 0 });
