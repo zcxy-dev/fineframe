@@ -1,0 +1,65 @@
+{
+  "doc": "packages/engine/MEASUREMENTS.md",
+  "columns": [
+    "Footage",
+    "Visuals",
+    "Asked",
+    "Made",
+    "Cuts inside words",
+    "Dead air ≥ 1 s",
+    "Clicks, drift",
+    "Analysis",
+    "Plan, render, check",
+    "Claude"
+  ],
+  "rows": [
+    [
+      "chat-b: synthetic conversation, 3 clips, 6.7 min",
+      "rich, without stock footage: 5 cards, 29 % of the edit",
+      "60 s, 9:16",
+      "58.9 s (-1.8 %)",
+      "0 of 12",
+      "0",
+      "0 of 5, 0.0 ms",
+      "from the cache",
+      "44 s, 57 s, 8 s",
+      "$0.19"
+    ],
+    [
+      "chat-b again, with the corpus's three synthetic tracks (`--music`, stated CC0) and a names file naming the guest (`--names`)",
+      "rich, without stock footage: 5 cards, 29 % of the edit",
+      "60 s, 9:16",
+      "59.3 s (-1.2 %)",
+      "0 of 12",
+      "0",
+      "0 of 5, 0.0 ms",
+      "9.9 min for the 3 clips and 3 tracks",
+      "58 s, 44 s, 8 s",
+      "$0.20"
+    ],
+    [
+      "Two-person interview, 5 clips from three cameras, 11.9 min",
+      "minimal, measured before rich visuals",
+      "60 s, 9:16",
+      "60.6 s (+1.0 %)",
+      "0 of 4",
+      "0",
+      "0 of 2, 0.0 ms",
+      "23.9 min",
+      "29 s, 28 s, 5 s",
+      "$0.10"
+    ],
+    [
+      "Live talks with slides, 3 clips, 8.8 min",
+      "minimal, measured before rich visuals",
+      "5 min, 16:9",
+      "301.5 s (+0.5 %)",
+      "0 of 57",
+      "0",
+      "0 of 28, 0.0 ms",
+      "16.0 min",
+      "52 s, 60 s, 21 s",
+      "$0.13"
+    ]
+  ]
+}
