@@ -1621,3 +1621,9 @@
 .versionItem[data-current="true"] {
   border-color: var(--text-2);
 }
+
+.replan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}

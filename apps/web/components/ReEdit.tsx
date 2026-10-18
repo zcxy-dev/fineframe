@@ -7,6 +7,7 @@ import type { EditView, Job } from "../lib/jobs.ts";
 import { formatClock } from "../lib/settings.ts";
 import styles from "./editor.module.css";
 import { AlertIcon } from "./icons.tsx";
+import { Replan } from "./Replan.tsx";
 
 /** Ticks in a second, as project.json counts time. */
 const TICKS = 120_000;
@@ -58,6 +59,7 @@ export function ReEdit({
   onJob: (job: Job) => void;
 }) {
   const [view, setView] = useState<EditView | null>(null);
+  const [replanning, setReplanning] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [selection, setSelection] = useState<[number, number] | null>(null);
   const [landed, setLanded] = useState<Landed | null>(null);
@@ -510,6 +512,18 @@ export function ReEdit({
           another music track cannot be changed here: Claude plans the edit again from the same
           footage, whose analysis is kept, so it takes a minute or two and one more plan.
         </p>
+        {replanning ? (
+          <Replan job={job} onJob={onJob} onClose={() => setReplanning(false)} />
+        ) : (
+          <button
+            type="button"
+            className={styles.button}
+            onClick={() => setReplanning(true)}
+            disabled={!view.footage || rendering !== null}
+          >
+            Re-plan…
+          </button>
+        )}
       </div>
 
       {error && (
