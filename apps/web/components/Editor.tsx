@@ -287,8 +287,6 @@ export function Editor() {
         setPhase({ kind: "compose", error: created.error ?? "The server refused the edit" });
         return;
       }
-      // What was asked of this edit is for its footage only; the next one starts empty.
-      setChoices((current) => ({ ...current, instructions: "" }));
       const total = used.reduce((sum, item) => sum + item.file.size, 0);
       let sent = 0;
       setPhase({ kind: "uploading", job: created, sent, total, file: 0 });
@@ -301,6 +299,9 @@ export function Editor() {
       const started = await fetch(`/api/jobs/${created.id}/start`, { method: "POST" });
       const job = (await started.json()) as Job & { error?: string };
       if (!started.ok) throw new Error(job.error ?? "The edit did not start");
+      // What was asked of this edit is for its footage only; the next one starts empty. An edit
+      // that never started keeps it, to try again.
+      setChoices((current) => ({ ...current, instructions: "" }));
       setPhase({ kind: "job", job });
     } catch (error) {
       if ((error as Error).name === "AbortError") return;
