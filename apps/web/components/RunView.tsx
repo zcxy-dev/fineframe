@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { formatEstimate } from "../lib/eta.ts";
 import type { Messages } from "../lib/i18n/messages.ts";
+import { downloadName, progressText } from "../lib/i18n/program.ts";
 import type { Job, Stage } from "../lib/jobs.ts";
 import { formatBytes, formatClock, formatLength } from "../lib/settings.ts";
 import styles from "./editor.module.css";
@@ -85,7 +86,7 @@ export function RunView({ job }: { job: Job }) {
         {current ? words.doing(words.stages[current].doing) : words.starting}
         <span className={styles.messageText}>
           {job.progress?.file && `${job.progress.file} — `}
-          {job.progress?.message ?? words.gettingReady}
+          {job.progress?.message ? progressText(job.progress.message, t) : words.gettingReady}
         </span>
       </p>
 
@@ -206,7 +207,7 @@ export function DownloadView({ download }: { download: NonNullable<Job["download
   const t = useT();
   const words = t.run;
   const { bytes, total, secondsLeft } = download;
-  const name = words.downloads[download.name] ?? download.name;
+  const name = downloadName(download.name, t);
   const percent = Math.floor((bytes / total) * 100);
   return (
     <div className={styles.download}>

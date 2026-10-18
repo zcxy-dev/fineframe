@@ -3,6 +3,7 @@
 import { join } from "node:path";
 import type { Revision } from "@video-editor/engine/revise";
 import type { ClaudeCost } from "@video-editor/schema";
+import type { Locale } from "./i18n/locale.ts";
 import { VIDEOS_KEPT } from "./retention.ts";
 
 export interface Version {
@@ -10,8 +11,10 @@ export interface Version {
   n: number;
   /** Epoch milliseconds. */
   created: number;
-  /** What changed from the version it was made from, for a person. */
+  /** What changed from the version it was made from, for a person, in English. */
   summary: string;
+  /** The same in each language the page speaks; versions from before had only the English. */
+  summaries?: Partial<Record<Locale, string>>;
   /** The version it was made from. */
   from?: number;
   /** Its length in seconds. */

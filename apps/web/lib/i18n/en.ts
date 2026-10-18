@@ -4,6 +4,38 @@
 import { PRESETS } from "@video-editor/engine/captions";
 import { LOOKS, type LookId, lookIds } from "@video-editor/engine/looks";
 
+/** The effects' cards, by their ids (packages/effects/src/cards.ts), which the page cannot import:
+ * its renderer is Node's. */
+export const CARD_IDS = [
+  "stat",
+  "kpis",
+  "list",
+  "checklist",
+  "versus",
+  "before-after",
+  "quote",
+  "steps",
+  "timeline",
+  "bar-chart",
+  "line-chart",
+  "ring",
+  "progress",
+  "chat",
+  "terminal",
+  "code",
+  "app",
+  "logo",
+  "icon-grid",
+  "definition",
+  "highlight",
+  "search",
+  "notifications",
+  "pros-cons",
+  "ranking",
+  "section",
+  "table",
+] as const;
+
 /** What the desktop app's first start downloads, as lib/setup.ts names it. */
 export const SETUP_DOWNLOAD = "the analysis environment (Python, PyTorch and the worker)";
 
@@ -268,7 +300,10 @@ export const en = {
     states: { active: ", running", done: ", done", failed: ", failed", pending: ", pending" },
     downloading: (name: string) => `Downloading ${name}`,
     /** What downloads that the page names itself; any other name is the program's. */
-    downloads: { [SETUP_DOWNLOAD]: SETUP_DOWNLOAD } as Record<string, string>,
+    downloads: {
+      [SETUP_DOWNLOAD]: SETUP_DOWNLOAD,
+      "Remotion's compositor": "Remotion's compositor",
+    } as Record<string, string>,
     left: (time: string) => ` · about ${time} left`,
     firstTime: " · only the first time it is used",
     cancel: "Cancel",
@@ -462,6 +497,101 @@ export const en = {
     replanned: (length: string, aspect: string) => `Planned again: ${length}, ${aspect}`,
     noMusic: "no music",
     withInstructions: "with instructions",
+  },
+  /** What the edit's programs say as they go (lib/i18n/program.ts reads each), in English as
+   * they write it. */
+  progress: {
+    probe: "Probing",
+    shots: "Detecting shots",
+    speech: "Finding speech",
+    loudness: "Measuring loudness",
+    sections: "Measuring loudness and sections",
+    events: "Finding audio events",
+    faces: "Finding faces",
+    denoise: "Removing noise from speech",
+    transcribe: (count: string) => `Transcribing ${count}`,
+    transcribeCost: (count: string, dollars: string) =>
+      `Transcribing ${count} (US$${dollars} so far)`,
+    transcribed: (dollars: string, perMinute: string) =>
+      `Transcribed on OpenRouter for US$${dollars} (US$${perMinute} per source minute)`,
+    correct: (chunks: string, model: string, batch: boolean) =>
+      `Correcting ${chunks} chunks with ${model}${batch ? " in a Message Batch" : ""}`,
+    correctBatch: (batch: string, count: string) => `Correction batch ${batch}: ${count} done`,
+    align: (count: string) => `Aligning ${count}`,
+    decode: "Decoding",
+    beats: (model: string) => `Finding beats with beat_this ${model}`,
+    downloading: (name: string) => `Downloading ${name}`,
+    downloadingFirst: (name: string) => `Downloading ${name}, the first time it is used`,
+    /** A model downloading, by what it is for: English names it alone. */
+    model: (_kind: string, name: string) => name,
+    models: {
+      speech: "speech model",
+      aligner: "word timing model",
+      events: "audio events model",
+      denoise: "speech clean-up model",
+      beats: "beat model",
+    },
+    checkClaude: "Checking that Claude can plan the edit",
+    readFile: "Reading the file",
+    readFiles: (files: string) => `Reading ${files} files`,
+    analysedBefore: "Analysed before",
+    planning: (short: boolean, model: string) =>
+      `Planning ${short ? "a short" : "a long"} edit with ${model}`,
+    planned: (model: string, dollars: string) => `${model} planned the edit (${dollars})`,
+    rewroteCards: (model: string, dollars: string) =>
+      `Rewrote the cards whose text broke their layout with ${model} (${dollars})`,
+    sourced: (ready: string, visuals: string) => `Sourced ${ready} of ${visuals} visuals`,
+    located: (found: string, wishes: string, model: string, cost: string) =>
+      `Found ${found} of ${wishes} things to point at with ${model} (${cost})`,
+    requests: (requests: string, dollars: string) => `${requests} requests, ${dollars}`,
+    cached: "all cached",
+    tooShort: (seconds: string) => `The edit lasts ${seconds} s; asking for more material`,
+    leftOutKind: (kind: string, _name: string, line: string, reason: string) =>
+      `Left out the ${kind} visual on line ${line}: ${reason}`,
+    /** The kinds of visual the plan asks for. */
+    visuals: { stock: "stock", web: "web", card: "card" } as Record<string, string>,
+    notJson: "The plan's visuals are not JSON; the edit has none",
+    notList: "The plan's visuals are not a list; the edit has none",
+    otherShape: (json: string) => `Left out a visual the plan gave in another shape: ${json}`,
+    leftOutOn: (source: string, line: string, problem: string) =>
+      `Left out a visual on ${source} line ${line}: ${problem}`,
+    measuringColour: (clips: string) => `Measuring the colour of ${clips} clips`,
+    leftColour: (source: string, problem: string) =>
+      `Left the colour of ${source} as it is: ${problem}`,
+    matchedColour: (source: string, reference: string) =>
+      `Matched the colour of ${source} to ${reference}`,
+    reviewing: (pass: string, cuts: string, model: string) =>
+      `Review ${pass}: checking ${cuts} cuts with ${model}`,
+    reviewed: (pass: string, cuts: string, judged: string, model: string, dollars: string) =>
+      `Review ${pass}: ${cuts} cuts checked, ${judged} judged by ${model} (${dollars})`,
+    refitting: (pass: string) => `Review ${pass}: fixing cuts and fitting again`,
+    checkingSources: "Checking sources",
+    mixingSound: (count: string) => `Mixing sound ${count}`,
+    mixingMusic: "Mixing music",
+    rendering: (count: string) => `Rendering ${count}`,
+    finished: "Finished",
+    preparingEffects: "Preparing the effects renderer",
+    renderingEffect: (count: string, id: string, _name: string) =>
+      `Rendering effect ${count} (${id})`,
+    preparingChanges: "Preparing the changes",
+    planningAgain: "Planning again",
+    startingRender: "Starting the render",
+  },
+  /** What the re-edit lists over the speaker, as the engine labels each (revise.ts). */
+  overlays: {
+    templates: {
+      title: "Title",
+      "lower-third": "Lower third",
+      keyword: "Keyword",
+      chapter: "Chapter",
+      callout: "Callout",
+      wipe: "Wipe",
+    } as Record<string, string>,
+    /** The cards, by their ids, which English names them by. */
+    cards: Object.fromEntries(CARD_IDS.map((id) => [id, id])) as Record<string, string>,
+    labelled: (name: string, text: string) => `${name}: ${text}`,
+    card: (kind: string, text?: string) => `Card (${kind})${text === undefined ? "" : `: ${text}`}`,
+    broll: (name: string) => `B-roll: ${name}`,
   },
   errors: {
     show: "Show details",

@@ -11,14 +11,16 @@ import {
   useRef,
   useState,
 } from "react";
-import type { Messages } from "../lib/i18n/messages.ts";
+import { LOCALES } from "../lib/i18n/locale.ts";
+import { en, MESSAGES, type Messages } from "../lib/i18n/messages.ts";
+import { overlayLabel, progressText } from "../lib/i18n/program.ts";
 import type { EditView, Job } from "../lib/jobs.ts";
 import { formatClock, formatDollars } from "../lib/settings.ts";
 import { dollarsOf } from "../lib/summary.ts";
 import { spacedWords } from "../lib/transcript.ts";
 import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
-import { useT } from "./I18n.tsx";
+import { useLocale, useT } from "./I18n.tsx";
 import { Replan } from "./Replan.tsx";
 
 /** Ticks in a second, as project.json counts time. */
@@ -206,7 +208,13 @@ export function ReEdit({
     const response = await fetch(`/api/jobs/${job.id}/versions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ revision, summary: describe(draft, t) }),
+      body: JSON.stringify({
+        revision,
+        summary: describe(draft, en),
+        summaries: Object.fromEntries(
+          LOCALES.map((locale) => [locale, describe(draft, MESSAGES[locale])]),
+        ),
+      }),
     });
     const body = (await response.json().catch(() => ({}))) as Job & { error?: string };
     if (!response.ok) setError(body.error ?? words.notApplied);
@@ -617,7 +625,7 @@ export function ReEdit({
               return (
                 <li key={id} className={styles.overlayItem} data-removed={removed}>
                   <span className={styles.tabular}>{formatClock(item.start / TICKS)}</span>
-                  <span className={styles.overlayLabel}>{item.label}</span>
+                  <span className={styles.overlayLabel}>{overlayLabel(item.label, t)}</span>
                   <button
                     type="button"
                     className={styles.inlineButton}
@@ -663,7 +671,7 @@ export function ReEdit({
       {rendering ? (
         <div className={styles.uploading} aria-live="polite">
           <div className={styles.uploadHead}>
-            <span>{words.rendering(rendering.version, rendering.message)}</span>
+            <span>{words.rendering(rendering.version, progressText(rendering.message, t))}</span>
             <span className={styles.tabular}>{Math.floor(rendering.fraction * 100)}%</span>
           </div>
           <div className={styles.bar}>
@@ -751,6 +759,7 @@ function Timeline({
 /** The versions of a finished edit, newest first, to show again. */
 export function Versions({ job, onJob }: { job: Job; onJob: (job: Job) => void }) {
   const t = useT();
+  const { locale } = useLocale();
   const words = t.versions;
   const versions = job.versions ?? [];
   const [error, setError] = useState<string | null>(null);
@@ -782,10 +791,11 @@ export function Versions({ job, onJob }: { job: Job; onJob: (job: Job) => void }
                 {version.seconds !== undefined && ` · ${formatClock(version.seconds)}`}
                 {version.claude && ` · Claude ${formatDollars(dollarsOf(version.claude), t)}`}
                 {" · "}
-                {/* The first is the edit itself, whichever language its record was made in. */}
+                {/* The first is the edit itself, whichever language its record was made in; a
+                    later one from before the summaries in each language has only the English. */}
                 {version.n === 1
                   ? words.first(Boolean(job.settings.instructions))
-                  : version.summary}
+                  : (version.summaries?.[locale] ?? version.summary)}
                 {busy && job.render?.version === version.n
                   ? words.rendering
                   : !version.video && words.notKept}

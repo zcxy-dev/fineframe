@@ -27,7 +27,8 @@ import {
 } from "@video-editor/schema";
 import { Finish } from "./eta.ts";
 import type { FixKind } from "./fixes.ts";
-import { en, type Messages } from "./i18n/en.ts";
+import { LOCALES } from "./i18n/locale.ts";
+import { en, MESSAGES, type Messages } from "./i18n/messages.ts";
 import { readKey, type Service, VARIABLES } from "./key.ts";
 import { safeRelativePath } from "./paths.ts";
 import { FOOTAGE_KEPT } from "./retention.ts";
@@ -765,7 +766,12 @@ export class Jobs {
 
   /** Makes the next version from the one shown with `revision`, and renders it; the one shown
    * stays until it is done. */
-  async revise(id: string, revision: Revision, summary: string): Promise<Job> {
+  async revise(
+    id: string,
+    revision: Revision,
+    summary: string,
+    summaries?: Version["summaries"],
+  ): Promise<Job> {
     const job = await this.#finished(id);
     this.#refuseWhileRunning();
     this.#requireFootage(job);
@@ -793,6 +799,7 @@ export class Jobs {
       n,
       created: Date.now(),
       summary,
+      ...(summaries ? { summaries } : {}),
       from,
       video: false,
       look: lookOf(revised),
@@ -805,7 +812,7 @@ export class Jobs {
   /** Plans the edit again from the same footage, its analysis cached, as the next version: at
    * another length or aspect, with other music, or with what the user asks of it. The version
    * shown stays until the new one is done. */
-  async replan(id: string, choice: ReplanChoice, t: Messages = en): Promise<Job> {
+  async replan(id: string, choice: ReplanChoice): Promise<Job> {
     const job = await this.#finished(id);
     const keys = await this.#requireKeys(job.settings);
     this.#refuseWhileRunning();
@@ -853,15 +860,10 @@ export class Jobs {
     const version: Version = {
       n,
       created: Date.now(),
-      summary: [
-        t.versions.replanned(formatLength(choice.length, t), choice.aspect),
-        ...(choice.music === "none"
-          ? [t.versions.noMusic]
-          : choice.music === "auto"
-            ? []
-            : [choice.music.split("/").at(-1) as string]),
-        ...(choice.instructions ? [t.versions.withInstructions] : []),
-      ].join(t.list),
+      summary: replanned(choice, en),
+      summaries: Object.fromEntries(
+        LOCALES.map((locale) => [locale, replanned(choice, MESSAGES[locale])]),
+      ),
       from,
       video: false,
       length: choice.length,
@@ -1112,6 +1114,19 @@ function stringParams(params: Record<string, unknown>): Record<string, string> {
       (entry): entry is [string, string] => typeof entry[1] === "string",
     ),
   );
+}
+
+/** A re-plan's version as the list names it, in `t`'s words. */
+function replanned(choice: ReplanChoice, t: Messages): string {
+  return [
+    t.versions.replanned(formatLength(choice.length, t), choice.aspect),
+    ...(choice.music === "none"
+      ? [t.versions.noMusic]
+      : choice.music === "auto"
+        ? []
+        : [choice.music.split("/").at(-1) as string]),
+    ...(choice.instructions ? [t.versions.withInstructions] : []),
+  ].join(t.list);
 }
 
 function gigabytes(bytes: number): string {
