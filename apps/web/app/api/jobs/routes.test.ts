@@ -518,7 +518,8 @@ test("a re-plan makes a new version from the same footage, at another length, as
     assert.equal((await put(id, index, new Uint8Array(2))).status, 200);
   }
   assert.equal((await start(id)).status, 200);
-  const read = async () => (await (await jobRoute.GET(new Request(url), ctx({ id }))).json()) as Job;
+  const read = async () =>
+    (await (await jobRoute.GET(new Request(url), ctx({ id }))).json()) as Job;
   const until = async (done: (job: Job) => boolean) => {
     for (;;) {
       const job = await read();
@@ -563,10 +564,13 @@ test("a re-plan makes a new version from the same footage, at another length, as
   ]);
   assert.equal(args[args.indexOf("-o") + 1], join("out", "edit-v2.mp4"));
   assert.deepEqual(
-    args.filter((arg, i) => args[i - 1] === "--music"),
+    args.filter((_, i) => args[i - 1] === "--music"),
     [join("footage", "music", "two.mp3")],
   );
   assert.ok(args.includes("--instructions=-Open with the demo."));
   // The page plays the track the new version chose.
   assert.deepEqual(job.result?.music, ["music/two.mp3"]);
+  // Its download is named by its own length and aspect.
+  const video = await videoRoute.GET(new Request(`${url}/${id}/video?download`), ctx({ id }));
+  assert.match(video.headers.get("content-disposition") ?? "", /edit-30s-1x1\.mp4/);
 });

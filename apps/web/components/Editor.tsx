@@ -7,6 +7,7 @@ import { durationOf } from "../lib/collect.ts";
 import { fixFor } from "../lib/fixes.ts";
 import type { Job } from "../lib/jobs.ts";
 import type { Service } from "../lib/key.ts";
+import { shownPlan } from "../lib/paths.ts";
 import type { Remembered } from "../lib/remembered.ts";
 import {
   DEFAULT_CAPTIONS,
@@ -627,8 +628,9 @@ function Summary({ job }: { job: Job }) {
   const photos = job.files.filter((file) => file.use === "image").length;
   const offered = job.files.filter((file) => file.use === "music").length;
   const rows: [string, string][] = [
-    ["Length", formatLength(job.settings.length)],
-    ["Aspect", job.settings.aspect],
+    // The version shown's, which a re-plan may have changed.
+    ["Length", formatLength(shownPlan(job).length)],
+    ["Aspect", shownPlan(job).aspect],
     ["Style", styleName(job.settings.style)],
     ["Speech", job.settings.asr === "cloud" ? "OpenRouter" : "On this computer"],
     // Edits from before the setting had none.

@@ -12,7 +12,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
     const path = await store.output(job.id, "video");
     if (!path) throw new JobError("The video is not ready", 404);
     const download = new URL(request.url).searchParams.has("download")
-      ? downloadName(job.settings.length, job.settings.aspect, "mp4")
+      ? downloadName(job, "mp4")
       : undefined;
     return await fileResponse(path, request, "video/mp4", download);
   } catch (error) {
