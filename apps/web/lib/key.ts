@@ -11,6 +11,7 @@ import { resolve } from "node:path";
 import { parseEnv, promisify } from "node:util";
 import Anthropic from "@anthropic-ai/sdk";
 import { PLAN_MODELS } from "@video-editor/engine/claude";
+import { en, type Messages } from "./i18n/en.ts";
 
 export type Service = "anthropic" | "openrouter" | "pexels" | "pixabay";
 export const SERVICES: readonly Service[] = ["anthropic", "openrouter", "pexels", "pixabay"];
@@ -35,57 +36,64 @@ export async function readKey(service: Service = "anthropic"): Promise<string | 
   return parseEnv(text)[name] || process.env[name] || undefined;
 }
 
-/** Why `key` cannot be a key for `service`, or null. */
-export function keyProblem(key: string, service: Service = "anthropic"): string | null {
+/** Why `key` cannot be a key for `service`, in `t`'s words, or null. */
+export function keyProblem(
+  key: string,
+  service: Service = "anthropic",
+  t: Messages = en,
+): string | null {
   // Keys are letters, digits, dashes and underscores after their prefix; anything else, such as
   // a line break, could also break the file they are saved in. Pexels and Pixabay keys have no
   // prefix.
   if (service === "pexels" || service === "pixabay") {
-    return /^[\w-]{1,400}$/.test(key)
-      ? null
-      : "Paste the whole key: one line of letters and digits";
+    return /^[\w-]{1,400}$/.test(key) ? null : t.server.pasteKey;
   }
   const prefix = service === "anthropic" ? "sk-ant-" : "sk-or-";
   if (!new RegExp(`^${prefix}[\\w-]{1,400}$`).test(key)) {
-    return `Paste the whole key: one line, starting with ${prefix}`;
+    return t.server.pastePrefixed(prefix);
   }
   return null;
 }
 
-/** Asks `service` whether `key` works, at no cost: null when it does, or what to do. */
-export function checkKey(key: string, service: Service = "anthropic"): Promise<string | null> {
-  if (service === "anthropic") return checkAnthropic(key);
-  if (service === "openrouter") return checkOpenRouter(key);
-  return checkStock(key, service);
+/** Asks `service` whether `key` works, at no cost: null when it does, or what to do, in `t`'s
+ * words. */
+export function checkKey(
+  key: string,
+  service: Service = "anthropic",
+  t: Messages = en,
+): Promise<string | null> {
+  if (service === "anthropic") return checkAnthropic(key, t);
+  if (service === "openrouter") return checkOpenRouter(key, t);
+  return checkStock(key, service, t);
 }
 
 /** Whether `key` can plan an edit: it looks up the planning model. */
-async function checkAnthropic(key: string): Promise<string | null> {
+async function checkAnthropic(key: string, t: Messages): Promise<string | null> {
   const client = new Anthropic({ apiKey: key, maxRetries: 1, timeout: 20_000 });
   try {
     await client.models.retrieve(PLAN_MODELS.best);
     return null;
   } catch (error) {
     if (error instanceof Anthropic.AuthenticationError) {
-      return "Anthropic did not accept this key. Copy it again from console.anthropic.com/settings/keys";
+      return t.server.rejected("Anthropic", "console.anthropic.com/settings/keys");
     }
     if (
       error instanceof Anthropic.PermissionDeniedError ||
       error instanceof Anthropic.NotFoundError
     ) {
-      return `This key cannot use ${PLAN_MODELS.best}, which plans the edit. Use a key from an account that has it`;
+      return t.server.noModel(PLAN_MODELS.best);
     }
     if (error instanceof Anthropic.APIConnectionError) {
-      return "Could not reach Anthropic to check the key. Check the internet connection and try again";
+      return t.server.unreachable("Anthropic");
     }
     // Anthropic's own words, which never hold the key.
-    return `Anthropic could not check the key: ${(error as Error).message}`;
+    return t.server.anthropicSaid((error as Error).message);
   }
 }
 
 /** Whether OpenRouter knows `key`: it reads the key's own details, as vework does before it
  * sends any speech. OPENROUTER_BASE_URL moves the server, as it does for vework. */
-async function checkOpenRouter(key: string): Promise<string | null> {
+async function checkOpenRouter(key: string, t: Messages): Promise<string | null> {
   const api = (process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1").replace(
     /\/$/,
     "",
@@ -97,16 +105,20 @@ async function checkOpenRouter(key: string): Promise<string | null> {
     });
     if (response.ok) return null;
     if (response.status === 401) {
-      return "OpenRouter did not accept this key. Copy it again from openrouter.ai/settings/keys";
+      return t.server.rejected("OpenRouter", "openrouter.ai/settings/keys");
     }
-    return `OpenRouter could not check the key (HTTP ${response.status}). Try again`;
+    return t.server.uncheckable("OpenRouter", response.status);
   } catch {
-    return "Could not reach OpenRouter to check the key. Check the internet connection and try again";
+    return t.server.unreachable("OpenRouter");
   }
 }
 
 /** Whether Pexels or Pixabay takes `key`: one search for a single clip, which is free. */
-async function checkStock(key: string, service: "pexels" | "pixabay"): Promise<string | null> {
+async function checkStock(
+  key: string,
+  service: "pexels" | "pixabay",
+  t: Messages,
+): Promise<string | null> {
   const [name, url, init] =
     service === "pexels"
       ? [
@@ -125,11 +137,11 @@ async function checkStock(key: string, service: "pexels" | "pixabay"): Promise<s
     // Pixabay answers a key it does not know with 400.
     if ([400, 401, 403].includes(response.status)) {
       const site = service === "pexels" ? "pexels.com/api" : "pixabay.com/api/docs";
-      return `${name} did not accept this key. Copy it again from ${site}`;
+      return t.server.rejected(name, site);
     }
-    return `${name} could not check the key (HTTP ${response.status}). Try again`;
+    return t.server.uncheckable(name, response.status);
   } catch {
-    return `Could not reach ${name} to check the key. Check the internet connection and try again`;
+    return t.server.unreachable(name);
   }
 }
 

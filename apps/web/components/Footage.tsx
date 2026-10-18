@@ -4,6 +4,7 @@ import { type DragEvent, useRef, useState } from "react";
 import { fromDrop, fromInput, type Picked } from "../lib/collect.ts";
 import { formatBytes, formatClock, type Role } from "../lib/settings.ts";
 import styles from "./editor.module.css";
+import { useT } from "./I18n.tsx";
 import {
   AudioIcon,
   CloseIcon,
@@ -37,6 +38,8 @@ interface Props {
 
 /** The drop zone, then the list of what was dropped. */
 export function Footage({ items, skipped, onAdd, onRemove, onToggle, onClear }: Props) {
+  const t = useT();
+  const words = t.footage;
   const [over, setOver] = useState(false);
   const files = useRef<HTMLInputElement>(null);
   const folder = useRef<HTMLInputElement>(null);
@@ -59,7 +62,7 @@ export function Footage({ items, skipped, onAdd, onRemove, onToggle, onClear }: 
       <section
         className={compact ? `${styles.drop} ${styles.dropCompact}` : styles.drop}
         data-over={over}
-        aria-label="Drop footage here"
+        aria-label={words.dropHere}
         onDragEnter={(event) => {
           event.preventDefault();
           depth.current += 1;
@@ -76,24 +79,17 @@ export function Footage({ items, skipped, onAdd, onRemove, onToggle, onClear }: 
           <UploadIcon width={22} height={22} />
         </div>
         <div className={styles.dropText}>
-          <p className={styles.dropTitle}>
-            {compact ? "Drop more footage" : "Drop video files or a whole folder"}
-          </p>
-          {!compact && (
-            <p className={styles.dropHint}>
-              Videos are cut into the edit; photos can appear over it as B-roll, and audio files are
-              music for it.
-            </p>
-          )}
+          <p className={styles.dropTitle}>{compact ? words.dropMore : words.drop}</p>
+          {!compact && <p className={styles.dropHint}>{words.hint}</p>}
         </div>
         <div className={styles.dropButtons}>
           <button type="button" className={styles.button} onClick={() => files.current?.click()}>
             <PlusIcon width={16} height={16} />
-            Choose files
+            {words.chooseFiles}
           </button>
           <button type="button" className={styles.button} onClick={() => folder.current?.click()}>
             <FolderIcon width={16} height={16} />
-            Choose a folder
+            {words.chooseFolder}
           </button>
         </div>
         <input
@@ -123,17 +119,17 @@ export function Footage({ items, skipped, onAdd, onRemove, onToggle, onClear }: 
         <div className={`${styles.card} ${styles.files}`}>
           <div className={styles.filesHead}>
             <div>
-              <h2 className={styles.filesTitle}>Footage</h2>
+              <h2 className={styles.filesTitle}>{words.title}</h2>
               <p className={styles.filesMeta}>
-                {videos.length} {videos.length === 1 ? "video" : "videos"}
-                {photos > 0 && ` · ${photos} ${photos === 1 ? "photo" : "photos"}`}
-                {music > 0 && ` · ${music} music ${music === 1 ? "track" : "tracks"}`}
-                {seconds > 0 && ` · ${formatClock(seconds)} in all`}
-                {skipped > 0 && ` · ${skipped} other ${skipped === 1 ? "file" : "files"} left out`}
+                {words.videos(videos.length)}
+                {photos > 0 && ` · ${words.photos(photos)}`}
+                {music > 0 && ` · ${words.tracks(music)}`}
+                {seconds > 0 && ` · ${words.inAll(formatClock(seconds))}`}
+                {skipped > 0 && ` · ${words.leftOut(skipped)}`}
               </p>
             </div>
             <button type="button" className={styles.linkButton} onClick={onClear}>
-              Clear all
+              {words.clear}
             </button>
           </div>
           <ul className={styles.fileList}>
@@ -154,21 +150,21 @@ export function Footage({ items, skipped, onAdd, onRemove, onToggle, onClear }: 
                   </span>
                   <span className={styles.fileMeta}>
                     {item.off ? (
-                      <span className={styles.badge}>Not used</span>
+                      <span className={styles.badge}>{words.notUsed}</span>
                     ) : (
                       <>
-                        {item.use === "music" && "Music · "}
+                        {item.use === "music" && `${words.music} · `}
                         {item.use !== "image" && (
                           <>
                             {item.duration === undefined
                               ? "…"
                               : item.duration === null
-                                ? "Length unknown"
+                                ? words.lengthUnknown
                                 : formatClock(item.duration)}
                             {" · "}
                           </>
                         )}
-                        {item.use === "image" && "Photo · "}
+                        {item.use === "image" && `${words.photo} · `}
                         {formatBytes(item.file.size)}
                       </>
                     )}
@@ -178,10 +174,14 @@ export function Footage({ items, skipped, onAdd, onRemove, onToggle, onClear }: 
                         <button
                           type="button"
                           className={styles.inlineButton}
-                          aria-label={`${item.off ? "Use" : "Don't use"} ${item.path} as music`}
+                          aria-label={
+                            item.off
+                              ? words.asMusicLabel(item.path)
+                              : words.notMusicLabel(item.path)
+                          }
                           onClick={() => onToggle(item.key)}
                         >
-                          {item.off ? "Use as music" : "Don't use"}
+                          {item.off ? words.asMusic : words.notMusic}
                         </button>
                       </>
                     )}
@@ -190,7 +190,7 @@ export function Footage({ items, skipped, onAdd, onRemove, onToggle, onClear }: 
                 <button
                   type="button"
                   className={styles.iconButton}
-                  aria-label={`Remove ${item.path}`}
+                  aria-label={words.remove(item.path)}
                   onClick={() => onRemove(item.key)}
                 >
                   <CloseIcon width={16} height={16} />

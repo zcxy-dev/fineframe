@@ -10,6 +10,6 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     await jobs().remove((await ctx.params).id);
     return new Response(null, { status: 204 });
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

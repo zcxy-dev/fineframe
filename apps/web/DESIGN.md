@@ -113,7 +113,7 @@ Tokens live in `app/globals.css`; `components/editor.module.css` uses them. The 
 
 ### Hierarchy
 - **Display** (Archivo 600, 26px; 22px on phones): screen titles, such as the compose title and "Making your edit"; panel titles 22px.
-- **Slug** (Archivo 600, 11.5px caps, 0.06em): a pane section's heading only (Footage, Projects, Versions, Change the edit and its sections, the analysis steps). Field labels are never slugs.
+- **Slug** (Archivo 600, 11.5px caps, 0.06em; in Chinese, which has no caps, 12.5px at 0.08em): a pane section's heading only (Footage, Projects, Versions, Change the edit and its sections, the analysis steps). Field labels are never slugs.
 - **xl** (24px), **lg** (17px): the run's percentage and the drop zone's title.
 - **md** (15px): body and transcript words.
 - **sm** (13.5px): controls, labels, file names, messages. Field labels are 600 in the inspector.

@@ -3,6 +3,7 @@
 import { type ReactNode, useId, useState } from "react";
 import { explain } from "../lib/fixes.ts";
 import styles from "./editor.module.css";
+import { useT } from "./I18n.tsx";
 import { AlertIcon } from "./icons.tsx";
 
 /** Something that failed, as a person reads it: what happened and what to do, with the program's
@@ -19,7 +20,8 @@ export function ErrorNote({
 }) {
   const [open, setOpen] = useState(false);
   const id = useId();
-  const { summary, next, details } = explain(message, fallback);
+  const t = useT();
+  const { summary, next, details } = explain(message, fallback, t);
   return (
     <div className={styles.error} role="alert">
       <AlertIcon width={16} height={16} />
@@ -35,7 +37,7 @@ export function ErrorNote({
               aria-controls={id}
               onClick={() => setOpen(!open)}
             >
-              {open ? "Hide details" : "Show details"}
+              {open ? t.errors.hide : t.errors.show}
             </button>
             <pre id={id} className={styles.errorDetails} hidden={!open}>
               {details}

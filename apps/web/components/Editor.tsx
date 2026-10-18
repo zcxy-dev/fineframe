@@ -6,6 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Picked } from "../lib/collect.ts";
 import { durationOf } from "../lib/collect.ts";
 import { fixFor } from "../lib/fixes.ts";
+import { LOCALE_NAMES, LOCALES } from "../lib/i18n/locale.ts";
+import type { Messages } from "../lib/i18n/messages.ts";
 import type { Job } from "../lib/jobs.ts";
 import type { Service } from "../lib/key.ts";
 import type { Remembered } from "../lib/remembered.ts";
@@ -25,6 +27,7 @@ import { dollarsOf, summaryRows } from "../lib/summary.ts";
 import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
 import { Footage, type Item } from "./Footage.tsx";
+import { useLocale, useT } from "./I18n.tsx";
 import { CaptionsIcon, CheckIcon, DownloadIcon, LockIcon } from "./icons.tsx";
 import { KeyDialog } from "./KeyDialog.tsx";
 import { Projects } from "./Projects.tsx";
@@ -60,6 +63,8 @@ function showInAddress(id: string | null): void {
 }
 
 export function Editor() {
+  const t = useT();
+  const { locale, choose } = useLocale();
   const [items, setItems] = useState<Item[]>([]);
   const [skipped, setSkipped] = useState(0);
   const [choices, setChoices] = useState<Choices>({
@@ -226,24 +231,22 @@ export function Editor() {
     () => items.reduce((sum, item) => sum + (item.use === "video" ? (item.duration ?? 0) : 0), 0),
     [items],
   );
-  const length = chosenLength(choices);
+  const length = chosenLength(choices, t);
   const estimate =
     "seconds" in length && footageSeconds > 0 ? estimateCost(footageSeconds, length.seconds) : null;
   const blocked =
     setup?.state === "installing"
-      ? "Setting up the analysis first"
+      ? t.compose.installing
       : setup?.state === "failed"
-        ? "The analysis could not be set up"
+        ? t.compose.setupFailed
         : !hasVideo
           ? items.length === 0
-            ? "Add footage to start"
-            : "Add at least one video: the edit is cut from video"
+            ? t.compose.addFootage
+            : t.compose.addVideo
           : "problem" in length
             ? length.problem
-            : (instructionsProblem(choices.instructions) ??
-              (music > 0 && !choices.musicLicense.trim()
-                ? "Say under which licence you use the music"
-                : null));
+            : (instructionsProblem(choices.instructions, t) ??
+              (music > 0 && !choices.musicLicense.trim() ? t.compose.musicLicense : null));
 
   /** Sends the footage and starts the edit; `instructions` are what the box holds unless a
    * retry gives the failed edit's own. */
@@ -290,21 +293,21 @@ export function Editor() {
           );
           setAsking(service);
         }
-        setPhase({ kind: "compose", error: created.error ?? "The server refused the edit" });
+        setPhase({ kind: "compose", error: created.error ?? t.compose.refused });
         return;
       }
       const total = used.reduce((sum, item) => sum + item.file.size, 0);
       let sent = 0;
       setPhase({ kind: "uploading", job: created, sent, total, file: 0 });
       for (const [index, item] of used.entries()) {
-        await put(`/api/jobs/${created.id}/files/${index}`, item.file, upload, (loaded) =>
+        await put(`/api/jobs/${created.id}/files/${index}`, item.file, upload, t, (loaded) =>
           setPhase({ kind: "uploading", job: created, sent: sent + loaded, total, file: index }),
         );
         sent += item.file.size;
       }
       const started = await fetch(`/api/jobs/${created.id}/start`, { method: "POST" });
       const job = (await started.json()) as Job & { error?: string };
-      if (!started.ok) throw new Error(job.error ?? "The edit did not start");
+      if (!started.ok) throw new Error(job.error ?? t.compose.notStarted);
       // What was asked of this edit is for its footage only; the next one starts empty. An edit
       // that never started keeps it, to try again.
       setChoices((current) => ({ ...current, instructions: "" }));
@@ -332,7 +335,7 @@ export function Editor() {
       const job = (await response.json()) as Job & { error?: string };
       setPhase(response.ok ? { kind: "job", job } : { kind: "compose", error: job.error });
     } catch {
-      setPhase({ kind: "compose", error: "The project could not be opened" });
+      setPhase({ kind: "compose", error: t.compose.openFailed });
     }
   };
 
@@ -352,20 +355,38 @@ export function Editor() {
       <header className={styles.header}>
         <span className={styles.brand}>
           <Image src="/icon.svg" width={32} height={32} alt="" loading="eager" />
-          Fineframe
+          <span className={styles.wordmark}>Fineframe</span>
         </span>
-        {keySet !== null && (
-          <button type="button" className={styles.keyButton} onClick={() => setAsking("anthropic")}>
-            {keySet ? (
-              <>
-                <CheckIcon width={14} height={14} />
-                API key saved · Replace
-              </>
-            ) : (
-              "Add your API key"
-            )}
-          </button>
-        )}
+        <div className={styles.headerTools}>
+          {LOCALES.filter((each) => each !== locale).map((other) => (
+            <button
+              key={other}
+              type="button"
+              className={styles.keyButton}
+              lang={other}
+              aria-label={`${t.header.language}: ${LOCALE_NAMES[other]}`}
+              onClick={() => choose(other)}
+            >
+              {LOCALE_NAMES[other]}
+            </button>
+          ))}
+          {keySet !== null && (
+            <button
+              type="button"
+              className={styles.keyButton}
+              onClick={() => setAsking("anthropic")}
+            >
+              {keySet ? (
+                <>
+                  <CheckIcon width={14} height={14} />
+                  {t.header.keySaved}
+                </>
+              ) : (
+                t.header.addKey
+              )}
+            </button>
+          )}
+        </div>
       </header>
       <KeyDialog
         service={asking ?? "anthropic"}
@@ -389,11 +410,8 @@ export function Editor() {
         <main className={styles.layout}>
           <div className={styles.main}>
             <div className={styles.hero}>
-              <h1 className={styles.title}>Drop in footage. Get back a finished video.</h1>
-              <p className={styles.lede}>
-                Cut to the length you choose, with the best takes kept, fillers and dead air
-                removed, and captions to go with it.
-              </p>
+              <h1 className={styles.title}>{t.compose.title}</h1>
+              <p className={styles.lede}>{t.compose.lede}</p>
             </div>
             {setup && setup.state !== "ready" && (
               <SetupView setup={setup} onRetry={() => void retrySetup().then(setSetup)} />
@@ -416,7 +434,10 @@ export function Editor() {
             {phase.kind === "compose" && <Projects onOpen={(id) => void open(id)} />}
           </div>
 
-          <aside className={`${styles.card} ${styles.panel} ${styles.dock}`} aria-label="Settings">
+          <aside
+            className={`${styles.card} ${styles.panel} ${styles.dock}`}
+            aria-label={t.compose.settings}
+          >
             <SettingsPanel
               choices={choices}
               onChange={setChoices}
@@ -429,14 +450,12 @@ export function Editor() {
               onAddStock={setAsking}
             />
             {phase.kind === "compose" && phase.error && (
-              <ErrorNote message={phase.error} fallback="The edit could not be started." />
+              <ErrorNote message={phase.error} fallback={t.compose.startFallback} />
             )}
             {phase.kind === "uploading" ? (
               <div className={styles.uploading}>
                 <div className={styles.uploadHead}>
-                  <span>
-                    Sending footage · file {phase.file + 1} of {used.length}
-                  </span>
+                  <span>{t.compose.sending(phase.file + 1, used.length)}</span>
                   <span className={styles.tabular}>
                     {Math.floor((phase.sent / Math.max(1, phase.total)) * 100)}%
                   </span>
@@ -448,14 +467,14 @@ export function Editor() {
                   />
                 </div>
                 <p className={styles.help}>
-                  {formatBytes(phase.sent)} of {formatBytes(phase.total)}
+                  {t.compose.of(formatBytes(phase.sent), formatBytes(phase.total))}
                 </p>
                 <button
                   type="button"
                   className={styles.button}
                   onClick={() => void cancel(phase.job)}
                 >
-                  Cancel
+                  {t.compose.cancel}
                 </button>
               </div>
             ) : (
@@ -467,20 +486,22 @@ export function Editor() {
                   onClick={() => void start()}
                 >
                   {"seconds" in length
-                    ? `Make the ${formatLength(length.seconds)} video`
-                    : "Make the video"}
+                    ? t.compose.make(formatLength(length.seconds, t))
+                    : t.compose.makeVideo}
                 </button>
                 {blocked ? (
                   <p className={styles.help}>{blocked}</p>
                 ) : keySet === false ? (
-                  <p className={styles.help}>Add your Anthropic API key to start</p>
+                  <p className={styles.help}>{t.compose.needAnthropic}</p>
                 ) : choices.asr === "cloud" && keys?.openrouter === false ? (
-                  <p className={styles.help}>Add your OpenRouter API key to start</p>
+                  <p className={styles.help}>{t.compose.needOpenRouter}</p>
                 ) : (
                   estimate && (
                     <p className={styles.help}>
-                      Claude will cost about {formatDollars(estimate.low)} to{" "}
-                      {formatDollars(estimate.high)} for this edit
+                      {t.compose.estimate(
+                        formatDollars(estimate.low, t),
+                        formatDollars(estimate.high, t),
+                      )}
                     </p>
                   )
                 )}
@@ -489,9 +510,7 @@ export function Editor() {
             <p className={styles.note}>
               <LockIcon width={14} height={14} />
               <span>
-                {choices.asr === "cloud"
-                  ? "Footage stays on this computer. OpenRouter hears the speech audio; Claude reads the transcripts and stills around each cut. No video file is uploaded."
-                  : "Footage stays on the server that runs this page. Claude reads the transcripts and stills around each cut; no video or audio file is uploaded."}
+                {choices.asr === "cloud" ? t.compose.privacyCloud : t.compose.privacyLocal}
               </span>
             </p>
           </aside>
@@ -508,7 +527,7 @@ export function Editor() {
               job && <RunView job={job} />
             )}
           </div>
-          <aside className={`${styles.card} ${styles.panel}`} aria-label="The edit">
+          <aside className={`${styles.card} ${styles.panel}`} aria-label={t.done.label}>
             {status === "running" && job && <Running job={job} onCancel={() => cancel(job)} />}
             {status === "done" && job && (
               <Done job={job} onJob={update} onNew={() => setPhase({ kind: "compose" })} />
@@ -539,6 +558,7 @@ export function Editor() {
 }
 
 function Running({ job, onCancel }: { job: Job; onCancel: () => void }) {
+  const t = useT();
   const [sure, setSure] = useState(false);
   useEffect(() => {
     if (!sure) return;
@@ -554,42 +574,40 @@ function Running({ job, onCancel }: { job: Job; onCancel: () => void }) {
           className={sure ? `${styles.button} ${styles.danger}` : styles.button}
           onClick={() => (sure ? onCancel() : setSure(true))}
         >
-          {sure ? "Stop the edit? Click again" : "Cancel"}
+          {sure ? t.run.sure : t.run.cancel}
         </button>
-        <p className={styles.help}>
-          You can close this page: the edit keeps going, and the page shows it again when you come
-          back.
-        </p>
+        <p className={styles.help}>{t.run.closeable}</p>
       </div>
     </>
   );
 }
 
 function Done({ job, onJob, onNew }: { job: Job; onJob: (job: Job) => void; onNew: () => void }) {
+  const t = useT();
   const base = `/api/jobs/${job.id}`;
   const seconds = useVideoLength(job);
   return (
     <>
       <div className={styles.block}>
         <div>
-          <h2 className={styles.panelTitle}>Your edit is ready</h2>
+          <h2 className={styles.panelTitle}>{t.done.ready}</h2>
           <ResultSummary job={job} seconds={seconds} />
         </div>
         <div className={styles.downloads}>
           <a className={styles.primary} href={`${base}/video?download`} download>
             <DownloadIcon width={18} height={18} />
-            Download MP4
+            {t.done.download}
           </a>
           {job.result?.captions && (
             <a className={styles.button} href={`${base}/captions?download`} download>
               <CaptionsIcon width={18} height={18} />
-              Download captions (SRT)
+              {t.done.downloadCaptions}
             </a>
           )}
           {job.result?.broll && (
             <a className={styles.button} href={`${base}/broll?download`} download>
               <DownloadIcon width={18} height={18} />
-              Download B-roll credits (TXT)
+              {t.done.downloadCredits}
             </a>
           )}
         </div>
@@ -598,7 +616,7 @@ function Done({ job, onJob, onNew }: { job: Job; onJob: (job: Job) => void; onNe
       <Summary job={job} actual={seconds} />
       <div className={styles.block}>
         <button type="button" className={styles.linkButton} onClick={onNew}>
-          Make another edit
+          {t.done.another}
         </button>
       </div>
     </>
@@ -617,39 +635,35 @@ function Failed({
   onRetry: (() => void) | null;
   onReplaceKey: (service: "anthropic" | "openrouter") => void;
 }) {
+  const t = useT();
   const cancelled = job.status === "cancelled";
-  const fix = !cancelled && job.error ? fixFor(job.error) : null;
+  const fix = !cancelled && job.error ? fixFor(job.error, t) : null;
   const spent = job.claude ? dollarsOf(job.claude) : null;
   // The step that fixes it first, then trying again, then the footage; the first is primary.
   const actions = [
-    fix?.kind === "key" && { label: "Replace the API key", run: () => onReplaceKey("anthropic") },
+    fix?.kind === "key" && { label: t.failed.replaceKey, run: () => onReplaceKey("anthropic") },
     fix?.kind === "openrouter" && {
-      label: "Replace the OpenRouter key",
+      label: t.failed.replaceOpenRouter,
       run: () => onReplaceKey("openrouter"),
     },
     fix?.kind === "credit" && {
-      label: "Add credit",
+      label: t.failed.addCredit,
       href: "https://console.anthropic.com/settings/billing",
     },
-    onRetry && fix?.kind !== "file" && { label: "Try again", run: onRetry },
+    onRetry && fix?.kind !== "file" && { label: t.failed.retry, run: onRetry },
     {
-      label: fix?.kind === "file" ? "Change the footage" : "Back to the footage",
+      label: fix?.kind === "file" ? t.failed.changeFootage : t.failed.back,
       run: onBack,
     },
   ].filter((action) => action !== false && action !== null);
   return (
     <div className={styles.block}>
-      <h2 className={styles.panelTitle}>
-        {cancelled ? "The edit was cancelled" : "The edit could not be finished"}
-      </h2>
+      <h2 className={styles.panelTitle}>{cancelled ? t.failed.cancelled : t.failed.title}</h2>
       {!cancelled && (
-        <ErrorNote
-          message={job.error ?? "Something went wrong"}
-          fallback="The edit stopped before it finished."
-        />
+        <ErrorNote message={job.error ?? t.failed.wrong} fallback={t.failed.fallback} />
       )}
       {spent !== null && spent !== 0 && (
-        <p className={styles.help}>Claude cost {formatDollars(spent)} before the edit stopped.</p>
+        <p className={styles.help}>{t.failed.spent(formatDollars(spent, t))}</p>
       )}
       <div className={styles.actions}>
         {actions.map((action, i) => {
@@ -676,7 +690,7 @@ function Failed({
 }
 
 function Summary({ job, actual }: { job: Job; actual?: number | null }) {
-  const rows = summaryRows(job, actual);
+  const rows = summaryRows(job, actual, useT());
   return (
     <dl className={styles.summary}>
       {rows.map(([name, value]) => (
@@ -691,32 +705,25 @@ function Summary({ job, actual }: { job: Job; actual?: number | null }) {
 
 /** The analysis's setup on the desktop app's first start: its download, or why it failed. */
 function SetupView({ setup, onRetry }: { setup: Setup; onRetry: () => void }) {
+  const t = useT();
   return (
-    <section className={`${styles.card} ${styles.setup}`} aria-label="Setting up the analysis">
+    <section className={`${styles.card} ${styles.setup}`} aria-label={t.setup.title}>
       <div>
         <h2 className={styles.panelTitle}>
-          {setup.state === "failed"
-            ? "The analysis could not be set up"
-            : "Setting up the analysis"}
+          {setup.state === "failed" ? t.setup.failed : t.setup.title}
         </h2>
-        <p className={styles.help}>
-          Only the first time: Python and the packages that analyse footage download and install on
-          this computer. Add your keys and footage meanwhile.
-        </p>
+        <p className={styles.help}>{t.setup.about}</p>
       </div>
       {setup.state === "failed" ? (
-        <ErrorNote
-          message={setup.error ?? "Something went wrong"}
-          fallback="The download or the install stopped."
-        >
+        <ErrorNote message={setup.error ?? t.failed.wrong} fallback={t.setup.fallback}>
           <button type="button" className={styles.button} onClick={onRetry}>
-            Try again
+            {t.setup.retry}
           </button>
         </ErrorNote>
       ) : setup.download ? (
         <DownloadView download={setup.download} />
       ) : (
-        <p className={styles.help}>Starting…</p>
+        <p className={styles.help}>{t.setup.starting}</p>
       )}
     </section>
   );
@@ -732,6 +739,7 @@ function put(
   url: string,
   file: File,
   current: { current: XMLHttpRequest | null },
+  t: Messages,
   onProgress: (loaded: number) => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -749,12 +757,12 @@ function put(
         } catch {
           // A proxy's or the framework's own error page, not the server's JSON.
         }
-        reject(new Error(error ?? `${file.name} could not be sent (HTTP ${request.status})`));
+        reject(new Error(error ?? t.compose.notSentStatus(file.name, request.status)));
       }
     };
     request.onerror = () => {
       current.current = null;
-      reject(new Error(`${file.name} could not be sent`));
+      reject(new Error(t.compose.notSent(file.name)));
     };
     request.onabort = () => {
       current.current = null;

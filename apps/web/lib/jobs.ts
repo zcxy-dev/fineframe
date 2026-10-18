@@ -27,6 +27,7 @@ import {
 } from "@video-editor/schema";
 import { Finish } from "./eta.ts";
 import type { FixKind } from "./fixes.ts";
+import { en, type Messages } from "./i18n/en.ts";
 import { readKey, type Service, VARIABLES } from "./key.ts";
 import { safeRelativePath } from "./paths.ts";
 import { FOOTAGE_KEPT } from "./retention.ts";
@@ -188,13 +189,21 @@ export interface EditView {
   captions: string | null;
 }
 
-/** A request the job cannot take in its state; the message is for the page, and `code` names
- * what its owner can fix. */
+/** A request the job cannot take in its state; the message is for the page, said in the words of
+ * the language the page asks for (`say`; `message` is the English), and `code` names what its
+ * owner can fix. */
 export class JobError extends Error {
   readonly status: 400 | 403 | 404 | 409 | 507;
   readonly code: FixKind | undefined;
-  constructor(message: string, status: 400 | 403 | 404 | 409 | 507, code?: FixKind) {
-    super(message);
+  readonly say: (t: Messages) => string;
+  constructor(
+    message: string | ((t: Messages) => string),
+    status: 400 | 403 | 404 | 409 | 507,
+    code?: FixKind,
+  ) {
+    const say = typeof message === "string" ? () => message : message;
+    super(say(en));
+    this.say = say;
     this.status = status;
     this.code = code;
   }
@@ -331,27 +340,23 @@ export class Jobs {
     const seen = new Set<string>();
     for (const entry of entries) {
       const path = safeRelativePath(entry.path);
-      if (!path) throw new JobError(`${entry.path}: not a file name the page can keep`, 400);
-      if (seen.has(path)) throw new JobError(`${path}: given twice`, 400);
+      if (!path) throw new JobError((t) => t.server.badName(entry.path), 400);
+      if (seen.has(path)) throw new JobError((t) => t.server.twice(path), 400);
       seen.add(path);
       const use = roleOf(path);
       if (!use) {
-        throw new JobError(
-          `${path}: not a video, a still image or music. Leave it out, or convert it to MP4`,
-          400,
-          "file",
-        );
+        throw new JobError((t) => t.server.notMedia(path), 400, "file");
       }
       if (!Number.isSafeInteger(entry.size) || entry.size <= 0) {
-        throw new JobError(`${path}: empty`, 400);
+        throw new JobError((t) => t.server.empty(path), 400);
       }
       files.push({ path, size: entry.size, use, received: 0 });
     }
     if (!files.some((file) => file.use === "video")) {
-      throw new JobError("An edit is cut from video: add at least one video file", 400);
+      throw new JobError((t) => t.server.noVideo, 400);
     }
     if (files.some((file) => file.use === "music") && !settings.musicLicense) {
-      throw new JobError("Say under which licence you use the music, such as CC0 1.0", 400);
+      throw new JobError((t) => t.server.musicLicense, 400);
     }
     await this.#prune();
     const { bavail, bsize } = await statfs(this.#root);
@@ -360,8 +365,7 @@ export class Jobs {
     // fail halfway through the render instead of now.
     if (needed * 1.2 > bavail * bsize) {
       throw new JobError(
-        `Not enough free disk space for this footage: it needs about ${gigabytes(needed * 1.2)} ` +
-          `and ${gigabytes(bavail * bsize)} is free. Free some space, or leave some files out`,
+        (t) => t.server.disk(gigabytes(needed * 1.2), gigabytes(bavail * bsize)),
         507,
         "disk",
       );
@@ -397,7 +401,7 @@ export class Jobs {
   async get(id: string): Promise<Job> {
     await this.#loaded;
     const job = this.#jobs.get(id);
-    if (!job) throw new JobError("No such edit", 404);
+    if (!job) throw new JobError((t) => t.server.noEdit, 404);
     return job;
   }
 
@@ -437,7 +441,7 @@ export class Jobs {
       job.status === "uploading" ||
       (job.render !== undefined && !job.render.error)
     ) {
-      throw new JobError("This edit is under way; cancel it before deleting it", 409);
+      throw new JobError((t) => t.server.underWay, 409);
     }
     this.#jobs.delete(job.id);
     this.#listeners.delete(job.id);
@@ -450,16 +454,16 @@ export class Jobs {
   /** Writes the request body as the job's file `index`, which must arrive whole. */
   async receive(id: string, index: number, body: ReadableStream<Uint8Array>): Promise<Job> {
     const job = await this.get(id);
-    if (job.status !== "uploading") throw new JobError("This edit takes no more files", 409);
+    if (job.status !== "uploading") throw new JobError((t) => t.server.noMoreFiles, 409);
     const file = job.files[index];
-    if (!file) throw new JobError("No such file in this edit", 404);
+    if (!file) throw new JobError((t) => t.server.noFile, 404);
     const path = join(this.#dir(job), "footage", file.path);
     await mkdir(dirname(path), { recursive: true });
     file.received = 0;
     const count = new Transform({
       transform: (chunk: Buffer, _encoding, done) => {
         file.received += chunk.length;
-        if (file.received > file.size) done(new JobError(`${file.path}: larger than said`, 400));
+        if (file.received > file.size) done(new JobError((t) => t.server.larger(file.path), 400));
         else done(null, chunk);
       },
     });
@@ -470,7 +474,7 @@ export class Jobs {
         createWriteStream(`${path}.part`),
       );
       if (file.received !== file.size) {
-        throw new JobError(`${file.path}: arrived incomplete; drop it again`, 400);
+        throw new JobError((t) => t.server.incomplete(file.path), 400);
       }
       await rename(`${path}.part`, path);
     } catch (error) {
@@ -486,9 +490,9 @@ export class Jobs {
   async start(id: string): Promise<Job> {
     const job = await this.get(id);
     const keys = await this.#requireKeys(job.settings);
-    if (job.status !== "uploading") throw new JobError("This edit has already started", 409);
+    if (job.status !== "uploading") throw new JobError((t) => t.server.started, 409);
     const missing = job.files.find((file) => file.received !== file.size);
-    if (missing) throw new JobError(`${missing.path} has not arrived yet`, 409);
+    if (missing) throw new JobError((t) => t.server.notArrived(missing.path), 409);
     this.#refuseWhileRunning();
     // Running from here, before the next await, so a second start at the same moment is refused.
     job.status = "running";
@@ -567,17 +571,12 @@ export class Jobs {
    * the edit's environment reads them. */
   async #requireKeys(settings: Settings): Promise<Record<string, string>> {
     const key = await this.#key("anthropic");
-    if (!key)
-      throw new JobError("Add your Anthropic API key first: Claude plans the edit", 400, "key");
+    if (!key) throw new JobError((t) => t.server.needAnthropic, 400, "key");
     const keys: Record<string, string> = { ANTHROPIC_API_KEY: key };
     if (settings.asr === "cloud") {
       const openrouter = await this.#key("openrouter");
       if (!openrouter) {
-        throw new JobError(
-          "Add your OpenRouter API key first: it hears the speech, or choose this computer",
-          400,
-          "openrouter",
-        );
+        throw new JobError((t) => t.server.needOpenRouter, 400, "openrouter");
       }
       keys.OPENROUTER_API_KEY = openrouter;
     }
@@ -592,10 +591,10 @@ export class Jobs {
 
   #refuseWhileRunning(): void {
     if ([...this.#jobs.values()].some((other) => other.status === "running")) {
-      throw new JobError("Another edit is running; wait for it to finish or cancel it", 409);
+      throw new JobError((t) => t.server.busy, 409);
     }
     if ([...this.#jobs.values()].some((other) => other.render && !other.render.error)) {
-      throw new JobError("A version is rendering; wait for it to finish or stop it", 409);
+      throw new JobError((t) => t.server.rendering, 409);
     }
   }
 
@@ -716,7 +715,7 @@ export class Jobs {
     const job = await this.#finished(id);
     const version = n ?? job.current ?? 1;
     if (!this.#versions(job).some((each) => each.n === version)) {
-      throw new JobError("No such version", 404);
+      throw new JobError((t) => t.server.noVersion, 404);
     }
     const { project } = await this.#project(job, version);
     return {
@@ -806,7 +805,7 @@ export class Jobs {
   /** Plans the edit again from the same footage, its analysis cached, as the next version: at
    * another length or aspect, with other music, or with what the user asks of it. The version
    * shown stays until the new one is done. */
-  async replan(id: string, choice: ReplanChoice): Promise<Job> {
+  async replan(id: string, choice: ReplanChoice, t: Messages = en): Promise<Job> {
     const job = await this.#finished(id);
     const keys = await this.#requireKeys(job.settings);
     this.#refuseWhileRunning();
@@ -819,7 +818,7 @@ export class Jobs {
           ? []
           : offered.filter((file) => file.path === choice.music);
     if (choice.music !== "auto" && choice.music !== "none" && music.length === 0) {
-      throw new JobError("That music track is not one this edit was offered", 400);
+      throw new JobError((t) => t.server.notOffered, 400);
     }
     const versions = this.#versions(job);
     const n = Math.max(...versions.map((version) => version.n)) + 1;
@@ -855,14 +854,14 @@ export class Jobs {
       n,
       created: Date.now(),
       summary: [
-        `Planned again: ${formatLength(choice.length)}, ${choice.aspect}`,
+        t.versions.replanned(formatLength(choice.length, t), choice.aspect),
         ...(choice.music === "none"
-          ? ["no music"]
+          ? [t.versions.noMusic]
           : choice.music === "auto"
             ? []
             : [choice.music.split("/").at(-1) as string]),
-        ...(choice.instructions ? ["with instructions"] : []),
-      ].join(", "),
+        ...(choice.instructions ? [t.versions.withInstructions] : []),
+      ].join(t.list),
       from,
       video: false,
       length: choice.length,
@@ -900,7 +899,7 @@ export class Jobs {
   async show(id: string, n: number): Promise<Job> {
     const job = await this.#finished(id);
     const version = this.#versions(job).find((each) => each.n === n);
-    if (!version) throw new JobError("No such version", 404);
+    if (!version) throw new JobError((t) => t.server.noVersion, 404);
     if (version.video && existsSync(join(this.#dir(job), versionFiles(n).video))) {
       job.current = n;
       await this.#settle(job, n);
@@ -917,18 +916,14 @@ export class Jobs {
 
   async #finished(id: string): Promise<Job> {
     const job = await this.get(id);
-    if (job.status !== "done") throw new JobError("Only a finished edit can change", 409);
+    if (job.status !== "done") throw new JobError((t) => t.server.notFinished, 409);
     return job;
   }
 
   /** Refuses a render without the footage it plays. */
   #requireFootage(job: Job): void {
     if (!existsSync(join(this.#dir(job), "footage"))) {
-      throw new JobError(
-        `This project's footage was deleted, as only the newest ${FOOTAGE_KEPT} keep theirs; ` +
-          "make a new edit from the footage instead",
-        409,
-      );
+      throw new JobError((t) => t.server.footageDeleted(FOOTAGE_KEPT), 409);
     }
   }
 

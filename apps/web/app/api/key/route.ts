@@ -1,4 +1,5 @@
 import { checkOrigin, errorResponse } from "../../../lib/http.ts";
+import { messagesOf } from "../../../lib/i18n/messages.ts";
 import { JobError } from "../../../lib/jobs.ts";
 import {
   checkKey,
@@ -31,13 +32,14 @@ export async function PUT(request: Request): Promise<Response> {
       service?: unknown;
     } | null;
     const service = (body?.service ?? "anthropic") as Service;
-    if (!SERVICES.includes(service)) throw new JobError("No such service", 400);
+    if (!SERVICES.includes(service)) throw new JobError((t) => t.server.noService, 400);
     const key = typeof body?.key === "string" ? body.key.trim() : "";
-    const problem = keyProblem(key, service) ?? (await checkKey(key, service));
+    const t = messagesOf(request);
+    const problem = keyProblem(key, service, t) ?? (await checkKey(key, service, t));
     if (problem) throw new JobError(problem, 400);
     await saveKey(key, service);
     return GET();
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

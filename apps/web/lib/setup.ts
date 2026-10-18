@@ -10,6 +10,7 @@ import { readdir, readFile, writeFile } from "node:fs/promises";
 import { totalmem } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
+import { SETUP_DOWNLOAD } from "./i18n/en.ts";
 import { secondsLeft } from "./jobs.ts";
 import type { Asr } from "./settings.ts";
 
@@ -28,8 +29,6 @@ export interface SetupState {
   download?: { name: string; bytes: number; total: number; secondsLeft?: number };
   error?: string;
 }
-
-const NAME = "the analysis environment (Python, PyTorch and the worker)";
 
 /** One line of uv's output: a package it starts downloading, with its size, or one it has. */
 export function parseUvLine(
@@ -142,7 +141,7 @@ export class Setup {
         this.#state = {
           state: "installing",
           download: {
-            name: NAME,
+            name: SETUP_DOWNLOAD,
             bytes,
             total,
             ...(left === undefined ? {} : { secondsLeft: left }),

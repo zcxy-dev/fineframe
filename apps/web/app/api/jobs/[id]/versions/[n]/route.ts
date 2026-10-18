@@ -10,6 +10,6 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     const { id, n } = await ctx.params;
     return Response.json(await jobs().show(id, Number(n)));
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

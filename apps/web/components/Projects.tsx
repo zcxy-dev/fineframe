@@ -6,18 +6,13 @@ import { FOOTAGE_KEPT } from "../lib/retention.ts";
 import { formatBytes, formatLength } from "../lib/settings.ts";
 import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
+import { useT } from "./I18n.tsx";
 import { FilmIcon } from "./icons.tsx";
-
-const STATUS: Record<ProjectSummary["status"], string> = {
-  uploading: "Not started",
-  running: "Running",
-  done: "Done",
-  error: "Failed",
-  cancelled: "Cancelled",
-};
 
 /** Earlier edits, to open again or delete, with the disk space each takes. */
 export function Projects({ onOpen }: { onOpen: (id: string) => void }) {
+  const t = useT();
+  const words = t.projects;
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // The project whose Delete was clicked once, asking for a second click.
@@ -41,7 +36,7 @@ export function Projects({ onOpen }: { onOpen: (id: string) => void }) {
     const response = await fetch(`/api/jobs/${id}/remove`, { method: "POST" });
     if (!response.ok) {
       const body = (await response.json().catch(() => ({}))) as { error?: string };
-      setError(body.error ?? "The project could not be deleted");
+      setError(body.error ?? words.notDeleted);
     } else setError(null);
     load();
   };
@@ -50,17 +45,16 @@ export function Projects({ onOpen }: { onOpen: (id: string) => void }) {
   if (shown.length === 0) return null;
   const total = shown.reduce((sum, project) => sum + project.bytes, 0);
   return (
-    <section className={`${styles.card} ${styles.files}`} aria-label="Projects">
+    <section className={`${styles.card} ${styles.files}`} aria-label={words.title}>
       <div className={styles.filesHead}>
         <div>
-          <h2 className={styles.filesTitle}>Projects</h2>
+          <h2 className={styles.filesTitle}>{words.title}</h2>
           <p className={styles.filesMeta}>
-            {shown.length} {shown.length === 1 ? "project" : "projects"} · {formatBytes(total)} on
-            disk · the newest {FOOTAGE_KEPT} finished keep their footage for editing again
+            {words.meta(shown.length, formatBytes(total), FOOTAGE_KEPT)}
           </p>
         </div>
       </div>
-      {error && <ErrorNote message={error} fallback="The project could not be deleted." />}
+      {error && <ErrorNote message={error} fallback={words.fallback} />}
       <ul className={styles.fileList}>
         {shown.map((project) => (
           <li key={project.id} className={styles.project}>
@@ -69,16 +63,16 @@ export function Projects({ onOpen }: { onOpen: (id: string) => void }) {
             </span>
             <span className={styles.fileText}>
               <span className={styles.fileName} title={project.name}>
-                {project.name || "Untitled"}
+                {project.name || words.untitled}
               </span>
               <span className={styles.fileMeta}>
-                {new Date(project.created).toLocaleString()} · {formatLength(project.length)} ·{" "}
-                {project.aspect} · {STATUS[project.status]} · {formatBytes(project.bytes)}
-                {project.status === "done" && !project.footage && " · footage removed"}
+                {t.date(project.created)} · {formatLength(project.length, t)} · {project.aspect} ·{" "}
+                {words.status[project.status]} · {formatBytes(project.bytes)}
+                {project.status === "done" && !project.footage && words.footageRemoved}
               </span>
             </span>
             <button type="button" className={styles.button} onClick={() => onOpen(project.id)}>
-              Open
+              {words.open}
             </button>
             <button
               type="button"
@@ -90,7 +84,7 @@ export function Projects({ onOpen }: { onOpen: (id: string) => void }) {
                 deleting === project.id ? void remove(project.id) : setDeleting(project.id)
               }
             >
-              {deleting === project.id ? "Delete? Click again" : "Delete"}
+              {deleting === project.id ? words.sure : words.delete}
             </button>
           </li>
         ))}

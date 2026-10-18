@@ -2,6 +2,7 @@
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
+import { en, messagesOf } from "./i18n/messages.ts";
 import { JobError } from "./jobs.ts";
 
 /**
@@ -69,16 +70,18 @@ function attachment(name: string): string {
 export function checkOrigin(request: Request): void {
   const origin = request.headers.get("origin");
   if (origin && URL.parse(origin)?.host !== request.headers.get("host")) {
-    throw new JobError("Requests from another site are refused", 403);
+    throw new JobError((t) => t.server.otherSite, 403);
   }
 }
 
-/** A JobError as the JSON the page reads; anything else is a bug, logged and hidden. */
-export function errorResponse(error: unknown): Response {
+/** A JobError as the JSON the page reads, in the language `request` asks for; anything else is a
+ * bug, logged and hidden. */
+export function errorResponse(error: unknown, request?: Request): Response {
+  const t = request ? messagesOf(request) : en;
   if (error instanceof JobError) {
     const code = error.code ? { code: error.code } : {};
-    return Response.json({ error: error.message, ...code }, { status: error.status });
+    return Response.json({ error: error.say(t), ...code }, { status: error.status });
   }
   console.error(error);
-  return Response.json({ error: "Something went wrong on the server" }, { status: 500 });
+  return Response.json({ error: t.server.wrong }, { status: 500 });
 }
