@@ -77,6 +77,8 @@ jobs:
       - name: Run the built app (Windows)
         if: runner.os == 'Windows'
         run: |
+          # Which CPU the runner has: the analysis crashed with an illegal instruction on some (#59).
+          powershell -NoProfile -Command "(Get-CimInstance Win32_Processor).Name"
           installer=$(ls apps/desktop/dist/*.exe)
           powershell -NoProfile -Command "Start-Process -Wait -FilePath '$installer' -ArgumentList '/S'"
           programs="$(cygpath -u "$LOCALAPPDATA")/Programs"
