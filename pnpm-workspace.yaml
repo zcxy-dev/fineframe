@@ -5,3 +5,7 @@ packages:
 # Runs package scripts with a POSIX-like shell on every system, so the page's start script reads
 # its address the same way on Windows.
 shellEmulator: true
+
+# Three days, as Dependabot's cooldown (.github/dependabot.yml): its update jobs fail while the
+# lockfile holds a younger release.
+minimumReleaseAge: 4320
