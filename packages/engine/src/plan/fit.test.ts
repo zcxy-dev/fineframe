@@ -3,8 +3,8 @@ import { test } from "node:test";
 import { fitLength, type Span } from "./fit.ts";
 
 /** Segments of lines with the given lengths in seconds; the edit's length is the sum of the kept
- * lines plus a breath of 0.4 s × breath at each join between segments. */
-function edit(lines: number[][]) {
+ * lines plus a breath of `join` seconds × breath at each join between segments. */
+function edit(lines: number[][], join = 0.4) {
   return (spans: readonly Span[], breath: number) => {
     let seconds = 0;
     let joins = -1;
@@ -13,7 +13,7 @@ function edit(lines: number[][]) {
       joins++;
       for (let k = span[0]; k <= span[1]; k++) seconds += (lines[i] as number[])[k] as number;
     }
-    return Math.round((seconds + Math.max(0, joins) * 0.4 * breath) * 120_000);
+    return Math.round((seconds + Math.max(0, joins) * join * breath) * 120_000);
   };
 }
 const T = 120_000;
@@ -180,4 +180,23 @@ test("segments of equal priority may each be trimmed while the other plays whole
     [0, 1],
   ]);
   assert.equal(fit.length, 30.54 * T);
+});
+
+test("when no single change lands within the tolerance, two may, losing the fewest important lines", () => {
+  // The lines and priorities of a 30 s plan of the synthetic talk-a1 (#84), whose joins add
+  // little: 42.08 s whole. Dropping by priority leaves 32.66 s, then 27.36 s, and trimming any one
+  // segment of the 32.66 s lands at 28.12 s at most. Dropping the priority-3 segment and the
+  // priority-2 one's last line, with the priority-4 one whole, gives 31.38 s at the shortest
+  // breath and keeps every priority-1 line.
+  const lines = [[3.56, 5.2, 5.04], [5.24], [3.4, 4.72], [5.2], [4.36, 4.4]];
+  const priorities = [1, 1, 2, 3, 4];
+  const fit = fitLength(
+    lines.map((l, i) => ({ lines: l.length, priority: priorities[i] as number })),
+    edit(lines, 0.1),
+    30 * T,
+    0.05,
+  );
+  assert.deepEqual(fit.spans, [[0, 2], [0, 0], [0, 0], null, [0, 1]]);
+  assert.equal(fit.breath, 0.6);
+  assert.equal(fit.length, 31.38 * T);
 });
