@@ -536,6 +536,7 @@ test("a re-plan makes a new version from the same footage, at another length, as
 
   assert.equal((await replan({ length: 5, aspect: "1:1", music: "auto" })).status, 400);
   assert.equal((await replan({ length: 30, aspect: "4:3", music: "auto" })).status, 400);
+  assert.equal((await replan({ length: 30.5, aspect: "1:1", music: "auto" })).status, 400);
   const other = await replan({ length: 30, aspect: "1:1", music: "music/three.mp3" });
   assert.equal(other.status, 400, "only a track the edit was offered");
 
@@ -568,6 +569,9 @@ test("a re-plan makes a new version from the same footage, at another length, as
     [join("footage", "music", "two.mp3")],
   );
   assert.ok(args.includes("--instructions=-Open with the demo."));
+  // The look and caption style of the version shown, not the settings' warm look.
+  assert.equal(args[args.indexOf("--look") + 1], "clean");
+  assert.equal(args[args.indexOf("--captions") + 1], "bold");
   // The page plays the track the new version chose.
   assert.deepEqual(job.result?.music, ["music/two.mp3"]);
   // Its download is named by its own length and aspect.

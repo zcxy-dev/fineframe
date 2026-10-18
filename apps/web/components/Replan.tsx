@@ -31,14 +31,17 @@ export function Replan({
   });
   const lengths = LENGTHS.includes(planned) ? LENGTHS : [...LENGTHS, planned].sort((a, b) => a - b);
   const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
   const start = async () => {
     setError(null);
+    setSending(true);
     const response = await fetch(`/api/jobs/${job.id}/replan`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(choice),
     });
     const body = (await response.json().catch(() => ({}))) as Job & { error?: string };
+    setSending(false);
     if (!response.ok) setError(body.error ?? "The edit could not be planned again");
     else {
       onJob(body);
@@ -120,7 +123,12 @@ export function Replan({
         </p>
       )}
       <div className={styles.toolbar}>
-        <button type="button" className={styles.primary} onClick={() => void start()}>
+        <button
+          type="button"
+          className={styles.primary}
+          disabled={sending}
+          onClick={() => void start()}
+        >
           Re-plan as a new version
         </button>
         <button type="button" className={styles.linkButton} onClick={onClose}>

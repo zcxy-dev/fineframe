@@ -34,6 +34,7 @@ import { type Run, runEdit } from "./runner.ts";
 import {
   DEFAULT_CAPTIONS,
   type FileEntry,
+  formatDollars,
   formatLength,
   LENGTH_RANGE,
   type Role,
@@ -124,11 +125,11 @@ export function checkReplan(value: unknown): ReplanChoice | string {
   const [shortest, longest] = LENGTH_RANGE;
   if (
     typeof choice.length !== "number" ||
-    !Number.isFinite(choice.length) ||
+    !Number.isInteger(choice.length) ||
     choice.length < shortest ||
     choice.length > longest
   ) {
-    return `The length is ${shortest} s to ${longest / 3600} h`;
+    return `The length is a whole number of seconds, ${shortest} s to ${longest / 3600} h`;
   }
   if (!["9:16", "1:1", "16:9"].includes(choice.aspect as string)) {
     return "The aspect is 9:16, 1:1 or 16:9";
@@ -146,6 +147,11 @@ export function checkReplan(value: unknown): ReplanChoice | string {
   };
 }
 
+/** The look over a project, by its first clip with one, or none. */
+function lookOf(project: Project): string {
+  return project.main.find((clip) => clip.grade?.look)?.grade?.look?.id ?? "none";
+}
+
 /** What one plan of an edit is for: its length, aspect, the music offered and what the user
  * asks of it. */
 interface EditPlan {
@@ -153,6 +159,9 @@ interface EditPlan {
   aspect: Settings["aspect"];
   music: JobFile[];
   instructions?: string;
+  /** The look and caption style, when not the edit's settings', as a version changed them. */
+  look?: string;
+  captions?: string;
 }
 
 /** What the re-edit panel shows of one version, in output ticks. */
@@ -525,11 +534,11 @@ export class Jobs {
       "--aspect",
       plan.aspect,
       "--look",
-      style,
+      plan.look ?? style,
       `--visuals=${visuals}`,
       ...["--quality", job.settings.quality ?? "best"],
       ...(job.settings.correct ? ["--correct"] : []),
-      ...["--captions", job.settings.captions ?? DEFAULT_CAPTIONS],
+      ...["--captions", plan.captions ?? job.settings.captions ?? DEFAULT_CAPTIONS],
       "-o",
       output,
       ...plan.music.flatMap((file) => ["--music", footage(file)]),
@@ -700,7 +709,6 @@ export class Jobs {
       throw new JobError("No such version", 404);
     }
     const { project } = await this.#project(job, version);
-    const firstLook = project.main.find((clip) => clip.grade?.look)?.grade?.look?.id;
     return {
       version,
       length: editLength(project),
@@ -723,7 +731,7 @@ export class Jobs {
           : [],
       ),
       music: project.audio.music?.[0] ? { gainDb: project.audio.music[0].gainDb ?? 0 } : null,
-      look: firstLook ?? "none",
+      look: lookOf(project),
       captions: project.captions?.preset ?? null,
     };
   }
@@ -796,11 +804,14 @@ export class Jobs {
     }
     const versions = this.#versions(job);
     const n = Math.max(...versions.map((version) => version.n)) + 1;
+    const from = job.current ?? 1;
     // Busy from here, before the next await, so a second request at the same moment is refused.
     job.render = { version: n, fresh: true, fraction: 0, message: "Planning again" };
     const files = versionFiles(n);
     let args: string[];
     try {
+      // The look and caption style the version shown has, which the panel may have changed.
+      const { project } = await this.#project(job, from);
       args = await this.#editArgs(
         job,
         {
@@ -808,6 +819,8 @@ export class Jobs {
           aspect: choice.aspect,
           music,
           ...(choice.instructions ? { instructions: choice.instructions } : {}),
+          look: lookOf(project),
+          ...(project.captions ? { captions: project.captions.preset } : {}),
         },
         files.video,
       );
@@ -827,7 +840,7 @@ export class Jobs {
             : [choice.music.split("/").at(-1) as string]),
         ...(choice.instructions ? ["with instructions"] : []),
       ].join(", "),
-      from: job.current ?? 1,
+      from,
       video: false,
       length: choice.length,
       aspect: choice.aspect,
@@ -968,8 +981,12 @@ export class Jobs {
         await rm(join(dir, versionFiles(n).project), { force: true });
       }
       await writeFile(join(dir, LOG), `${log.join("\n")}\n`);
-      await this.#save({ ...job, render: { ...render, error } });
-      render.error = error;
+      // What a plan cost before it failed, which its version, dropped, no longer shows.
+      const told = version?.claude
+        ? `${error}. Claude cost ${formatDollars(version.claude)} before it stopped`
+        : error;
+      await this.#save({ ...job, render: { ...render, error: told } });
+      render.error = told;
     } else {
       await this.#save(job);
     }
