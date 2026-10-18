@@ -129,7 +129,7 @@ function anyChanges(
 ) {
   const base = measure(spans, 1);
   const levels = [...new Set(segments.map((s) => s.priority))].sort((a, b) => a - b);
-  const step = (target * tolerance) / 100;
+  const step = Math.max(1, (target * tolerance) / 100);
   // A choice up to some segment: its spans from the last back, its change in length and the
   // lines it loses at each level.
   interface Draft {
@@ -187,14 +187,9 @@ function anyChanges(
     }
     drafts = [...next.values()];
   }
-  const near = drafts
-    .map((draft) => ({
-      draft,
-      lost: draft.lost,
-      off: Math.abs(base + draft.delta - target),
-    }))
-    .sort((p, q) => (fewer(p, q) ? -1 : fewer(q, p) ? 1 : p.off - q.off));
-  for (const { draft } of near) {
+  const off = (draft: Draft) => Math.abs(base + draft.delta - target);
+  drafts.sort((p, q) => (fewer(p, q) ? -1 : fewer(q, p) ? 1 : off(p) - off(q)));
+  for (const draft of drafts) {
     const choice: Span[] = [];
     for (let at = draft; at.from; at = at.from) choice.unshift(at.span);
     const fit = { spans: choice, ...tuneBreath((breath) => measure(choice, breath), target) };

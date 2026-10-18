@@ -200,3 +200,15 @@ test("when no single change lands within the tolerance, two may, losing the fewe
   assert.equal(fit.breath, 0.6);
   assert.equal(fit.length, 31.38 * T);
 });
+
+test("when no changes together land within the tolerance either, the nearest choice is returned", () => {
+  // 10 s lines with no breath: 16 s ± 5 % lies between 10 and 20 s.
+  const lines = [[10], [10], [10]];
+  const fit = fitLength(
+    lines.map(() => ({ lines: 1, priority: 3 })),
+    edit(lines, 0),
+    16 * T,
+    0.05,
+  );
+  assert.equal(fit.length, 20 * T);
+});
