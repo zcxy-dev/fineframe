@@ -37,3 +37,17 @@ def test_a_new_table_is_written_into_empty_markers(tmp_path):
     tables.write(tmp_path)
     assert doc.read_text().startswith("<!-- results:asr -->\n| Model | MER |\n")
     assert doc.read_text().endswith("| b | 2.0 % |\n<!-- /results -->\n")
+
+
+def test_an_empty_block_ends_at_its_own_closing_marker(tmp_path):
+    empty = "<!-- results:{} -->\n<!-- /results -->\n"
+    doc = corpus(tmp_path, empty.format("asr") + "Middle.\n" + empty.format("wer"))
+    wer = {**TABLE, "columns": ["Model", "WER"]}
+    (tmp_path / "bench" / "results" / "wer.json").write_text(json.dumps(wer))
+    tables.write(tmp_path)
+    block = "<!-- results:{} -->\n{}\n<!-- /results -->\n"
+    assert doc.read_text() == (
+        block.format("asr", tables.render(TABLE))
+        + "Middle.\n"
+        + block.format("wer", tables.render(wer))
+    )
