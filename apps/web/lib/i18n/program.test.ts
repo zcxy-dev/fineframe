@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { cardIds, templateIds } from "@video-editor/effects";
 import { removables } from "@video-editor/engine/revise";
 import type { Project } from "@video-editor/schema";
@@ -10,7 +11,7 @@ import { en, MESSAGES } from "./messages.ts";
 import { downloadName, overlayLabel, progressText } from "./program.ts";
 
 const zh = MESSAGES["zh-TW"];
-const repo = new URL("../../../../", import.meta.url).pathname;
+const repo = fileURLToPath(new URL("../../../../", import.meta.url));
 
 /** One of every progress line the edit's programs write, with made-up numbers and names. */
 const SAID = [
