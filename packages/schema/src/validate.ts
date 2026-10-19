@@ -7,7 +7,7 @@ import projectSchema from "../project.schema.json" with { type: "json" };
 import type { MediaIndex } from "./generated/media-index.ts";
 import type { MusicIndex } from "./generated/music-index.ts";
 import type { Progress } from "./generated/progress.ts";
-import type { Clip, Project, Rect, Source } from "./generated/project.ts";
+import type { Clip, CropKeyframe, CropRect, Project, Rect, Source } from "./generated/project.ts";
 import { ticksPerFrame } from "./time.ts";
 
 /** A value that does not match its schema; the message lists every problem, one per line. */
@@ -93,6 +93,11 @@ function projectProblems(project: Project): string[] {
       problems.push(`${path}: x + w and y + h may not exceed 1`);
     }
   };
+  const onPicture = (path: string, rect: CropRect) => {
+    if (rect.x >= 1 || rect.y >= 1 || rect.x + rect.w <= 0 || rect.y + rect.h <= 0) {
+      problems.push(`${path}: lies wholly off the picture`);
+    }
+  };
 
   const { fps, aspect, width, height } = project.output;
   try {
@@ -126,11 +131,21 @@ function projectProblems(project: Project): string[] {
       }
     };
     const crop = clip.framing?.crop;
-    if (crop?.type === "static") inside(`${path}/framing/crop/rect`, crop.rect);
+    if (crop?.type === "static") {
+      onPicture(`${path}/framing/crop/rect`, crop.rect);
+      if (crop.below) onPicture(`${path}/framing/crop/below`, crop.below);
+    }
     if (crop?.type === "path") {
       forward(`${path}/framing/crop`, crop.keyframes);
       for (const [k, key] of crop.keyframes.entries()) {
-        inside(`${path}/framing/crop/keyframes/${k}/rect`, key.rect);
+        onPicture(`${path}/framing/crop/keyframes/${k}/rect`, key.rect);
+        if (key.below) onPicture(`${path}/framing/crop/keyframes/${k}/below`, key.below);
+        const before = crop.keyframes[k - 1];
+        if (before && key.t - before.t > 1 && !sameShape(before, key)) {
+          problems.push(
+            `${path}/framing/crop/keyframes/${k}: changes size or split more than a tick after the keyframe before`,
+          );
+        }
       }
     }
     const scale = clip.framing?.scale;
@@ -179,4 +194,12 @@ function projectProblems(project: Project): string[] {
     range(`/plan/emphasis/${i}`, moment.start, moment.end);
   }
   return problems;
+}
+
+/** Whether two crop keyframes have rects of one size, and both split the area or neither does. */
+function sameShape(a: CropKeyframe, b: CropKeyframe): boolean {
+  const same = (p: CropRect, q: CropRect) => p.w === q.w && p.h === q.h;
+  if (!same(a.rect, b.rect)) return false;
+  if (!a.below || !b.below) return !a.below && !b.below;
+  return same(a.below, b.below);
 }

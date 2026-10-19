@@ -188,3 +188,26 @@ def test_callouts_are_scored_through_their_crop_against_the_region_on_screen(tmp
     assert scored == {"count": 3, "on_target": 1, "mean_iou": 0.333, "ious": [1.0, 0.0, 0.0]}
     pooled = edit.summarize([edit.score(path)])["callouts"]
     assert pooled == {"count": 3, "scored": 3, "on_target": 1, "mean_iou": 0.333}
+
+
+def test_a_callout_over_the_whole_picture_in_a_taller_frame_is_scored_where_it_shows(tmp_path):
+    path = corpus(tmp_path, [(1.2, 2.0)], target=0.8)
+    clip = tmp_path / "a1"
+    index = {"source": {"duration": 8.0, "video": {"width": 1280, "height": 720}}}
+    (clip / "index.json").write_text(json.dumps(index))
+    field = {"x": 0.4, "y": 0.2, "w": 0.1, "h": 0.1}
+    regions = [{"start": 1.0, "end": 2.0, "name": "field", "rect": field}]
+    (clip / "truth" / "regions.json").write_text(json.dumps({"regions": regions}))
+    project = json.loads(path.read_text())
+    project["output"] |= {"width": 1080, "height": 1920}
+    # The whole 16:9 picture in the middle of the 9:16 frame: the crop reaches past its top and
+    # bottom, 3.16 times its height.
+    h = (16 / 9) / (9 / 16)
+    crop = {"type": "static", "rect": {"x": 0.0, "y": (1 - h) / 2, "w": 1.0, "h": h}}
+    project["main"][0]["framing"] = {"crop": crop}
+    on = {"x": 0.4, "y": (0.2 - (1 - h) / 2) / h, "w": 0.1, "h": 0.1 / h}
+    project["overlays"] = [
+        {"template": "callout", "start": 0, "duration": 3 * T, "params": {"rect": on}}
+    ]
+    path.write_text(json.dumps(project))
+    assert edit.score(path)["callouts"]["ious"] == [1.0]

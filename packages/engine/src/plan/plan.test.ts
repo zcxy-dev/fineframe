@@ -409,7 +409,7 @@ test("a planned edit punches in at its jump cuts and pushes in on emphasis, unde
     const from = scaleAt(before.framing?.scale, before.out);
     const to = scaleAt(clip.framing?.scale, clip.in);
     assert.ok(Math.abs(Math.log(to / from)) >= Math.log(1.08) - 1e-9, `cut ${i}: ${from} to ${to}`);
-    assert.ok(Math.max(from, to) <= 1.2, "no further than UPSCALE");
+    assert.ok(Math.max(from, to) <= 1.25, "no further than the punch-in");
   }
   // The clip each emphasis starts in pushes in.
   const pushed = main.filter((clip) => typeof clip.framing?.scale === "object");

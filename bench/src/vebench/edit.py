@@ -200,7 +200,8 @@ def _callouts(project: dict, base: Path) -> dict:
 
 def _visible(framing: dict | None, t: float, aspect: float, shape: float) -> tuple:
     """The part of the source on screen at source tick t, as (x, y, w, h) fractions of its
-    picture: the engine's visible() in packages/engine/src/framing.ts."""
+    picture, reaching past it where the crop does: the engine's visible() in
+    packages/engine/src/framing.ts."""
     framing = framing or {}
     crop = framing.get("crop")
     rect = {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0}
@@ -221,7 +222,8 @@ def _visible(framing: dict | None, t: float, aspect: float, shape: float) -> tup
     h = min(rect["h"], rect["w"] * aspect / shape) / scale
     x = (rect["x"] + rect["w"] / 2) * aspect - w / 2 + (anchor["x"] - 0.5) * w * (scale - 1)
     y = rect["y"] + rect["h"] / 2 - h / 2 + (anchor["y"] - 0.5) * h * (scale - 1)
-    x, y = min(max(x, 0.0), max(0.0, aspect - w)), min(max(y, 0.0), max(0.0, 1 - h))
+    if scale > 1:
+        x, y = min(max(x, 0.0), max(0.0, aspect - w)), min(max(y, 0.0), max(0.0, 1 - h))
     return x / aspect, y, w / aspect, h
 
 

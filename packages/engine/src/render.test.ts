@@ -516,6 +516,69 @@ test("a crop path moves the crop frame by frame, cutting on the exact frame", as
   }
 });
 
+test("a crop past the picture shows it whole over a blurred copy, from the exact frame it cuts to", async (t) => {
+  const dir = await scratch(t, "backdrop-");
+  const ramp = "geq=lum='16+219*X/W':cb=128:cr=128";
+  const spec = { id: "ramp", pattern: "color", width: 320, height: 180, fps: 30, seconds: 2 };
+  const source = await makeSource(dir, { ...spec, sound: null, filter: ramp });
+  const portrait = { aspect: "9:16", width: 72, height: 128, fps: { num: 30, den: 1 } } as const;
+  const w = 9 / 16 / (16 / 9);
+  const h = 1 / w;
+  // A 9:16 crop in the middle until 1 s, then the whole picture in the middle of the frame.
+  const keyframes = [
+    { t: 0, rect: { x: 0.5 - w / 2, y: 0, w, h: 1 } },
+    { t: SECOND - 1, rect: { x: 0.5 - w / 2, y: 0, w, h: 1 } },
+    { t: SECOND, rect: { x: 0, y: (1 - h) / 2, w: 1, h } },
+  ];
+  const main = [{ ...clip("ramp", 0.5, 1), framing: { crop: { type: "path", keyframes } } }];
+  const project = projectOf([source], main as Project["main"], portrait);
+  const result = await render(await write(dir, project), join(dir, "out.mp4"));
+  const frames = await grey(result.video, 72, 128);
+  assert.equal(frames.length, 30);
+  const pixel = (frame: Uint8Array, x: number, y: number) => frame[y * 72 + x] ?? 0;
+  for (const [k, frame] of frames.entries()) {
+    const [left, right] = [pixel(frame, 1, 64), pixel(frame, 70, 64)];
+    if (k < 15) {
+      // Output frame k shows 0.5 s + k frames: the crop spans 0.34 to 0.66 of the ramp.
+      assert.ok(Math.abs(left - 255 * (0.5 - w / 2)) < 12, `frame ${k}: left ${left}`);
+      assert.ok(Math.abs(right - 255 * (0.5 + w / 2)) < 12, `frame ${k}: right ${right}`);
+      continue;
+    }
+    // The whole ramp across the middle, 40 rows of the 128, and its blurred copy above and below.
+    assert.ok(left < 20 && right > 235, `frame ${k}: ${left} to ${right}`);
+    for (const y of [4, 124]) {
+      const row = Array.from({ length: 72 }, (_, x) => pixel(frame, x, y));
+      assert.ok(row.every((v) => v > 0) && (row[36] ?? 0) > 60, `frame ${k}, row ${y}: ${row}`);
+      const steps = row.slice(1).map((v, x) => Math.abs(v - (row[x] ?? 0)));
+      assert.ok(Math.max(...steps) < 20, `frame ${k}, row ${y} is not smooth: ${row}`);
+    }
+  }
+});
+
+test("a split screen fills its top and bottom halves with their own crops", async (t) => {
+  const dir = await scratch(t, "halves-");
+  // Dark on the left half of the picture, light on the right.
+  const sides = "geq=lum='if(lt(X,W/2),40,220)':cb=128:cr=128";
+  const spec = { id: "sides", pattern: "color", width: 320, height: 180, fps: 30, seconds: 1 };
+  const source = await makeSource(dir, { ...spec, sound: null, filter: sides });
+  const portrait = { aspect: "9:16", width: 72, height: 128, fps: { num: 30, den: 1 } } as const;
+  // Each half is 72 × 64, 9:8: 0.6 of the picture's height is 0.38 of its width.
+  const pane = (x: number) => ({ x, y: 0.2, w: 0.6 * (9 / 8) * (9 / 16), h: 0.6 });
+  const crop = { type: "static", rect: pane(0.05), below: pane(0.55) } as const;
+  const project = projectOf([source], [{ ...clip("sides", 0, 0.5), framing: { crop } }], portrait);
+  const result = await render(await write(dir, project), join(dir, "out.mp4"));
+  const frames = await grey(result.video, 72, 128);
+  assert.equal(frames.length, 15);
+  for (const frame of frames) {
+    const mean = (from: number, to: number) =>
+      frame.subarray(from * 72, to * 72).reduce((sum, v) => sum + v, 0) / ((to - from) * 72);
+    // Grey levels 40 and 220 of the limited range, in the full range the frames are read in.
+    const full = (level: number) => ((level - 16) * 255) / 219;
+    assert.ok(Math.abs(mean(2, 62) - full(40)) < 6, `top ${mean(2, 62)}`);
+    assert.ok(Math.abs(mean(66, 126) - full(220)) < 6, `bottom ${mean(66, 126)}`);
+  }
+});
+
 test("footage with non-square pixels is cropped where the plan puts the crop", async (t) => {
   const dir = await scratch(t, "anamorphic-");
   // 16:9 stored in 240 × 180 with 4:3 pixels, grey rising from black on the left to white on the
@@ -684,6 +747,41 @@ test("a push-in zooms on exact frames, smoothly and about the centre, across pie
       `frame ${n}: ${width} px wide, expected ${expected}`,
     );
     assert.ok(Math.abs(moment / width - 159.5) < 0.25, `frame ${n}: centred at ${moment / width}`);
+  }
+});
+
+test("a punch-in that steps within a clip changes on the exact frame, each side at its own scale", async (t) => {
+  const dir = await scratch(t, "step-");
+  // A white square, 40 pixels wide, in the middle of a black frame.
+  const square = await makeSource(dir, {
+    id: "square",
+    pattern: "color",
+    filter: "drawbox=x=140:y=70:w=40:h=40:color=white:t=fill",
+    width: 320,
+    height: 180,
+    fps: 30,
+    seconds: 2,
+    sound: null,
+  });
+  const scale: ScalePath = {
+    type: "path",
+    keyframes: [
+      { t: SECOND / 2 - 1, scale: 1 },
+      { t: SECOND / 2, scale: 1.25 },
+    ],
+  };
+  const project = projectOf([square], [{ ...clip("square", 0, 1), framing: { scale } }], {
+    ...tiny,
+    width: 320,
+    height: 180,
+  });
+  const result = await render(await write(dir, project), join(dir, "out.mp4"));
+  const picture = await grey(result.video, 320, 180);
+  assert.equal(picture.length, 30);
+  for (const [n, frame] of picture.entries()) {
+    const row = frame.subarray(90 * 320, 91 * 320);
+    const width = row.filter((value) => value > 128).length;
+    assert.equal(width, n < 15 ? 40 : 50, `frame ${n}`);
   }
 });
 
@@ -1026,23 +1124,19 @@ test("what the renderer does not draw yet fails the render instead of being drop
       {
         ...clip(source.id, 0, 0.5),
         framing: {
-          crop: {
-            type: "path",
-            keyframes: [
-              { t: 0, rect: { x: 0, y: 0, w: 1, h: 1 } },
-              { t: 1, rect: { x: 0.2, y: 0.2, w: 0.5, h: 0.5 } },
-            ],
-          },
+          crop: { type: "static", rect: { x: 0, y: -0.5, w: 1, h: 2 } },
+          scale: 1.1,
         },
       },
     ],
     { ...tiny, width: 64, height: 36 },
   );
   project.audio.music = [];
-  assert.deepEqual(unrendered(project), ["/main/0/framing/crop: crop paths that change size"]);
+  const problem = "/main/0/framing/scale: a zoom on a crop past the picture or a split screen";
+  assert.deepEqual(unrendered(project), [problem]);
   await assert.rejects(
     render(await write(dir, project), join(dir, "out.mp4")),
-    /does not draw these yet:\n\/main\/0\/framing\/crop: crop paths that change size$/,
+    new RegExp(`does not draw these yet:\\n${problem.replaceAll("/", "\\/")}$`),
   );
 });
 

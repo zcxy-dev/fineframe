@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Grade, type Project, TICKS_PER_SECOND } from "@video-editor/schema";
 import { ffmpeg, run } from "./ffmpeg.ts";
+import { framingCuts } from "./framing.ts";
 import { sampleRate } from "./grade.ts";
 import { QUIET } from "./graph/encode.ts";
 import { decimal } from "./graph/inputs.ts";
@@ -66,50 +67,60 @@ const SATURATION = [0.7, 1.4] as const;
 const OFFSET = 0.15;
 
 /** Samples a clip's picture as the render shows it after its auto grade: frames spread over it
- * as the auto grade samples them, framed into a small box of the output's shape. */
+ * as the auto grade samples them, framed into a small box of the output's shape, each stretch
+ * between the framing's cuts with its own crop. */
 async function measureColour(
   source: SourceFacts,
   clip: { in: number; out: number; framing?: Project["main"][number]["framing"]; grade?: Grade },
   aspect: { width: number; height: number },
 ): Promise<ColourSample> {
-  const seconds = (clip.out - clip.in) / TICKS_PER_SECOND;
   const long = Math.max(aspect.width, aspect.height);
   const even = (side: number) => Math.max(2, Math.round((side * SAMPLE_LONG_SIDE) / long / 2) * 2);
   const box = { width: even(aspect.width), height: even(aspect.height) };
   const auto = clip.grade?.auto;
-  const rate = sampleRate(seconds);
-  // fps runs first, so a crop path moves with the sampled frames' own source times.
-  const span = {
-    start: clip.in,
-    frames: Math.ceil(seconds * rate),
-    frameTicks: TICKS_PER_SECOND / rate,
-  };
-  const filters = [
-    `fps=${decimal(rate)}`,
-    ...fill(clip.framing, box, source, span),
-    ...colour(auto ? { auto } : undefined),
-    "scale=in_color_matrix=bt709:in_range=tv:out_range=pc:flags=accurate_rnd+full_chroma_int",
-    "format=rgb24",
+  const rate = sampleRate((clip.out - clip.in) / TICKS_PER_SECOND);
+  const edges = [
+    clip.in,
+    ...framingCuts(clip.framing).filter((t) => t > clip.in && t < clip.out),
+    clip.out,
   ];
   const dir = await mkdtemp(join(tmpdir(), "colour-"));
   try {
-    const raw = join(dir, "frames.rgb");
-    await run(await ffmpeg(), [
-      ...QUIET,
-      "-ss",
-      decimal(clip.in / TICKS_PER_SECOND),
-      "-i",
-      source.path,
-      "-t",
-      decimal(seconds),
-      "-vf",
-      filters.join(","),
-      "-an",
-      "-f",
-      "rawvideo",
-      raw,
-    ]);
-    return thin(new Uint8Array(await readFile(raw)), CLIP_PIXELS);
+    const parts: Uint8Array[] = [];
+    for (const [k, from] of edges.slice(0, -1).entries()) {
+      const seconds = ((edges[k + 1] as number) - from) / TICKS_PER_SECOND;
+      // fps runs first, so a crop path moves with the sampled frames' own source times.
+      const span = {
+        start: from,
+        frames: Math.ceil(seconds * rate),
+        frameTicks: TICKS_PER_SECOND / rate,
+      };
+      const filters = [
+        `fps=${decimal(rate)}`,
+        ...fill(clip.framing, box, source, span),
+        ...colour(auto ? { auto } : undefined),
+        "scale=in_color_matrix=bt709:in_range=tv:out_range=pc:flags=accurate_rnd+full_chroma_int",
+        "format=rgb24",
+      ];
+      const raw = join(dir, `frames-${k}.rgb`);
+      await run(await ffmpeg(), [
+        ...QUIET,
+        "-ss",
+        decimal(from / TICKS_PER_SECOND),
+        "-i",
+        source.path,
+        "-t",
+        decimal(seconds),
+        "-vf",
+        filters.join(","),
+        "-an",
+        "-f",
+        "rawvideo",
+        raw,
+      ]);
+      parts.push(new Uint8Array(await readFile(raw)));
+    }
+    return thin(Buffer.concat(parts), CLIP_PIXELS);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

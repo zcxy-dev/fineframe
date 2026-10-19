@@ -89,18 +89,16 @@ test("a callout points at what Claude boxed on the frame where it is named, mapp
   const wishes = [wish("the blue button", "就是這裡"), wish("the red button")];
   const first = await edit(dir, "9:16", wishes, [found(MIDDLE), found(RIGHT)], cache);
   assert.equal(first.asked, 2);
-  // The red button is outside the 9:16 crop of the middle: left out.
-  const [callout, ...more] = callouts(first.edit) as Overlay[];
+  // At 9:16 the whole screen shows in the middle of the frame, so the box maps into its crop.
+  const [callout] = callouts(first.edit) as Overlay[];
   assert.ok(callout);
-  assert.deepEqual(more, []);
   const crop = first.edit.project.main[0]?.framing?.crop;
-  assert.ok(crop?.type === "static");
+  assert.ok(crop?.type === "static" && crop.rect.w === 1 && crop.rect.h > 3);
   const rect = callout.params.rect as { x: number; y: number; w: number; h: number };
   const near = (a: number, b: number) => Math.abs(a - b) < 2e-3;
-  assert.ok(near(rect.x, (140 / 320 - crop.rect.x) / crop.rect.w), JSON.stringify(rect));
-  assert.ok(
-    near(rect.w, 40 / 320 / crop.rect.w) && near(rect.y, 120 / 180) && near(rect.h, 24 / 180),
-  );
+  const y = (120 / 180 - crop.rect.y) / crop.rect.h;
+  assert.ok(near(rect.x, 140 / 320) && near(rect.w, 40 / 320), JSON.stringify(rect));
+  assert.ok(near(rect.y, y) && near(rect.h, 24 / 180 / crop.rect.h), JSON.stringify(rect));
   assert.equal(callout.params.label, "就是這裡");
   // It starts 0.3 s before "video" is said, on the output timeline, and on a frame.
   const video = first.edit.state.sources.get("talk")?.words.findIndex((w) => w.text === "video");

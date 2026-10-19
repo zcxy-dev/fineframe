@@ -24,7 +24,7 @@ const project: Project = await loadJson("edit/project.json", validateProject);
 - Source ids are unique, and every source a project names exists and has a kind that fits: video or image for clips and colour references, video or audio for voice decisions, audio for music.
 - Ranges run forward, crop and scale keyframes move forward in time, and caption words lie within their line.
 - The first clip has no transition, and a clip is long enough for the transitions into and out of it.
-- Rects stay inside the frame (`x + w` and `y + h` at most 1).
+- B-roll rects stay inside the frame (`x + w` and `y + h` at most 1); a crop lies at least partly on the picture, and a crop path changes its size, or whether it splits the area, only at a cut.
 - A source has at most one voice decision, and an image's clips start at 0.
 - The output frame rate has a whole number of ticks per frame, and the size matches the aspect.
 

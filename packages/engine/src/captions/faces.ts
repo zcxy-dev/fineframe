@@ -4,7 +4,7 @@
 
 import { layoutFor } from "@video-editor/effects";
 import { type Framing, type Project, TICKS_PER_SECOND } from "@video-editor/schema";
-import { visible } from "../framing.ts";
+import { panes } from "../framing.ts";
 import { panelRect, placement } from "../graph/broll.ts";
 import type { SourceFacts } from "../sources.ts";
 import type { Timeline } from "../timeline.ts";
@@ -102,7 +102,6 @@ function zonesOf(
   const frameOf = (t: number) =>
     layer.start + Math.ceil(((t - from) * TICKS_PER_SECOND) / frameTicks - 1e-9);
   const hold = 1 / faces.framing.fps;
-  const { box } = layer;
   for (const shot of faces.framing.shots) {
     if (shot.end <= from || shot.start >= to) continue;
     for (const face of shot.faces) {
@@ -111,35 +110,36 @@ function zonesOf(
         const end = Math.min(layer.end, frameOf(Math.min(detection.t + hold, shot.end)));
         if (end <= start) continue;
         const t = detection.t * TICKS_PER_SECOND;
-        const view = visible(layer.framing, t, faces.aspect, box);
-        const x0 = box.x + ((detection.x - view.x) / view.w) * box.width;
-        const x1 = box.x + ((detection.x + detection.w - view.x) / view.w) * box.width;
-        const y0 = box.y + ((detection.y - view.y) / view.h) * box.height;
-        const y1 = box.y + ((detection.y + detection.h - view.y) / view.h) * box.height;
-        if (x1 <= box.x || x0 >= box.x + box.width || y1 <= box.y || y0 >= box.y + box.height) {
-          continue;
+        for (const { view, box } of panes(layer.framing, t, faces.aspect, layer.box)) {
+          const x0 = box.x + ((detection.x - view.x) / view.w) * box.width;
+          const x1 = box.x + ((detection.x + detection.w - view.x) / view.w) * box.width;
+          const y0 = box.y + ((detection.y - view.y) / view.h) * box.height;
+          const y1 = box.y + ((detection.y + detection.h - view.y) / view.h) * box.height;
+          if (x1 <= box.x || x0 >= box.x + box.width || y1 <= box.y || y0 >= box.y + box.height) {
+            continue;
+          }
+          if (x1 <= 0 || x0 >= output.width || y1 <= 0 || y0 >= output.height) continue;
+          const cx = (x0 + x1) / 2;
+          const cy = (y0 + y1) / 2;
+          const hidden = covers.some(
+            (cover) =>
+              cover.start <= start &&
+              end <= cover.end &&
+              cx >= cover.box.x &&
+              cx < cover.box.x + cover.box.width &&
+              cy >= cover.box.y &&
+              cy < cover.box.y + cover.box.height,
+          );
+          if (hidden) continue;
+          // Only the part inside its box shows: the rest is under what is beside it.
+          const inside = {
+            x0: Math.max(x0, box.x),
+            y0: Math.max(y0, box.y),
+            x1: Math.min(x1, box.x + box.width),
+            y1: Math.min(y1, box.y + box.height),
+          };
+          zones.push({ start, end, boxes: [inside] });
         }
-        if (x1 <= 0 || x0 >= output.width || y1 <= 0 || y0 >= output.height) continue;
-        const cx = (x0 + x1) / 2;
-        const cy = (y0 + y1) / 2;
-        const hidden = covers.some(
-          (cover) =>
-            cover.start <= start &&
-            end <= cover.end &&
-            cx >= cover.box.x &&
-            cx < cover.box.x + cover.box.width &&
-            cy >= cover.box.y &&
-            cy < cover.box.y + cover.box.height,
-        );
-        if (hidden) continue;
-        // Only the part inside its box shows: the rest is under what is beside it.
-        const inside = {
-          x0: Math.max(x0, box.x),
-          y0: Math.max(y0, box.y),
-          x1: Math.min(x1, box.x + box.width),
-          y1: Math.min(y1, box.y + box.height),
-        };
-        zones.push({ start, end, boxes: [inside] });
       }
     }
   }

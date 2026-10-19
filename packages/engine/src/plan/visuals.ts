@@ -22,7 +22,7 @@ import type { Credit } from "../broll/credits.ts";
 import { pickSfx, SFX_LICENSE, type SfxKind } from "../broll/sfx.ts";
 import { findStock, stockProviders } from "../broll/stock.ts";
 import { cacheDir } from "../download.ts";
-import { cropPath } from "../framing.ts";
+import { CAMERA, cropPath } from "../framing.ts";
 import { fingerprintOf } from "../sources.ts";
 import type { TimedWord } from "./captions.ts";
 import { CHECK_MODEL, type Claude, type Usage } from "./claude.ts";
@@ -661,14 +661,16 @@ export function stillFraming(
 
 /**
  * The speaker beside each split screen: the main track's own picture in the lower part of the
- * frame, in step with it, as B-roll framed on the faces for that shape. A split that spans a cut
- * is one clip for each main clip under it.
+ * frame, in step with it, as B-roll framed on the faces for that shape, in a video call on the
+ * speaker's window (`windows`, by source). A split that spans a cut is one clip for each main clip
+ * under it.
  */
 export function speakerClips(
   placed: readonly PlacedVisual[],
   main: readonly { source: string; in: number; out: number }[],
   indexes: (source: string) => MediaIndex | null,
   output: Pick<Project["output"], "aspect" | "width" | "height">,
+  windows: (source: string) => ReadonlyMap<number, Rect> | undefined = () => undefined,
 ): BrollClip[] {
   const share = panelShare(output.aspect);
   const rect = { x: 0, y: share, w: 1, h: 1 - share };
@@ -683,7 +685,7 @@ export function speakerClips(
         const clipIn = clip.in + from - at;
         const range = { in: clipIn, out: clipIn + to - from };
         const index = indexes(clip.source);
-        const crop = index && cropPath(index, range, box);
+        const crop = index && cropPath(index, range, box, CAMERA, windows(clip.source));
         clips.push({
           source: clip.source,
           ...range,

@@ -60,7 +60,13 @@ export function pieceVideo(
     const { index, offset } = opened.open(clip.source, start);
     const chain = [
       ...clock(offset, fps, layer.frames),
-      ...fill(clip.clip.framing, output, clip.source, { start, frames: layer.frames, frameTicks }),
+      ...fill(
+        clip.clip.framing,
+        output,
+        clip.source,
+        { start, frames: layer.frames, frameTicks },
+        `m${i}`,
+      ),
       ...push(clip.clip.framing, { start, frames: layer.frames, frameTicks }, output),
       ...colour(clip.clip.grade, lut(clip.clip.grade)),
       "format=yuv420p",
@@ -80,7 +86,13 @@ export function pieceVideo(
     const { index, offset } = opened.open(clip.source, start);
     const chain = [
       ...clock(offset, fps, layer.frames),
-      ...fill(clip.clip.framing, at, clip.source, { start, frames: layer.frames, frameTicks }),
+      ...fill(
+        clip.clip.framing,
+        at,
+        clip.source,
+        { start, frames: layer.frames, frameTicks },
+        `b${j}`,
+      ),
       ...push(clip.clip.framing, { start, frames: layer.frames, frameTicks }, at),
       ...colour(clip.clip.grade, lut(clip.clip.grade)),
       ...brollTiming(layer, fps),
