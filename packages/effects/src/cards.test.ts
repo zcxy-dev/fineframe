@@ -204,7 +204,7 @@ function statement(text: string, phrases: string[], area = AREAS[0] as (typeof A
     text: lines,
     width: layout.box.width,
     height: layout.box.height,
-    floor: 0.7 * layout.type("display"),
+    floor: 0.8 * layout.type("display"),
   };
 }
 
@@ -217,13 +217,33 @@ test("a one-line highlight statement breaks between words to fill a 9:16 card", 
   assert.deepEqual(set.text, ["未來剪輯師會被", "AI 取代嗎？"]);
   assert.ok(set.size >= set.floor, `${set.size} px is under the floor`);
   for (const w of widths(set)) assert.ok(w <= set.width, `${w} px overflows ${set.width}`);
-  // As large as a statement that breaks at its comma, which it once was half of.
-  const twoLines = statement("AI 不會取代你，但會用 AI 的人會。", ["會用 AI 的人"]);
-  assert.deepEqual(twoLines.text, ["AI 不會取代你，", "但會用 AI 的人會。"]);
-  assert.ok(set.size >= twoLines.size, `${set.size} px against ${twoLines.size} px`);
 });
 
-test("a highlight statement breaks at punctuation and Latin spaces, never inside a phrase", () => {
+test("a short statement in two clauses fills a card as a one-line statement does", () => {
+  const text = "AI 不會取代你，但會用 AI 的人會。";
+  // At 9:16 its second clause, too long for the size, breaks inside the phrase, which sweeps one
+  // line after the other.
+  const portrait = statement(text, ["會用 AI 的人"]);
+  assert.deepEqual(portrait.text, ["AI 不會取代你，", "但會用", "AI 的人會。"]);
+  const oneLine = statement("未來剪輯師會被 AI 取代嗎？", ["AI 取代"]);
+  assert.ok(portrait.size >= 0.9 * oneLine.size, `${portrait.size} px against ${oneLine.size}`);
+  const marked = portrait.lines.flat().filter((segment) => segment.mark === 0);
+  assert.deepEqual(
+    marked.map((segment) => segment.text),
+    ["會用", "AI 的人"],
+  );
+  assert.equal(marked[0]?.sweep[0], 0);
+  assert.equal(marked[0]?.sweep[1], marked[1]?.sweep[0]);
+  assert.equal(marked[1]?.sweep[1], 1);
+  for (const area of AREAS) {
+    const set = statement(text, ["會用 AI 的人"], area);
+    assert.ok(set.size >= set.floor, `${area}: ${set.size} px is under ${set.floor}`);
+    for (const w of widths(set)) assert.ok(w <= set.width, `${area}: ${w} px overflows`);
+    assert.ok(set.lines.length * STATEMENT_LEADING * set.size <= set.height, `${area}: too tall`);
+  }
+});
+
+test("a highlight statement breaks at punctuation and spaces, never between a phrase's Latin words", () => {
   const latin = statement("Will AI replace video editors?", ["AI replace"]);
   assert.deepEqual(latin.text, ["Will", "AI replace", "video", "editors?"]);
   const mixed = statement("用 Claude Code 寫程式，比你想的更快", ["Claude Code"]);

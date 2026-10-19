@@ -37,7 +37,10 @@ export function Highlight({ params, layout }: { params: HighlightParams; layout:
             {line.map((segment, j) => {
               // biome-ignore lint/suspicious/noArrayIndexKey: the segments never reorder.
               if (segment.mark < 0) return <span key={j}>{segment.text}</span>;
-              const swept = build.at(0.45 + segment.mark * 0.4, 0.45);
+              // A phrase broken across lines sweeps one line after the other.
+              const [from, to] = segment.sweep;
+              const whole = build.at(0.45 + segment.mark * 0.4, 0.45);
+              const swept = Math.min(1, Math.max(0, (whole - from) / (to - from)));
               const mark = markStyle(swept, accent);
               return (
                 <span
