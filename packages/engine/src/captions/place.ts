@@ -1,10 +1,12 @@
-// Where each caption goes so that it does not cover a face.
+// Where each caption goes so that it does not cover a face, or a visual drawn over the picture.
 
 /** Faces on screen over output frames [start, end), as boxes in output pixels. */
 export interface FaceZone {
   start: number;
   end: number;
   boxes: { x0: number; y0: number; x1: number; y1: number }[];
+  /** A visual rather than a face: a caption covers a face before it covers this. */
+  hard?: boolean;
 }
 
 /** A caption's drawn extent in output pixels, when it shows, and the main-track clip it starts
@@ -31,7 +33,7 @@ const FACE_GAP = 12;
  * while it shows; then it moves just below or above the faces, whichever is nearer, inside
  * `band` (top and bottom edges in pixels). A caption keeps the bottom edge of the one before it
  * in the same shot while that stays clear, so captions do not hop between phrases. If no spot is
- * clear, the one covering the least face wins.
+ * clear, the one covering the least face wins, among those that cover no visual if any does not.
  */
 export function placeBlocks(
   blocks: Block[],
@@ -45,11 +47,17 @@ export function placeBlocks(
     const anchor = bottom - half;
     const covered: [number, number][] = [];
     const clear: [number, number][] = [];
+    const blocked: [number, number][] = [];
     for (const zone of faces) {
       if (zone.end <= block.start || zone.start >= block.end) continue;
       for (const { x0, y0, x1, y1 } of zone.boxes) {
         const w = x1 - x0;
         const h = y1 - y0;
+        if (zone.hard) {
+          if (x1 <= block.left || x0 >= block.right) continue;
+          blocked.push([y0 - FACE_GAP, y1 + FACE_GAP]);
+          continue;
+        }
         if (x1 + w * FACE_PAD_X <= block.left || x0 - w * FACE_PAD_X >= block.right) continue;
         covered.push([y0, y1]);
         clear.push([
@@ -72,9 +80,12 @@ export function placeBlocks(
     // The previous caption's bottom edge, so a caption of one row under one of two lines up with
     // its last row.
     if (last?.shot === block.shot) candidates.push([inBand(last.bottom - half), 0]);
-    for (const [a, b] of clear) candidates.push([inBand(b + half), 2], [inBand(a - half), 2]);
+    for (const [a, b] of [...clear, ...blocked]) {
+      candidates.push([inBand(b + half), 2], [inBand(a - half), 2]);
+    }
     candidates.push([top, 2], [low, 2]);
     const score = ([centre, tier]: [number, number]) => [
+      overlap(centre, blocked),
       4 * overlap(centre, covered) + overlap(centre, clear),
       tier,
       Math.abs(centre - anchor),

@@ -119,7 +119,7 @@ for (const group of values.group) {
     const summary = {
       usage: totalUsage(edit.state.usage),
       byPurpose: Object.fromEntries(
-        ["plan", "check", "judge"].map((purpose) => [
+        ["plan", "graphics", "check", "judge"].map((purpose) => [
           purpose,
           totalUsage(edit.state.usage.filter((u) => u.purpose === purpose)),
         ]),

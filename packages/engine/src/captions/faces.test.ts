@@ -121,7 +121,7 @@ test("faces land on the output frames and pixels that show them", () => {
 
 test("beside a split screen, the speaker's face is where the lower half shows it", () => {
   const face = facts("a", { faces: { framing: LOW_FACE, aspect: WIDE } });
-  // A card over the top half for the first second, the speaker in step in the bottom half.
+  // A panel over the top half for the first second, the speaker in step in the bottom half.
   const split = project([{ source: "a", in: 2 * SECOND, out: 4 * SECOND }], {
     broll: [
       {
@@ -132,7 +132,7 @@ test("beside a split screen, the speaker's face is where the lower half shows it
         rect: { x: 0, y: 0.5, w: 1, h: 0.5 },
       },
     ],
-    cards: [{ card: "stat", params: {}, start: 0, duration: SECOND, placement: "panel" }],
+    graphics: [{ layout: "panel", html: "<b>27</b>", css: "", start: 0, duration: SECOND }],
   });
   const zones = faceZones(buildTimeline(split, sources(face)), split.output);
   // The main track's face, low in the frame, is hidden by the speaker's half over it in the
@@ -175,10 +175,10 @@ test("a caption sits at its place, and above a face that would be under it", asy
   assert.ok(moved < 504 - 0.25 * 180, `moved to ${moved}`);
 });
 
-test("captions keep off what a visual draws: a split screen's panel and a card's content", async () => {
+test("captions keep off what a visual draws: a split screen's panel and a full graphic", async () => {
   const visuals = project([{ source: "a", in: 0, out: 3 * SECOND }], {
     broll: [{ source: "b", in: 0, out: SECOND, start: 0, rect: { x: 0, y: 0, w: 1, h: 0.5 } }],
-    cards: [{ card: "stat", params: {}, start: SECOND, duration: SECOND, placement: "full" }],
+    graphics: [{ layout: "full", html: "<b>27</b>", css: "", start: SECOND, duration: SECOND }],
   });
   // The speaker's own half of a split screen is B-roll of the main track's source: captions may
   // sit over it.
@@ -191,10 +191,15 @@ test("captions keep off what a visual draws: a split screen's panel and a card's
     visuals.output,
   );
   // A visual's panel over its frames (B-roll of another source than the speaker's), and a full
-  // card over the frame above the captions' safe margin.
+  // graphic over the frame above the captions' safe margin.
   assert.deepEqual(zones, [
-    { start: 0, end: 30, boxes: [{ x0: 0, y0: 0, x1: 1280, y1: 360 }] },
-    { start: 30, end: 60, boxes: [{ x0: 0, y0: 0, x1: 1280, y1: 720 - Math.round(0.24 * 720) }] },
+    { start: 0, end: 30, boxes: [{ x0: 0, y0: 0, x1: 1280, y1: 360 }], hard: true },
+    {
+      start: 30,
+      end: 60,
+      boxes: [{ x0: 0, y0: 0, x1: 1280, y1: 720 - Math.round(0.24 * 720) }],
+      hard: true,
+    },
   ]);
   // A caption moved off a low face goes below it rather than up into the panel.
   const line = {

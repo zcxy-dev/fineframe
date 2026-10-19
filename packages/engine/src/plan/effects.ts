@@ -48,7 +48,7 @@ const CHAPTERS_MAX = 12;
  * person's line is said, where someone on screen talks for as long as its template needs, and
  * ends before that shot does or the talking stops, coming in sooner than usual, but not before
  * they speak, to fit; with no such shot it is left out. A keyword pop ends before the shot
- * changes after its word. `visuals` are where the edit cuts to a card, a capture or footage on
+ * changes after its word. `visuals` are where the edit cuts to a capture or footage on
  * its points, which no effect may overlap.
  */
 export function plannedOverlays(

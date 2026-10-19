@@ -5,7 +5,8 @@
 import { layoutFor } from "@video-editor/effects";
 import { type Framing, type Project, TICKS_PER_SECOND } from "@video-editor/schema";
 import { panes } from "../framing.ts";
-import { panelRect, placement } from "../graph/broll.ts";
+import { placement } from "../graph/broll.ts";
+import { graphicPlacement } from "../graph/overlays.ts";
 import type { SourceFacts } from "../sources.ts";
 import type { Timeline } from "../timeline.ts";
 import type { FaceZone } from "./place.ts";
@@ -23,11 +24,11 @@ interface Layer {
 
 /**
  * Every face on screen, in output pixels, over the output frames it shows on. Each detection
- * stands for its source frames until the next sample. A face that B-roll or a card drawn over it
- * hides is left out.
+ * stands for its source frames until the next sample. A face that B-roll or a panel or full-frame
+ * graphic drawn over it hides is left out.
  */
 export function faceZones(
-  timeline: Pick<Timeline, "main" | "broll" | "frameTicks"> & Partial<Pick<Timeline, "cards">>,
+  timeline: Pick<Timeline, "main" | "broll" | "frameTicks"> & Partial<Pick<Timeline, "graphics">>,
   output: Pick<Project["output"], "width" | "height" | "aspect">,
 ): FaceZone[] {
   const main: Layer[] = timeline.main.map((clip) => ({
@@ -40,27 +41,29 @@ export function faceZones(
     framing: clip.clip.framing,
     box: placement(clip.clip.rect, output),
   }));
-  const cards: Layer[] = (timeline.cards ?? []).map((clip) => ({
-    ...{ start: clip.start, end: clip.end, in: 0, source: null, framing: undefined },
-    box: placement(clip.card.placement === "panel" ? panelRect(output.aspect) : undefined, output),
-  }));
+  const graphics: Layer[] = (timeline.graphics ?? [])
+    .filter((clip) => clip.graphic.layout === "panel" || clip.graphic.layout === "full")
+    .map((clip) => ({
+      ...{ start: clip.start, end: clip.end, in: 0, source: null, framing: undefined },
+      box: graphicPlacement(clip.graphic, output),
+    }));
   // Layers bottom to top: each is covered by the ones after it.
   const layers = [
     ...main.map((layer) => [layer, 0] as const),
     ...broll.map((layer, i) => [layer, i + 1] as const),
   ];
   return layers.flatMap(([layer, above]) =>
-    zonesOf(layer, [...broll.slice(above), ...cards], timeline.frameTicks, output),
+    zonesOf(layer, [...broll.slice(above), ...graphics], timeline.frameTicks, output),
   );
 }
 
 /**
- * What visuals draw, as zones captions keep off like faces: a split screen's panel of B-roll from
- * another source than the speaker's (whose own half captions may sit over), a card in its panel,
- * and a full-frame card above the bottom safe margin it leaves for captions.
+ * What visuals draw, as zones captions keep off even before faces: a split screen's panel of B-roll from
+ * another source than the speaker's (whose own half captions may sit over), a graphic in its panel,
+ * and a full-frame graphic above the bottom safe margin it leaves for captions.
  */
 export function visualZones(
-  timeline: Pick<Timeline, "main" | "broll"> & Partial<Pick<Timeline, "cards">>,
+  timeline: Pick<Timeline, "main" | "broll"> & Partial<Pick<Timeline, "graphics">>,
   output: Pick<Project["output"], "width" | "height" | "aspect">,
 ): FaceZone[] {
   const speakers = new Set(timeline.main.map((clip) => clip.source?.id));
@@ -72,18 +75,23 @@ export function visualZones(
     start,
     end,
     boxes: [{ x0: box.x, y0: box.y, x1: box.x + box.width, y1: box.y + box.height }],
+    hard: true,
   });
   const broll = timeline.broll
     .filter((clip) => clip.clip.rect && !speakers.has(clip.source?.id))
     .map((clip) => zone(clip.start, clip.end, placement(clip.clip.rect, output)));
   const above =
     output.height - Math.round(layoutFor(output.aspect, output.width, output.height).safe.bottom);
-  const cards = (timeline.cards ?? []).map((clip) =>
-    clip.card.placement === "panel"
-      ? zone(clip.start, clip.end, placement(panelRect(output.aspect), output))
-      : zone(clip.start, clip.end, { x: 0, y: 0, width: output.width, height: above }),
-  );
-  return [...broll, ...cards];
+  const graphics = (timeline.graphics ?? []).flatMap((clip) => {
+    if (clip.graphic.layout === "panel") {
+      return [zone(clip.start, clip.end, graphicPlacement(clip.graphic, output))];
+    }
+    if (clip.graphic.layout === "full") {
+      return [zone(clip.start, clip.end, { x: 0, y: 0, width: output.width, height: above })];
+    }
+    return [];
+  });
+  return [...broll, ...graphics];
 }
 
 function zonesOf(

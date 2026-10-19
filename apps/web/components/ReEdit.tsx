@@ -852,7 +852,7 @@ function toRevision(draft: Draft, words: readonly Word[]): Revision {
   if (titles.length > 0) revision.overlays = titles;
   if (draft.remove.length > 0) {
     revision.remove = draft.remove.map((id) => {
-      const [kind, index] = id.split(":") as ["overlay" | "card" | "broll", string];
+      const [kind, index] = id.split(":") as ["overlay" | "graphic" | "broll", string];
       return { kind, index: Number(index) };
     });
   }

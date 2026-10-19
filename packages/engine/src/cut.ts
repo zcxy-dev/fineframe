@@ -80,9 +80,9 @@ export async function placeSources(
  * none lies inside (`outside` says which words that took). The clip splits around them, each
  * new end placed in that pause as the planner places cuts, so no cut falls inside a word or
  * between two words said without a pause. Captions,
- * overlays, B-roll, cards, music, sound effects and the planner's emphasis move with the speech
+ * overlays, B-roll, graphics, music, sound effects and the planner's emphasis move with the speech
  * they were on; a caption word that went is taken out of its line, and an overlay, B-roll clip or
- * card whose whole time went goes too. B-roll of a source the main track plays, the speaker beside
+ * graphic whose whole time went goes too, as does a graphic showing a word that went. B-roll of a source the main track plays, the speaker beside
  * a split screen, splits where the main track does, so it stays in step.
  */
 export function cutEdit(
@@ -101,6 +101,8 @@ export function cutEdit(
   const seconds = (ticks: number) => (ticks / TICKS_PER_SECOND).toFixed(2);
   const notes: string[] = [];
   const outside: CutResult["outside"] = [];
+  // Each word cut, by `source:index`, so a graphic showing one goes with it.
+  const cutWords = new Set<string>();
 
   const main: Clip[] = [];
   const kept: Kept[] = [];
@@ -126,22 +128,24 @@ export function cutEdit(
     const end = position;
     const at = (ticks: number) => start + ticks - clip.in;
     const covering = ranges.findIndex(([a, b]) => a <= start && b >= end);
-    if (covering >= 0) {
-      used.add(covering);
-      notes.push(`Cut /main/${i} whole, ${seconds(start)}–${seconds(end)} s`);
-      continue;
-    }
     const source = sources.get(clip.source);
     const mid = (word: Word) => secondsToTicks((word.start + word.end) / 2);
     const words = (source?.words ?? []).flatMap((word, index) =>
       mid(word) >= clip.in && mid(word) < clip.out ? [index] : [],
     );
+    if (covering >= 0) {
+      used.add(covering);
+      notes.push(`Cut /main/${i} whole, ${seconds(start)}–${seconds(end)} s`);
+      for (const index of words) cutWords.add(`${clip.source}:${index}`);
+      continue;
+    }
     const asked = words.filter((index) => inRange(at(mid(source?.words[index] as Word))));
     if (!source || asked.length === 0) {
       place(clip, start);
       continue;
     }
     const { gone, beyond } = toPauses(words, new Set(asked), source);
+    for (const index of gone) cutWords.add(`${clip.source}:${index}`);
     const said = (list: number[]) =>
       joinWords(list.map((index) => source.words[index]?.text ?? ""));
     notes.push(`Cut from /main/${i}, ${seconds(start)}–${seconds(end)} s: ${said(gone)}`);
@@ -306,13 +310,18 @@ export function cutEdit(
       return [{ ...clip, start: moved.to, in: clipIn, out: clipIn + length }];
     });
   }
-  if (project.cards) {
-    out.cards = project.cards.flatMap((card, i) => {
-      const moved = span(card.start, card.duration, `/cards/${i} (${card.card})`);
+  if (project.graphics) {
+    // A graphic that shows a word cut would show what the edit no longer says, so it goes too.
+    out.graphics = project.graphics.flatMap((graphic, i) => {
+      const path = `/graphics/${i} (${graphic.layout})`;
+      if ((graphic.words ?? []).some((w) => cutWords.has(`${w.source}:${w.word}`))) {
+        notes.push(`Removed ${path}: it shows words the cut took out`);
+        return [];
+      }
+      const moved = span(graphic.start, graphic.duration, path);
       if (!moved) return [];
-      return [
-        { ...card, start: moved.to, duration: keptOf(moved.from, card.start + card.duration) },
-      ];
+      const duration = keptOf(moved.from, graphic.start + graphic.duration);
+      return [{ ...graphic, start: moved.to, duration }];
     });
   }
   if (project.audio.music) {

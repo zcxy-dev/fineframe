@@ -46,12 +46,28 @@ const SAID: [RegExp, (words: Words, said: Groups, t: Messages) => string][] = [
     /^Planning (a short|a long) edit with (.+)$/,
     (w, [size, model]) => w.planning(size === "a short", model),
   ],
-  [
-    /^Rewrote the cards whose text broke their layout with (.+) \((.+)\)$/,
-    (w, [m, d]) => w.rewroteCards(m, d),
-  ],
   [/^(.+) planned the edit \((.+)\)$/, (w, [model, d]) => w.planned(model, d)],
   [/^Sourced (\d+) of (\d+) visuals$/, (w, [n, of]) => w.sourced(n, of)],
+  // The graphics (plan/graphics.ts).
+  [/^(.+) wrote (\d+) graphics \((.+)\)$/, (w, [m, n, d]) => w.wroteGraphics(m, n, d)],
+  [
+    /^Left out the (\S+) graphic at ([\d.]+) s: ([\s\S]*)$/,
+    (w, [layout, s, why], t) =>
+      w.leftOutGraphic(layout, t.overlays.layouts[layout] ?? layout, s, why),
+  ],
+  [
+    /^Left out a (\S+) graphic: ([\s\S]*)$/,
+    (w, [layout, why], t) => w.leftOutCutGraphic(layout, t.overlays.layouts[layout] ?? layout, why),
+  ],
+  [
+    /^Left out a graphic on words the edit does not say: "([\s\S]*)"$/,
+    (w, [words]) => w.unsaidGraphic(words),
+  ],
+  [/^Kept (\d+) of (\d+) graphics$/, (w, [n, of]) => w.keptGraphics(n, of)],
+  [
+    /^Wrote no graphics for ([\d.]+)–([\d.]+) s: ([\s\S]*)$/,
+    (w, [from, to, problem]) => w.noGraphics(from, to, problem),
+  ],
   [
     /^Found (\d+) of (\d+) things to point at with (.+) \((.+)\)$/,
     (w, [n, of, model, cost]) => {
@@ -99,12 +115,8 @@ const SAID: [RegExp, (words: Words, said: Groups, t: Messages) => string][] = [
   [/^Mixing music$/, (w) => w.mixingMusic],
   [/^Rendering (\d+\/\d+)$/, (w, [n]) => w.rendering(n)],
   [/^Finished$/, (w) => w.finished],
-  [/^Preparing the effects renderer$/, (w) => w.preparingEffects],
-  [
-    /^Rendering effect (\d+\/\d+) \((.+)\)$/,
-    (w, [n, id], t) =>
-      w.renderingEffect(n, id, t.overlays.templates[id] ?? t.overlays.cards[id] ?? id),
-  ],
+  [/^Rendering effect (\d+\/\d+)$/, (w, [n]) => w.renderingEffect(n)],
+  [/^Rendered (\d+) effects$/, (w, [n]) => w.renderedEffects(n)],
   // The page's own server, before a render's first line (lib/jobs.ts).
   [/^Preparing the changes$/, (w) => w.preparingChanges],
   [/^Planning again$/, (w) => w.planningAgain],
@@ -138,12 +150,15 @@ export function downloadName(name: string, t: Messages): string {
   return kind ? t.progress.model(t.progress.models[kind], name) : name;
 }
 
-/** The engine's label for an overlay, card or B-roll clip (revise.ts) in `t`'s words: its kind
- * named, its text as it is. */
+/** The engine's label for an overlay, graphic or B-roll clip (revise.ts) in `t`'s words: its
+ * kind named, its text as it is. */
 export function overlayLabel(label: string, t: Messages): string {
   const { overlays } = t;
-  const card = label.match(/^Card \(([^)]+)\)(?:: ([\s\S]*))?$/);
-  if (card) return overlays.card(overlays.cards[card[1] as string] ?? (card[1] as string), card[2]);
+  const graphic = label.match(/^Graphic \(([^)]+)\)(?:: ([\s\S]*))?$/);
+  if (graphic) {
+    const layout = graphic[1] as string;
+    return overlays.graphic(overlays.layouts[layout] ?? layout, graphic[2]);
+  }
   const broll = label.match(/^B-roll: ([\s\S]*)$/);
   if (broll) return overlays.broll(broll[1] as string);
   for (const [id, name] of Object.entries(en.overlays.templates)) {

@@ -66,17 +66,17 @@ export interface Template<P> {
   example: P;
 }
 
-export const accent = {
+const accent = {
   description: "The accent colour, `#rrggbb`; leave it out for the house amber.",
   type: "string",
   pattern: "^#[0-9a-fA-F]{6}$",
 } as const;
 
 /** Text the templates draw on one or two lines, so its length is capped. */
-export const text = (description: string, maxLength: number) =>
+const text = (description: string, maxLength: number) =>
   ({ description, type: "string", minLength: 1, maxLength, pattern: "\\S" }) as const;
 
-export const object = (properties: Record<string, object>, required: string[]) => ({
+const object = (properties: Record<string, object>, required: string[]) => ({
   type: "object",
   additionalProperties: false,
   required,

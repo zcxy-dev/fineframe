@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { SchemaError } from "@video-editor/schema";
 import { catalog, templateIds } from "./catalog.ts";
-import { ems, fit, layoutFor, TYPE } from "./layout.ts";
-import { type OverlayJob, overlayKey } from "./render.ts";
+import { layoutFor, TYPE } from "./layout.ts";
+import { type PageJob, pageKey } from "./render.ts";
 import { overlayProblems, validateOverlays } from "./validate.ts";
 
 const SECOND = 120_000;
@@ -63,36 +63,26 @@ test("an overlay runs no shorter than its motion needs and no longer than it hol
   assert.doesNotThrow(() => validateOverlays([]));
 });
 
-test("an overlay's cache key ignores key order and changes with anything that shapes it", () => {
-  const job: OverlayJob = {
-    template: "callout",
-    params: { label: "設定", rect: { x: 0.1, y: 0.2, w: 0.3, h: 0.1 } },
-    aspect: "9:16",
+test("a rendered page's cache key changes with anything that shapes it", async () => {
+  const job: PageJob = {
+    page: "<!doctype html><b>設定</b>",
     width: 1080,
     height: 1920,
     fps: { num: 30, den: 1 },
     frames: 90,
+    transparent: true,
   };
-  const key = overlayKey(job, "code");
-  const reordered = { ...job, params: { rect: { h: 0.1, w: 0.3, y: 0.2, x: 0.1 }, label: "設定" } };
-  assert.equal(overlayKey(reordered, "code"), key);
+  const key = await pageKey(job);
+  assert.equal(await pageKey({ ...job }), key);
   for (const changed of [
-    { ...job, params: { ...job.params, label: "設定頁" } },
+    { ...job, page: "<!doctype html><b>設定頁</b>" },
     { ...job, frames: 91 },
     { ...job, fps: { num: 30000, den: 1001 } },
     { ...job, width: 720, height: 1280 },
+    { ...job, transparent: false },
   ]) {
-    assert.notEqual(overlayKey(changed, "code"), key);
+    assert.notEqual(await pageKey(changed), key);
   }
-  assert.notEqual(overlayKey(job, "other code"), key);
-});
-
-test("type fits its line: CJK is one em a character, Latin about half", () => {
-  assert.equal(ems("效能"), 2);
-  // Two capitals at 0.64, eight lower-case letters at 0.54, a space at 0.26 and two characters.
-  assert.ok(Math.abs(ems("TypeScript 型別") - 7.86) < 1e-9);
-  assert.equal(fit("效能", 100, 300), 100);
-  assert.equal(fit("一二三四五六七八九十", 100, 800), 80);
 });
 
 test("the safe area keeps 9:16 overlays clear of short-form apps and every aspect clear of captions", () => {

@@ -6,9 +6,10 @@
 // cloud speech and its key, adds a synthetic spoken clip, makes a 15 s edit and checks the video,
 // then quits the app and checks nothing it started is left running. Claude and OpenRouter are
 // local stand-ins that answer as they would, so it costs nothing: the plan keeps the lines in
-// order and pops one keyword, every cut passes its check, and each speech chunk is heard as one
-// of the clip's sentences. Everything else is real: the analysis's models, FFmpeg and Chrome
-// Headless Shell download on first use, and the clip is analysed, planned, rendered and checked.
+// order and pops one keyword, the graphics are one label on the first word said, every cut passes
+// its check, and each speech chunk is heard as one of the clip's sentences. Everything else is
+// real: the analysis's models, FFmpeg, ffprobe and Chrome Headless Shell download on first use,
+// and the clip is analysed, planned, rendered with its graphic and checked.
 // `--shots` saves the window at each step.
 //
 // On Linux, run it under a display, such as `xvfb-run -a`. The clip's speech comes from the
@@ -170,6 +171,29 @@ function planFor(packed: string, schema: Schema): unknown {
   return { ...decisions, content: "A short spoken test.", segments, emphasis };
 }
 
+/** The edit's graphics: one label on the first word of the speech the request lists, which it
+ * gives as `word@seconds`, in the safe area at either aspect. */
+function graphicsFor(request: string): unknown {
+  const first = request.match(/^\[[\d.]+–[\d.]+\] (\S+)@([\d.]+)/m);
+  if (!first) return { graphics: [] };
+  const [, word, at] = first as unknown as [string, string, string];
+  return {
+    graphics: [
+      {
+        layout: "label",
+        anchor: word,
+        at: Number(at),
+        seconds: 2,
+        quotes: [word],
+        shows: "The first word said.",
+        sfx: "none",
+        html: `<div class="ff-chip" style="position:absolute;left:calc(var(--u)*12);top:calc(var(--u)*24);animation:ff-rise .5s var(--enter) both"><div class="ff-dot"></div><span style="font-size:calc(var(--u)*6)">${word}</span></div>`,
+        css: "",
+      },
+    ],
+  };
+}
+
 async function body(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of request) chunks.push(chunk as Buffer);
@@ -182,6 +206,8 @@ function json(response: ServerResponse, status: number, value: unknown): void {
 }
 
 const asked: string[] = [];
+/** How many graphics the edit's project has once it is made. */
+let graphics = 0;
 const anthropic = createServer(async (request, response) => {
   const path = request.url ?? "";
   if (request.method === "GET" && path.startsWith("/v1/models/")) {
@@ -206,9 +232,12 @@ const anthropic = createServer(async (request, response) => {
   };
   const schema = params.output_config.format.schema;
   const planning = "segments" in (schema.properties ?? {});
-  asked.push(planning ? "plan" : "check");
+  const writing = "graphics" in (schema.properties ?? {}) && !asked.includes("graphics");
+  asked.push(planning ? "plan" : writing ? "graphics" : "check");
   const packed = params.messages[0]?.content[0]?.text ?? "";
-  const text = JSON.stringify(planning ? planFor(packed, schema) : plainest(schema));
+  const text = JSON.stringify(
+    planning ? planFor(packed, schema) : writing ? graphicsFor(packed) : plainest(schema),
+  );
   const usage = { input_tokens: 10, output_tokens: 10, cache_creation_input_tokens: 0 };
   const message = {
     id: `msg_${asked.length}`,
@@ -499,11 +528,14 @@ async function makeEdit(): Promise<string[]> {
   if (existsSync(projectPath)) {
     const project = JSON.parse(await readFile(projectPath, "utf8")) as {
       overlays?: { template: string; start: number; params: { text?: string } }[];
+      graphics?: { layout: string; start: number }[];
     };
     const overlays = (project.overlays ?? []).map(
       (o) => `${o.template} "${o.params.text ?? ""}" at ${o.start}`,
     );
     say(`overlays in the edit: ${overlays.join(", ") || "none"}`);
+    graphics = (project.graphics ?? []).length;
+    say(`graphics in the edit: ${graphics}`);
   }
   const playing = await playInPage(page);
   await shot(page, "6-playing");
@@ -517,6 +549,8 @@ async function makeEdit(): Promise<string[]> {
     Math.abs(seconds - LENGTH) > LENGTH * 0.05 && `the edit is ${seconds} s, not ${LENGTH} s ± 5 %`,
     !job.result?.captions && "no captions",
     !asked.includes("plan") && "Claude was not asked for a plan",
+    !asked.includes("graphics") && "Claude was not asked for the graphics",
+    graphics === 0 && "the edit has no graphic: HyperFrames did not draw it",
     heard === 0 && "OpenRouter heard nothing",
     ![...downloads].some((name) => name.startsWith("the analysis environment")) &&
       "the analysis environment's download was not shown",
@@ -526,7 +560,11 @@ async function makeEdit(): Promise<string[]> {
       !fetched("ffmpeg-") &&
       "FFmpeg was neither shown downloading nor downloaded",
     !downloads.has("Chrome Headless Shell") &&
-      `Chrome Headless Shell's download was not shown; the effects cache holds: ${contents(join(home.XDG_CACHE_HOME, "video-editor", "effects"))}`,
+      !fetched("chrome") &&
+      `Chrome Headless Shell was neither shown downloading nor downloaded; the cache holds: ${contents(join(home.XDG_CACHE_HOME, "video-editor"))}`,
+    !downloads.has("ffprobe") &&
+      !fetched("ffprobe-") &&
+      "ffprobe was neither shown downloading nor downloaded",
     (playing.error || playing.width === 0 || playing.brightest < 32) &&
       "the window's player does not show the video",
   ].filter((problem): problem is string => typeof problem === "string");

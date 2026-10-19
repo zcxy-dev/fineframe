@@ -7,7 +7,6 @@ import { validateProject } from "@video-editor/schema";
 import type { Capture } from "../broll/capture.ts";
 import { project, SECOND, scratch } from "../testing.ts";
 import type { TimedWord } from "./captions.ts";
-import { recordedClaude, type Usage } from "./claude.ts";
 import type { Line } from "./pack.ts";
 import { planSchema, planSystem } from "./prompt.ts";
 import {
@@ -17,7 +16,6 @@ import {
   type PlacedVisual,
   parseVisuals,
   placeVisuals,
-  repairCards,
   sourceVisuals,
   speakerClips,
   stillFraming,
@@ -32,17 +30,15 @@ const wish = (overrides: Partial<VisualWish>): VisualWish => ({
   source: "a",
   line: 1,
   text: "",
-  kind: "card",
+  kind: "web",
   query: "",
   url: "",
   focus: "",
-  card: "",
-  params: "",
   sfx: "none",
   reason: "",
   ...overrides,
 });
-const stat = wish({ card: "stat", params: JSON.stringify({ value: 3, label: "倍的速度" }) });
+const surya = wish({ url: "https://huggingface.co/nasa-ibm-ai4science", focus: "Surya" });
 const extras = { music: false, title: false, chapters: false, people: false, callouts: false };
 
 test("a rich plan asks for visuals, with stock footage only when a key allows it", () => {
@@ -62,14 +58,9 @@ test("a rich plan asks for visuals, with stock footage only when a key allows it
   });
   const rich = planSystem({ ...extras, visuals: true, stock: false });
   assert.match(rich, /## Visuals/);
-  assert.match(rich, /- stat: /);
-  // Each card's text limits, so its params pass the card's schema.
-  assert.match(rich, /- versus: .*left\.name 14/);
-  assert.match(rich, /- stat: .*At most: prefix 4, suffix 6, label 28, context 40 characters\./);
-  assert.match(
-    rich,
-    /- kpis: .*At most: title 24 characters; items 2 to 4, each prefix 4, suffix 6, label 14 characters\./,
-  );
+  // Motion graphics are written once the cut is known, not in the plan.
+  assert.doesNotMatch(rich, /card/);
+  assert.match(rich, /web: the real page of a product.*the speaker names in that line/s);
   assert.doesNotMatch(rich, /stock: real footage/);
   assert.match(planSystem({ ...extras, visuals: true, stock: true }), /stock: real footage/);
 });
@@ -80,10 +71,10 @@ test("the plan's visuals are read from their JSON, each left out unless whole", 
     source: "a",
     line: 2,
     text: "Surya",
-    kind: "card",
-    card: "stat",
-    params: "{}",
-    sfx: "tap",
+    kind: "web",
+    url: "https://huggingface.co/nasa-ibm-ai4science",
+    focus: "Surya",
+    sfx: "click",
     reason: "r",
   };
   const read = parseVisuals(
@@ -92,6 +83,7 @@ test("the plan's visuals are read from their JSON, each left out unless whole", 
       { ...good, line: "3" },
       { ...good, kind: "stock" },
       { ...good, sfx: "laser" },
+      { ...good, kind: "card" },
       { source: "a", line: 4, text: "x", kind: "web", url: "https://example.com/" },
     ]),
     false,
@@ -101,15 +93,14 @@ test("the plan's visuals are read from their JSON, each left out unless whole", 
     wish({
       line: 2,
       text: "Surya",
-      kind: "card",
-      card: "stat",
-      params: "{}",
-      sfx: "tap",
+      url: "https://huggingface.co/nasa-ibm-ai4science",
+      focus: "Surya",
+      sfx: "click",
       reason: "r",
     }),
     wish({ line: 4, text: "x", kind: "web", url: "https://example.com/" }),
   ]);
-  assert.equal(problems.length, 3);
+  assert.equal(problems.length, 4);
   assert.deepEqual(
     parseVisuals(JSON.stringify([{ ...good, kind: "stock", query: "sun" }]), true).length,
     1,
@@ -122,49 +113,11 @@ test("the plan's visuals are read from their JSON, each left out unless whole", 
   assert.deepEqual(parseVisuals("", false), []);
 });
 
-test("a card whose params break its schema is rewritten once, then checked again", async () => {
-  const long = wish({
-    line: 2,
-    card: "stat",
-    params: JSON.stringify({
-      value: 3,
-      label: "這是一段超過二十八個字元的標籤，太長了放不進卡片的版面裡面",
-    }),
-  });
-  const zero = wish({
-    line: 3,
-    card: "list",
-    params: JSON.stringify({ items: [{ text: "一" }, { text: "二" }], active: 0 }),
-  });
-  const page = wish({ line: 4, kind: "web", url: "https://example.com/" });
-  const fixedStat = JSON.stringify({ value: 3, label: "倍的速度" });
-  const { claude, requests } = recordedClaude({
-    repair: [{ fixed: [fixedStat, '{"items": []}'] }],
-  });
-  const usage: Usage[] = [];
-  const repaired = await repairCards([stat, long, zero, page], claude, usage);
-  assert.equal(requests.length, 1);
-  assert.equal(requests[0]?.purpose, "repair");
-  const asked = requests[0]?.content.at(-1);
-  assert.match(asked?.type === "text" ? asked.text : "", /label.*28 characters/s);
-  assert.deepEqual(repaired, [stat, { ...long, params: fixedStat }, zero, page]);
-  assert.equal(usage.length, 1);
-  // Nothing to repair, nothing asked; a failed request keeps the wishes as they were.
-  const none = recordedClaude({});
-  assert.deepEqual(await repairCards([stat, page], none.claude, []), [stat, page]);
-  assert.equal(none.requests.length, 0);
-  assert.deepEqual(await repairCards([long], none.claude, []), [long]);
-});
-
 test("code checks each visual before sourcing it", () => {
-  assert.equal(wishProblem(stat, false), null);
-  assert.match(wishProblem(wish({ card: "sparkles", params: "{}" }), false) ?? "", /no card/);
-  assert.match(wishProblem(wish({ card: "stat", params: "{value: 3" }), false) ?? "", /not JSON/);
-  assert.match(
-    wishProblem(wish({ card: "stat", params: JSON.stringify({ value: "3" }) }), false) ?? "",
-    /params/,
-  );
-  const web = (url: string) => wishProblem(wish({ kind: "web", url }), false);
+  assert.equal(wishProblem(surya, false), null);
+  // A page with no words on it to show would show its first screen: a home page or an ad.
+  assert.match(wishProblem(wish({ url: surya.url }), false) ?? "", /no words on the page/);
+  const web = (url: string) => wishProblem(wish({ kind: "web", url, focus: "x" }), false);
   assert.equal(web("https://huggingface.co/nasa-ibm-ai4science"), null);
   assert.match(web("http://localhost:3000/") ?? "", /local/);
   assert.match(web("http://192.168.1.2/") ?? "", /local/);
@@ -180,10 +133,10 @@ test("a visual that cannot be sourced is left out and its line keeps the speaker
   const assets = new Map<string, Asset | null>();
   const problems: string[] = [];
   const page = wish({ kind: "web", url: "https://example.com/", focus: "Example Domain", line: 2 });
-  const broken = wish({ kind: "web", url: "https://example.org/", line: 3 });
+  const broken = wish({ kind: "web", url: "https://example.org/", focus: "x", line: 3 });
   const footage = wish({ kind: "stock", query: "solar flare", line: 4 });
   const captured: { url: string; text?: string; viewport?: object }[] = [];
-  await sourceVisuals([stat, page, broken, footage, stat], assets, {
+  await sourceVisuals([page, broken, footage, page], assets, {
     output: { aspect: "9:16", width: 1080, height: 1920 },
     stock: false,
     dir,
@@ -208,11 +161,6 @@ test("a visual that cannot be sourced is left out and its line keeps the speaker
         credit,
       } satisfies Capture;
     },
-  });
-  assert.deepEqual(assets.get(visualKey(stat)), {
-    kind: "card",
-    card: "stat",
-    params: { value: 3, label: "倍的速度" },
   });
   assert.equal(assets.get(visualKey(page))?.kind, "image");
   assert.equal(assets.get(visualKey(broken)), null);
@@ -273,29 +221,30 @@ test("visuals land on their words, a creator's pace apart, clear of what they ma
     focus: null,
     credit: { what: "x", source: "https://x.com", license: null, by: null },
   };
-  const card = (line: number, text = "") => ({ ...stat, line, text });
+  const sun = { kind: "video", path: "/sun.mp4", seconds: 3, id: "pexels:1", credit: image.credit };
+  const clip = (line: number, text = "") => wish({ kind: "stock", query: "the sun", line, text });
   const web = (line: number) => wish({ kind: "web", url: "https://x.com/", line });
-  assets.set(visualKey(stat), { kind: "card", card: "stat", params: { value: 3, label: "x" } });
+  assets.set(visualKey(clip(0)), sun as Asset);
   assets.set(visualKey(web(0)), image);
   const context = { ...talk, edit: 40 * SECOND, frame: SECOND / 30, aspect: "9:16" as const };
   const placed = placeVisuals(
     [
-      card(1, "w1"),
+      clip(1, "w1"),
       // Too close after the first: left out.
-      card(2),
+      clip(2),
       web(4),
       // Starts inside a name: left out.
-      card(8),
-      card(12),
-      card(14),
-      card(16),
-      card(18),
+      clip(8),
+      clip(12),
+      clip(14),
+      clip(16),
+      clip(18),
     ],
     assets,
     { ...context, blocked: [{ start: 14 * SECOND, end: 17 * SECOND }] },
   );
   const at = (v: PlacedVisual) => [v.wish.line, v.start / SECOND, v.end / SECOND, v.layout];
-  // On w1, said at 0.6 s, a stat card runs its typical 3 s, on over the next line's words.
+  // On w1, said at 0.6 s, 3 s of footage runs on over the next line's words.
   assert.deepEqual(at(placed[0] as PlacedVisual), [1, 0.6, 3.6, "full"]);
   // A capture splits the screen for its 4 s.
   assert.deepEqual(at(placed[1] as PlacedVisual), [4, 6, 10, "panel"]);
@@ -304,24 +253,24 @@ test("visuals land on their words, a creator's pace apart, clear of what they ma
     [1, 4, 12, 14, 16, 18],
   );
   // At most one every 5 s of the edit.
-  const few = placeVisuals([card(1), card(5), card(9), card(13)], assets, {
+  const few = placeVisuals([clip(1), clip(5), clip(9), clip(13)], assets, {
     ...context,
     edit: 10 * SECOND,
   });
   assert.equal(few.length, 2);
   // Under a name, it waits for the name to end while its line is said.
-  const waits = placeVisuals([card(1, "w1")], assets, {
+  const waits = placeVisuals([clip(1, "w1")], assets, {
     ...context,
     blocked: [{ start: 0.5 * SECOND, end: 0.8 * SECOND }],
   });
   assert.deepEqual(waits.map(at), [[1, 0.8, 3.8, "full"]]);
   // Ends where something it may not cover starts.
-  const cut = placeVisuals([card(1)], assets, {
+  const cut = placeVisuals([clip(1)], assets, {
     ...context,
     blocked: [{ start: 1.9 * SECOND, end: 5 * SECOND }],
   });
   const why: string[] = [];
-  placeVisuals([card(1)], assets, {
+  placeVisuals([clip(1)], assets, {
     ...context,
     blocked: [{ start: 0, end: 5 * SECOND }],
     onLeftOut: (_, reason) => why.push(reason),
@@ -337,8 +286,8 @@ test("visuals land on their words, a creator's pace apart, clear of what they ma
     id: "pexels:1",
     credit: image.credit,
   });
-  const [sun] = placeVisuals([footage], assets, context);
-  assert.deepEqual(sun && at(sun), [6, 10, 13.5, "full"]);
+  const [long] = placeVisuals([footage], assets, context);
+  assert.deepEqual(long && at(long), [6, 10, 13.5, "full"]);
   // Other aspects have no split; every visual fills the frame.
   const wide = placeVisuals([web(4)], assets, { ...context, aspect: "16:9" });
   assert.equal(wide[0]?.layout, "full");
@@ -386,11 +335,7 @@ test("the speaker beside a split screen plays in step with the main track, acros
     { source: "a", in: 10 * SECOND, out: 13 * SECOND },
     { source: "a", in: 20 * SECOND, out: 24 * SECOND },
   ];
-  const panel = {
-    wish: stat,
-    asset: { kind: "card", card: "stat", params: {} },
-    layout: "panel",
-  } as const;
+  const panel = { layout: "panel" } as const;
   const clips = speakerClips(
     [
       { ...panel, start: 2 * SECOND, end: 5 * SECOND },
@@ -407,7 +352,7 @@ test("the speaker beside a split screen plays in step with the main track, acros
   ]);
 });
 
-test("placed visuals become cards, B-roll with credits and an occasional sound", async (t) => {
+test("placed visuals become B-roll with credits and an occasional sound", async (t) => {
   const dir = await scratch(t, "visual-parts-");
   const still = join(dir, "page.png");
   await writeFile(still, "png");
@@ -420,7 +365,9 @@ test("placed visuals become cards, B-roll with credits and an occasional sound",
     focus: null,
     credit,
   };
-  const card: Asset = { kind: "card", card: "stat", params: { value: 3, label: "x" } };
+  const footage = join(dir, "sun.mp4");
+  await writeFile(footage, "mp4");
+  const sun: Asset = { kind: "video", path: footage, seconds: 4, id: "pexels:1", credit };
   const output = { aspect: "9:16" as const, width: 1080, height: 1920 };
   const at = (
     start: number,
@@ -431,25 +378,19 @@ test("placed visuals become cards, B-roll with credits and an occasional sound",
   ) => ({ wish: wish({ sfx }), asset, start: start * SECOND, end: end * SECOND, layout });
   const parts = await visualParts(
     [
-      at(0, 2, card, "full", "tap"),
+      at(0, 2, sun, "full", "tap"),
       at(3, 6, image, "panel", "click"),
-      at(7, 9, card, "full", "tap"),
+      at(7, 9, sun, "full", "tap"),
       at(10, 12, image, "panel", "none"),
     ],
     output,
     (file) => visualPath(dir, file),
   );
-  assert.deepEqual(
-    parts.cards.map((c) => [c.card, c.start / SECOND, c.duration / SECOND, c.placement]),
-    [
-      ["stat", 0, 2, "full"],
-      ["stat", 7, 2, "full"],
-    ],
-  );
-  // One still, shown twice, is one source; in the panel, pushed in.
-  assert.equal(parts.broll.length, 2);
-  assert.deepEqual(new Set(parts.broll.map((b) => b.source)).size, 1);
-  assert.deepEqual(parts.broll[0]?.rect, { x: 0, y: 0, w: 1, h: panelShare("9:16") });
+  // One still, shown twice, is one source; in the panel, pushed in. The footage fills the frame.
+  assert.equal(parts.broll.length, 4);
+  assert.deepEqual(new Set(parts.broll.map((b) => b.source)).size, 2);
+  assert.deepEqual(parts.broll[1]?.rect, { x: 0, y: 0, w: 1, h: panelShare("9:16") });
+  assert.equal(parts.broll[0]?.rect, undefined);
   // A sound at most every 6 s: the click 3 s after the first tap is left out.
   assert.deepEqual(
     parts.sfx.map((s) => s.start / SECOND),
@@ -468,7 +409,6 @@ test("placed visuals become cards, B-roll with credits and an occasional sound",
     output: { ...main.output, aspect: "9:16", width: 1080, height: 1920 },
     sources: [...main.sources, ...parts.sources] as typeof main.sources,
     broll: parts.broll,
-    cards: parts.cards,
     audio: { ...main.audio, sfx: parts.sfx },
   });
 });

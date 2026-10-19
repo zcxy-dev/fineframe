@@ -1,15 +1,15 @@
 // B-roll for each point the speaker makes, as a rich edit shows it: the planner names a stock
-// search, a page to capture or a motion-graphics card for a line, and code sources it, checks it,
-// times it on the speech, picks its layout and adds a sound only on a visible action.
+// search or a page to capture for a line, and code sources it, checks it, times it on the speech,
+// picks its layout and adds a sound only on a visible action. Motion graphics are written once the
+// cut is known (./graphics.ts).
 
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, isAbsolute, join, relative, sep } from "node:path";
-import { cardProblems, cards, isCardId, panelShare } from "@video-editor/effects";
+import { panelShare } from "@video-editor/effects";
 import {
   type BrollClip,
-  type CardClip,
   type MediaIndex,
   type Project,
   type Credit as ProjectCredit,
@@ -25,7 +25,6 @@ import { cacheDir } from "../download.ts";
 import { CAMERA, cropPath } from "../framing.ts";
 import { fingerprintOf } from "../sources.ts";
 import type { TimedWord } from "./captions.ts";
-import { CHECK_MODEL, type Claude, type Usage } from "./claude.ts";
 import { findWords } from "./fillers.ts";
 import type { Line } from "./pack.ts";
 
@@ -36,7 +35,6 @@ export const VISUALS: readonly Visuals[] = ["rich", "minimal"];
 /** The sounds a visual may ask for: the kinds of sound effects there are. */
 export const SFX_WISHES = ["click", "tap", "paper", "tone", "stop", "whoosh"] as const;
 
-/** One visual as the planner proposes it, on a line and the words it lands on. */
 /**
  * The plan's visuals, which it gives as one JSON array in a string: an array of objects in the
  * plan's schema, with every other extra on, makes a grammar too large for structured outputs to
@@ -60,7 +58,7 @@ export function parseVisuals(
     onProblem("The plan's visuals are not a list; the edit has none");
     return [];
   }
-  const kinds: readonly string[] = stock ? ["stock", "web", "card"] : ["web", "card"];
+  const kinds: readonly string[] = stock ? ["stock", "web"] : ["web"];
   const sounds: readonly string[] = ["none", ...SFX_WISHES];
   const wishes: VisualWish[] = [];
   for (const entry of entries) {
@@ -74,21 +72,10 @@ export function parseVisuals(
       query: text("query"),
       url: text("url"),
       focus: text("focus"),
-      card: text("card"),
-      params: text("params"),
       sfx: e.sfx === undefined ? "none" : e.sfx,
       reason: text("reason"),
     };
-    const strings = [
-      "source",
-      "text",
-      "query",
-      "url",
-      "focus",
-      "card",
-      "params",
-      "reason",
-    ] as const;
+    const strings = ["source", "text", "query", "url", "focus", "reason"] as const;
     const ok =
       strings.every((key) => typeof fields[key] === "string") &&
       Number.isInteger(fields.line) &&
@@ -104,23 +91,19 @@ export interface VisualWish {
   source: string;
   line: number;
   text: string;
-  kind: "stock" | "web" | "card";
+  kind: "stock" | "web";
   /** stock: what to search for, in English. */
   query: string;
   /** web: the page. */
   url: string;
-  /** web: the words on the page to zoom into, or empty for its first screen. */
+  /** web: the words on the page to zoom into. */
   focus: string;
-  /** card: which, and its params as JSON. */
-  card: string;
-  params: string;
   sfx: "none" | (typeof SFX_WISHES)[number];
   reason: string;
 }
 
 /** A visual sourced and checked, ready to place. */
 export type Asset =
-  | { kind: "card"; card: string; params: Record<string, unknown> }
   | {
       kind: "image";
       path: string;
@@ -167,83 +150,12 @@ const SFX_GAIN: Record<SfxKind, number> = {
 
 /** A wish's key: a visual is sourced once per plan, however often the edit is fitted again. */
 export const visualKey = (wish: VisualWish) =>
-  JSON.stringify([wish.kind, wish.query, wish.url, wish.focus, wish.card, wish.params]);
+  JSON.stringify([wish.kind, wish.query, wish.url, wish.focus]);
 
-/** Why a wish cannot be shown, or null when it can be sourced: a card whose params break its
- * schema, an address a capture may not open, or a stock search with no key to make it. */
-const REPAIR_SYSTEM = `You fix the params of animated motion-graphics cards so they pass each \
-card's JSON Schema. Keep the meaning, the speaker's language and every number; shorten text to \
-its limit with fewer words, never by cutting a word; never invent a figure. Give each card's \
-fixed params as a JSON object written as a string, in the order given.`;
-
-/**
- * The wishes with each card whose params break its card's schema rewritten once by
- * CHECK_MODEL, from the schema and the problems found. A fix that still breaks it, and every
- * card when the request fails, stays as it was, to be left out with its reason.
- */
-export async function repairCards(
-  wishes: readonly VisualWish[],
-  claude: Claude,
-  usage: Usage[],
-): Promise<VisualWish[]> {
-  const broken = wishes.flatMap((wish, at) => {
-    if (wish.kind !== "card" || !isCardId(wish.card)) return [];
-    const problem = wishProblem(wish, false);
-    return problem && !/not JSON|not an object/.test(problem) ? [{ at, wish, problem }] : [];
-  });
-  if (broken.length === 0) return [...wishes];
-  const asked = broken
-    .map(
-      ({ wish, problem }, i) =>
-        `${i + 1}. Card ${wish.card}, its schema ${JSON.stringify(cards[wish.card as keyof typeof cards].params)}\nParams: ${wish.params}\nProblems: ${problem}`,
-    )
-    .join("\n\n");
-  let fixed: unknown[];
-  try {
-    const reply = await claude({
-      purpose: "repair",
-      model: CHECK_MODEL,
-      system: REPAIR_SYSTEM,
-      content: [{ type: "text", text: asked }],
-      schema: {
-        type: "object",
-        additionalProperties: false,
-        required: ["fixed"],
-        properties: { fixed: { type: "array", items: { type: "string" } } },
-      },
-      effort: "low",
-      maxTokens: 8000,
-    });
-    usage.push(reply.usage);
-    fixed = (reply.json as { fixed?: unknown[] }).fixed ?? [];
-  } catch {
-    return [...wishes];
-  }
-  const repaired = [...wishes];
-  broken.forEach(({ at, wish }, i) => {
-    const params = fixed[i];
-    if (typeof params !== "string") return;
-    const candidate = { ...wish, params };
-    if (wishProblem(candidate, false) === null) repaired[at] = candidate;
-  });
-  return repaired;
-}
-
+/** Why a wish cannot be shown, or null when it can be sourced: a page a capture may not open, a
+ * search page, or one with no words on it to show (a first screen is a home page or an ad, not
+ * the part talked about), or a stock search with no key to make it. */
 export function wishProblem(wish: VisualWish, stock: boolean): string | null {
-  if (wish.kind === "card") {
-    if (!isCardId(wish.card)) return `no card ${wish.card}`;
-    let params: unknown;
-    try {
-      params = JSON.parse(wish.params);
-    } catch {
-      return `its params are not JSON: ${wish.params}`;
-    }
-    if (typeof params !== "object" || params === null || Array.isArray(params)) {
-      return "its params are not an object";
-    }
-    const problems = cardProblems([{ card: wish.card, params }], "/card");
-    return problems.length > 0 ? problems.join("; ") : null;
-  }
   if (wish.kind === "web") {
     try {
       const url = checkedUrl(wish.url);
@@ -256,6 +168,7 @@ export function wishProblem(wish: VisualWish, stock: boolean): string | null {
     } catch (error) {
       return (error as Error).message;
     }
+    if (!wish.focus.trim()) return "no words on the page to show";
     return null;
   }
   if (wish.kind === "stock") {
@@ -293,8 +206,8 @@ function boxOf(layout: Layout, output: Pick<Project["output"], "aspect" | "width
 }
 
 /**
- * Sources each wish not sourced yet, at most `limit` of them: a card is checked, a page captured
- * in a viewport of the shape it will fill, footage searched. A wish that cannot be shown, or whose
+ * Sources each wish not sourced yet: a page captured in a viewport of the shape it will fill,
+ * footage searched. A wish that cannot be shown, or whose
  * source fails, gets null, and its line keeps the speaker; `onProblem` hears why.
  */
 export async function sourceVisuals(
@@ -325,9 +238,7 @@ export async function sourceVisuals(
         continue;
       }
       try {
-        if (wish.kind === "card") {
-          assets.set(key, { kind: "card", card: wish.card, params: JSON.parse(wish.params) });
-        } else if (wish.kind === "web") {
+        if (wish.kind === "web") {
           const box = boxOf(
             layoutOf(options.output.aspect, "image", CAPTURE_SECONDS),
             options.output,
@@ -393,18 +304,15 @@ async function captured(
     };
   }
   await mkdir(dir, { recursive: true });
-  const focus = wish.focus.trim();
   // A padding wider than the viewport keeps the whole screen around the words, to zoom into.
+  // Words not on the page leave it out: its first screen would not show what is talked about.
   const shot = await capture({
     url: wish.url,
     out,
     viewport,
-    ...(focus ? { text: focus, padding: 4 * viewport.width } : {}),
+    text: wish.focus.trim(),
+    padding: 4 * viewport.width,
     ...(browser ? { browser } : {}),
-  }).catch(async (error) => {
-    // Words not on the page still leave the page worth showing.
-    if (!focus) throw error;
-    return capture({ url: wish.url, out, viewport, ...(browser ? { browser } : {}) });
   });
   const { width: w, height: h, focus: box2, credit } = shot;
   await writeFile(facts, `${JSON.stringify({ width: w, height: h, focus: box2, credit })}\n`);
@@ -423,7 +331,7 @@ export interface PlacedVisual {
 /**
  * Places the sourced visuals on the speech: each from the first of its words as said, or after a
  * title, chapter marker or name in `blocked` it would start under while its line is still said,
- * for its card's typical length, a capture's CAPTURE_SECONDS or its footage's, running on over
+ * for a capture's CAPTURE_SECONDS or its footage's length, running on over
  * the words after it, up to FULL_MAX full frame or PANEL_MAX split, on the frame grid. One that
  * would come within SPEAKER_GAP of the one before, run shorter than it may or come more often
  * than one every VISUAL_EVERY seconds is left out, earliest first, with its reason.
@@ -497,14 +405,9 @@ export function placeVisuals(
       continue;
     }
     const [least, wantedSeconds] =
-      asset.kind === "card"
-        ? [
-            cards[asset.card as keyof typeof cards].seconds.min,
-            cards[asset.card as keyof typeof cards].seconds.typical,
-          ]
-        : asset.kind === "image"
-          ? [VISUAL_MIN, CAPTURE_SECONDS]
-          : [VISUAL_MIN, Math.min(asset.seconds, FULL_MAX)];
+      asset.kind === "image"
+        ? [VISUAL_MIN, CAPTURE_SECONDS]
+        : [VISUAL_MIN, Math.min(asset.seconds, FULL_MAX)];
     const layout = layoutOf(context.aspect, asset.kind, wantedSeconds);
     const cap = layout === "full" ? FULL_MAX : PANEL_MAX;
     const blockedAfter = (context.blocked ?? [])
@@ -542,7 +445,7 @@ export async function visualPath(
   return `visuals/${name}`;
 }
 
-/** What the placed visuals add to the project: B-roll and the sources it shows, cards and sound
+/** What the placed visuals add to the project: B-roll and the sources it shows, and sound
  * effects, each source with its credit. Ids start with `visual-`. */
 export async function visualParts(
   placed: readonly PlacedVisual[],
@@ -551,12 +454,10 @@ export async function visualParts(
 ): Promise<{
   sources: Project["sources"][number][];
   broll: BrollClip[];
-  cards: CardClip[];
   sfx: SoundEffect[];
 }> {
   const sources: Project["sources"][number][] = [];
   const broll: BrollClip[] = [];
-  const cardClips: CardClip[] = [];
   const sfx: SoundEffect[] = [];
   const ids = new Map<string, string>();
   const sourceFor = async (path: string, kind: "video" | "image" | "audio", credit: Credit) => {
@@ -580,15 +481,7 @@ export async function visualParts(
     const duration = end - start;
     const rect =
       layout === "panel" ? { x: 0, y: 0, w: 1, h: panelShare(output.aspect) } : undefined;
-    if (asset.kind === "card") {
-      cardClips.push({
-        card: asset.card,
-        params: asset.params,
-        start,
-        duration,
-        placement: layout,
-      });
-    } else if (asset.kind === "image") {
+    if (asset.kind === "image") {
       const source = await sourceFor(asset.path, "image", asset.credit);
       const box = boxOf(layout, output);
       broll.push({
@@ -617,7 +510,7 @@ export async function visualParts(
       lastSound = start;
     }
   }
-  return { sources, broll, cards: cardClips, sfx };
+  return { sources, broll, sfx };
 }
 
 /** A still's framing: the box's shape around the words it was captured for, zoomed so they take
@@ -666,7 +559,7 @@ export function stillFraming(
  * under it.
  */
 export function speakerClips(
-  placed: readonly PlacedVisual[],
+  placed: readonly { start: number; end: number; layout: string }[],
   main: readonly { source: string; in: number; out: number }[],
   indexes: (source: string) => MediaIndex | null,
   output: Pick<Project["output"], "aspect" | "width" | "height">,
@@ -701,7 +594,7 @@ export function speakerClips(
 }
 
 /** A sound effect's credit: CC0, from the pack its source names. */
-function sfxCredit(path: string, source: string): Credit {
+export function sfxCredit(path: string, source: string): Credit {
   const url = source.match(/\((https?:\/\/[^)]+)\)/)?.[1];
   const name = path.split(/[\\/]/).at(-1) ?? path;
   return {
@@ -713,7 +606,7 @@ function sfxCredit(path: string, source: string): Credit {
 }
 
 /** A credit as project.json keeps it, without its empty parts. */
-function projectCredit(credit: Credit): ProjectCredit {
+export function projectCredit(credit: Credit): ProjectCredit {
   return {
     what: credit.what,
     source: credit.source,

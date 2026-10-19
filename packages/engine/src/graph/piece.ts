@@ -9,10 +9,10 @@ import { EDGE_FADE_SAMPLES } from "../pieces.ts";
 import type { SourceFacts } from "../sources.ts";
 import { type Timeline, type TimelineClip, ticksToSamples } from "../timeline.ts";
 import { fades, silence, soundClock, span } from "./audio.ts";
-import { brollSound, brollTiming, mix, overlay, panelRect, placement } from "./broll.ts";
+import { brollSound, brollTiming, mix, overlay, placement } from "./broll.ts";
 import { RAW_AUDIO, RAW_VIDEO } from "./encode.ts";
 import { openSource } from "./inputs.ts";
-import { overlayInput, overlayTiming } from "./overlays.ts";
+import { graphicPlacement, overlayInput, overlayTiming, slideIn } from "./overlays.ts";
 import { crossfade, dissolve } from "./transitions.ts";
 import { clock, colour, dips, fill, ON_SCREEN_TOLERANCE, push } from "./video.ts";
 import { lead, voiceSound } from "./voice.ts";
@@ -36,14 +36,14 @@ function inputs(timeline: Timeline) {
 }
 
 /** The piece's picture, written to stdout as raw frames. `overlays` are the rendered files of
- * `timeline.overlays`, in its order, and `cards` those of `timeline.cards`; `luts` the .cube
- * file of each clip's match and look, by lutKey. */
+ * `timeline.overlays`, in its order, and `graphics` those of `timeline.graphics`; `luts` the
+ * .cube file of each clip's match and look, by lutKey. */
 export function pieceVideo(
   piece: Piece,
   timeline: Timeline,
   overlays: string[] = [],
   luts: ReadonlyMap<string, string> = new Map(),
-  cards: string[] = [],
+  graphics: string[] = [],
 ): string[] {
   const lut = (grade: Grade | undefined) => {
     const key = lutKey(grade);
@@ -83,16 +83,24 @@ export function pieceVideo(
     );
     base = `[o${j}]`;
   }
-  for (const [k, layer] of piece.cards.entries()) {
-    const file = cards[layer.clip.index];
-    if (!file) throw new Error(`/cards/${layer.clip.index}: has no rendered file`);
-    const index = opened.add(["-i", file]);
-    const { card } = layer.clip;
-    const at = placement(card.placement === "panel" ? panelRect(output.aspect) : undefined, output);
-    graph.push(
-      `[${index}:v]${overlayTiming(layer, fps).slice(0, -1).join(",")},format=yuv420p[c${k}]`,
-      `${base}[c${k}]${overlay(at)}[d${k}]`,
-    );
+  for (const [k, layer] of piece.graphics.entries()) {
+    const file = graphics[layer.clip.index];
+    if (!file) throw new Error(`/graphics/${layer.clip.index}: has no rendered file`);
+    const { graphic } = layer.clip;
+    const at = graphicPlacement(graphic, output);
+    if (graphic.layout === "label" || graphic.layout === "lower-third") {
+      const index = opened.add(overlayInput(file));
+      graph.push(
+        `[${index}:v]${overlayTiming(layer, fps).join(",")}[c${k}]`,
+        `${base}[c${k}]${overlay(at)}[d${k}]`,
+      );
+    } else {
+      const index = opened.add(["-i", file]);
+      graph.push(
+        `[${index}:v]${overlayTiming(layer, fps).slice(0, -1).join(",")},format=yuv420p[c${k}]`,
+        `${base}[c${k}]${slideIn(graphic.layout, at, layer, output)}[d${k}]`,
+      );
+    }
     base = `[d${k}]`;
   }
   for (const [k, layer] of piece.overlays.entries()) {

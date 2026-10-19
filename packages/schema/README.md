@@ -44,15 +44,15 @@ The media index keeps seconds, as its Python producer measures them. The helpers
 
 A project renders the same video every time from the file and the sources it names. Each source carries a fingerprint (size and SHA-256), so a changed file fails the render instead of shifting the edit. A source's sound is its first audio stream, the one its media index analysed for speech. `plan` records how the planner arrived at the edit; rendering ignores it.
 
-**Two clocks.** Clip `in`/`out`, crop and scale keyframes, music `in`/`out`, the beat grid's downbeat and dropped ranges are in source time, which counts from the same time zero as the source's media index. An image has no time of its own: its clips run from 0 to how long it shows. B-roll `start`, cards, captions, overlays, music and sound effect `start` and `plan.emphasis` are on the output timeline.
+**Two clocks.** Clip `in`/`out`, crop and scale keyframes, music `in`/`out`, the beat grid's downbeat and dropped ranges are in source time, which counts from the same time zero as the source's media index. An image has no time of its own: its clips run from 0 to how long it shows. B-roll `start`, graphics, captions, overlays, music and sound effect `start` and `plan.emphasis` are on the output timeline.
 
 **The main track** plays its clips back to back. A clip starts where the one before it ends, except after a dissolve, which overlaps the two clips by its duration. So the edit lasts the sum of `out - in` over the clips, minus the dissolves' durations.
 
-**Layers**, bottom to top: the main track, B-roll in array order, cards in array order, overlays in array order, then captions, which are never covered.
+**Layers**, bottom to top: the main track, B-roll in array order, graphics in array order, overlays in array order, then captions, which are never covered.
 
 **Frames.** Output frame *n* shows what is on the timeline at its start, `frameToTicks(n, fps)`. Something on screen from `start` to `end` is in frame *n* when `start <= frameToTicks(n, fps) < end`.
 
-**Adding to it.** Sections a later feature fills (`broll`, `cards`, `captions`, `overlays`, `audio.voice`, `audio.music`, `audio.sfx`, `framing`, `grade`, `plan`) are optional, so a project without them stays valid.
+**Adding to it.** Sections a later feature fills (`broll`, `graphics`, `captions`, `overlays`, `audio.voice`, `audio.music`, `audio.sfx`, `framing`, `grade`, `plan`) are optional, so a project without them stays valid.
 
 ## Media index
 

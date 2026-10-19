@@ -20,7 +20,7 @@ const sources = new Map<string, PlaceSource>([
   ["a", { id: "a", words, duration: 60, frameTicks: 4000 }],
 ]);
 
-/** 5 s of source a, captioned, with a chapter and its wipe, a second chapter, a panel card with
+/** 5 s of source a, captioned, with a chapter and its wipe, a second chapter, a panel graphic with
  * the speaker below it and its sound, full-frame B-roll, and music. */
 function edit(): Project {
   const timed = words.map((word) => ({ text: word.text, start: s(word.start), end: s(word.end) }));
@@ -62,8 +62,14 @@ function edit(): Project {
           duration: s(1),
         },
       ],
-      cards: [
-        { card: "stat", params: { label: "Up" }, start: s(1), duration: s(1), placement: "panel" },
+      graphics: [
+        {
+          layout: "panel",
+          html: '<div class="ff-stage"></div><b>Up</b> &amp; <i>away</i>',
+          css: "",
+          start: s(1),
+          duration: s(1),
+        },
       ],
       broll: [
         { source: "a", in: s(1), out: s(2), start: s(1), rect: { x: 0, y: 0.5, w: 1, h: 0.5 } },
@@ -150,7 +156,7 @@ test("what goes with a removal goes too: a chapter's wipe, a panel's speaker, th
     removables(edit()).map((item) => [item.kind, item.index, item.label]),
     [
       ["overlay", 0, "Title: Hello"],
-      ["card", 0, "Card (stat): Up"],
+      ["graphic", 0, "Graphic (panel): Up & away"],
       ["overlay", 1, "Wipe"],
       ["overlay", 2, "Chapter: One"],
       ["broll", 1, "B-roll: clip.mp4"],
@@ -162,7 +168,7 @@ test("what goes with a removal goes too: a chapter's wipe, a panel's speaker, th
     {
       remove: [
         { kind: "overlay", index: 2 },
-        { kind: "card", index: 0 },
+        { kind: "graphic", index: 0 },
         { kind: "broll", index: 1 },
       ],
     },
@@ -178,8 +184,8 @@ test("what goes with a removal goes too: a chapter's wipe, a panel's speaker, th
     ],
   );
   assert.equal(project.overlays?.[1]?.params.total, 1);
-  assert.deepEqual(project.cards, []);
-  // The speaker below the card and the B-roll both go, with the sound at each one's start.
+  assert.deepEqual(project.graphics, []);
+  // The speaker below the panel and the B-roll both go, with the sound at each one's start.
   assert.deepEqual(project.broll, []);
   assert.deepEqual(project.audio.sfx, []);
   // The speaker beside a split is not something to remove on its own.

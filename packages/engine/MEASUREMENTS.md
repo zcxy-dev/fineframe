@@ -6,7 +6,7 @@ How the engine's behaviour, described in the [README](README.md), measures on th
 
 Each row is one `pnpm edit` run with the real API on the reference machine. Every file was analysed with the 0.6B speech model and no transcript correction. The table mixes two kinds of row, as its Visuals column says:
 
-- **The two synthetic rows** come from the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0), edited at 5dc8da9 with rich visuals, without stock footage (no Pexels or Pixabay key), and `--quality best`, one edit at a time. Rich visuals here are motion-graphics cards, with the icons and logos in them and their sound effects; Claude asked for no web capture. The first edit found the clips analysed by the [planner runs](#planner-measurements), which analysed the three in 3.2 min, all at once; the second analysed them again, since a names file changes the analysis.
+- **The two synthetic rows** come from the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0), edited with rich visuals, without stock footage (no Pexels or Pixabay key), and `--quality best`, one edit at a time. The first was edited with the motion graphics Claude writes for each edit, the second at 5dc8da9 with the motion-graphics cards they replaced. Claude asked for no web capture in either. The first edit found the clips analysed; the second analysed them again, since a names file changes the analysis.
 - **The two real rows** are openly licensed web recordings whose transcripts nobody has corrected yet, so their cuts are checked against the words as the analysis timed them. They were measured before rich visuals, with what is now `--visuals minimal`, on the machine shared with other jobs (load average 8 to 10); their analysis time is from the first edit of that footage, the rest from a later one that found the indexes cached.
 
 `vebench edit` scores each project and `vebench render` each video.
@@ -23,56 +23,58 @@ uv run vebench render --media synthetic/chat-b1/runs/edit-60s/output.mp4 \
 <!-- results:engine-edit -->
 | Footage | Visuals | Asked | Made | Cuts inside words | Dead air ≥ 1 s | Clicks, drift | Analysis | Plan, render, check | Claude |
 |---|---|---|---|---|---|---|---|---|---|
-| chat-b: synthetic conversation, 3 clips, 6.7 min | rich, without stock footage: 5 cards, 29 % of the edit | 60 s, 9:16 | 58.9 s (-1.8 %) | 0 of 12 | 0 | 0 of 5, 0.0 ms | from the cache | 44 s, 57 s, 8 s | $0.19 |
-| chat-b again, with the corpus's three synthetic tracks (`--music`, stated CC0) and a names file naming the guest (`--names`) | rich, without stock footage: 5 cards, 29 % of the edit | 60 s, 9:16 | 59.3 s (-1.2 %) | 0 of 12 | 0 | 0 of 5, 0.0 ms | 9.9 min for the 3 clips and 3 tracks | 58 s, 44 s, 8 s | $0.20 |
+| chat-b: synthetic conversation, 3 clips, 6.7 min | rich, without stock footage: 9 motion graphics (4 labels, 3 panels, 2 full frame), 65 % of the edit | 60 s, 9:16 | 60.0 s (0.0 %) | 0 of 10 | 0 | 0 of 4, 0.0 ms | from the cache | 3.3 min, 73 s, 5 s | $0.49 |
+| chat-b again, with the corpus's three synthetic tracks (`--music`, stated CC0) and a names file naming the guest (`--names`) | rich, measured with the cards before motion graphics: 5 cards, 29 % of the edit | 60 s, 9:16 | 59.3 s (-1.2 %) | 0 of 12 | 0 | 0 of 5, 0.0 ms | 9.9 min for the 3 clips and 3 tracks | 58 s, 44 s, 8 s | $0.20 |
 | Two-person interview, 5 clips from three cameras, 11.9 min | minimal, measured before rich visuals | 60 s, 9:16 | 60.6 s (+1.0 %) | 0 of 4 | 0 | 0 of 2, 0.0 ms | 23.9 min | 29 s, 28 s, 5 s | $0.10 |
 | Live talks with slides, 3 clips, 8.8 min | minimal, measured before rich visuals | 5 min, 16:9 | 301.5 s (+0.5 %) | 0 of 57 | 0 | 0 of 28, 0.0 ms | 16.0 min | 52 s, 60 s, 21 s | $0.13 |
 <!-- /results -->
 
 - **Music and effects:** in the second chat-b edit Claude chose the 96 BPM track, which plays from 1.9 s to the end with the voice 21.0 dB over it while anyone talks (15.0 dB in the quietest 5 %, `vebench mix` on the stems of the same project rendered again), and its one join does not click; it showed the guest's name and role in a lower third, popped two keywords and pushed in on 3 of the 6 clips, at most 1.19 times; the sound measures -13.9 LUFS at -3.1 dBTP.
-- **Visuals:** each synthetic edit cuts to 5 full-frame cards (a checklist, a list, a comparison, and a search and a highlighted line in the first, two highlighted lines in the second), 3.0 to 3.5 s each and 29 % of the edit, with a soft sound on 2 or 3 of them; the captions carry on over them.
-- **Cost:** $0.19 and $0.20, against $0.10 for the same edits before rich visuals: the plan, $0.17 and $0.19, is most of it, as rich visuals make Claude write more (*Cost* under the planner's table).
-- **Time:** the second chat-b edit analysed its 6.7 min of footage and 3.7 min of music in 9.9 min; on its own, without the names, the footage took 3.2 min, all three clips at once. Shot detection takes about a fifth of an analysis, faces an eighth, transcribing and aligning the rest. Another edit of the same footage starts at the plan and took 1.8 min here with rich visuals; 41 s to 2.3 min without.
+- **Visuals:** the first edit shows 9 of the 10 graphics Claude wrote: 4 labels over the speaker, 3 panels over the speaker and 2 full-frame graphics, on screen for 65 % of the edit and full frame for 16 %, with a soft sound on 5 of them; the checks left out a panel whose text lay where the captions are. The second, measured with cards, cuts to 5 full-frame cards, 3.0 to 3.5 s each and 29 % of the edit.
+- **Cost:** $0.49 with motion graphics, $0.44 of it for the graphics (writing them, $0.25, and one request to fix the ones the checks failed), against $0.19 and $0.20 with cards and $0.10 before rich visuals ([effects](#effect-measurements)).
+- **Time:** the second chat-b edit analysed its 6.7 min of footage and 3.7 min of music in 9.9 min; on its own, without the names, the footage took 3.2 min, all three clips at once. Shot detection takes about a fifth of an analysis, faces an eighth, transcribing and aligning the rest. Another edit of the same footage starts at the plan and took 4.7 min with motion graphics, 3.3 min of it planning, writing and checking the graphics; 1.8 min with cards, and 41 s to 2.3 min without rich visuals.
 - **Pictures:** in the 9:16 edits the crop follows whoever is on screen, and cuts to the listener's shot with the source. The interview's cuts join two answers inside one camera's shot, so they show as jump cuts; the talks cut between the host and the speaker at a pause.
 - **Captions:** on the synthetic edit measured before rich visuals, each caption appears within 23 ms of its first word's true start at the median and 118 ms at the 95th percentile, and stays up about 0.4 s past its last word. This was not measured again.
 
 ## Planner measurements
 
-These runs use the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0), each clip analysed at 5dc8da9 with the 0.6B speech model and no transcript correction. Each footage was planned, rendered and reviewed at each length its speech allows, with rich visuals, without stock footage (no Pexels or Pixabay key), and `--quality best`, one edit at a time: the two groups at 16:9, the single clips at 9:16 except the screen recording. The baseline keeps every clip whole, in file order, cut off at the target. `vebench edit` scores both, and `vebench render` the planner's renders.
+These runs use the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0), each clip analysed at 5dc8da9 with the 0.6B speech model and no transcript correction. Each footage was planned, rendered and reviewed at each length its speech allows, with rich visuals and their motion graphics, without stock footage (no Pexels or Pixabay key), and `--quality best`, one edit at a time: the two groups at 16:9, the single clips at 9:16 except the screen recording. The baseline keeps every clip whole, in file order, cut off at the target. `vebench edit` scores both, and `vebench render` the planner's renders.
 
 ```bash
 # Each clip is analysed once into the index cache, then read from it
 PEXELS_API_KEY= PIXABAY_API_KEY= node --env-file=../../.env scripts/plan-corpus.ts ../../bench/synthetic \
-  --group talk-a --lengths 30,60,300 --naive --system rich --live-claude
+  --group talk-a --lengths 30,60,300 --naive --system after --live-claude
 cd ../../bench && uv run vebench report synthetic/
 ```
 
 <!-- results:engine-planner -->
-| Footage | Target | Length error, naive / planner | Cuts inside words: naive / planned → reviewed | Fillers cut | Retakes right | Dead air ≥ 1 s, naive / planner | Clicks, drift | Cards (share of the edit) | Claude |
+| Footage | Target | Length error, naive / planner | Cuts inside words: naive / planned → reviewed | Fillers cut | Retakes right | Dead air ≥ 1 s, naive / planner | Clicks, drift | Graphics (on screen, full frame) | Claude |
 |---|---|---|---|---|---|---|---|---|---|
-| talk-a (3 clips, 7.0 min) | 30 s | +0.0 % / -2.3 % | 0 / 0 → 0 of 8 | 1 of 1 | 1 of 1 | 1 (2 s) / 0 | 0 of 3, 0.0 ms | 4 (47 %) | $0.15 |
-| talk-a (3 clips, 7.0 min) | 60 s | +0.0 % / +1.9 % | 1 / 0 → 0 of 12 | 3 of 3 | 1 of 1 | 1 (2 s) / 0 | 0 of 5, 0.0 ms | 7 (37 %) | $0.12 |
-| talk-a (3 clips, 7.0 min) | 300 s | +0.0 % / -0.6 % | 1 / 0 → 0 of 22 | 0 of 18 | 2 of 2 | 12 (25 s) / 0 | 0 of 10, 0.0 ms | 18 (19 %) | $0.49 |
-| chat-b (3 clips, 6.7 min) | 30 s | +0.0 % / +0.0 % | 0 / 0 → 0 of 4 | 2 of 4 | – | 1 (1 s) / 0 | 0 of 1, 0.0 ms | 3 (35 %) | $0.13 |
-| chat-b (3 clips, 6.7 min) | 60 s | +0.0 % / -0.2 % | 0 / 0 → 0 of 10 | 1 of 7 | – | 3 (8 s) / 0 | 0 of 4, 0.0 ms | 4 (23 %) | $0.13 |
-| chat-b (3 clips, 6.7 min) | 300 s | +0.0 % / +0.0 % | 1 / 0 → 0 of 48 | 0 of 24 | 3 of 3 | 13 (30 s) / 0 | 0 of 23, 0.0 ms | 20 (22 %) | $0.50 |
-| talk-a2 (2.4 min) | 30 s | +0.0 % / -0.4 % | 0 / 0 → 0 of 6 | 1 of 2 | – | 2 (3 s) / 0 | 0 of 2, 0.0 ms | 4 (42 %) | $0.12 |
-| talk-a2 (2.4 min) | 60 s | +0.0 % / -2.1 % | 0 / 0 → 0 of 6 | 0 of 4 | – | 3 (5 s) / 0 | 0 of 2, 0.0 ms | 6 (32 %) | $0.11 |
-| talk-a3 (2.1 min) | 30 s | +0.0 % / +0.0 % | 1 / 0 → 0 of 6 | 0 of 1 | 1 of 1 | 2 (3 s) / 0 | 0 of 2, 0.0 ms | 2 (23 %) | $0.16 |
-| talk-a3 (2.1 min) | 60 s | +0.0 % / -0.9 % | 1 / 0 → 0 of 8 | 1 of 4 | 1 of 1 | 3 (4 s) / 0 | 0 of 3, 0.0 ms | 4 (23 %) | $0.21 |
-| phone-c (77 s, 9:16) | 30 s | +0.0 % / +0.9 % | 1 / 0 → 0 of 12 | 3 of 6 | 1 of 1 | 2 (7 s) / 0 | 0 of 5, 0.0 ms | 2 (20 %) | $0.11 |
-| phone-c (77 s, 9:16) | 60 s | +0.0 % / -0.4 % | 0 / 0 → 0 of 8 | 0 of 7 | 1 of 1 | 4 (11 s) / 0 | 0 of 3, 0.0 ms | 5 (28 %) | $0.12 |
-| screen-d (75 s) | 30 s | +0.0 % / -1.3 % | 0 / 0 → 0 of 8 | 0 of 2 | 1 of 1 | 1 (2 s) / 0 | 0 of 3, 0.0 ms | 3 (31 %) | $0.13 |
-| screen-d (75 s) | 60 s | +0.0 % / +1.3 % | 1 / 0 → 0 of 6 | 0 of 5 | 1 of 1 | 2 (6 s) / 0 | 0 of 2, 0.0 ms | 5 (29 %) | $0.13 |
+| talk-a (3 clips, 7.0 min) | 30 s | +0.0 % / -1.7 % | 0 / 0 → 0 of 8 | 1 of 1 | 1 of 1 | 1 (2 s) / 0 | 0 of 3, 0.0 ms | 6 (65 %, full frame 14 %) | $0.29 |
+| talk-a (3 clips, 7.0 min) | 60 s | +0.0 % / +0.5 % | 1 / 0 → 0 of 8 | 2 of 3 | – | 1 (2 s) / 0 | 0 of 3, 0.0 ms | 3 (23 %, full frame 14 %) | $0.20 |
+| talk-a (3 clips, 7.0 min) | 300 s | +0.0 % / +0.9 % | 1 / 0 → 0 of 26 | 1 of 20 | 3 of 3 | 12 (25 s) / 0 | 0 of 12, 0.0 ms | 18 (26 %, full frame 6 %) | $0.96 |
+| chat-b (3 clips, 6.7 min) | 30 s | +0.0 % / -3.3 % | 0 / 0 → 0 of 4 | 0 of 3 | – | 1 (1 s) / 0 | 0 of 1, 0.0 ms | 4 (53 %, full frame 24 %) | $0.23 |
+| chat-b (3 clips, 6.7 min) | 60 s | +0.0 % / +1.9 % | 0 / 0 → 0 of 10 | 3 of 8 | – | 3 (8 s) / 0 | 0 of 4, 0.0 ms | 8 (48 %, full frame 14 %) | $0.40 |
+| chat-b (3 clips, 6.7 min) | 300 s | +0.0 % / +0.0 % | 1 / 0 → 0 of 50 | 1 of 22 | 3 of 3 | 13 (30 s) / 0 | 0 of 24, 0.0 ms | 18 (25 %, full frame 8 %) | $0.96 |
+| talk-a2 (2.4 min) | 30 s | +0.0 % / +1.3 % | 0 / 0 → 0 of 6 | 1 of 2 | – | 2 (3 s) / 0 | 0 of 2, 0.0 ms | 4 (42 %, full frame 0 %) | $0.30 |
+| talk-a2 (2.4 min) | 60 s | +0.0 % / -2.3 % | 0 / 0 → 0 of 6 | 0 of 4 | – | 3 (5 s) / 0 | 0 of 2, 0.0 ms | 8 (55 %, full frame 0 %) | $0.47 |
+| talk-a3 (2.1 min) | 30 s | +0.0 % / +2.7 % | 1 / 0 → 0 of 6 | 1 of 4 | – | 2 (3 s) / 0 | 0 of 2, 0.0 ms | 4 (53 %, full frame 0 %) | $0.29 |
+| talk-a3 (2.1 min) | 60 s | +0.0 % / -0.5 % | 1 / 0 → 0 of 8 | 1 of 4 | 1 of 1 | 3 (4 s) / 0 | 0 of 3, 0.0 ms | 7 (63 %, full frame 0 %) | $0.46 |
+| phone-c (77 s, 9:16) | 30 s | +0.0 % / -0.3 % | 1 / 0 → 0 of 12 | 2 of 6 | 1 of 1 | 2 (7 s) / 0 | 0 of 5, 0.0 ms | 3 (28 %, full frame 0 %) | $0.33 |
+| phone-c (77 s, 9:16) | 60 s | +0.0 % / -0.4 % | 0 / 0 → 0 of 8 | 0 of 7 | 1 of 1 | 4 (11 s) / 0 | 0 of 3, 0.0 ms | 9 (47 %, full frame 0 %) | $0.46 |
+| screen-d (75 s) | 30 s | +0.0 % / +0.0 % | 0 / 0 → 0 of 10 | 1 of 2 | 1 of 1 | 1 (2 s) / 0 | 0 of 4, 0.0 ms | 2 (29 %, full frame 19 %) | $0.20 |
+| screen-d (75 s) | 60 s | +0.0 % / +1.3 % | 1 / 0 → 0 of 6 | 0 of 5 | 1 of 1 | 2 (6 s) / 0 | 0 of 2, 0.0 ms | 8 (42 %, full frame 7 %) | $0.24 |
 <!-- /results -->
 
-- **Length:** all 14 edits land within ±5 %, 0.9 % off on average and 2.3 % at most.
-- **Cuts inside words:** none of 162 as planned, none of 164 after review; the baseline's cut at the target falls inside a word in 7 of 14 edits. When these 14 edits were measured before rich visuals and before the analysis shrank each gap between two words to the silence in it (*Word gaps* below), one of 170 planned cuts was inside a word: the index put 0.18 s of silence between 呃 and 講 where the speaker left none, so the cut after the removed filler clipped 講 by 115 ms, and the review put the filler back. In a separate check, the review passed a cut 30 ms before a word and caught one 100 ms into it.
-- **Retakes:** the kept take was the right one in all 13 groups the edits used.
-- **Dead air:** none left, against 50 silences of a second or more, 108 s in all, in the baseline.
-- **Fillers:** recall is low, 12 of 88; no other word was cut between clips. The synthetic voice runs each filler straight into the next word: the median gap after one is 0 s, and only 2 of 69 leave the 0.13 s a cut needs. Whether real speech leaves more room is not measured yet.
-- **Visuals:** the 14 edits cut to 87 full-frame cards of 14 kinds, the most a highlighted line (21), a checklist (13) or a before and after (11), with icons, 7 logo cards and 31 soft sounds. Cards fill 19 to 47 % of an edit, more in the short edits than the long; the planner left out the cards whose lines were cut, or that came too close to the one before. Claude asked for no web capture.
-- **Cost:** $2.62 for all 14 edits, $0.11 to $0.50 each, against $0.90 and $0.02 to $0.12 before rich visuals. Planning is 90 % of it: Opus writes 3,100 to 7,200 tokens for a 30 or 60 s plan and 16,000 to 17,600 for a 300 s one, so a plan costs $0.11 to $0.20, and $0.39 and $0.42 at 300 s. The cached prefix, the instructions and the packed transcripts, is 9,500 to 13,600 tokens; three plans read it from the plan before. The 112 cut checks cost $0.028 together, and the 17 escalated to Opus $0.24. One review changed an edit: chat-b at 300 s, twice, before its third pass found nothing to change.
+- **Before and after:** the same 14 edits were also planned, rendered and reviewed on the code before motion graphics (9dcdb83, with cards), on the same indexes. Every bullet gives both, before first. The six 9:16 edits were made again once captions kept off panels, replaying the same plans and graphics from Claude.
+- **Length:** all 14 edits land within ±5 % both times, 0.9 % and 1.2 % off on average, 3.1 % and 3.3 % at most.
+- **Cuts inside words:** none as planned and none of 174 and 168 after review; the baseline's cut at the target falls inside a word in 7 of 14 edits. When these 14 edits were measured before rich visuals and before the analysis shrank each gap between two words to the silence in it (*Word gaps* below), one of 170 planned cuts was inside a word: the index put 0.18 s of silence between 呃 and 講 where the speaker left none, so the cut after the removed filler clipped 講 by 115 ms, and the review put the filler back. In a separate check, the review passed a cut 30 ms before a word and caught one 100 ms into it.
+- **Retakes:** the kept take was the right one in all 13 and all 12 groups the edits used.
+- **Dead air:** none left, against 50 silences of a second or more, 109 s in all, in the baseline.
+- **Renders:** 0 clicks at 73 and 70 cuts, and 0.0 ms of drift.
+- **Fillers:** recall is low, 11 of 86 and 14 of 91; no other word was cut between clips. The synthetic voice runs each filler straight into the next word: the median gap after one is 0 s, and only 2 of 69 leave the 0.13 s a cut needs. Whether real speech leaves more room is not measured yet.
+- **Visuals:** before, the 14 edits cut to 87 full-frame cards, 16 to 47 % of an edit. After, they show 102 graphics Claude wrote: 44 labels and 23 lower thirds over the speaker, 22 panels over the speaker at 9:16 and 13 full-frame graphics, with 44 soft sounds. Graphics are on screen for 23 to 65 % of an edit and full frame for at most 24 %. 17 more were left out: 6 that filled too little of the frame or panel, 3 that showed the sentence the captions show, 1 with a word the speaker does not say and 1 outside the safe area; the other 6 had no room, too close to the graphic before, giving way to a panel or full-frame graphic, or too near the end. Claude asked for no web capture before, and for two after: talk-a at 300 s shows 3.5 s of the Claude product page as the speaker says Claude decides the cut, and the other page did not load in time and was left out.
+- **Cost:** $2.46 for all 14 edits before, $0.10 to $0.44 each, and $5.79 after, $0.20 to $0.47 for a 30 or 60 s edit and $0.96 for each 300 s one. The graphics are $4.52 of it: one request per 3 min of the edit to write them, $0.07 to $0.35 each, and one to fix the ones the checks failed, $0.04 to $0.22. Planning fell from $2.28 to $1.06, as the plan no longer writes cards. The cut checks cost $0.02 both times, and those escalated to Opus $0.16 and $0.19. One review changed an edit after.
 - **Earlier comparisons:** every bullet below was measured before rich visuals, with what is now `--visuals minimal`.
 - **With effects:** the talk-a and chat-b edits were planned, rendered and reviewed again at 30, 60 and 300 s, with the code before the planner placed effects and after it, on the same indexes. Lengths stay within ±5 % (0.5 to 3.6 % off before, 0.5 to 4.1 % after), retakes stay right (8 of 8 both times) and no dead air is left; renders have 0 clicks and 0.0 ms of drift. Each edit now carries one to three keyword pops a minute, and the two 300 s edits open on a title. Cuts inside words, after review: 1 of 110 before and 2 of 114 after. Both are the index's timing, as above: a gap it heard between two words the speaker joined. One is the 115 ms cut into 講 in both runs. The other is new: a cut the review moved, 28 ms into 個. The analysis now closes that gap (*Word gaps* below).
 - **With callouts:** on six frames of the synthetic screen recording screen-d, each where a thing on screen is named, `claude-haiku-5-5` boxed the API key, model and output folder fields and the Save button at 0.98 to 1.00 intersection over union with the generator's truth (`truth/regions.json`), answered not found for an `edit` command the terminal never shows, and boxed the timecodes of a scrolling editor, which the stillness check then rejects. Each request costs $0.0002: about 1,600 tokens in, for a 1280 × 720 frame. screen-d was planned four times at 45 s and 16:9 on the same index. Each time, Claude asked for the same three callouts: the API key field, the length in the terminal command and the subtitle file's timecodes. The length was never found and the timecodes were left out as moving. The API key callout, on target at 0.977 IoU (`vebench edit`), played in both edits planned with callouts running on across a jump cut. Finding the things cost $0.0008 in three requests the first time, then $0.0002, $0.0003 and nothing, as the cache answered, on top of plans of $0.036 to $0.062. Every edit lands within ±5 % (at most 0.07 % off), with no cut inside a word, the retake chosen right and no dead air, and the render with its callout has 0 clicks and 0.0 ms of drift. At 9:16 the same field was found but left out while a 16:9 screen was cropped to its middle third; now that a screen shows whole at 9:16 (*Framing* below), it plays there too, on target at 0.974 IoU.
@@ -171,7 +173,7 @@ On the synthetic corpus's three conversations, framed 9:16, the face of the pers
 
 ## Caption measurements
 
-The planner's edits of the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0) talk-a2, 30 s at 9:16, and chat-b, 60 s at 16:9, rendered with their captions score as they do without them in `vebench report`: 1.7 % and 2.3 % off the length, no cut inside a word, 0 clicks and 0.0 ms drift. On a 62.6 s 9:16 edit of a corpus interview, libass draws the `bold` captions (1,260 events over 1,566 frames at 1080×1920) in 3.2 s more than decoding the frames alone takes, about 2 ms a frame. Captions were not rendered with Remotion for comparison: its effect overlays take about 0.2 s a frame at 1080p ([effects](../effects/README.md#rendering)), about a hundred times as long, so captions are drawn by libass. The two have not been compared by look.
+The planner's edits of the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0) talk-a2, 30 s at 9:16, and chat-b, 60 s at 16:9, rendered with their captions score as they do without them in `vebench report`: 1.7 % and 2.3 % off the length, no cut inside a word, 0 clicks and 0.0 ms drift. On a 62.6 s 9:16 edit of a corpus interview, libass draws the `bold` captions (1,260 events over 1,566 frames at 1080×1920) in 3.2 s more than decoding the frames alone takes, about 2 ms a frame. Captions are drawn by libass rather than as web pages: an effect page takes 48 to 128 ms a frame at 1080×1920 ([effects](#effect-measurements)), about 25 to 60 times as long. The two have not been compared by look.
 
 ## Render measurements
 
@@ -188,12 +190,46 @@ cd ../../bench && uv run vebench report /tmp/synthetic-edit
 | The same 14 cuts with each clip encoded alone with 30 ms fades and joined with `-c copy` | 13 | 0 | 57.6 ms |
 | The same 14 cuts with seven effect overlays across them | 13 | 0 | 0.0 ms |
 
-Peak memory of the whole render without overlays, every FFmpeg process included, on 0.4–0.5 s clips. Each overlay a piece spans adds one VP9 decoder ([its memory](../effects/README.md#format)).
+Peak memory of the whole render without overlays, every FFmpeg process included, on 0.4–0.5 s clips. Each overlay a piece spans adds one VP9 decoder ([its memory](../effects/README.md#rendering)).
 
 | Source | Clips | One FFmpeg with an input per clip | Pieces |
 |---|---|---|---|
 | H.264 1080p30 | 10 / 50 / 150 | 1.3 / 4.6 / 11.3 GB (≈110 MB a clip) | 1.27 / 1.27 / 1.27 GB |
 | HEVC 4K 10-bit PQ | 5 / 30 | ≈650 MB a clip | 1.63 / 1.68 GB |
+
+## Effect measurements
+
+The effects and motion graphics render with [HyperFrames](../effects/README.md#rendering) 0.8.164 in Chrome Headless Shell 149. Before, they rendered with Remotion 4.0.531.
+
+**Speed.** The same content at the same sizes and frame counts: two full-frame checklists of 105 frames at 1080×1920 and 1920×1080, and two lower thirds of 120 frames with alpha. Each figure is seconds for both renders of a pair. HyperFrames ran 4 workers; Remotion ran at its default concurrency.
+
+| Machine | Full frame: HyperFrames | Full frame: Remotion | Lower thirds: HyperFrames | Lower thirds: Remotion |
+|---|--:|--:|--:|--:|
+| Reference machine, 8 cores | 10.8 | 17.0–17.8 | 10.1 | 13.3–13.8 |
+| GitHub's Linux runner | 32–35 | 42.4 | 21–22 | 27.2 |
+| GitHub's macOS runner (arm64) | 49–58 | 142–147 | 22–26 | 113–117 |
+| GitHub's Windows runner | 44–46 | 52.3 | 31–32 | 33 |
+
+- **Lower thirds at their own size:** a label or lower third now renders only at the box it draws in, with alpha: 9.5 s on Linux, 15 to 17 s on macOS and 18 s on Windows for the pair.
+- **Opaque pages:** a full-frame graphic or panel renders as H.264 without alpha, which HyperFrames captures faster on Linux: 48 ms a frame for a 1080×1920 graphic, against 128 ms for the same page with alpha and 83 ms for Remotion's cards.
+- **Windows:** full-frame overlays with alpha took 0.95 to 1.24 times Remotion's time, depending on the runner.
+- **Same frames every time:** every file's decoded frames hashed the same over three renders on each system (`framemd5`). The WebM files' bytes differ between runs, in their mux metadata. Frames differ between systems, each of which runs its own Chrome build.
+
+**Graphics on real footage.** Six edits of CC BY clips from the [step 3 check](#planner-measurements) (#103) were made again with `pnpm edit --asr cloud --quality best`. Claude wrote each edit's graphics in one request and fixed the ones the checks failed in one more; what still failed was left out.
+
+| Edit | Written | Kept | Left out because | Claude: all, graphics |
+|---|--:|--:|---|---|
+| real-2, 60 s at 9:16 | 8 | 8 | – | $0.40, $0.31 |
+| real-10, 60 s at 9:16 (English) | 8 | 6 | 1 over the speaker's face, 1 too close to the one before | $0.34, $0.27 |
+| real-8, 60 s at 9:16 | 9 | 8 | 1 text under the captions | $0.47, $0.37 |
+| real-1, 60 s at 9:16 | 9 | 7 | 1 too little of the panel filled, 1 too near the end | $0.40, $0.31 |
+| real-2, 3 min at 16:9 | 12 | 9 | 1 text under the captions, 1 repeats the captions, 1 too little of the frame filled | $0.62, $0.42 |
+| real-6, 3 min at 16:9 | 14 | 13 | 1 too little of the frame filled and words not said | $0.64, $0.46 |
+
+- **Cost:** a 60 s edit cost $0.34 to $0.47 in all, a 3 min one $0.62 and $0.64. The graphics are 68 to 80 % of it; writing them is half to most of that, the fix request the rest.
+- **Hard rules:** every edit lands within ±5 % of its length (−0.5 to +3.3 %), with 0 clicks at 26 cuts and 0.0 ms of drift.
+- **Captions and panels:** the 9:16 edits were made last, once captions kept off panels; the 3 min edits at 16:9, which have no panels, before.
+- **What the checks do not see:** text already drawn into the footage. Some of real-6's lower thirds land on its own titles.
 
 ## Colour measurements
 

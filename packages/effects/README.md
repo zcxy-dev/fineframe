@@ -1,21 +1,80 @@
 # @video-editor/effects
 
-Animated effect overlays for the edit, as [Remotion](https://www.remotion.dev) templates: titles, lower thirds, keyword highlights, chapter markers, callouts and wipes; and motion-graphics [cards](#cards) to cut to as B-roll. Each entry in a [`project.json`](../schema/README.md#projectjson)'s `overlays` names a template and its params; the renderer draws it as transparent video and lays it over exactly the output frames it covers ([engine](../engine/README.md#how-it-renders)). Remotion is source-available, not MIT: see [who needs its company licence](../../THIRD_PARTY_NOTICES.md#remotion).
+The edit's motion graphics and effect overlays, drawn as web pages and rendered to video with [HyperFrames](https://github.com/heygen-com/hyperframes) in Chrome Headless Shell:
+
+- **Graphics** Claude writes for each edit as HTML and CSS: corner labels and lower thirds over the speaker, the upper panel of a 9:16 split screen, and full-frame graphics ([graphics](#graphics)).
+- **Templates** for titles, people's names, keyword pops, chapter markers, callouts and wipes ([templates](#templates)).
+
+Each entry in a [`project.json`](../schema/README.md#projectjson)'s `graphics` or `overlays` becomes one page. The renderer draws it as video and lays it over exactly the output frames it covers ([engine](../engine/README.md#how-it-renders)).
+
+## Look
+
+The house look is one stylesheet, [`HOUSE_CSS`](src/style.ts). It is taken from the motion-graphics style of the [Herk Edit Kit](../../THIRD_PARTY_NOTICES.md#herk-edit-kit), in Fineframe's own colours:
+
+- **Stage:** near-black (`#0b0c0f`), lit by a soft amber bloom, with a faint grid and a vignette.
+- **Panels:** frosted glass panels with a thin light edge.
+- **Type:** white bold type, with one amber accent (`#ffb547`).
+- **Over footage:** chips and pills are dark and nearly opaque. Graphics are laid over the footage after they are rendered, so there is nothing under them to frost.
+
+Type is set in Noto Sans TC for Chinese and Inter for Latin letters and digits. Both come from [Fontsource](https://fontsource.org) at pinned versions, so a frame never depends on the fonts installed on the machine. Sizes are given in `--u`, 1 % of the frame's short side.
+
+Motion follows the same numbers everywhere:
+
+- **Entrances:** every part enters with a CSS animation of 0.3 to 0.8 s, from a fast start that settles, and stays. Nothing animates out; an effect is cut away at its end. The wipe is the exception: its bands cross the frame and leave it.
+- **Pushes:** a full-frame graphic is pushed in from the right, and a panel down from the top, over its first 0.35 s ([`SLIDE`](src/graphics.ts)). The renderer moves the rendered graphic, so the graphic itself stays opaque.
+
+## Graphics
+
+Claude writes each edit's graphics for that video, as markup and its own CSS on the house stylesheet's classes. [`graphicsGuide`](src/graphics.ts) is what it is told: the look, the layouts, the safe area, the type sizes and the motion.
+
+| Layout | What it is | Length | Rendered |
+|---|---|---|---|
+| `label` | A chip in a corner, over the speaker | 1.5–6 s | At its own box, with its alpha |
+| `lower-third` | A pill low on one side, over the speaker | 2–6 s | At its own box, with its alpha |
+| `panel` | The top 880 of every 1920 rows of a 9:16 frame, with the speaker below it | 3–8 s | Opaque, at the panel's size |
+| `full` | The whole frame | 4–12 s | Opaque, at the frame's size |
+
+**What runs.** A graphic's page runs no script but the renderer's own, and loads nothing but the house stylesheet and the fonts beside it.
+- A Content-Security-Policy in every page enforces that.
+- [`markupProblem`](src/page.ts) refuses, before any render, markup with a script, an event handler, an image, an embedded page or a `url()`.
+
+**Checks.** [`checkGraphics`](src/check.ts) loads each graphic in the same Chrome, seeks its animations to each part's start and end and to its last frame, and reports each problem as a sentence. It reports text that:
+- runs off the frame or out of its box;
+- lies where the captions are drawn;
+- overlaps other text;
+- is under the smallest size;
+- disappears before the end.
+
+It also reports:
+- a label that covers a face or leaves the safe area;
+- a panel or full-frame graphic whose text spans too little of it, or whose largest text is under 12 units;
+- a part that does not enter, enters for longer than 0.8 s or keeps moving.
+
+It returns:
+- the text the graphic shows, for the engine to check against the speech;
+- for a label or lower third, the box it draws in;
+- a half-size screenshot, for Claude to fix it from.
+
+```ts
+import { checkGraphics, graphicProblems, renderGraphics } from "@video-editor/effects";
+
+const problems = graphicProblems(project.graphics ?? [], "9:16"); // [] when valid
+const [check] = await checkGraphics([{ layout, html, css, output, frames, captions, faces }], chrome);
+const [file] = await renderGraphics([{ layout, html, css, box, output, frames }], binaries);
+```
 
 ## Templates
 
 | Template | What it does | Params |
 |---|---|---|
 | `title` | Names the video or a major section in large type, over a soft pool of shade | `text`, `subtitle` |
-| `lower-third` | A person's name and role, on a plate that opens out of an accent bar; at 9:16 at the top of the frame ([why](#design)) | `name`, `role` |
+| `lower-third` | A person's name and role in a dark pill with an accent bar; at 9:16 at the top of the frame ([why](#safe-area)) | `name`, `role` |
 | `keyword` | A highlighter swipe that lands on the word a sentence turns on | `text`, `position`: `upper` or `lower` |
 | `chapter` | The chapter's number and name, under one segment per chapter that shows how far through the video it is | `title`, `index`, `total` |
 | `callout` | Outlines a region of a screen recording, dims the rest and labels it | `rect`, `label`, `dim` |
 | `wipe` | Two bands sweep across the frame and cover the cut in the middle of the wipe | `direction`, `color` |
 
-Every template also takes `accent`, a `#rrggbb` that replaces the house amber. Each template's lengths and its params' limits are in [`src/catalog.ts`](src/catalog.ts). Lengths are hard limits: below the minimum the motion cannot finish, above the maximum the overlay outstays its point.
-
-## For the planner
+Every template also takes `accent`, a `#rrggbb` that replaces the house amber. Each template's lengths and its params' limits are in [`src/catalog.ts`](src/catalog.ts), and its markup in [`src/templates.ts`](src/templates.ts). Lengths are hard limits: below the minimum the motion cannot finish, and above the maximum the overlay outstays its point.
 
 ```ts
 import { catalog, guidance, overlayProblems } from "@video-editor/effects";
@@ -24,105 +83,53 @@ const keyword = catalog.keyword; // purpose, whenToUse, avoid, timing, seconds, 
 const problems = overlayProblems(project.overlays ?? []); // [] when every overlay is valid
 ```
 
-- **`catalog`:** for each template, what it says to the viewer (`purpose`), the moments it serves (`whenToUse`), where it does not belong (`avoid`), where its `start` goes relative to the speech or the cut (`timing`), its lengths in seconds, its params as a JSON Schema (draft 2020-12) and an example.
+- **`catalog`:** for each template:
+  - what it says to the viewer (`purpose`);
+  - the moments it serves (`whenToUse`);
+  - where it does not belong (`avoid`);
+  - where its `start` goes relative to the speech or the cut (`timing`);
+  - its lengths in seconds;
+  - its params as a JSON Schema (draft 2020-12);
+  - an example.
 - **`guidance`:** the rules across templates. Effects serve the story, so most cuts get none.
 - **`overlayProblems` and `validateOverlays`:** check each overlay's template, params and length, and report every problem with its JSON path. The renderer runs `validateOverlays` before it renders anything.
 
-## Design
+### Safe area
 
-One motion language for every template: the accent element draws first, the content reveals from behind its edge, and everything leaves faster than it came. Arrivals ease out from a fast start, departures gather speed, and nothing bounces. The first frame of an overlay comes before its entrance and the last after its exit, so it never pops in or out.
+Overlays keep to a safe area inside the frame's edges. The bottom margin leaves the lower part of the frame to the captions, which are drawn over everything.
 
-Type is white, on near-black plates, with one amber accent. It is set in Noto Sans TC and sized from the frame's short side, larger at 9:16 for a phone held in the hand. Every size is a step of one scale, each step 1.25 times the one below: small print (a role, a chapter count, a callout label), a subtitle, a heading on a plate (a name, a chapter), a keyword and a title, at 3.2, 4, 5, 7.8 and 9.8 % of the short side. Names, keywords and labels shrink to stay on one line; titles balance their lines, and no closing punctuation starts a line.
+At 9:16 the margins also clear what short-form apps lay over the video: the header, the buttons down the right, and the description at the bottom. That pushes the band above the captions up to where a talking head's mouth and chin fall. So at 9:16 the lower third sits at the top of the frame instead, and a `lower` keyword suits only shots with no one on camera.
 
-Overlays keep to a safe area inside the frame's edges. The bottom margin leaves the lower part of the frame to captions, which are drawn over everything. At 9:16 the margins also clear what short-form apps lay over the video: the header, the buttons down the right, and the description at the bottom. That pushes the band above the captions up to where a talking head's mouth and chin fall, so at 9:16 the lower third sits at the top of the frame instead, and a `lower` keyword suits only shots with no one on camera.
-
-The timings, curves, colours, type sizes and margins live in [`src/layout.ts`](src/layout.ts).
-
-## Cards
-
-Cards are opaque motion graphics the edit cuts to, like B-roll: full frame, or the upper panel of a split screen with the speaker below. Each builds in over its first second or two and then holds, slowly pushing in, until a hard cut takes it away; it has no exit. They share the overlays' colours, Noto Sans TC, curves and type scale, on a dark canvas lit by a bloom of the accent, with frosted panels.
-
-| Card | What it shows | Params |
-|---|---|---|
-| `stat` | One number counting up, with what it measures | `value`, `prefix`, `suffix`, `decimals`, `label`, `context`, `trend` |
-| `kpis` | Two to four numbers side by side | `title`, `items` |
-| `list` | A numbered list; `active` lights one item and dims the rest | `title`, `items`, `active` |
-| `checklist` | Boxes that tick one after another | `title`, `items`, `checked` |
-| `versus` | Two things across a VS badge, one lit as the winner | `left`, `right`, `winner` |
-| `before-after` | A before state that turns into an after state | `title`, `before`, `after` |
-| `quote` | A quotation revealed word by word, with its author | `text`, `author`, `role`, `icon`, `logo` |
-| `steps` | A process as icons joined by a drawing line | `title`, `steps` |
-| `timeline` | Dated events on a line that draws through them | `title`, `events`, `active` |
-| `bar-chart` | Columns growing to their values | `title`, `unit`, `bars`, `highlight` |
-| `line-chart` | A line drawing through a series | `title`, `unit`, `points` |
-| `ring` | A ring filling to a percentage | `value`, `label`, `context` |
-| `progress` | Bars filling to their percentages | `title`, `items` |
-| `chat` | A chat window, the reply streaming in | `app`, `icon`, `logo`, `messages` |
-| `terminal` | Commands typing out, with their output | `title`, `lines` |
-| `code` | Code writing in line by line, some lines lit | `filename`, `lines`, `highlight` |
-| `app` | A product card: logo, name, tagline, tags, address | `name`, `tagline`, `icon`, `logo`, `tags`, `url` |
-| `logo` | A brand's logo landing, with its name | `name`, `tagline`, `icon`, `logo` |
-| `icon-grid` | Icons with labels popping in | `title`, `items` |
-| `definition` | A term, its kind and a definition | `term`, `kind`, `text` |
-| `highlight` | A statement with key phrases highlighted | `text`, `highlights`, `source` |
-| `search` | A query typing into a search box, results under it | `query`, `results` |
-| `notifications` | Phone notifications stacking in | `items` |
-| `pros-cons` | Upsides with ticks, downsides with crosses | `title`, `pros`, `cons`, `prosLabel`, `consLabel` |
-| `ranking` | Ranked rows with bars proportional to their values | `title`, `unit`, `items` |
-| `section` | A big number and a section's name | `title`, `index`, `kicker` |
-| `table` | Products across, features down, ticks and values | `columns`, `rows`, `highlight` |
-
-Every card also takes `accent`. Icons are Lucide's names and logos Simple Icons' slugs, from the subset in [`src/icons.ts`](src/icons.ts); a logo appears only where the video names that brand ([licences and trademarks](../../THIRD_PARTY_NOTICES.md#icons-copied-into-the-source)). Each card's purpose, lengths, params as a JSON Schema and an example are in [`src/cards.ts`](src/cards.ts):
-
-```ts
-import { cardProblems, cards, renderCards } from "@video-editor/effects";
-
-const problems = cardProblems([{ card: "stat", params, seconds: 3 }]); // [] when valid
-const [file] = await renderCards([
-  { card: "stat", params, placement: "panel", aspect: "9:16", width: 1080, height: 880, fps, frames: 90 },
-]);
-```
-
-The panel is the top 880 of every 1920 rows at 9:16 and the upper half elsewhere (`panelShare`); `cardSize` gives a card's size in pixels for an output. A rich edit's planner proposes cards from this list and the renderer draws `project.json`'s `cards` with `renderCards` ([visuals](../engine/README.md#visuals)).
-
-A card lays out in the content box [`cardLayout`](src/layout.ts) gives it: inside the overlays' safe area for a full card, so a full 9:16 card ends above the captions; across a panel, clear of the apps' header at 9:16 and of the captions on the seam. Its sizes are in units of the box's short side, growing to 1.3 times that in a long box such as a 16:9 panel, and each card lays out in a row or a column by the box's shape. Cards render like overlays, as VP9 in WebM without alpha, cached by the same key plus their placement.
+The timings, curves, type sizes and margins live in [`src/layout.ts`](src/layout.ts).
 
 ## Rendering
 
-`renderOverlays(jobs)` renders each overlay at the output's size and frame rate, for exactly the frames it covers, and returns one file per job. The renderer calls it; nothing else needs to.
+`renderOverlays(jobs, binaries)` and `renderGraphics(jobs, binaries)` render each page for exactly the frames it covers, at the output's rate, and return one file per job. The renderer calls them; nothing else needs to.
 
-- **Speed:** a new overlay costs about 0.2 s a frame at 1080p on the [reference machine](../../bench/README.md#reference-machine), so the six templates at 16:9 take about 100 s; a cached one costs only its compositing.
-- **Format:** VP9 with alpha in WebM ([why](#format)). Reading the alpha needs the libvpx decoder ([FFmpeg requirements](../engine/README.md#ffmpeg)).
-- **Cache:** renders are kept in `~/.cache/video-editor/effects/` (or under `XDG_CACHE_HOME`). An overlay is keyed by its template, params (in any key order), aspect, size, frame rate and frame count, and a hash of this package's source and pinned dependencies. An unchanged overlay renders once. The bundled page each source version renders from takes about 45 MB; delete the folder to reclaim the space.
-- **Chrome:** Remotion renders in Chrome Headless Shell, which it downloads (about 92 MB) on the first render into `~/.cache/video-editor/effects/chrome/node_modules/.remotion/`. Renders run in a child process with that folder as its working directory, because Remotion chooses where Chrome goes from the working directory, and this package's own folder may not be writable, as in the desktop app. `onDownload` reports the download's bytes. No licence key or usage event is sent to Remotion.
-- **Compositor:** Remotion's native compositor, with its own FFmpeg, comes with `@remotion/renderer` for this system. Where it was not installed, as in the desktop app, whose installer leaves it out because that FFmpeg is GPL with non-free parts ([notes](../../THIRD_PARTY_NOTICES.md#desktop-installers)), the first render downloads it from npm (about 10 MB) into `~/.cache/video-editor/effects/`, checks it against the integrity in `pnpm-lock.yaml` and passes it to Remotion as `binariesDirectory` ([`src/compositor.ts`](src/compositor.ts)).
-- **Fonts:** Noto Sans TC comes from [Fontsource](https://fontsource.org) at a pinned version, so a render never depends on the fonts installed on the machine. A frame waits until every slice of the font its text needs has loaded.
-
-### Format
-
-The renderer composites an overlay in every piece of the edit it spans, so the format is chosen by render speed, file size and decoding cost. Each template at its typical length, 30 fps, rendered on the [reference machine](../../bench/README.md#reference-machine), shared with other jobs, with PNG frames from Chrome; decoding as the renderer does, into `yuva420p`:
-
-| | ProRes 4444 | VP9 with alpha |
-|---|---|---|
-| Render, all six templates at 1080×1920 and 1920×1080 (936 frames) | 164 s | 202 s |
-| Size, the same 12 files | 650 MB | 1.05 MB |
-| Size, the title at 1080×1920 (its shade covers the frame) | 295 MB | 0.34 MB |
-| Decode, title / lower third / chapter | 2.9–3.7 / 1.5 / 1.2–1.4 s | 0.5–0.8 / 0.3–0.6 / 0.4 s |
-| Decoder peak memory | 250–360 MB | 60–70 MB |
-
-VP9 renders about 1.2 times slower, but its files are 600 times smaller and it decodes 2 to 8 times faster in a quarter of the memory. At CRF 28 its frames match ProRes's to 40–52 dB PSNR; side by side over footage the two are indistinguishable.
+- **How:** each page is a [HyperFrames](https://github.com/heygen-com/hyperframes) composition with no timeline of its own. HyperFrames seeks the page's CSS animations to each frame and captures it in Chrome Headless Shell. Renders run in a child process ([`src/worker.ts`](src/worker.ts)), so a caller's stdout stays its own.
+- **Programs:** `binaries` names Chrome Headless Shell, FFmpeg and ffprobe. The engine downloads Chrome and ffprobe on first use ([engine](../engine/README.md#ffmpeg)).
+- **Format:**
+  - A transparent page (a template, a label or a lower third) is VP9 with alpha in WebM. Reading its alpha needs FFmpeg's libvpx decoder ([FFmpeg requirements](../engine/README.md#ffmpeg)).
+  - An opaque page (a panel or a full-frame graphic) is H.264 in MP4. HyperFrames captures opaque pages faster on Linux, where Chrome's BeginFrame capture leaves out alpha.
+- **Cache:** renders are kept in `~/.cache/video-editor/effects/` (or under `XDG_CACHE_HOME`). A page is keyed by its whole document, size, frame rate, frame count and alpha, and by the house stylesheet, the fonts and the pinned HyperFrames version, so an unchanged page renders once. The folder the pages load the stylesheet and the fonts from, about 7 MB, is made once per version beside them; delete the folder to reclaim the space.
+- **Speed:** measured in [MEASUREMENTS.md](../engine/MEASUREMENTS.md#effect-measurements).
 
 ## Preview
 
-[`../engine/scripts/effects-preview.ts`](../engine/scripts/effects-preview.ts) renders every template at 16:9 and 9:16 over the [synthetic corpus](../../bench/README.md#synthetic-corpus), once `vework analyze` has written each clip's `runs/vework/index.json`, with a strip of frames from each template's entrance, hold and exit:
+[`../engine/scripts/effects-preview.ts`](../engine/scripts/effects-preview.ts) renders every template at 16:9 and 9:16 over the [synthetic corpus](../../bench/README.md#synthetic-corpus), with a strip of frames from each template's entrance and hold. Run `vework analyze` first, so that each clip has its `runs/vework/index.json`.
 
 ```bash
 cd packages/engine
 node scripts/effects-preview.ts ../../bench/synthetic /tmp/effects-preview
 ```
 
-In `packages/effects`, `node scripts/cards-preview.ts <folder>` renders each card's example as a still at 3 s; `--at 9:16/full,16:9/panel` picks the aspects and placements, `--only` some cards and `--mp4` an MP4 of each card named.
-
 ## Tests
 
-`pnpm --filter @video-editor/effects test` checks the catalog, the params validation of templates and cards, the cache keys and the layout. Rendering every template through Remotion is tested in the engine, in [`render.test.ts`](../engine/src/render.test.ts). One test renders every card's example through Remotion, full frame at 9:16 and as a 16:9 panel, at five frames a second so a few frames span its build; it is skipped where `CI` is set.
+`pnpm --filter @video-editor/effects test` checks:
+- the catalog and the template params' validation;
+- the pages, what markup may hold, and each layout's render size;
+- each template's markup;
+- the graphics' validation;
+- the cache keys and the layout.
+
+Rendering every template and the graphics through HyperFrames, and the checks in Chrome, are tested in the engine ([`render.test.ts`](../engine/src/render.test.ts), [`plan/graphics.test.ts`](../engine/src/plan/graphics.test.ts)). Those tests are skipped where `CI` is set.

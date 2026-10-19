@@ -6,7 +6,7 @@
 /** A Lucide icon: SVG elements on a 24-unit grid, stroked in currentColor. */
 type IconNode = [tag: string, attrs: Record<string, string>][];
 
-export const ICONS = {
+const ICONS = {
   "arrow-down": [
     ["path", { d: "M12 5v14" }],
     ["path", { d: "m19 12-7 7-7-7" }],

@@ -108,11 +108,11 @@ export function checkRevision(value: unknown): Revision | string {
       Array.isArray(revision.remove) &&
       revision.remove.every(
         (removal) =>
-          ["overlay", "card", "broll"].includes(removal?.kind) && integer(removal?.index),
+          ["overlay", "graphic", "broll"].includes(removal?.kind) && integer(removal?.index),
       )
     )
   ) {
-    return "Each removal names an overlay, a card or B-roll";
+    return "Each removal names an overlay, a graphic or B-roll";
   }
   if (
     revision.music !== undefined &&

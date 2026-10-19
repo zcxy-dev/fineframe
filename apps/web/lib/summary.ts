@@ -6,10 +6,10 @@ import type { Job } from "./jobs.ts";
 import { shownPlan } from "./paths.ts";
 import { formatClock, formatDollars, formatLength, type Style, styleName } from "./settings.ts";
 
-/** What Claude cost in all; null when a price is unknown. */
+/** What Claude cost in all; null when a price is unknown. Edits from before graphics had none. */
 export function dollarsOf(cost: ClaudeCost): number | null {
-  const { plan, check } = cost;
-  return plan.dollars === null || check.dollars === null ? null : plan.dollars + check.dollars;
+  const parts = [cost.plan, cost.graphics ?? { dollars: 0 }, cost.check].map((s) => s.dollars);
+  return parts.includes(null) ? null : parts.reduce<number>((sum, d) => sum + (d ?? 0), 0);
 }
 
 /** The summary's rows, name and value in `t`'s words, for the version shown, whose video is
@@ -75,6 +75,7 @@ export function summaryRows(
   const cost = first ? job.claude : shown?.claude;
   if (cost) {
     rows.push([words.planning, formatDollars(cost.plan.dollars, t)]);
+    if (cost.graphics) rows.push([words.graphics, formatDollars(cost.graphics.dollars, t)]);
     rows.push([words.checking, formatDollars(cost.check.dollars, t)]);
   } else if (!first) {
     rows.push([words.claude, words.noPlan]);

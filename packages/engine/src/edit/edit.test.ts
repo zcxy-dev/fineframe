@@ -154,11 +154,13 @@ test("a footage folder becomes the video, its project, its captions and progress
     message: `Finished: ${result.seconds.toFixed(1)} s at 9:16 in talk.mp4, captions in talk.srt`,
     claude: {
       plan: { dollars: 0.05, requests: 1 },
-      check: { dollars: 0.001 * (purposes.length - 1), requests: purposes.length - 1 },
+      // The edit's graphics, written once its cut is known; Claude wrote none here.
+      graphics: { dollars: 0.001, requests: 1 },
+      check: { dollars: 0.001 * (purposes.length - 2), requests: purposes.length - 2 },
     },
     outputs: result.outputs,
   });
-  assert.deepEqual(purposes.slice(0, 2), ["plan", "check"]);
+  assert.deepEqual(purposes.slice(0, 3), ["plan", "graphics", "check"]);
   assert.equal(result.reviews, 1, "a review that finds nothing ends the loop");
 
   // The index lies in the cache with the denoised speech beside it, and nothing half-written.
@@ -614,6 +616,7 @@ test("an edit that fails after a plan says what Claude cost on its error line", 
   assert.equal(last?.stage, "error");
   assert.deepEqual(last && "claude" in last ? last.claude : undefined, {
     plan: { dollars: 0.05, requests: 1 },
+    graphics: { dollars: 0, requests: 0 },
     check: { dollars: 0, requests: 0 },
   });
 });

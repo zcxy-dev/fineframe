@@ -5,7 +5,7 @@
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { cacheDir, pinnedFile } from "../download.ts";
+import { cacheDir, pinnedFile, untar } from "../download.ts";
 import type { Credit } from "./credits.ts";
 
 export type IconSet = "lucide" | "tabler" | "simple-icons";
@@ -283,31 +283,6 @@ function unpacked(set: IconSet, dir: string): Promise<string> {
     await rm(tarball, { force: true });
     return root;
   });
-}
-
-/** The regular files in a tar archive, by path. */
-export function* untar(archive: Buffer): Generator<[string, Buffer]> {
-  let offset = 0;
-  let longName: string | null = null;
-  while (offset + 512 <= archive.length) {
-    const header = archive.subarray(offset, offset + 512);
-    if (header.every((byte) => byte === 0)) break;
-    const field = (start: number, length: number) =>
-      header.toString("utf8", start, start + length).replace(/\0[\s\S]*$/, "");
-    const size = Number.parseInt(field(124, 12).trim() || "0", 8);
-    const type = field(156, 1);
-    const prefix = field(345, 155);
-    const data = archive.subarray(offset + 512, offset + 512 + size);
-    offset += 512 + Math.ceil(size / 512) * 512;
-    if (type === "x") {
-      // A pax header: only its path is used.
-      longName = /\d+ path=([^\n]*)\n/.exec(data.toString("utf8"))?.[1] ?? null;
-      continue;
-    }
-    const name = longName ?? (prefix ? `${prefix}/${field(0, 100)}` : field(0, 100));
-    longName = null;
-    if (type === "0" || type === "") yield [name, data];
-  }
 }
 
 /** A name as Simple Icons' slugs are made: lower case letters and digits, with + . & spelled. */

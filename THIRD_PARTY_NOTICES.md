@@ -1,6 +1,6 @@
 # Third-party notices
 
-The project's own code is proprietary, all rights reserved ([LICENSE](LICENSE)). It uses the components below, each under its own licence. Nothing in this repository bundles a model weight, a font or a binary, and its only third-party media are [a few CC0 sound effects](#sound-effects) and [the effect cards' icons](#icons-copied-into-the-source): the tools download the rest on first use, from their publishers, or the package managers install them. The desktop app's installers do carry programs: Electron, uv and the npm packages the editor runs, but no FFmpeg, model or Python package ([what they carry](#desktop-installers)). Licences were checked against each component's own licence file or model card at the version or revision the project pins.
+The project's own code is proprietary, all rights reserved ([LICENSE](LICENSE)). It uses the components below, each under its own licence. Nothing in this repository bundles a model weight, a font or a binary, and its only third-party media are [a few CC0 sound effects](#sound-effects) and [a subset of icons and logos](#icons-copied-into-the-source): the tools download the rest on first use, from their publishers, or the package managers install them. The desktop app's installers do carry programs: Electron, uv and the npm packages the editor runs, but no FFmpeg, model or Python package ([what they carry](#desktop-installers)). Licences were checked against each component's own licence file or model card at the version or revision the project pins.
 
 ## Components
 
@@ -15,9 +15,9 @@ The project's own code is proprietary, all rights reserved ([LICENSE](LICENSE)).
 | [DeepFilterNet3](https://github.com/Rikorose/DeepFilterNet) ONNX export | MIT OR Apache-2.0 | GitHub, pinned commit and SHA-256; worker `ml` group |
 | [Noto Sans CJK TC](https://github.com/notofonts/noto-cjk) Bold and Black | OFL-1.1 | GitHub, pinned commit and SHA-256; renderer, for captions |
 | [FFmpeg](https://ffmpeg.org) static builds: from [imageio-binaries](https://github.com/imageio/imageio-binaries), 7.0.2 on Linux, 7.1 on Apple silicon and on Windows ([gyan.dev](https://www.gyan.dev/ffmpeg/builds/)'s essentials build) | GPL-3.0-or-later (Linux, Windows), GPL-2.0-or-later (macOS) | GitHub, pinned commit and SHA-256; renderer, run as a separate program (see [notes](#ffmpeg)) |
-| Remotion's compositor (`@remotion/compositor-*`), with its own FFmpeg | [Remotion License](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md); its FFmpeg is configured with `--enable-gpl`, libx264, libx265 and libfdk-aac | Installed with @remotion/renderer by pnpm; for the desktop app, downloaded from npm on the first effect render, checked against `pnpm-lock.yaml` (see [notes](#desktop-installers)) |
+| ffprobe static builds from [@ffprobe-installer](https://github.com/SavageCore/node-ffprobe-installer)'s npm packages: 5.2.0 on Linux, 5.0.1 on Apple silicon, 5.1.0 on Windows | GPL-3.0 (Linux, Windows), LGPL-2.1 (macOS), as each package states | npm registry tarball, SHA-256 checked; renderer, on the first effect render, run as a separate program by HyperFrames (see [notes](#ffmpeg)) |
 | [CPython](https://www.python.org) builds from [python-build-standalone](https://github.com/astral-sh/python-build-standalone) | PSF-2.0, with the licences of the libraries each build includes | Desktop app only: installed by uv into the app's folder on its first start |
-| Chrome Headless Shell ([Chromium](https://www.chromium.org)) | Chromium's BSD-3-Clause licence and the third-party licences it lists; Google's build also refers to the Chrome terms of service | Downloaded by Remotion on the first effect render or web capture: from Google's [Chrome for Testing](https://github.com/GoogleChromeLabs/chrome-for-testing), on Linux with glibc 2.35 or later from Remotion's own build, and on older Linux arm64 from Playwright's Chromium build |
+| Chrome Headless Shell ([Chromium](https://www.chromium.org)) | Chromium's BSD-3-Clause licence and the third-party licences it lists; Google's build also refers to the Chrome terms of service | Google's [Chrome for Testing](https://github.com/GoogleChromeLabs/chrome-for-testing), pinned build, through @puppeteer/browsers; renderer, on the first effect render or web capture. There is no build for Linux on arm64 |
 | [Lucide](https://lucide.dev) icons (`lucide-static` 1.50.0) | ISC; the icons drawn from Feather MIT, as its licence file lists them | npm registry tarball, SHA-256 checked; engine, on the first icon lookup |
 | [Tabler Icons](https://tabler.io/icons) (`@tabler/icons` 3.48.0), outline style | MIT | npm registry tarball, SHA-256 checked; engine, on the first icon lookup |
 | [Simple Icons](https://simpleicons.org) (`simple-icons` 16.33.0) | CC0-1.0, except the logos its data gives another licence (see [notes](#icons-and-logos)) | npm registry tarball, SHA-256 checked; engine, on the first logo lookup |
@@ -57,12 +57,13 @@ Models that come inside a package: the TransNetV2 weights in transnetv2-pytorch,
 | Package | Licence | Used by |
 |---|---|---|
 | [@anthropic-ai/sdk](https://github.com/anthropics/anthropic-sdk-typescript) | MIT | engine, web page |
-| [remotion](https://www.remotion.dev), @remotion/bundler, @remotion/renderer | [Remotion License](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md), source-available (see [notes](#remotion)) | effects; @remotion/renderer also engine, to download Chrome for web capture |
-| [react](https://react.dev), react-dom | MIT | effects, web page |
+| [@hyperframes/producer](https://github.com/heygen-com/hyperframes) | Apache-2.0 | effects, rendering the effects and graphics |
+| [puppeteer-core](https://pptr.dev) | Apache-2.0 | effects, checking the graphics |
+| [@puppeteer/browsers](https://pptr.dev/browsers-api) | Apache-2.0 | engine, downloading Chrome Headless Shell |
+| [react](https://react.dev), react-dom | MIT | web page |
 | [ajv](https://github.com/ajv-validator/ajv) | MIT | schema, effects |
 | [@fontsource/noto-sans-tc](https://fontsource.org/fonts/noto-sans-tc) | OFL-1.1 | effects, web page |
-| [@fontsource/jetbrains-mono](https://fontsource.org/fonts/jetbrains-mono) | OFL-1.1 | effects, the cards' terminal and code |
-| [@fontsource-variable/inter](https://fontsource.org/fonts/inter) | OFL-1.1 | web page |
+| [@fontsource-variable/inter](https://fontsource.org/fonts/inter) | OFL-1.1 | effects, web page |
 | [@fontsource-variable/archivo](https://fontsource.org/fonts/archivo) | OFL-1.1 | web page, the wordmark and titles |
 | [next](https://nextjs.org) | MIT | web page |
 | [typescript](https://www.typescriptlang.org) | Apache-2.0 | development |
@@ -88,24 +89,20 @@ In `packages/engine/assets/sfx/`, 22 short Ogg Vorbis files, 144 KB in all, each
 
 ### Icons, copied into the source
 
-The effect cards draw icons and brand logos from `packages/effects/src/icons.ts`, which holds only the icons they can name, copied from these sets.
+`packages/effects/src/icons.ts` holds a subset of icons and brand logos, copied from these sets, for the motion graphics.
 
 | Component | Licence | Used by |
 |---|---|---|
-| [Lucide](https://lucide.dev) 1.50.0 (`lucide-static`) | ISC; the icons Lucide derived from [Feather](https://github.com/feathericons/feather) also MIT (both texts [below](#lucide)) | effects, the cards' icons |
-| [Simple Icons](https://simpleicons.org) 16.33.0 | CC0-1.0 | effects, the cards' brand logos |
+| [Lucide](https://lucide.dev) 1.50.0 (`lucide-static`) | ISC; the icons Lucide derived from [Feather](https://github.com/feathericons/feather) also MIT (both texts [below](#lucide)) | effects, icons |
+| [Simple Icons](https://simpleicons.org) 16.33.0 | CC0-1.0 | effects, brand logos |
 
-Each brand logo is its owner's trademark ([notes](#icons-and-logos)): a card shows a brand's logo only where the video names that brand. The logos Simple Icons' data gives a licence of their own are left out.
+Each brand logo is its owner's trademark ([notes](#icons-and-logos)): a graphic shows a brand's logo only where the video names that brand. The logos Simple Icons' data gives a licence of their own are left out.
 
 ## Notes
 
-### Remotion
-
-Remotion is source-available, not open source. Its licence is free for individuals, for-profit organisations with up to three employees, non-profits, and evaluation before any commercial use; any other organisation that renders with it needs a [Remotion company licence](https://www.remotion.pro/license). The effect templates render with Remotion, so this applies to whoever runs the editor, not to people who only watch its output. The licence also forbids selling or sublicensing a derivative of Remotion itself.
-
 ### FFmpeg
 
-The renderer runs FFmpeg as a separate program and needs libx264, which is GPL; the builds it downloads are therefore GPL builds, and the [Remotion compositor](https://www.remotion.dev/docs/miscellaneous/ffmpeg-license) and the PyAV wheels carry GPL-licensed FFmpeg code as well. The project's own code stays proprietary, all rights reserved: it only runs FFmpeg, which is downloaded or installed separately.
+The renderer runs FFmpeg as a separate program and needs libx264, which is GPL; the builds it downloads are therefore GPL builds; the ffprobe builds HyperFrames runs are GPL or LGPL builds, and the PyAV wheels carry GPL-licensed FFmpeg code as well. The project's own code stays proprietary, all rights reserved: it only runs FFmpeg and ffprobe, which are downloaded or installed separately.
 
 The Windows build is gyan.dev's 7.1 essentials build, which imageio-binaries republishes; it is configured with `--enable-gpl --enable-version3` and nothing nonfree, so the binary is GPL-3.0-or-later and may be redistributed.
 
@@ -115,8 +112,7 @@ Anyone who redistributes these builds, for example in a desktop app or a contain
 
 - **soxr** (LGPL-2.1-or-later) comes with beat-this in the worker's `ml` group.
 - The benchmark's `synth` extra installs **phonemizer-fork** (GPL-3.0-or-later), **espeakng-loader**, whose wheel bundles espeak-ng (GPL-3.0), and **num2words** (LGPL-2.1), through kokoro's English support. The corpus generator never calls them.
-- **sharp**'s libvips (LGPL-3.0-or-later) is installed as an optional dependency of Next.js; the web page does not use it, and the desktop app's installers leave it out.
-- **mediabunny** (MPL-2.0), which Remotion depends on, is in the desktop app's installers as its published source, unchanged.
+- **sharp**'s libvips (LGPL-3.0-or-later) is installed as an optional dependency of Next.js and as a dependency of HyperFrames' preview server; neither the web page nor a render uses it, and the desktop app's installers leave it out.
 
 ### Desktop installers
 
@@ -124,14 +120,14 @@ Each of the [desktop app](apps/desktop/README.md)'s installers carries:
 
 - **Electron** (MIT), with the Chromium and Node.js it is built from; their licences are in `LICENSES.chromium.html` and `LICENSE.electron.txt` inside the app.
 - **[uv](https://github.com/astral-sh/uv)** (MIT OR Apache-2.0), pinned by version and SHA-256, which installs the analysis's Python on the first start.
-- **The editor's code and the npm packages it runs**, the production dependencies listed above and theirs, as pnpm installs them, under their own licences: almost all MIT, ISC, Apache-2.0 or BSD; Remotion under the [Remotion License](#remotion); mediabunny under MPL-2.0; caniuse-lite's data under CC-BY-4.0.
+- **The editor's code and the npm packages it runs**, the production dependencies listed above and theirs, as pnpm installs them, under their own licences: almost all MIT, ISC, Apache-2.0 or BSD; caniuse-lite's data under CC-BY-4.0.
 
 Left out on purpose, and downloaded on first use instead, from their publishers, as when the editor runs from a clone:
 
 - **FFmpeg.** The renderer's pinned build downloads on the first edit, as [above](#ffmpeg).
-- **Remotion's compositor**, whose FFmpeg is built with `--enable-gpl` and with libfdk-aac, a combination the GPL does not allow to be passed on. It downloads from npm on the first effect render, checked against the integrity in `pnpm-lock.yaml`.
+- **ffprobe and Chrome Headless Shell**, which download on the first effect render, as [above](#models-and-data-downloaded-on-first-use).
 - **The analysis's Python**, its packages (PyAV's GPL FFmpeg among them) and the models, which uv and vework download into the user's folders.
-- **sharp** and its libvips, which the page does not use.
+- **sharp** and its libvips, which neither the page nor a render uses.
 
 The installers are not signed with an Apple Developer ID or a Windows code-signing certificate yet; the macOS app is signed ad hoc, which Apple silicon requires to run it.
 
@@ -285,11 +281,11 @@ THE SOFTWARE.
 
 ### Herk Edit Kit
 
-The effect cards rebuild in Remotion the layouts and motion of cards from the [Herk Edit Kit](https://github.com/nateherkai/hyperframes-student-kit) (HTML, CSS and GSAP); none of its code, fonts or brand assets is copied. The planner's visuals follow its editing playbook's B-roll order, split-screen proportions, time away from the speaker and sound-effect rules.
+The house stylesheet adapts the look of the motion graphics in the [Herk Edit Kit](https://github.com/nateherkai/hyperframes-student-kit) (HTML, CSS and GSAP): its lit stages, glass panels, chips and entrances, redrawn in CSS animations without GSAP and in Fineframe's own colours; none of its fonts or brand assets is copied. The graphics' layouts, lengths and timing, and the planner's visuals, follow its editing playbook's split-screen proportions, card frequency, time away from the speaker and sound-effect rules.
 
-- `packages/effects/src/cards.ts`
-- `packages/effects/src/remotion/cards/`
-- `packages/effects/src/layout.ts` (`panelShare`)
+- `packages/effects/src/style.ts`
+- `packages/effects/src/graphics.ts`
+- `packages/engine/src/plan/graphics.ts`
 - `packages/engine/src/plan/visuals.ts`
 
 ```text

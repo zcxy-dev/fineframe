@@ -233,7 +233,9 @@ export function Editor() {
   );
   const length = chosenLength(choices, t);
   const estimate =
-    "seconds" in length && footageSeconds > 0 ? estimateCost(footageSeconds, length.seconds) : null;
+    "seconds" in length && footageSeconds > 0
+      ? estimateCost(footageSeconds, length.seconds, choices.visuals)
+      : null;
   const blocked =
     setup?.state === "installing"
       ? t.compose.installing

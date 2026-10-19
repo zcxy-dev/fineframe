@@ -1,8 +1,8 @@
 # Recipes for changing an edit
 
-Each recipe starts from the newest version, here `out/edit.project.json`, and makes the next one, here `edit-v2`. For a field no recipe covers, the schema says what each one means (`packages/schema/project.schema.json`), the effect templates' catalog gives their params and limits (`packages/effects/src/catalog.ts`), and the cards' theirs (`packages/effects/src/cards.ts`). The overlays' limits below are copied from the catalog.
+Each recipe starts from the newest version, here `out/edit.project.json`, and makes the next one, here `edit-v2`. For a field no recipe covers, the schema says what each one means (`packages/schema/project.schema.json`), the effect templates' catalog gives their params and limits (`packages/effects/src/catalog.ts`), and `packages/effects/src/graphics.ts` the graphics' layouts and lengths. The limits below are copied from them.
 
-**Ticks.** Every time and length is an integer: 120 000 ticks a second. Seconds × 120 000, rounded, gives ticks; `start` of captions, overlays, cards, B-roll, music and sound effects is on the output timeline, from the video's first frame.
+**Ticks.** Every time and length is an integer: 120 000 ticks a second. Seconds × 120 000, rounded, gives ticks; `start` of captions, overlays, graphics, B-roll, music and sound effects is on the output timeline, from the video's first frame.
 
 **Editing a copy.** Recipes other than cutting change a copy of the project in the same folder, so its relative paths still resolve. Use your own file tools on the copy, or for a change across many entries:
 
@@ -61,15 +61,25 @@ Change the params; keep `start` and `duration`. Overlays show one at a time, so 
 
 Any overlay can take `params.accent`, a `#rrggbb` colour for its accent instead of the house amber. A changed overlay renders again, in a few seconds; unchanged ones come from the cache.
 
-## Remove or add a card or B-roll
+## Change a motion graphic or B-roll
 
-A rich edit (`pnpm edit --visuals rich`, the default) cuts away from the speaker on its points: to a motion-graphics card (`cards`), or to a web capture or stock footage (`broll` entries whose source id starts with `visual-`), full frame or as the upper panel of a split screen. In a split, the speaker plays below as `broll` entries of the main track's own source with `rect` `{ "x": 0, "y": 0.458…, "w": 1, "h": 0.541… }` at 9:16 (the lower half elsewhere), in step with it. A visual lasts at most 3.5 s full frame and 6 s split, and the speaker shows between two for at least a second.
+A rich edit (`pnpm edit --visuals rich`, the default) adds motion graphics Claude wrote for this video, in `graphics`. Each is HTML and CSS on the house stylesheet (`packages/effects/src/style.ts`), with a `layout`:
 
-- **Remove a card:** delete its entry in `cards`. When its `placement` is `panel`, also delete the speaker entries in `broll` with the same `start` range (their `start` within the card's `start` to `start + duration`), so the full-frame speaker shows again. A sound effect in `audio.sfx` at the card's `start` belongs to it: delete it too.
+| `layout` | What it is | Length |
+|---|---|---|
+| `label` | A chip over the speaker, at its `box` | 1.5–6 s (180000–720000) |
+| `lower-third` | A pill low on one side over the speaker, at its `box` | 2–6 s (240000–720000) |
+| `panel` | 9:16 only: the top 880 of every 1920 rows, with the speaker below | 3–8 s (360000–960000) |
+| `full` | The whole frame | 4–12 s (480000–1440000) |
+
+It also cuts away to web captures or stock footage: `broll` entries whose source id starts with `visual-`, full frame or as the upper panel of a split screen, at most 3.5 s full frame and 6 s split. Below a panel or a split, the speaker plays as `broll` entries of the main track's own source with `rect` `{ "x": 0, "y": 0.458…, "w": 1, "h": 0.541… }` at 9:16 (the lower half elsewhere), in step with it.
+
+- **Remove a graphic:** delete its entry in `graphics`. For a `panel`, also delete the speaker entries in `broll` within the graphic's `start` to `start + duration`, so the full-frame speaker shows again. A sound effect in `audio.sfx` at the graphic's `start` belongs to it: delete it too.
 - **Remove a capture or footage:** delete its `broll` entry, and for a split the speaker entries beside it, as above; and its sound effect.
-- **Change a card's text or numbers:** edit its `params`, as its JSON Schema in `packages/effects/src/cards.ts` allows; the render names any param that breaks it. Never put a number on a card that the speaker does not say.
-- **Add a card:** `{ "card": "stat", "params": { "value": 3, "suffix": "倍", "label": "…" }, "start": …, "duration": 360000, "placement": "full" }`, `start` at the first word it illustrates (its `start` in `captions.lines[].words`), `duration` within the card's `seconds`, and at most 420000 (3.5 s) full frame or 720000 (6 s) as a panel, and clear of other cards, B-roll and overlays. `"placement": "panel"` splits the screen: then add the speaker below as one `broll` entry per main clip the card spans, `{ "source": <the main clip's source>, "in": <the main clip's in + (start − where that clip starts in the edit)>, "out": in + the length, "start": …, "rect": <the speaker rect above> }`, which plays in step with the main track. A card renders in a few seconds a second of it, and once rendered comes from the cache.
-- **Credits:** the render writes `edit-v2.broll.txt` again from what the new version shows: each source's `credit`, and the logos and icons its cards draw.
+- **Change a graphic's words or numbers:** edit the text in its `html`, keeping the markup and classes. Show only words and numbers the speaker says while it shows, as keywords, never the whole sentence the captions already show. Each part enters with a CSS animation of 0.3 to 0.8 s in its `css` and stays; nothing animates out.
+- **Move a graphic:** change `start`, 0.4 s (48000) before the word it shows (its `start` in `captions.lines[].words`), keeping it clear of other graphics and B-roll. Its `words` name the spoken words it shows, so a later cut that takes one out removes it.
+- **Add a graphic:** `{ "layout": "label", "html": "…", "css": "…", "box": { "x": …, "y": …, "w": …, "h": … }, "start": …, "duration": 360000 }`, written as `graphicsGuide` in `packages/effects/src/graphics.ts` says: the house classes, sizes in `var(--u)`, inside the safe area and clear of the captions and the speaker's face; `box` only for a label or a lower third, as fractions of the frame. The render checks only its markup and length, so look at a frame of it in the rendered video before handing it over.
+- **Credits:** the render writes `edit-v2.broll.txt` again from what the new version shows: each source's `credit`.
 
 ## Change the music level, or remove the music
 

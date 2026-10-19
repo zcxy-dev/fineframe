@@ -2,16 +2,21 @@ import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, open, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import {
-  cardSize,
-  renderCards,
+  type Binaries,
+  type RenderOptions as EffectOptions,
+  type GraphicJob,
+  type OverlayJob,
+  renderGraphics,
   renderOverlays,
-  validateCards,
+  type TemplateId,
+  validateGraphics,
   validateOverlays,
 } from "@video-editor/effects";
 import { loadJson, type Project, TICKS_PER_SECOND, validateProject } from "@video-editor/schema";
-import { type Credit, cardCredits, creditText } from "./broll/credits.ts";
+import { type Credit, creditText } from "./broll/credits.ts";
 import { buildCaptions, stageFonts } from "./captions/index.ts";
-import { ffmpeg, QUIET, run } from "./ffmpeg.ts";
+import { chrome } from "./chrome.ts";
+import { ffmpeg, ffprobe, QUIET, run } from "./ffmpeg.ts";
 import { pastPicture } from "./framing.ts";
 import { AAC, alignToAacFrames, encoderArgs, RAW_AUDIO } from "./graph/encode.ts";
 import {
@@ -31,6 +36,7 @@ import {
   parseMomentary,
   rides,
 } from "./graph/music.ts";
+import { graphicPlacement } from "./graph/overlays.ts";
 import { pieceAudio, pieceVideo } from "./graph/piece.ts";
 import { cube, isLookId, lookIds, lutKey } from "./looks.ts";
 import { cutPieces } from "./pieces.ts";
@@ -40,14 +46,14 @@ import { buildTimeline } from "./timeline.ts";
 export interface RenderOptions {
   /** Called as the render advances, with the fraction done (0 to 1) and a line to show. */
   onProgress?: (fraction: number, message: string) => void;
-  /** Called while what renders the effect overlays downloads on its first use: its name, and
-   * the bytes so far of `total`. */
+  /** Called while what renders the effects downloads on its first use, Chrome Headless Shell and
+   * ffprobe: its name, and the bytes so far of `total`. */
   onDownload?: (name: string, bytes: number, total: number) => void;
-  /** Renders the effect overlays; @video-editor/effects' Remotion renderer unless replaced,
+  /** Renders the effect overlays; @video-editor/effects' HyperFrames renderer unless replaced,
    * as the tests replace it with files FFmpeg draws. */
-  renderOverlays?: typeof renderOverlays;
-  /** Renders the cards; @video-editor/effects' Remotion renderer unless replaced. */
-  renderCards?: typeof renderCards;
+  renderOverlays?: (jobs: OverlayJob[], options: EffectOptions) => Promise<string[]>;
+  /** Renders the graphics; @video-editor/effects' HyperFrames renderer unless replaced. */
+  renderGraphics?: (jobs: GraphicJob[], options: EffectOptions) => Promise<string[]>;
   /** A folder to also write the mix's parts into, before loudness normalisation scales them
    * alike: `voice.wav`, the main track and B-roll, and with music `music.wav`, the bed as ducked.
    * vebench measures the voice's lead over the music from them, and a cut check can read the
@@ -153,10 +159,7 @@ export async function render(
 ): Promise<RenderResult> {
   const project = await loadJson(projectPath, validateProject);
   validateOverlays(project.overlays ?? []);
-  validateCards(
-    (project.cards ?? []).map(({ card, params }) => ({ card, params })),
-    "/cards",
-  );
+  validateGraphics(project.graphics ?? [], project.output.aspect);
   const problems = unrendered(project);
   if (problems.length > 0) {
     throw new Error(`The renderer does not draw these yet:\n${problems.join("\n")}`);
@@ -172,46 +175,58 @@ export async function render(
   const captions = await buildCaptions(project, timeline);
   const bin = await ffmpeg();
 
-  const effects = timeline.overlays.length + timeline.cards.length;
+  const effects = timeline.overlays.length + timeline.graphics.length;
   const share = effects > 0 ? OVERLAY_SHARE : 0;
   const { aspect, width, height, fps } = project.output;
-  // Shared between the overlays and the cards by how many each has.
+  // Shared between the overlays and the graphics by how many each has.
   const part = timeline.overlays.length / Math.max(1, effects);
-  const download = options.onDownload ? { onDownload: options.onDownload } : {};
-  const overlays = await (options.renderOverlays ?? renderOverlays)(
-    timeline.overlays.map(({ overlay, start, end }) => ({
-      template: overlay.template,
-      params: overlay.params,
-      aspect,
-      width,
-      height,
-      fps,
-      frames: end - start,
-    })),
-    { onProgress: (fraction, message) => report(fraction * share * part, message), ...download },
-  );
-  const cards =
-    timeline.cards.length === 0
+  // Chrome Headless Shell and ffprobe are fetched only for the renderer that runs them.
+  let binaries: Promise<Binaries> | undefined;
+  const programs = () => {
+    binaries ??= effectBinaries(bin, options.onDownload);
+    return binaries;
+  };
+  const overlays =
+    timeline.overlays.length === 0
       ? []
-      : await (options.renderCards ?? renderCards)(
-          timeline.cards.map(({ card, start, end }) => {
-            const [w, h] = cardSize(aspect, card.placement, width, height);
-            const { placement } = card;
-            return {
-              card: card.card,
-              params: card.params,
-              placement,
+      : await (
+          options.renderOverlays ??
+          (async (jobs, effectOptions) => renderOverlays(jobs, await programs(), effectOptions))
+        )(
+          timeline.overlays.map(
+            ({ overlay, start, end }): OverlayJob => ({
+              template: overlay.template as TemplateId,
+              params: overlay.params as unknown as OverlayJob["params"],
               aspect,
-              width: w,
-              height: h,
+              width,
+              height,
               fps,
+              frames: end - start,
+            }),
+          ),
+          { onProgress: (fraction, message) => report(fraction * share * part, message) },
+        );
+  const graphics =
+    timeline.graphics.length === 0
+      ? []
+      : await (
+          options.renderGraphics ??
+          (async (jobs, effectOptions) => renderGraphics(jobs, await programs(), effectOptions))
+        )(
+          timeline.graphics.map(({ graphic, start, end }): GraphicJob => {
+            const at = graphicPlacement(graphic, project.output);
+            return {
+              layout: graphic.layout,
+              html: graphic.html,
+              css: graphic.css,
+              ...(graphic.box ? { box: at } : {}),
+              output: project.output,
               frames: end - start,
             };
           }),
           {
             onProgress: (fraction, message) =>
               report(share * (part + fraction * (1 - part)), message),
-            ...download,
           },
         );
   const progress = (fraction: number, message: string) =>
@@ -335,7 +350,7 @@ export async function render(
           progress((pieces.length + 1 + i) / steps, `Rendering ${i + 1}/${pieces.length}`);
           // A crop path's expression can outgrow one command-line argument (128 KiB on Linux),
           // so FFmpeg reads the graph from a file.
-          const args = pieceVideo(piece, timeline, overlays, luts, cards);
+          const args = pieceVideo(piece, timeline, overlays, luts, graphics);
           const at = args.indexOf("-filter_complex");
           const graph = join(work, "graph.txt");
           await writeFile(graph, args[at + 1] ?? "");
@@ -492,8 +507,23 @@ function credits(project: Project, video: string): string {
   return `${lines.join("\n")}\n`;
 }
 
-/** The credits of the sources the video shows as B-roll or plays as sound effects, and of the
- * logos and icons its cards draw, in the order they first play. */
+/** What the effects render with: Chrome Headless Shell, the FFmpeg the edit renders with, and
+ * ffprobe, the first two downloaded on first use with `onDownload` hearing their progress. */
+async function effectBinaries(
+  bin: string,
+  onDownload: RenderOptions["onDownload"],
+): Promise<Binaries> {
+  const heard = (name: string) =>
+    onDownload ? (bytes: number, total: number) => onDownload(name, bytes, total) : undefined;
+  return {
+    chrome: await chrome(heard("Chrome Headless Shell")),
+    ffmpeg: bin,
+    ffprobe: await ffprobe(heard("ffprobe")),
+  };
+}
+
+/** The credits of the sources the video shows as B-roll or plays as sound effects, in the order
+ * they first play. */
 function brollCredits(project: Project, timeline: ReturnType<typeof buildTimeline>): Credit[] {
   const ticks = timeline.frameTicks;
   const byId = new Map(project.sources.map((source) => [source.id, source]));
@@ -507,10 +537,6 @@ function brollCredits(project: Project, timeline: ReturnType<typeof buildTimelin
   };
   const played: [number, Credit[]][] = [
     ...timeline.broll.map((clip): [number, Credit[]] => [clip.start * ticks, of(clip.clip.source)]),
-    ...timeline.cards.map((clip): [number, Credit[]] => [
-      clip.start * ticks,
-      cardCredits(clip.card.params),
-    ]),
     ...(project.audio.sfx ?? []).map((sfx): [number, Credit[]] => [sfx.start, of(sfx.source)]),
   ];
   return played.sort((a, b) => a[0] - b[0]).flatMap(([, credits]) => credits);

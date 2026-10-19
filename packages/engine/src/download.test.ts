@@ -7,7 +7,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { test } from "node:test";
-import { pinnedFile } from "./download.ts";
+import { pinnedFile, untar } from "./download.ts";
 import { scratch } from "./testing.ts";
 
 test("a program another download put in place first is kept, even while it runs", async (t) => {
@@ -73,4 +73,30 @@ test("a pinned download reports its bytes against the size the server gives", as
     heard.push([bytes, total]),
   );
   assert.deepEqual(heard, []);
+});
+
+/** A ustar archive of `files`, with long paths split into prefix and name. */
+function tar(files: Record<string, string>): Buffer {
+  const blocks: Buffer[] = [];
+  for (const [path, text] of Object.entries(files)) {
+    const header = Buffer.alloc(512);
+    const cut = path.length > 100 ? path.lastIndexOf("/", 155) : -1;
+    header.write(cut > 0 ? path.slice(cut + 1) : path, 0);
+    if (cut > 0) header.write(path.slice(0, cut), 345);
+    const data = Buffer.from(text);
+    header.write(`${data.length.toString(8).padStart(11, "0")}\0`, 124);
+    header.write("0", 156);
+    header.write("ustar\0", 257);
+    blocks.push(header, data, Buffer.alloc((512 - (data.length % 512)) % 512));
+  }
+  return Buffer.concat([...blocks, Buffer.alloc(1024)]);
+}
+
+test("unpacks a tar archive's files, long paths included", () => {
+  const long = `package/${"a".repeat(120)}/icon.svg`;
+  const files = { "package/LICENSE": "ISC", [long]: "<svg/>" };
+  const read = Object.fromEntries(
+    [...untar(tar(files))].map(([path, data]) => [path, data.toString()]),
+  );
+  assert.deepEqual(read, files);
 });

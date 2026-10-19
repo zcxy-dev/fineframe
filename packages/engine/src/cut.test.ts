@@ -315,15 +315,7 @@ test("the speaker beside a split screen splits with the main track, so it stays 
     { source: "a", in: s(1), out: s(4), start: s(1), rect: below },
     { source: "b", in: s(20), out: s(23), start: s(1), rect: { x: 0, y: 0, w: 1, h: 0.5 } },
   ];
-  project.cards = [
-    {
-      card: "stat",
-      params: { value: 3, label: "x" },
-      start: s(1),
-      duration: s(3),
-      placement: "panel",
-    },
-  ];
+  project.graphics = [{ layout: "panel", html: "<b>3</b>", css: "", start: s(1), duration: s(3) }];
   project.audio.sfx = [
     { source: "m", start: s(1), gainDb: -16 },
     { source: "m", start: s(2.7), gainDb: -16 },
@@ -347,14 +339,36 @@ test("the speaker beside a split screen splits with the main track, so it stays 
   }
   assert.equal(
     (first?.out ?? 0) + (second?.out ?? 0) - (first?.in ?? 0) - (second?.in ?? 0),
-    cut.cards?.[0]?.duration ?? 0,
+    cut.graphics?.[0]?.duration ?? 0,
   );
   assert.equal(other?.source, "b");
-  assert.equal(cut.cards?.length, 1);
+  assert.equal(cut.graphics?.length, 1);
   // The sound on a moment cut out goes with it.
   assert.deepEqual(
     cut.audio.sfx?.map((sfx) => sfx.start),
     [s(1)],
+  );
+  validateProject(cut);
+});
+
+test("a graphic showing a word the cut takes goes with it; one showing words kept moves up", () => {
+  const project = edit();
+  const graphic = (word: number, start: number) => ({
+    layout: "full" as const,
+    html: "<b>x</b>",
+    css: "",
+    words: [{ source: "a", word }],
+    start: s(start),
+    duration: s(1),
+  });
+  // w5 is said 2.6 to 2.9 s, w8 4.1 to 4.4 s.
+  project.graphics = [graphic(5, 2.4), graphic(8, 4)];
+  const { project: cut, notes } = cutEdit(project, [[s(2.5), s(3)]], sources);
+  assert.equal(cut.graphics?.length, 1);
+  assert.deepEqual(cut.graphics?.[0]?.words, [{ source: "a", word: 8 }]);
+  assert.ok((cut.graphics?.[0]?.start ?? 0) < s(4));
+  assert.ok(
+    notes.some((note) => /\/graphics\/0 \(full\): it shows words the cut took out/.test(note)),
   );
   validateProject(cut);
 });
