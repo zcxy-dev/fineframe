@@ -1,6 +1,7 @@
 // What the done view's summary says of an edit: the version shown's own length, aspect, look,
 // caption style and Claude cost, and the settings every version shares.
 import type { ClaudeCost } from "@video-editor/schema";
+import { en, type Messages } from "./i18n/en.ts";
 import type { Job } from "./jobs.ts";
 import { shownPlan } from "./paths.ts";
 import { formatClock, formatDollars, formatLength, type Style, styleName } from "./settings.ts";
@@ -11,9 +12,14 @@ export function dollarsOf(cost: ClaudeCost): number | null {
   return plan.dollars === null || check.dollars === null ? null : plan.dollars + check.dollars;
 }
 
-/** The summary's rows, name and value, for the version shown, whose video is `actual` seconds
- * long once the page knows. */
-export function summaryRows(job: Job, actual?: number | null): [string, string][] {
+/** The summary's rows, name and value in `t`'s words, for the version shown, whose video is
+ * `actual` seconds long once the page knows. */
+export function summaryRows(
+  job: Job,
+  actual?: number | null,
+  t: Messages = en,
+): [string, string][] {
+  const words = t.summary;
   const shown = job.versions?.find((version) => version.n === (job.current ?? 1));
   const first = !shown || shown.n === 1;
   const { length, aspect } = shownPlan(job);
@@ -23,50 +29,55 @@ export function summaryRows(job: Job, actual?: number | null): [string, string][
   const photos = job.files.filter((file) => file.use === "image").length;
   const offered = job.files.filter((file) => file.use === "music").length;
   const rows: [string, string][] = [
-    ["Length", `Target ${formatLength(length)}${actual ? ` · Actual ${formatClock(actual)}` : ""}`],
-    ["Aspect", aspect],
-    ["Style", styleName(look)],
+    [
+      words.length,
+      `${words.target(formatLength(length, t))}${actual ? words.actual(formatClock(actual)) : ""}`,
+    ],
+    [words.aspect, aspect],
+    [words.style, styleName(look, t)],
     // Edits from before the setting had none.
-    ...(captions ? [["Captions", styleName(captions as Style)] as [string, string]] : []),
-    ["Speech", job.settings.asr === "cloud" ? "OpenRouter" : "On this computer"],
+    ...(captions
+      ? [[words.captions, t.captions[captions]?.name ?? captions] as [string, string]]
+      : []),
+    [words.speech, job.settings.asr === "cloud" ? "OpenRouter" : words.local],
     ...(job.settings.visuals
-      ? [["Visuals", job.settings.visuals === "rich" ? "Rich" : "Minimal"] as [string, string]]
+      ? [[words.visuals, t.settings.visualsChoices[job.settings.visuals].name] as [string, string]]
       : []),
     [
-      "Footage",
-      `${videos} ${videos === 1 ? "video" : "videos"}${photos ? `, ${photos} ${photos === 1 ? "photo" : "photos"}` : ""}`,
+      words.footage,
+      `${t.footage.videos(videos)}${photos ? `${t.list}${t.footage.photos(photos)}` : ""}`,
     ],
   ];
   if (offered > 0) {
     // Claude picks one of the tracks offered, or none; the page knows which once it is done.
     const played = job.result?.music;
     rows.push([
-      "Music",
+      words.music,
       played
         ? played.length > 0
-          ? played.map((path) => path.split("/").at(-1)).join(", ")
-          : "None chosen"
-        : `${offered} ${offered === 1 ? "track" : "tracks"} offered`,
+          ? played.map((path) => path.split("/").at(-1)).join(t.list)
+          : words.noMusic
+        : words.offered(offered),
     ]);
   }
   if (job.settings.names.length > 0) {
     // Edits from before terms had their own list counted both here.
     rows.push([
-      job.settings.terms ? "Names" : "Names and terms",
+      job.settings.terms ? words.names : words.namesAndTerms,
       String(job.settings.names.length),
     ]);
   }
-  if (job.settings.terms?.length) rows.push(["Terms", String(job.settings.terms.length)]);
+  if (job.settings.terms?.length) rows.push([words.terms, String(job.settings.terms.length)]);
   // A re-plan's instructions are named in its version's summary instead.
-  if (first && job.settings.instructions) rows.push(["Planned", "With instructions"]);
+  if (first && job.settings.instructions) rows.push([words.planned, words.withInstructions]);
   // What this version cost: the edit's plan, a re-plan's, or nothing for a change made without
   // one.
   const cost = first ? job.claude : shown?.claude;
   if (cost) {
-    rows.push(["Claude, planning", formatDollars(cost.plan.dollars)]);
-    rows.push(["Claude, checking cuts", formatDollars(cost.check.dollars)]);
+    rows.push([words.planning, formatDollars(cost.plan.dollars, t)]);
+    rows.push([words.checking, formatDollars(cost.check.dollars, t)]);
   } else if (!first) {
-    rows.push(["Claude", "None: changed without a new plan"]);
+    rows.push([words.claude, words.noPlan]);
   }
   const costs = [job.claude, ...(job.versions ?? []).map((version) => version.claude)].filter(
     (each): each is ClaudeCost => each !== undefined,
@@ -76,7 +87,7 @@ export function summaryRows(job: Job, actual?: number | null): [string, string][
     const total = each.includes(null)
       ? null
       : each.reduce<number>((sum, dollars) => sum + (dollars ?? 0), 0);
-    rows.push(["Claude, all versions in total", formatDollars(total)]);
+    rows.push([words.total, formatDollars(total, t)]);
   }
   return rows;
 }

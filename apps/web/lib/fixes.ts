@@ -1,6 +1,8 @@
 // What a person reads when something fails: what happened in plain words and the step that fixes
 // it, with the program's own message kept behind "Show details", never with a local path in it.
 
+import { en, type Messages } from "./i18n/en.ts";
+
 export type FixKind = "key" | "openrouter" | "credit" | "disk" | "file" | "missing" | "network";
 
 export interface Fix {
@@ -11,55 +13,28 @@ export interface Fix {
   next: string;
 }
 
-const FIXES: [FixKind, RegExp, string, string][] = [
-  [
-    "key",
-    /authentication_error|invalid x-api-key|ANTHROPIC_API_KEY|permission_error/i,
-    "Anthropic did not accept the API key.",
-    "Replace it, then start the edit again.",
-  ],
-  [
-    "openrouter",
-    /OpenRouter rejected|OPENROUTER_API_KEY|OpenRouter has no credit/i,
-    "OpenRouter did not accept the key, or has no credit left for it.",
-    "Replace the key or add credit at openrouter.ai/settings/credits, then start the edit again.",
-  ],
-  [
-    "credit",
-    /credit balance is too low|billing/i,
-    "The Anthropic account is out of credit.",
-    "Add some at console.anthropic.com/settings/billing, then start the edit again: the analysis is kept.",
-  ],
-  [
-    "disk",
-    /no space left on device|ENOSPC|disk is full/i,
-    "The disk is full.",
-    "Free some space, then start the edit again. Speech recognition needs about 3.5 GB the first time, and each edit's files take a few times the size of its footage; deleting older projects frees theirs.",
-  ],
+/** What each fix is for, as a program says it; the fix itself is in each language's words. */
+const FIXES: [FixKind, RegExp][] = [
+  ["key", /authentication_error|invalid x-api-key|ANTHROPIC_API_KEY|permission_error/i],
+  ["openrouter", /OpenRouter rejected|OPENROUTER_API_KEY|OpenRouter has no credit/i],
+  ["credit", /credit balance is too low|billing/i],
+  ["disk", /no space left on device|ENOSPC|disk is full/i],
   [
     "file",
     /invalid data found|not an image FFmpeg can read|moov atom not found|no video stream|unsupported codec|could not open/i,
-    "One of the files can't be read.",
-    "It may be damaged, still copying, or in a format Fineframe can't read. Leave it out, or convert it to MP4, and start again.",
   ],
-  [
-    "missing",
-    /ENOENT|no such file or directory/i,
-    "A file this edit needs can't be found.",
-    "Check that it is still where it was and that its drive is connected, then try again.",
-  ],
+  ["missing", /ENOENT|no such file or directory/i],
   [
     "network",
     /connection error|cannot reach|could not download|ENOTFOUND|ECONNRESET|ETIMEDOUT|temporary failure in name resolution/i,
-    "Fineframe could not reach the internet.",
-    "Check the connection and start the edit again: what was analysed or downloaded is kept.",
   ],
 ];
 
-/** The step that fixes an edit that failed with `message`, or null when there is none to give. */
-export function fixFor(message: string): Fix | null {
-  for (const [kind, pattern, summary, next] of FIXES) {
-    if (pattern.test(message)) return { kind, summary, next };
+/** The step that fixes an edit that failed with `message`, in `t`'s words, or null when there is
+ * none to give. */
+export function fixFor(message: string, t: Messages = en): Fix | null {
+  for (const [kind, pattern] of FIXES) {
+    if (pattern.test(message)) return { kind, ...t.errors.fixes[kind] };
   }
   return null;
 }
@@ -88,13 +63,20 @@ export interface Explained {
   kind: FixKind | null;
 }
 
-/** `message` for a person to read. `fallback` says what failed when nothing better can be said
- * of a message that reads as a program's. A message the server wrote for people stays as it is. */
-export function explain(message: string, fallback: string): Explained {
+/** Whether `message` is in Chinese, leaving out the names of files, which may be in any
+ * language. */
+const CHINESE = (message: string) => /\p{Script=Han}/u.test(message.replace(/\S+\.\w{2,4}\b/g, ""));
+
+/** `message` for a person to read, in `t`'s words. `fallback` says what failed when nothing
+ * better can be said of a message that reads as a program's. A message the server wrote for
+ * people stays as it is; in Chinese, one left in English, as the edit's own program writes, is
+ * said by `fallback`, with the message itself behind details. */
+export function explain(message: string, fallback: string, t: Messages = en): Explained {
   const details = withoutPaths(message);
-  const fix = fixFor(message);
+  const fix = fixFor(message, t);
   if (fix) return { summary: fix.summary, next: fix.next, details, kind: fix.kind };
-  if (TECHNICAL.test(message) || details !== message || message.length > 200) {
+  const untranslated = t !== en && !CHINESE(message);
+  if (untranslated || TECHNICAL.test(message) || details !== message || message.length > 200) {
     return { summary: fallback, next: null, details, kind: null };
   }
   return { summary: message, next: null, details: null, kind: null };

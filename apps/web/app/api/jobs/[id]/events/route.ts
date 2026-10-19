@@ -50,6 +50,6 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
       },
     });
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

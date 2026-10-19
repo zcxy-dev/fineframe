@@ -1,4 +1,5 @@
 import { checkOrigin, errorResponse } from "../../../lib/http.ts";
+import { messagesOf } from "../../../lib/i18n/messages.ts";
 import { JobError, jobs } from "../../../lib/jobs.ts";
 import { checkSettings, type FileEntry } from "../../../lib/settings.ts";
 import { defaultAsr, setup } from "../../../lib/setup.ts";
@@ -22,20 +23,18 @@ export async function POST(request: Request): Promise<Response> {
       settings?: unknown;
       files?: FileEntry[];
     } | null;
-    const settings = checkSettings(body?.settings, defaultAsr());
+    const settings = checkSettings(body?.settings, defaultAsr(), messagesOf(request));
     if (typeof settings === "string") throw new JobError(settings, 400);
     // Refused before the page sends any footage, which could not be analysed yet.
     const { state, error } = setup().state;
     if (state !== "ready") {
       throw new JobError(
-        state === "failed"
-          ? `The analysis could not be set up: ${error}`
-          : "The analysis is still being set up; the page shows how far it is",
+        (t) => (state === "failed" ? t.server.setupFailed(String(error)) : t.server.settingUp),
         409,
       );
     }
     if (!Array.isArray(body?.files) || body.files.length === 0) {
-      throw new JobError("Drop some footage first", 400);
+      throw new JobError((t) => t.server.noFootage, 400);
     }
     const files = body.files.map((file) => ({
       path: String(file?.path),
@@ -43,6 +42,6 @@ export async function POST(request: Request): Promise<Response> {
     }));
     return Response.json(await jobs().create(settings, files), { status: 201 });
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

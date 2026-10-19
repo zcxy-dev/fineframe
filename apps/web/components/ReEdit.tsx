@@ -11,36 +11,22 @@ import {
   useRef,
   useState,
 } from "react";
+import { LOCALES } from "../lib/i18n/locale.ts";
+import { en, MESSAGES, type Messages } from "../lib/i18n/messages.ts";
+import { overlayLabel, progressText } from "../lib/i18n/program.ts";
 import type { EditView, Job } from "../lib/jobs.ts";
 import { formatClock, formatDollars } from "../lib/settings.ts";
 import { dollarsOf } from "../lib/summary.ts";
 import { spacedWords } from "../lib/transcript.ts";
 import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
+import { useLocale, useT } from "./I18n.tsx";
 import { Replan } from "./Replan.tsx";
 
 /** Ticks in a second, as project.json counts time. */
 const TICKS = 120_000;
 const LOOKS = [...lookIds, "none"] as const;
-const CAPTION_STYLES = [
-  { id: "bold", name: "Bold" },
-  { id: "spotlight", name: "Spotlight" },
-  { id: "sweep", name: "Sweep" },
-  { id: "boxed", name: "Boxed" },
-] as const;
-/** A word's state, as a screen reader says it after the word. */
-const STATE_NAMES: Record<string, string> = {
-  cut: "to cut",
-  kept: "kept: no pause to cut at",
-  gone: "cut",
-  fixed: "fixed",
-};
-const PARAM_NAMES: Record<string, string> = {
-  text: "Title",
-  subtitle: "Subtitle",
-  name: "Name",
-  role: "Role",
-};
+const CAPTION_STYLES = ["bold", "spotlight", "sweep", "boxed"] as const;
 
 /** The changes waiting for Apply. Words are by their place in the whole transcript. */
 interface Draft {
@@ -78,6 +64,8 @@ export function ReEdit({
   /** The player, which Space plays and the arrow keys step. */
   video: RefObject<HTMLVideoElement | null>;
 }) {
+  const t = useT();
+  const words = t.reedit;
   const [view, setView] = useState<EditView | null>(null);
   const [replanning, setReplanning] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY);
@@ -122,7 +110,7 @@ export function ReEdit({
     return () => document.removeEventListener("keydown", listen, true);
   }, []);
 
-  const words = useMemo<Word[]>(
+  const transcriptWords = useMemo<Word[]>(
     () =>
       view?.lines.flatMap((line, l) =>
         line.words.map((word, w) => ({ ...word, line: l, word: w })),
@@ -138,7 +126,7 @@ export function ReEdit({
       return first;
     });
   }, [view]);
-  const revision = useMemo(() => toRevision(draft, words), [draft, words]);
+  const revision = useMemo(() => toRevision(draft, transcriptWords), [draft, transcriptWords]);
 
   // Where the cuts land once moved into the pauses, asked again as they change.
   const cuts = JSON.stringify(revision.cuts ?? []);
@@ -175,11 +163,11 @@ export function ReEdit({
   if (!view) {
     keys.current = () => {};
     return (
-      <section className={`${styles.card} ${styles.reedit}`} aria-label="Change the edit">
+      <section className={`${styles.card} ${styles.reedit}`} aria-label={words.label}>
         {error ? (
-          <ErrorNote message={error} fallback="This edit's changes could not be loaded." />
+          <ErrorNote message={error} fallback={words.loadFallback} />
         ) : (
-          <p className={styles.help}>Loading…</p>
+          <p className={styles.help}>{words.loading}</p>
         )}
       </section>
     );
@@ -187,11 +175,11 @@ export function ReEdit({
 
   const count = changes(draft);
   const blocked = !view.footage
-    ? "This project's footage was deleted, so it cannot change; make a new edit from the footage"
+    ? words.noFootage
     : rendering
       ? null
       : count === 0
-        ? "Make a change first"
+        ? words.noChange
         : null;
   const [from, to]: [number, number] = selection
     ? [Math.min(...selection), Math.max(...selection)]
@@ -203,8 +191,8 @@ export function ReEdit({
     ) ?? false;
   // A cut's landed start or end in the pause before word g.
   const marksBefore = (g: number) => {
-    const word = words[g] as Word;
-    const previous = words[g - 1];
+    const word = transcriptWords[g] as Word;
+    const previous = transcriptWords[g - 1];
     return (landed?.removed ?? []).flatMap(([a, b]) =>
       [a, b].filter(
         (t) => t <= word.start && (!previous || t >= previous.end) && (t !== 0 || g === 0),
@@ -212,7 +200,7 @@ export function ReEdit({
     );
   };
   const marksAfterLast = (landed?.removed ?? []).flatMap(([a, b]) =>
-    [a, b].filter((t) => words.length > 0 && t >= (words.at(-1) as Word).end),
+    [a, b].filter((t) => transcriptWords.length > 0 && t >= (transcriptWords.at(-1) as Word).end),
   );
 
   const apply = async () => {
@@ -220,10 +208,16 @@ export function ReEdit({
     const response = await fetch(`/api/jobs/${job.id}/versions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ revision, summary: describe(draft) }),
+      body: JSON.stringify({
+        revision,
+        summary: describe(draft, en),
+        summaries: Object.fromEntries(
+          LOCALES.map((locale) => [locale, describe(draft, MESSAGES[locale])]),
+        ),
+      }),
     });
     const body = (await response.json().catch(() => ({}))) as Job & { error?: string };
-    if (!response.ok) setError(body.error ?? "The changes could not be applied");
+    if (!response.ok) setError(body.error ?? words.notApplied);
     else onJob(body);
   };
   const stop = () =>
@@ -259,7 +253,7 @@ export function ReEdit({
     change({ ...draft, cuts: next });
     setSelection(null);
   };
-  const single = selection && from === to ? (words[from] as Word) : null;
+  const single = selection && from === to ? (transcriptWords[from] as Word) : null;
 
   keys.current = (event) => {
     const target = event.target as HTMLElement;
@@ -295,21 +289,21 @@ export function ReEdit({
 
   /** Moves the transcript's focus to word `g`, extending the selection with Shift. */
   const moveTo = (g: number, extend: boolean) => {
-    const next = Math.min(Math.max(0, g), words.length - 1);
+    const next = Math.min(Math.max(0, g), transcriptWords.length - 1);
     setCursor(next);
     if (extend) setSelection([selection?.[0] ?? cursor, next]);
     transcript.current?.querySelector<HTMLElement>(`[data-word="${next}"]`)?.focus();
   };
   const onTranscriptKey = (event: ReactKeyboardEvent) => {
-    const word = words[cursor];
+    const word = transcriptWords[cursor];
     const step: Record<string, number | undefined> = {
       ArrowLeft: cursor - 1,
       ArrowRight: cursor + 1,
       Home: 0,
-      End: words.length - 1,
+      End: transcriptWords.length - 1,
       // The first word of the line before or after.
       ArrowUp: word ? (offsets[word.line - 1] ?? 0) : 0,
-      ArrowDown: word ? (offsets[word.line + 1] ?? words.length - 1) : 0,
+      ArrowDown: word ? (offsets[word.line + 1] ?? transcriptWords.length - 1) : 0,
     };
     const to = step[event.key];
     if (to === undefined) return;
@@ -322,46 +316,44 @@ export function ReEdit({
   const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 
   return (
-    <section className={`${styles.card} ${styles.reedit}`} aria-label="Change the edit">
+    <section className={`${styles.card} ${styles.reedit}`} aria-label={words.label}>
       <div className={styles.reeditHead}>
         <div>
-          <h2 className={styles.filesTitle}>Change the edit</h2>
+          <h2 className={styles.filesTitle}>{words.title}</h2>
           <p className={styles.filesMeta}>
-            Version {view.version} · {formatClock(view.length / TICKS)}
-            {landed && ` · ${formatClock(landed.length / TICKS)} after the cuts`}
+            {words.version(view.version, formatClock(view.length / TICKS))}
+            {landed && words.afterCuts(formatClock(landed.length / TICKS))}
           </p>
         </div>
       </div>
 
       <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>Transcript</h3>
+        <h3 className={styles.sectionTitle}>{words.transcript}</h3>
         <p className={styles.help} id={`${job.id}-transcript-help`}>
-          Click a word, then Shift-click another to select the words between. Delete them, or fix a
-          single caption word. Each cut moves to a pause inside your selection, so no word is cut
-          through; ✂ marks where it lands, and selected words a dotted line marks stay.
+          {words.help}
         </p>
         <p className={styles.keys}>
           <span>
-            <kbd>Space</kbd> play or pause
+            <kbd>Space</kbd> {words.keys.play}
           </span>
           <span>
             <kbd>←</kbd>
-            <kbd>→</kbd> move between words, with <kbd>Shift</kbd> to select
+            <kbd>→</kbd> {words.keys.move} <kbd>Shift</kbd> {words.keys.select}
           </span>
           <span>
-            <kbd>Delete</kbd> cut the selected words
+            <kbd>Delete</kbd> {words.keys.cut}
           </span>
           <span>
             <kbd>{mac ? "⌘" : "Ctrl"}</kbd>
-            <kbd>Z</kbd> undo the last change
+            <kbd>Z</kbd> {words.keys.undo}
           </span>
           <span>
             <kbd>←</kbd>
-            <kbd>→</kbd> one frame, in the player
+            <kbd>→</kbd> {words.keys.frame}
           </span>
         </p>
-        {words.length === 0 ? (
-          <p className={styles.help}>This edit has no captions to show.</p>
+        {transcriptWords.length === 0 ? (
+          <p className={styles.help}>{words.noCaptions}</p>
         ) : (
           <>
             <Timeline
@@ -372,7 +364,7 @@ export function ReEdit({
             <fieldset
               ref={transcript}
               className={styles.transcript}
-              aria-label="Transcript"
+              aria-label={words.transcript}
               aria-describedby={`${job.id}-transcript-help`}
               onKeyDown={onTranscriptKey}
             >
@@ -380,7 +372,7 @@ export function ReEdit({
                 <p key={line.words[0]?.start ?? line.text} className={styles.transcriptLine}>
                   {line.words.map((_, w) => {
                     const g = (offsets[l] ?? 0) + w;
-                    const word = words[g] as Word;
+                    const word = transcriptWords[g] as Word;
                     const fixed = draft.words[key(word)];
                     const state =
                       g >= from && g <= to
@@ -398,11 +390,7 @@ export function ReEdit({
                       <Fragment key={key(word)}>
                         {spaced[l]?.[w] && " "}
                         {marksBefore(g).map((t) => (
-                          <span
-                            key={t}
-                            className={styles.cutMark}
-                            title={`Cut lands at ${seconds(t)} s`}
-                          >
+                          <span key={t} className={styles.cutMark} title={words.lands(seconds(t))}>
                             ✂
                           </span>
                         ))}
@@ -416,8 +404,8 @@ export function ReEdit({
                           onFocus={() => setCursor(g)}
                           title={
                             state === "kept"
-                              ? "Kept: no pause to cut at beside it inside the selection"
-                              : `${seconds(word.start)}–${seconds(word.end)} s`
+                              ? words.keptWord
+                              : words.span(seconds(word.start), seconds(word.end))
                           }
                           onClick={(event) =>
                             setSelection(event.shiftKey && selection ? [selection[0], g] : [g, g])
@@ -425,7 +413,7 @@ export function ReEdit({
                         >
                           {fixed ?? word.text}
                           {state && state !== "selected" && (
-                            <span className={styles.visuallyHidden}> ({STATE_NAMES[state]})</span>
+                            <span className={styles.visuallyHidden}> ({words.states[state]})</span>
                           )}
                         </button>
                       </Fragment>
@@ -434,7 +422,7 @@ export function ReEdit({
                 </p>
               ))}
               {marksAfterLast.map((t) => (
-                <span key={t} className={styles.cutMark} title={`Cut lands at ${seconds(t)} s`}>
+                <span key={t} className={styles.cutMark} title={words.lands(seconds(t))}>
                   ✂
                 </span>
               ))}
@@ -444,27 +432,32 @@ export function ReEdit({
         {selection && (
           <div className={styles.toolbar}>
             <span className={styles.help}>
-              {to - from + 1} {to - from === 0 ? "word" : "words"} selected,{" "}
-              {seconds((words[from] as Word).start)}–{seconds((words[to] as Word).end)} s
+              {words.selected(
+                to - from + 1,
+                words.span(
+                  seconds((transcriptWords[from] as Word).start),
+                  seconds((transcriptWords[to] as Word).end),
+                ),
+              )}
             </span>
             <button type="button" className={styles.button} onClick={deleteSelection}>
-              Delete
+              {words.delete}
             </button>
             {single && (
               <WordFix
                 key={key(single)}
                 text={draft.words[key(single)] ?? single.text}
                 onFix={(text) => {
-                  const words = { ...draft.words };
-                  if (text === single.text) delete words[key(single)];
-                  else words[key(single)] = text;
-                  change({ ...draft, words });
+                  const fixes = { ...draft.words };
+                  if (text === single.text) delete fixes[key(single)];
+                  else fixes[key(single)] = text;
+                  change({ ...draft, words: fixes });
                   setSelection(null);
                 }}
               />
             )}
             <button type="button" className={styles.linkButton} onClick={() => setSelection(null)}>
-              Clear
+              {words.clear}
             </button>
           </div>
         )}
@@ -475,14 +468,19 @@ export function ReEdit({
               const span = asked && landed?.removed.find(([x, y]) => x < asked[1] && y > asked[0]);
               return (
                 <li key={`${a}-${b}`}>
-                  Cut “
-                  {said(words.slice(a, b + 1).map((word) => draft.words[key(word)] ?? word.text))}”
-                  {span && ` · lands ${seconds(span[0])}–${seconds(span[1])} s`}{" "}
+                  {words.cutWords(
+                    said(
+                      transcriptWords
+                        .slice(a, b + 1)
+                        .map((word) => draft.words[key(word)] ?? word.text),
+                    ),
+                  )}
+                  {span && words.landsSpan(words.span(seconds(span[0]), seconds(span[1])))}{" "}
                   {landed?.outside
                     .filter((extra) => extra.range === i)
                     .map((extra) => (
                       <span key={extra.words} className={styles.warning}>
-                        No pause inside your selection, so this cut also removes: {extra.words}
+                        {words.outside(extra.words)}
                       </span>
                     ))}
                   <button
@@ -490,7 +488,7 @@ export function ReEdit({
                     className={styles.inlineButton}
                     onClick={() => change({ ...draft, cuts: draft.cuts.filter((_, j) => j !== i) })}
                   >
-                    Undo
+                    {words.undo}
                   </button>
                 </li>
               );
@@ -501,14 +499,14 @@ export function ReEdit({
 
       {view.titles.length > 0 && (
         <div className={styles.section}>
-          <h3 className={styles.sectionTitle}>Title and lower thirds</h3>
+          <h3 className={styles.sectionTitle}>{words.titles}</h3>
           {view.titles.map((title) => (
             <div key={title.index} className={styles.titleFields}>
               {Object.entries(title.limits).map(([name, limit]) => (
                 <label key={name} className={styles.field}>
                   <span className={styles.label}>
-                    {title.template === "title" ? "" : "Lower third · "}
-                    {PARAM_NAMES[name] ?? name}
+                    {title.template === "title" ? "" : words.lowerThird}
+                    {words.params[name] ?? name}
                   </span>
                   <input
                     className={styles.input}
@@ -530,12 +528,12 @@ export function ReEdit({
       )}
 
       <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>Music</h3>
+        <h3 className={styles.sectionTitle}>{words.music}</h3>
         {view.music ? (
           <div className={styles.musicRow}>
             <label className={styles.field}>
               <span className={styles.label}>
-                Volume{" "}
+                {words.volume}{" "}
                 {draft.music !== "remove" &&
                   `${(draft.music?.gainDb ?? 0) > 0 ? "+" : ""}${draft.music?.gainDb ?? 0} dB`}
               </span>
@@ -562,16 +560,16 @@ export function ReEdit({
                   change(event.target.checked ? { ...draft, music: "remove" } : rest);
                 }}
               />
-              Remove the music
+              {words.removeMusic}
             </label>
           </div>
         ) : (
-          <p className={styles.help}>This edit has no music.</p>
+          <p className={styles.help}>{words.noMusic}</p>
         )}
       </div>
 
       <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>Look</h3>
+        <h3 className={styles.sectionTitle}>{words.look}</h3>
         <div className={styles.chips}>
           {LOOKS.map((look) => (
             <button
@@ -584,8 +582,7 @@ export function ReEdit({
                 change(look === view.look ? rest : { ...draft, look });
               }}
             >
-              {look[0]?.toUpperCase()}
-              {look.slice(1)}
+              {t.looks[look].name}
             </button>
           ))}
         </div>
@@ -593,25 +590,25 @@ export function ReEdit({
 
       {view.captions && (
         <div className={styles.section}>
-          <h3 className={styles.sectionTitle}>Caption style</h3>
+          <h3 className={styles.sectionTitle}>{words.captionStyle}</h3>
           <div className={styles.captionStyles}>
             {CAPTION_STYLES.map((style) => (
               <button
-                key={style.id}
+                key={style}
                 type="button"
                 className={styles.captionStyle}
-                aria-pressed={(draft.captions ?? view.captions) === style.id}
+                aria-pressed={(draft.captions ?? view.captions) === style}
                 onClick={() => {
                   const { captions: _, ...rest } = draft;
-                  change(style.id === view.captions ? rest : { ...draft, captions: style.id });
+                  change(style === view.captions ? rest : { ...draft, captions: style });
                 }}
               >
-                <span className={styles.captionPreview} data-style={style.id} aria-hidden="true">
-                  <span>Say </span>
-                  <span data-active="true">it</span>
-                  <span> clearly</span>
+                <span className={styles.captionPreview} data-style={style} aria-hidden="true">
+                  <span>{words.preview[0]}</span>
+                  <span data-active="true">{words.preview[1]}</span>
+                  <span>{words.preview[2]}</span>
                 </span>
-                {style.name}
+                {t.captions[style]?.name ?? style}
               </button>
             ))}
           </div>
@@ -620,7 +617,7 @@ export function ReEdit({
 
       {view.removables.length > 0 && (
         <div className={styles.section}>
-          <h3 className={styles.sectionTitle}>Overlays</h3>
+          <h3 className={styles.sectionTitle}>{words.overlays}</h3>
           <ul className={styles.overlayList}>
             {view.removables.map((item) => {
               const id = `${item.kind}:${item.index}`;
@@ -628,7 +625,7 @@ export function ReEdit({
               return (
                 <li key={id} className={styles.overlayItem} data-removed={removed}>
                   <span className={styles.tabular}>{formatClock(item.start / TICKS)}</span>
-                  <span className={styles.overlayLabel}>{item.label}</span>
+                  <span className={styles.overlayLabel}>{overlayLabel(item.label, t)}</span>
                   <button
                     type="button"
                     className={styles.inlineButton}
@@ -641,7 +638,7 @@ export function ReEdit({
                       })
                     }
                   >
-                    {removed ? "Keep" : "Remove"}
+                    {removed ? words.keep : words.remove}
                   </button>
                 </li>
               );
@@ -651,12 +648,8 @@ export function ReEdit({
       )}
 
       <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>Needs a re-plan</h3>
-        <p className={styles.help}>
-          Reordering, putting removed parts back, a length more than 5 % off, another aspect or
-          another music track cannot be changed here: Claude plans the edit again from the same
-          footage, whose analysis is kept, so it takes a minute or two and one more plan.
-        </p>
+        <h3 className={styles.sectionTitle}>{words.replanTitle}</h3>
+        <p className={styles.help}>{words.replanHelp}</p>
         {replanning ? (
           <Replan job={job} onJob={onJob} onClose={() => setReplanning(false)} />
         ) : (
@@ -666,29 +659,27 @@ export function ReEdit({
             onClick={() => setReplanning(true)}
             disabled={!view.footage || rendering !== null}
           >
-            Re-plan…
+            {words.replan}
           </button>
         )}
       </div>
 
-      {error && <ErrorNote message={error} fallback="The changes could not be made." />}
+      {error && <ErrorNote message={error} fallback={words.fallback} />}
       {job.render?.error && (
-        <ErrorNote message={job.render.error} fallback="The new version could not be rendered." />
+        <ErrorNote message={job.render.error} fallback={words.renderFallback} />
       )}
       {rendering ? (
         <div className={styles.uploading} aria-live="polite">
           <div className={styles.uploadHead}>
-            <span>
-              Rendering version {rendering.version} · {rendering.message}
-            </span>
+            <span>{words.rendering(rendering.version, progressText(rendering.message, t))}</span>
             <span className={styles.tabular}>{Math.floor(rendering.fraction * 100)}%</span>
           </div>
           <div className={styles.bar}>
             <div className={styles.barFill} style={{ width: `${rendering.fraction * 100}%` }} />
           </div>
-          <p className={styles.help}>Version {current} keeps playing until the new one is ready.</p>
+          <p className={styles.help}>{words.keepsPlaying(current)}</p>
           <button type="button" className={styles.button} onClick={stop}>
-            Stop
+            {words.stop}
           </button>
         </div>
       ) : (
@@ -699,10 +690,10 @@ export function ReEdit({
             disabled={blocked !== null}
             onClick={() => void apply()}
           >
-            {count > 0 ? `Apply ${count} ${count === 1 ? "change" : "changes"}` : "Apply"}
+            {count > 0 ? words.applyCount(count) : words.apply}
           </button>
           <p className={styles.help}>
-            {blocked ?? `${describe(draft)}. Renders once as version ${nextVersion(job)}.`}
+            {blocked ?? words.renders(describe(draft, t), nextVersion(job))}
           </p>
         </div>
       )}
@@ -711,6 +702,7 @@ export function ReEdit({
 }
 
 function WordFix({ text, onFix }: { text: string; onFix: (text: string) => void }) {
+  const words = useT().reedit;
   const [value, setValue] = useState(text);
   return (
     <form
@@ -722,12 +714,12 @@ function WordFix({ text, onFix }: { text: string; onFix: (text: string) => void 
     >
       <input
         className={styles.input}
-        aria-label="Caption word"
+        aria-label={words.word}
         value={value}
         onChange={(event) => setValue(event.target.value)}
       />
       <button type="submit" className={styles.button} disabled={!value.trim()}>
-        Fix word
+        {words.fix}
       </button>
     </form>
   );
@@ -766,6 +758,9 @@ function Timeline({
 
 /** The versions of a finished edit, newest first, to show again. */
 export function Versions({ job, onJob }: { job: Job; onJob: (job: Job) => void }) {
+  const t = useT();
+  const { locale } = useLocale();
+  const words = t.versions;
   const versions = job.versions ?? [];
   const [error, setError] = useState<string | null>(null);
   if (versions.length < 2) return null;
@@ -774,7 +769,7 @@ export function Versions({ job, onJob }: { job: Job; onJob: (job: Job) => void }
   const show = async (n: number) => {
     const response = await fetch(`/api/jobs/${job.id}/versions/${n}`, { method: "POST" });
     const body = (await response.json().catch(() => ({}))) as Job & { error?: string };
-    if (!response.ok) setError(body.error ?? "That version could not be shown");
+    if (!response.ok) setError(body.error ?? words.notShown);
     else {
       setError(null);
       onJob(body);
@@ -782,24 +777,28 @@ export function Versions({ job, onJob }: { job: Job; onJob: (job: Job) => void }
   };
   return (
     <div className={styles.versions}>
-      <h3 className={styles.sectionTitle}>Versions</h3>
+      <h3 className={styles.sectionTitle}>{words.title}</h3>
       <ul className={styles.versionList}>
         {[...versions].reverse().map((version) => (
           <li key={version.n} className={styles.versionItem} data-current={version.n === current}>
             <span className={styles.fileText}>
               <span className={styles.fileName}>
-                Version {version.n}
-                {version.n === current && " · shown"}
+                {words.version(version.n)}
+                {version.n === current && words.shown}
               </span>
               <span className={styles.fileMeta}>
-                {new Date(version.created).toLocaleString()}
+                {t.date(version.created)}
                 {version.seconds !== undefined && ` · ${formatClock(version.seconds)}`}
-                {version.claude && ` · Claude ${formatDollars(dollarsOf(version.claude))}`}
+                {version.claude && ` · Claude ${formatDollars(dollarsOf(version.claude), t)}`}
                 {" · "}
-                {version.summary}
+                {/* The first is the edit itself, whichever language its record was made in; a
+                    later one from before the summaries in each language has only the English. */}
+                {version.n === 1
+                  ? words.first(Boolean(job.settings.instructions))
+                  : (version.summaries?.[locale] ?? version.summary)}
                 {busy && job.render?.version === version.n
-                  ? " · rendering"
-                  : !version.video && " · video not kept"}
+                  ? words.rendering
+                  : !version.video && words.notKept}
               </span>
             </span>
             {version.n !== current && !(busy && job.render?.version === version.n) && (
@@ -809,16 +808,14 @@ export function Versions({ job, onJob }: { job: Job; onJob: (job: Job) => void }
                 disabled={busy}
                 onClick={() => void show(version.n)}
               >
-                {version.video ? "Show" : "Render again"}
+                {version.video ? words.show : words.again}
               </button>
             )}
           </li>
         ))}
       </ul>
-      <p className={styles.help}>
-        The newest 3 versions keep their video; an older one renders again from its record.
-      </p>
-      {error && <ErrorNote message={error} fallback="That version could not be shown." />}
+      <p className={styles.help}>{words.kept}</p>
+      {error && <ErrorNote message={error} fallback={words.fallback} />}
     </div>
   );
 }
@@ -877,21 +874,22 @@ function changes(draft: Draft): number {
   );
 }
 
-/** The changes in a few words, for the version list. */
-function describe(draft: Draft): string {
-  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+/** The changes in a few of `t`'s words, for the version list. */
+function describe(draft: Draft, t: Messages): string {
+  const words = t.reedit.describe;
   const parts = [
-    draft.cuts.length > 0 && `Cut ${plural(draft.cuts.length, "span", "spans")}`,
-    Object.keys(draft.words).length > 0 &&
-      `fixed ${plural(Object.keys(draft.words).length, "caption word", "caption words")}`,
-    Object.keys(draft.titles).length > 0 && "changed the titles",
-    draft.remove.length > 0 && `removed ${plural(draft.remove.length, "overlay", "overlays")}`,
+    draft.cuts.length > 0 && words.cuts(draft.cuts.length),
+    Object.keys(draft.words).length > 0 && words.words(Object.keys(draft.words).length),
+    Object.keys(draft.titles).length > 0 && words.titles,
+    draft.remove.length > 0 && words.removed(draft.remove.length),
     draft.music === "remove"
-      ? "removed the music"
-      : draft.music && `music ${draft.music.gainDb > 0 ? "+" : ""}${draft.music.gainDb} dB`,
-    draft.look && `look ${draft.look}`,
-    draft.captions && `captions ${draft.captions}`,
+      ? words.noMusic
+      : draft.music && words.music(`${draft.music.gainDb > 0 ? "+" : ""}${draft.music.gainDb}`),
+    draft.look &&
+      words.look(draft.look, t.looks[draft.look as keyof Messages["looks"]]?.name ?? draft.look),
+    draft.captions &&
+      words.captions(draft.captions, t.captions[draft.captions]?.name ?? draft.captions),
   ].filter((part): part is string => Boolean(part));
-  const text = parts.join(", ");
-  return text ? text[0]?.toUpperCase() + text.slice(1) : "No changes";
+  const text = parts.join(t.list);
+  return text ? text[0]?.toUpperCase() + text.slice(1) : words.none;
 }

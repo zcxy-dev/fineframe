@@ -10,10 +10,10 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
     const store = jobs();
     const job = await store.get((await ctx.params).id);
     const path = await store.output(job.id, "captions");
-    if (!path) throw new JobError("This edit has no captions", 404);
+    if (!path) throw new JobError((t) => t.server.noCaptions, 404);
     const name = downloadName(job, "srt");
     return await fileResponse(path, request, "application/x-subrip; charset=utf-8", name);
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

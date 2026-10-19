@@ -9,6 +9,6 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
     const v = new URL(request.url).searchParams.get("v");
     return Response.json(await jobs().view((await ctx.params).id, v ? Number(v) : undefined));
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

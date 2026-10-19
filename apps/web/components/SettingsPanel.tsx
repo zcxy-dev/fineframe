@@ -3,6 +3,7 @@
 import { rgba } from "@video-editor/effects/layout";
 import { PRESETS, type Preset } from "@video-editor/engine/captions";
 import { type CSSProperties, Fragment, useId } from "react";
+import { en, type Messages } from "../lib/i18n/messages.ts";
 import {
   ASPECTS,
   type Aspect,
@@ -18,7 +19,6 @@ import {
   parseLength,
   QUALITIES,
   type Quality,
-  STYLE_TEXT,
   STYLES,
   type Style,
   styleName,
@@ -26,6 +26,7 @@ import {
   type Visuals,
 } from "../lib/settings.ts";
 import styles from "./editor.module.css";
+import { useT } from "./I18n.tsx";
 
 export interface Choices {
   /** A preset in seconds, or "custom" for the typed length. */
@@ -57,38 +58,26 @@ export interface Machine {
   needed: number;
 }
 
-/** The length the choices ask for, or why there is none. */
-export function chosenLength(choices: Choices): { seconds: number } | { problem: string } {
+/** The length the choices ask for, or why there is none, in `t`'s words. A length typed in
+ * Chinese units (90 秒, 2 分鐘, 1 小時) reads as the same in English ones. */
+export function chosenLength(
+  choices: Choices,
+  t: Messages = en,
+): { seconds: number } | { problem: string } {
   if (choices.preset !== "custom") return { seconds: choices.preset };
-  const text = choices.custom.trim().replace(/\s+/g, "").toLowerCase();
-  if (!text) return { problem: "Type a length" };
+  const text = choices.custom
+    .trim()
+    .replace(/\s+/g, "")
+    .toLowerCase()
+    .replace(/小時|時/g, "h")
+    .replace(/分鐘|分/g, "m")
+    .replace(/秒/g, "s");
+  if (!text) return { problem: t.settings.typeLength };
   const seconds = parseLength(text.replace(/mins?$/, "m").replace(/(\d)min/, "$1m"));
-  if (seconds === null) return { problem: "Type a length such as 90 s, 2:30 or 1 h" };
-  const problem = lengthProblem(seconds);
+  if (seconds === null) return { problem: t.settings.lengthExample };
+  const problem = lengthProblem(seconds, t);
   return problem ? { problem } : { seconds };
 }
-
-const VISUALS_TEXT: Record<Visuals, { name: string; help: string }> = {
-  rich: {
-    name: "Rich",
-    help: "Claude adds B-roll to each point: motion-graphics cards, web pages, stock footage and logos, beside the speaker or full frame, with soft sound effects.",
-  },
-  minimal: { name: "Minimal", help: "Only the footage you dropped in, cut and captioned." },
-};
-
-const QUALITY_TEXT: Record<Quality, { name: string; help: string }> = {
-  best: { name: "Best", help: "Claude Opus plans the edit and judges the doubtful cuts." },
-  economy: {
-    name: "Economy",
-    help: "Claude Sonnet plans the edit and judges the doubtful cuts, for about half the cost.",
-  },
-};
-
-const ASPECT_LABELS: Record<Aspect, { name: string; hint: string }> = {
-  "9:16": { name: "Vertical", hint: "9:16 · phones" },
-  "1:1": { name: "Square", hint: "1:1 · feeds" },
-  "16:9": { name: "Wide", hint: "16:9 · screens" },
-};
 
 interface Props {
   choices: Choices;
@@ -118,20 +107,22 @@ export function SettingsPanel({
   stock,
   onAddStock,
 }: Props) {
+  const t = useT();
+  const words = t.settings;
   const id = useId();
   const set = (changes: Partial<Choices>) => onChange({ ...choices, ...changes });
-  const length = chosenLength(choices);
+  const length = chosenLength(choices, t);
   const [shortest, longest] = LENGTH_RANGE;
-  const asked = instructionsProblem(choices.instructions);
+  const asked = instructionsProblem(choices.instructions, t);
   const tooLong = "seconds" in length && footageSeconds > 0 && length.seconds > footageSeconds;
 
   return (
     <>
       <fieldset className={styles.field}>
         <legend className={styles.label}>
-          Length
+          {words.length}
           <span className={styles.labelHint}>
-            {formatLength(shortest)} to {formatLength(longest)}
+            {words.range(formatLength(shortest, t), formatLength(longest, t))}
           </span>
         </legend>
         <div className={styles.chips}>
@@ -143,7 +134,7 @@ export function SettingsPanel({
               aria-pressed={choices.preset === seconds}
               onClick={() => set({ preset: seconds })}
             >
-              {formatLength(seconds)}
+              {formatLength(seconds, t)}
             </button>
           ))}
           <button
@@ -152,7 +143,7 @@ export function SettingsPanel({
             aria-pressed={choices.preset === "custom"}
             onClick={() => set({ preset: "custom" })}
           >
-            Custom
+            {words.custom}
           </button>
         </div>
         {choices.preset === "custom" && (
@@ -162,8 +153,8 @@ export function SettingsPanel({
               className={styles.input}
               inputMode="text"
               autoComplete="off"
-              placeholder="90 s, 2:30, 1 h"
-              aria-label="Custom length"
+              placeholder={words.customPlaceholder}
+              aria-label={words.customLabel}
               aria-invalid={"problem" in length && choices.custom.trim() !== ""}
               value={choices.custom}
               // biome-ignore lint/a11y/noAutofocus: the field appears because it was asked for.
@@ -172,7 +163,7 @@ export function SettingsPanel({
             />
             <span className={styles.customOut} aria-live="polite">
               {"seconds" in length
-                ? `= ${formatLength(length.seconds)}`
+                ? `= ${formatLength(length.seconds, t)}`
                 : choices.custom.trim()
                   ? length.problem
                   : ""}
@@ -180,15 +171,12 @@ export function SettingsPanel({
           </div>
         )}
         {tooLong && (
-          <p className={styles.warning}>
-            Longer than all of the footage ({formatLength(footageSeconds)}); the edit can only keep
-            what was said.
-          </p>
+          <p className={styles.warning}>{words.tooLong(formatLength(footageSeconds, t))}</p>
         )}
       </fieldset>
 
       <fieldset className={styles.field}>
-        <legend className={styles.label}>Aspect</legend>
+        <legend className={styles.label}>{words.aspect}</legend>
         <div className={styles.aspects}>
           {ASPECTS.map((aspect) => (
             <label key={aspect} className={styles.aspect}>
@@ -203,8 +191,8 @@ export function SettingsPanel({
               <span className={styles.shapeBox}>
                 <span className={styles.shape} data-aspect={aspect} />
               </span>
-              <span className={styles.aspectName}>{ASPECT_LABELS[aspect].name}</span>
-              <span className={styles.aspectHint}>{ASPECT_LABELS[aspect].hint}</span>
+              <span className={styles.aspectName}>{words.aspects[aspect].name}</span>
+              <span className={styles.aspectHint}>{words.aspects[aspect].hint}</span>
             </label>
           ))}
         </div>
@@ -212,29 +200,28 @@ export function SettingsPanel({
 
       <div className={styles.field}>
         <label className={styles.label} htmlFor={`${id}-instructions`}>
-          Tell Claude what you want
-          <span className={styles.labelHint}>Optional</span>
+          {words.instructions}
+          <span className={styles.labelHint}>{words.optional}</span>
         </label>
         <textarea
           id={`${id}-instructions`}
           className={styles.textarea}
           rows={3}
-          placeholder={"Focus on the product demo\nLeave out the small talk at the start"}
+          placeholder={words.instructionsPlaceholder}
           aria-invalid={asked !== null}
           aria-describedby={`${id}-instructions-help`}
           value={choices.instructions}
           onChange={(event) => set({ instructions: event.target.value })}
         />
         <p id={`${id}-instructions-help`} className={asked ? styles.warning : styles.help}>
-          {asked ??
-            `What to keep, leave out or open with, in up to ${INSTRUCTIONS_MAX} characters. Only for this edit: the next one starts empty.`}
+          {asked ?? words.instructionsHelp(INSTRUCTIONS_MAX)}
         </p>
       </div>
 
       <fieldset className={styles.field}>
         <legend className={styles.label}>
-          Style
-          <span className={styles.labelHint}>Optional</span>
+          {words.style}
+          <span className={styles.labelHint}>{words.optional}</span>
         </legend>
         <div className={styles.chips}>
           {STYLES.map((style) => (
@@ -246,19 +233,19 @@ export function SettingsPanel({
               aria-describedby={choices.style === style ? `${id}-style` : undefined}
               onClick={() => set({ style })}
             >
-              {styleName(style)}
+              {styleName(style, t)}
             </button>
           ))}
         </div>
         <p id={`${id}-style`} className={styles.help}>
-          {STYLE_TEXT[choices.style]}
+          {t.looks[choices.style].description}
         </p>
       </fieldset>
 
       <div className={styles.field}>
         <label className={styles.label} htmlFor={`${id}-names`}>
-          People's names
-          <span className={styles.labelHint}>Optional</span>
+          {words.names}
+          <span className={styles.labelHint}>{words.optional}</span>
         </label>
         <textarea
           id={`${id}-names`}
@@ -268,16 +255,13 @@ export function SettingsPanel({
           value={choices.names}
           onChange={(event) => set({ names: event.target.value })}
         />
-        <p className={styles.help}>
-          One per line, spelled as the captions should show them. Helps the speech model hear them,
-          and a lower third can show them.
-        </p>
+        <p className={styles.help}>{words.namesHelp}</p>
       </div>
 
       <div className={styles.field}>
         <label className={styles.label} htmlFor={`${id}-terms`}>
-          Terms
-          <span className={styles.labelHint}>Optional</span>
+          {words.terms}
+          <span className={styles.labelHint}>{words.optional}</span>
         </label>
         <textarea
           id={`${id}-terms`}
@@ -287,14 +271,11 @@ export function SettingsPanel({
           value={choices.terms}
           onChange={(event) => set({ terms: event.target.value })}
         />
-        <p className={styles.help}>
-          Brands, products and jargon, one per line. Only helps the speech model hear them; never
-          shown as a name. Both lists are kept for your next edit.
-        </p>
+        <p className={styles.help}>{words.termsHelp}</p>
       </div>
 
       <fieldset className={styles.field}>
-        <legend className={styles.label}>Speech</legend>
+        <legend className={styles.label}>{words.speech}</legend>
         <div className={styles.chips}>
           <button
             type="button"
@@ -302,7 +283,7 @@ export function SettingsPanel({
             aria-pressed={choices.asr === "local"}
             onClick={() => set({ asr: "local" })}
           >
-            On this computer
+            {words.local}
           </button>
           <button
             type="button"
@@ -315,24 +296,19 @@ export function SettingsPanel({
         </div>
         {machine && machine.memory < machine.needed && (
           <p className={styles.warning}>
-            This computer has {Math.round(machine.memory / 1024 ** 3)} GB of memory, and the speech
-            model needs about 9 GB of it, so speech is heard on OpenRouter.
+            {words.lowMemory(Math.round(machine.memory / 1024 ** 3))}
           </p>
         )}
-        <p className={styles.help}>
-          {choices.asr === "local"
-            ? "The most accurate, and nothing is sent; it needs about 9 GB of memory and downloads 3.4 GB the first time."
-            : "Qwen3-ASR hears the speech on OpenRouter with your OpenRouter key, for about US$0.03 an hour of footage. Only the speech audio is sent; the words are timed on this computer."}
-        </p>
+        <p className={styles.help}>{choices.asr === "local" ? words.localHelp : words.cloudHelp}</p>
         {choices.asr === "cloud" && openrouter === false && (
           <button type="button" className={styles.button} onClick={onAddOpenRouter}>
-            Add your OpenRouter key
+            {words.addOpenRouter}
           </button>
         )}
       </fieldset>
 
       <fieldset className={styles.field}>
-        <legend className={styles.label}>Visuals</legend>
+        <legend className={styles.label}>{words.visuals}</legend>
         <div className={styles.chips}>
           {VISUALS.map((visuals) => (
             <button
@@ -342,14 +318,14 @@ export function SettingsPanel({
               aria-pressed={choices.visuals === visuals}
               onClick={() => set({ visuals })}
             >
-              {VISUALS_TEXT[visuals].name}
+              {words.visualsChoices[visuals].name}
             </button>
           ))}
         </div>
-        <p className={styles.help}>{VISUALS_TEXT[choices.visuals].help}</p>
+        <p className={styles.help}>{words.visualsChoices[choices.visuals].help}</p>
         {choices.visuals === "rich" && stock && (
           <p className={styles.help}>
-            Stock footage needs a free Pexels or Pixabay key; optional.{" "}
+            {words.stock}{" "}
             {(["pexels", "pixabay"] as const).map((service, i) => (
               <span key={service}>
                 {i > 0 && " · "}
@@ -358,8 +334,7 @@ export function SettingsPanel({
                   className={styles.linkButton}
                   onClick={() => onAddStock(service)}
                 >
-                  {service === "pexels" ? "Pexels" : "Pixabay"}{" "}
-                  {stock[service] ? "key saved · Replace" : "key"}
+                  {words.stockKey(service === "pexels" ? "Pexels" : "Pixabay", stock[service])}
                 </button>
               </span>
             ))}
@@ -368,10 +343,10 @@ export function SettingsPanel({
       </fieldset>
 
       <details className={styles.advanced}>
-        <summary className={styles.advancedSummary}>Advanced settings</summary>
+        <summary className={styles.advancedSummary}>{words.advanced}</summary>
         <div className={styles.advancedBody}>
           <fieldset className={styles.field}>
-            <legend className={styles.label}>Quality</legend>
+            <legend className={styles.label}>{words.quality}</legend>
             <div className={styles.chips}>
               {QUALITIES.map((quality) => (
                 <button
@@ -381,15 +356,15 @@ export function SettingsPanel({
                   aria-pressed={choices.quality === quality}
                   onClick={() => set({ quality })}
                 >
-                  {QUALITY_TEXT[quality].name}
+                  {words.qualities[quality].name}
                 </button>
               ))}
             </div>
-            <p className={styles.help}>{QUALITY_TEXT[choices.quality].help}</p>
+            <p className={styles.help}>{words.qualities[choices.quality].help}</p>
           </fieldset>
 
           <fieldset className={styles.field}>
-            <legend className={styles.label}>Transcript correction</legend>
+            <legend className={styles.label}>{words.correction}</legend>
             <div className={styles.chips}>
               {[false, true].map((correct) => (
                 <button
@@ -399,18 +374,15 @@ export function SettingsPanel({
                   aria-pressed={choices.correct === correct}
                   onClick={() => set({ correct })}
                 >
-                  {correct ? "On" : "Off"}
+                  {correct ? words.on : words.off}
                 </button>
               ))}
             </div>
-            <p className={styles.help}>
-              Claude reads each transcript with your names and terms and fixes what the speech model
-              misheard, before its words are timed. Adds a Claude cost.
-            </p>
+            <p className={styles.help}>{words.correctionHelp}</p>
           </fieldset>
 
           <fieldset className={styles.field}>
-            <legend className={styles.label}>Caption style</legend>
+            <legend className={styles.label}>{words.captionStyle}</legend>
             <div className={styles.captionStyles}>
               {CAPTION_STYLES.map((captions) => (
                 <label key={captions} className={styles.captionStyle}>
@@ -424,12 +396,12 @@ export function SettingsPanel({
                   />
                   <CaptionPreview preset={PRESETS[captions] as Preset} />
                   <span className={styles.aspectName}>
-                    {`${captions[0]?.toUpperCase()}${captions.slice(1)}`}
+                    {t.captions[captions]?.name ?? captions}
                   </span>
                 </label>
               ))}
             </div>
-            <p className={styles.help}>{PRESETS[choices.captions]?.description}.</p>
+            <p className={styles.help}>{t.captions[choices.captions]?.description}</p>
           </fieldset>
         </div>
       </details>
@@ -437,7 +409,7 @@ export function SettingsPanel({
       {music > 0 && (
         <div className={styles.field}>
           <label className={styles.label} htmlFor={`${id}-license`}>
-            Music licence
+            {words.license}
           </label>
           <input
             id={`${id}-license`}
@@ -448,22 +420,17 @@ export function SettingsPanel({
             value={choices.musicLicense}
             onChange={(event) => set({ musicLicense: event.target.value })}
           />
-          <p className={styles.help}>
-            Use only music you have the right to use; this licence covers every track. Claude picks
-            the track that fits, or none, and sets it under the voice.
-          </p>
+          <p className={styles.help}>{words.licenseHelp}</p>
         </div>
       )}
     </>
   );
 }
 
-/** The words a preview shows; the second is being spoken. */
-const SAMPLE = ["Every", "word", "on", "time"];
-
 /** A caption preset drawn with CSS from its own values, over a dark frame: an approximation of
  * what libass draws, to choose by. */
 function CaptionPreview({ preset }: { preset: Preset }) {
+  const { sample, sampleGap } = useT().settings;
   const em = (value: number) => `${value}em`;
   const shadows = [
     preset.shadow &&
@@ -505,9 +472,9 @@ function CaptionPreview({ preset }: { preset: Preset }) {
   return (
     <span className={styles.captionFrame} aria-hidden="true">
       <span className={styles.captionText} style={text}>
-        {SAMPLE.map((word, i) => (
+        {sample.map((word, i) => (
           <Fragment key={word}>
-            {i > 0 && " "}
+            {i > 0 && sampleGap}
             <span
               style={
                 i === 1

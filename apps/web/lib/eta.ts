@@ -1,6 +1,7 @@
 // When a running edit will finish: the analysis at the rate its bar has moved, then the plan, the
 // render and the check, which take about as long on any machine, from the edit's length.
 
+import { en, type Messages } from "./i18n/en.ts";
 import type { Stage } from "./jobs.ts";
 
 /** Too little of the analysis to say how fast it goes: its first half minute, or 2 % of the
@@ -76,14 +77,15 @@ export class Finish {
   }
 }
 
-/** Time left in words, rounded more coarsely the longer it is: less than a minute, about 4 min,
- * 25 min, 1 h 5 min. */
-export function formatEstimate(seconds: number): string {
-  if (seconds < 60) return "Less than a minute left";
+/** Time left in `t`'s words, rounded more coarsely the longer it is: less than a minute, about
+ * 4 min, 25 min, 1 h 5 min. */
+export function formatEstimate(seconds: number, t: Messages = en): string {
+  if (seconds < 60) return t.eta.underMinute;
+  const { h, min } = t.units;
   const minutes = Math.round(seconds / 60);
-  if (minutes < 10) return `About ${minutes} min left`;
+  if (minutes < 10) return t.eta.about(`${minutes} ${min}`);
   const rounded = Math.round(minutes / 5) * 5;
-  if (rounded < 60) return `About ${rounded} min left`;
+  if (rounded < 60) return t.eta.about(`${rounded} ${min}`);
   const rest = rounded % 60;
-  return `About ${Math.floor(rounded / 60)} h${rest ? ` ${rest} min` : ""} left`;
+  return t.eta.about(`${Math.floor(rounded / 60)} ${h}${rest ? ` ${rest} ${min}` : ""}`);
 }

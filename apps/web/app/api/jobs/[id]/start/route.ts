@@ -12,6 +12,6 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     await remember(defaultRoot(), job.settings).catch(() => {});
     return Response.json(job);
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

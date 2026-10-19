@@ -5,12 +5,14 @@ import type { Job } from "../lib/jobs.ts";
 import { shownPlan } from "../lib/paths.ts";
 import { formatClock } from "../lib/settings.ts";
 import styles from "./editor.module.css";
+import { useT } from "./I18n.tsx";
 
 /** The finished video in the page's player. */
 export function Player({ job, video }: { job: Job; video: RefObject<HTMLVideoElement | null> }) {
+  const t = useT();
   const base = `/api/jobs/${job.id}`;
   return (
-    <section className={`${styles.card} ${styles.player}`} aria-label="Your edit">
+    <section className={`${styles.card} ${styles.player}`} aria-label={t.done.player}>
       <div className={styles.screen} data-aspect={shownPlan(job).aspect}>
         {/* biome-ignore lint/a11y/useMediaCaption: the captions are burned into the picture. */}
         <video
@@ -45,10 +47,11 @@ export function useVideoLength(job: Job): number | null {
 }
 
 export function ResultSummary({ job, seconds }: { job: Job; seconds: number | null }) {
+  const t = useT();
   return (
     <p className={styles.resultMeta}>
       {seconds ? formatClock(seconds) : "…"} · {shownPlan(job).aspect}
-      {job.result?.captions ? " · captions" : ""}
+      {job.result?.captions ? t.done.captions : ""}
     </p>
   );
 }

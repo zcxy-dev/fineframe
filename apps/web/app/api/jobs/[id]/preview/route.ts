@@ -12,6 +12,6 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     if (typeof revision === "string") throw new JobError(revision, 400);
     return Response.json(await jobs().preview((await ctx.params).id, revision));
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, request);
   }
 }

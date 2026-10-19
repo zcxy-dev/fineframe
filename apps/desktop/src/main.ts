@@ -2,7 +2,7 @@
 // and everything the server started stopped when the app quits.
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { app, BrowserWindow, dialog, nativeTheme, shell } from "electron";
+import { app, BrowserWindow, dialog, nativeTheme, session, shell } from "electron";
 import { type Places, type Server, startServer } from "./server.ts";
 
 const NAME = "Fineframe";
@@ -22,9 +22,26 @@ function places(): Places {
   };
 }
 
-// The page's background, from the editor's own copy of the page.
-const theme = pathToFileURL(join(places().editor, "apps", "web", "lib", "theme.ts")).href;
-const { BACKGROUND }: typeof import("../../web/lib/theme.ts") = await import(theme);
+// The page's background and the app's own words, from the editor's own copy of the page.
+const web = (path: string) => pathToFileURL(join(places().editor, "apps", "web", "lib", path)).href;
+const { BACKGROUND }: typeof import("../../web/lib/theme.ts") = await import(web("theme.ts"));
+const { DESKTOP }: typeof import("../../web/lib/i18n/desktop.ts") = await import(
+  web("i18n/desktop.ts")
+);
+const { LOCALE_COOKIE, resolveLocale }: typeof import("../../web/lib/i18n/locale.ts") =
+  await import(web("i18n/locale.ts"));
+
+/** The app's words in the page's language: the one chosen on the page, whose cookie the page's
+ * server shares on any port, or else the system's, which the page is told as well. */
+async function words() {
+  const languages = app.getPreferredSystemLanguages();
+  const { defaultSession } = session;
+  defaultSession.setUserAgent(defaultSession.getUserAgent(), languages.join(","));
+  const [saved] = await defaultSession.cookies
+    .get({ url: "http://127.0.0.1", name: LOCALE_COOKIE })
+    .catch(() => []);
+  return DESKTOP[resolveLocale(saved ? `${saved.name}=${saved.value}` : null, languages)];
+}
 
 let starting: Promise<Server> | null = null;
 let window: BrowserWindow | null = null;
@@ -58,7 +75,10 @@ async function open(): Promise<void> {
   window.on("closed", () => {
     window = null;
   });
-  void window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(STARTING)}`);
+  const t = await words();
+  void window.loadURL(
+    `data:text/html;charset=utf-8,${encodeURIComponent(startingPage(t.starting(NAME)))}`,
+  );
   try {
     const where = places();
     starting = startServer(where, process.execPath);
@@ -68,17 +88,14 @@ async function open(): Promise<void> {
     if (stopping || !window) return;
     void server.exited.then((code) => {
       if (stopping) return;
-      dialog.showErrorBox(
-        `${NAME} stopped`,
-        `The editor's server stopped unexpectedly (exit code ${code}). Its output is in ${where.log}.`,
-      );
+      dialog.showErrorBox(t.stopped(NAME), t.stoppedDetail(code, where.log));
       app.quit();
     });
     keepToPage(window, server.url);
     await window.loadURL(server.url);
   } catch (error) {
     if (stopping) return;
-    dialog.showErrorBox(`${NAME} could not start`, (error as Error).message);
+    dialog.showErrorBox(t.notStarted(NAME), (error as Error).message);
     app.quit();
   }
 }
@@ -118,8 +135,11 @@ app.on("before-quit", (event) => {
 });
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, () => app.quit());
 
-const STARTING = `<!doctype html><html><head><meta charset="utf-8"><title>${NAME}</title>
+/** The window while the page's server starts, saying `text`. */
+const startingPage = (
+  text: string,
+) => `<!doctype html><html><head><meta charset="utf-8"><title>${NAME}</title>
 <style>body{margin:0;height:100vh;display:grid;place-items:center;font:15px system-ui,sans-serif;
 color:#a1a1aa;background:${BACKGROUND.dark}}
 @media (prefers-color-scheme:light){body{color:#52525b;background:${BACKGROUND.light}}}</style></head>
-<body>Starting ${NAME}…</body></html>`;
+<body>${text}</body></html>`;

@@ -1,8 +1,9 @@
 // What the page asks for, checked the same way in the browser and on the server.
 import { PRESETS } from "@video-editor/engine/captions";
 import { LENGTH_RANGE, parseLength } from "@video-editor/engine/length";
-import { LOOKS, type LookId, lookIds } from "@video-editor/engine/looks";
+import { type LookId, lookIds } from "@video-editor/engine/looks";
 import { kindOf } from "@video-editor/engine/media";
+import { en, type Messages } from "./i18n/en.ts";
 
 export { LENGTH_RANGE, parseLength };
 
@@ -25,16 +26,9 @@ export const INSTRUCTIONS_MAX = 2000;
 export type Style = LookId | "none";
 export const STYLES: readonly Style[] = [...lookIds, "none"];
 export const DEFAULT_STYLE: Style = "clean";
-export const STYLE_TEXT: Record<Style, string> = {
-  ...(Object.fromEntries(lookIds.map((id) => [id, LOOKS[id].description])) as Record<
-    LookId,
-    string
-  >),
-  none: "No look: the footage's own colour, balanced and matched between cameras.",
-};
 
-export function styleName(style: Style): string {
-  return style === "none" ? "None" : `${style[0]?.toUpperCase()}${style.slice(1)}`;
+export function styleName(style: Style, t: Messages = en): string {
+  return t.looks[style]?.name ?? style;
 }
 
 /** Where the speech is heard: by the model on this computer, or on OpenRouter (`--asr cloud`). */
@@ -84,19 +78,19 @@ export interface FileEntry {
 }
 
 /** Why `length` cannot be an edit's length, or null when it can. */
-export function lengthProblem(length: number): string | null {
+export function lengthProblem(length: number, t: Messages = en): string | null {
   const [shortest, longest] = LENGTH_RANGE;
-  if (!Number.isFinite(length)) return "Type a length such as 90 s, 2:30 or 1 h";
-  if (length < shortest) return `The shortest edit is ${formatLength(shortest)}`;
-  if (length > longest) return `The longest edit is ${formatLength(longest)}`;
+  if (!Number.isFinite(length)) return t.settings.lengthExample;
+  if (length < shortest) return t.settings.shortest(formatLength(shortest, t));
+  if (length > longest) return t.settings.longest(formatLength(longest, t));
   return null;
 }
 
 /** Why `text` cannot be what the user tells Claude, or null when it can. */
-export function instructionsProblem(text: string): string | null {
+export function instructionsProblem(text: string, t: Messages = en): string | null {
   const length = text.trim().length;
   return length > INSTRUCTIONS_MAX
-    ? `Tell Claude what you want in at most ${INSTRUCTIONS_MAX} characters, not ${length}`
+    ? t.settings.instructionsTooLong(INSTRUCTIONS_MAX, length)
     : null;
 }
 
@@ -109,8 +103,13 @@ export function namesFrom(text: string): string[] {
   return [...new Set(names)];
 }
 
-/** The settings in `input`, or why they cannot make an edit; `asr` unless it says otherwise. */
-export function checkSettings(input: unknown, asr: Asr = "local"): Settings | string {
+/** The settings in `input`, or why they cannot make an edit; `asr` unless it says otherwise. What
+ * the page can ask for wrongly is said in `t`'s words; the rest only a program sends. */
+export function checkSettings(
+  input: unknown,
+  asr: Asr = "local",
+  t: Messages = en,
+): Settings | string {
   if (typeof input !== "object" || input === null) return "No settings";
   const { length, aspect, style, names, terms, musicLicense, visuals } = input as Record<
     string,
@@ -120,7 +119,7 @@ export function checkSettings(input: unknown, asr: Asr = "local"): Settings | st
   const heard = (input as Record<string, unknown>).asr ?? asr;
   if (!ASRS.includes(heard as Asr)) return `Speech is heard ${ASRS.join(" or ")}`;
   if (typeof length !== "number") return "No length";
-  const problem = lengthProblem(length);
+  const problem = lengthProblem(length, t);
   if (problem) return problem;
   if (!ASPECTS.includes(aspect as Aspect)) return `The aspect is ${ASPECTS.join(", ")}`;
   const chosen = style ?? DEFAULT_STYLE;
@@ -156,7 +155,7 @@ export function checkSettings(input: unknown, asr: Asr = "local"): Settings | st
   }
   const asked = instructions ?? "";
   if (typeof asked !== "string") return "What you tell Claude is text";
-  const tooLong = instructionsProblem(asked);
+  const tooLong = instructionsProblem(asked, t);
   if (tooLong) return tooLong;
   return {
     length,
@@ -174,16 +173,17 @@ export function checkSettings(input: unknown, asr: Asr = "local"): Settings | st
   };
 }
 
-/** How the page reads a length: 15 s, 1 min, 1 min 30 s, 1 h. */
-export function formatLength(seconds: number): string {
+/** How the page reads a length: 15 s, 1 min, 1 min 30 s, 1 h, in `t`'s units. */
+export function formatLength(seconds: number, t: Messages = en): string {
   const whole = Math.round(seconds);
   const hours = Math.floor(whole / 3600);
   const minutes = Math.floor((whole % 3600) / 60);
   const rest = whole % 60;
+  const { h, min, s } = t.units;
   const parts = [
-    hours ? `${hours} h` : "",
-    minutes ? `${minutes} min` : "",
-    rest || whole === 0 ? `${rest} s` : "",
+    hours ? `${hours} ${h}` : "",
+    minutes ? `${minutes} ${min}` : "",
+    rest || whole === 0 ? `${rest} ${s}` : "",
   ];
   return parts.filter(Boolean).join(" ");
 }
@@ -198,9 +198,9 @@ export function formatClock(seconds: number): string {
 }
 
 /** US dollars as the page shows them: $0.07, or unknown for a model without a price. */
-export function formatDollars(dollars: number | null): string {
-  if (dollars === null) return "unknown";
-  if (dollars > 0 && dollars < 0.01) return "under $0.01";
+export function formatDollars(dollars: number | null, t: Messages = en): string {
+  if (dollars === null) return t.dollars.unknown;
+  if (dollars > 0 && dollars < 0.01) return t.dollars.under;
   return `$${dollars.toFixed(2)}`;
 }
 
