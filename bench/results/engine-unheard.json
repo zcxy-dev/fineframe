@@ -1,13 +1,6 @@
 {
   "doc": "packages/engine/MEASUREMENTS.md",
-  "columns": [
-    "Footage",
-    "Asked",
-    "Made",
-    "Clicks, drift",
-    "Edges checked",
-    "Claude"
-  ],
+  "columns": ["Footage", "Asked", "Made", "Clicks, drift", "Edges checked", "Claude"],
   "rows": [
     [
       "real-4: street walk, Taiwanese Mandarin, 7.0 min",
