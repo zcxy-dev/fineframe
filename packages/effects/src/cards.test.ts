@@ -4,7 +4,17 @@ import { test } from "node:test";
 import { SchemaError } from "@video-editor/schema";
 import { type CardId, cardIds, cards } from "./cards.ts";
 import { ICONS, LOGOS } from "./icons.ts";
-import { type Aspect, cardLayout, ems, fitRuns, type Placement } from "./layout.ts";
+import {
+  type Aspect,
+  cardLayout,
+  ems,
+  fitRuns,
+  heavyEms,
+  type Placement,
+  STATEMENT_LEADING,
+  setStatement,
+} from "./layout.ts";
+import { markStyle } from "./remotion/cards/mark.ts";
 import { type CardJob, cardKey, renderCards } from "./render.ts";
 import { cardProblems, validateCards } from "./validate.ts";
 
@@ -173,4 +183,136 @@ test("a long English statement shrinks until its words, wrapped whole, fit the c
   );
   // The old estimate, by characters, let this statement run past the box at a larger size.
   assert.ok(size < type("display"));
+});
+
+const AREAS: [Aspect, Placement, number, number][] = [
+  ["9:16", "full", 1080, 1920],
+  ["9:16", "panel", 1080, 880],
+  ["1:1", "full", 1080, 1080],
+  ["1:1", "panel", 1080, 540],
+  ["16:9", "full", 1920, 1080],
+  ["16:9", "panel", 1920, 540],
+];
+
+/** A highlight statement set as the highlight card sets it, in an area of `aspect`. */
+function statement(text: string, phrases: string[], area = AREAS[0] as (typeof AREAS)[number]) {
+  const layout = cardLayout(...area);
+  const set = setStatement(text, phrases, layout);
+  const lines = set.lines.map((line) => line.map((s) => s.text).join(""));
+  return {
+    ...set,
+    text: lines,
+    width: layout.box.width,
+    height: layout.box.height,
+    floor: 0.8 * layout.type("display"),
+    heading: layout.type("heading"),
+  };
+}
+
+/** Each line's width at the set's size, in heavy type. */
+const widths = (set: ReturnType<typeof statement>) =>
+  set.text.map((line) => heavyEms(line) * set.size);
+
+test("a one-line highlight statement breaks between words to fill a 9:16 card", () => {
+  const set = statement("未來剪輯師會被 AI 取代嗎？", ["AI 取代"]);
+  assert.deepEqual(set.text, ["未來剪輯師會被", "AI 取代嗎？"]);
+  assert.ok(set.size >= set.floor, `${set.size} px is under the floor`);
+  for (const w of widths(set)) assert.ok(w <= set.width, `${w} px overflows ${set.width}`);
+});
+
+test("a highlight phrase stays on one line, at a smaller size if need be", () => {
+  const text = "AI 不會取代你，但會用 AI 的人會。";
+  // Breaking inside 「會用 AI 的人」 or leaving 「會。」 alone would set it larger.
+  assert.deepEqual(statement(text, ["會用 AI 的人"]).text, [
+    "AI 不會取代你，",
+    "但會用 AI 的人會。",
+  ]);
+  for (const area of AREAS) {
+    const set = statement(text, ["會用 AI 的人"], area);
+    assert.ok(set.size >= set.heading, `${area}: ${set.size} px is under a heading`);
+    for (const w of widths(set)) assert.ok(w <= set.width, `${area}: ${w} px overflows`);
+    assert.ok(set.lines.length * STATEMENT_LEADING * set.size <= set.height, `${area}: too tall`);
+    assert.ok(
+      set.text.some((line) => line.includes("會用 AI 的人")),
+      `${area}: phrase split`,
+    );
+  }
+});
+
+test("a highlight phrase too long for one line at a heading's size sweeps one line after another", () => {
+  const phrase = "所有影片的剪輯流程全部交給自動化工具處理";
+  const set = statement(`我們決定把${phrase}`, [phrase]);
+  const marked = set.lines.flat().filter((segment) => segment.mark === 0);
+  assert.ok(marked.length > 1, set.text.join(" / "));
+  assert.equal(marked.map((segment) => segment.text).join(""), phrase);
+  assert.equal(marked[0]?.sweep[0], 0);
+  for (const [k, segment] of marked.entries()) {
+    if (k > 0) assert.equal(segment.sweep[0], marked[k - 1]?.sweep[1]);
+  }
+  assert.equal(marked.at(-1)?.sweep[1], 1);
+  for (const w of widths(set)) assert.ok(w <= set.width, `${w} px overflows`);
+});
+
+test("no line of a highlight statement starts with closing punctuation or holds one character", () => {
+  const statements: [string, string[]][] = [
+    ["未來剪輯師會被 AI 取代嗎？", ["AI 取代"]],
+    ["AI 不會取代你，但會用 AI 的人會。", ["會用 AI 的人"]],
+    ["我們花了整整三個月把團隊的剪輯流程從頭到尾重新設計過一遍", ["剪輯流程"]],
+    ["其實剪輯最花時間的不是剪，是找素材。", ["找素材"]],
+    ["「快」不是重點，「穩」才是。", ["「穩」"]],
+  ];
+  for (const area of AREAS) {
+    for (const [text, phrases] of statements) {
+      const set = statement(text, phrases, area);
+      for (const line of set.text) {
+        assert.doesNotMatch(line, /^[，。、！？；：」』）]/, `${area}: ${set.text.join(" / ")}`);
+        assert.doesNotMatch(
+          line,
+          /^[「『（]?.[，。、！？；：」』）]*$/u,
+          `${area}: ${set.text.join(" / ")}`,
+        );
+      }
+    }
+  }
+});
+
+test("a highlight statement breaks at punctuation and spaces, never between a phrase's Latin words", () => {
+  const latin = statement("Will AI replace video editors?", ["AI replace"]);
+  assert.deepEqual(latin.text, ["Will", "AI replace", "video", "editors?"]);
+  const mixed = statement("用 Claude Code 寫程式，比你想的更快", ["Claude Code"]);
+  assert.deepEqual(mixed.text, ["用 Claude Code", "寫程式，", "比你想的更快"]);
+});
+
+test("a long highlight statement fits every card area, with no line left short", () => {
+  const text = "我們花了整整三個月把團隊的剪輯流程從頭到尾重新設計過一遍";
+  for (const area of AREAS) {
+    const set = statement(text, ["剪輯流程"], area);
+    const ws = widths(set);
+    for (const w of ws) assert.ok(w <= set.width, `${area}: ${w} px overflows ${set.width}`);
+    assert.ok(set.lines.length * STATEMENT_LEADING * set.size <= set.height, `${area}: too tall`);
+    assert.ok(Math.min(...ws) >= 0.4 * Math.max(...ws), `${area}: ${set.text.join(" / ")}`);
+    assert.ok(
+      set.text.some((line) => line.includes("剪輯流程")),
+      `${area}: phrase split`,
+    );
+    assert.equal(set.text.join(""), text);
+  }
+});
+
+test("a highlight statement that fits one line large enough stays on one line", () => {
+  const set = statement("未來剪輯師會被 AI 取代嗎？", ["AI 取代"], ["16:9", "full", 1920, 1080]);
+  assert.deepEqual(set.text, ["未來剪輯師會被 AI 取代嗎？"]);
+});
+
+test("the highlighter's box takes no room, so the text beside it never moves", () => {
+  for (const swept of [0, 0.3, 1]) {
+    const { text, box } = markStyle(swept, "#ffc233");
+    for (const key of ["padding", "margin", "border", "letterSpacing", "display"]) {
+      assert.equal(key in text, false, `${key} on the marked text`);
+    }
+    assert.equal(box.position, "absolute");
+  }
+  const start = markStyle(0, "#ffc233").box;
+  const end = markStyle(1, "#ffc233").box;
+  assert.deepEqual({ ...start, clipPath: 0 }, { ...end, clipPath: 0 });
 });

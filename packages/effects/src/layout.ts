@@ -153,6 +153,250 @@ export function fitRuns(
   return size;
 }
 
+/** A piece of a set line: plain text (`mark` -1), or the `mark`th of the phrases asked for, of
+ * which it takes the `sweep` share of the highlighter's sweep: all of it, or for a phrase broken
+ * across lines, its part in reading order. */
+export interface Segment {
+  text: string;
+  mark: number;
+  sweep: [number, number];
+}
+
+/** Where each phrase is marked in `text`: at its first place, unless an earlier one is there. */
+function marksIn(text: string, phrases: readonly string[]) {
+  const found = phrases
+    .map((phrase, k) => ({
+      at: text.indexOf(phrase),
+      end: text.indexOf(phrase) + phrase.length,
+      k,
+    }))
+    .filter((m) => m.at >= 0)
+    .sort((a, b) => a.at - b.at);
+  const marks: typeof found = [];
+  for (const m of found) if (m.at >= (marks.at(-1)?.end ?? 0)) marks.push(m);
+  return marks;
+}
+
+const CJK = (char: string) => (char.codePointAt(0) ?? 0) >= 0x2e80;
+
+/** The advance of each printable ASCII character, from the space to the tilde, in Noto Sans TC
+ * Black (2.004), in hundredths of an em rounded up. */
+const BLACK_ASCII = (
+  "23 40 64 61 61 99 78 36 40 40 53 61 36 39 36 39 61 61 61 61 61 61 61 61 61 61 36 36 61 61 61 " +
+  "54 105 66 70 67 73 63 61 74 78 35 59 71 60 88 77 79 69 79 71 64 64 77 65 94 66 61 62 40 39 " +
+  "40 61 58 64 61 66 54 66 60 40 62 66 33 33 64 34 99 66 64 66 66 47 51 45 66 61 90 60 61 54 40 " +
+  "32 40 61"
+)
+  .split(" ")
+  .map((n) => Number(n) / 100);
+
+/** How many ems `text` takes in the cards' heavy type (weight 900): a CJK character one em, as
+ * `ems` counts it, ASCII at the face's own advances, and other Latin a little wider than `ems`
+ * counts. */
+export function heavyEms(text: string): number {
+  let total = 0;
+  for (const char of text) {
+    const code = char.codePointAt(0) ?? 0;
+    total += CJK(char) ? 1 : (BLACK_ASCII[code - 32] ?? ems(char) * 1.08);
+  }
+  return total;
+}
+
+/** A clause ends after these, so a line may too. */
+const PAUSE = /[，。、！？；：]/;
+/** Never at the start of a line. */
+const CLOSING = /[，。、！？；：」』）》】,.!?;:)\]…]/;
+/** Never at the end of a line. */
+const OPENING = /[「『（《【([]/;
+
+/** An unbreakable piece of a statement from `from`, with its characters other than spaces and
+ * punctuation, the space after it and the break that follows, which with `split` falls inside a
+ * marked phrase. */
+interface Atom {
+  from: number;
+  letters: number;
+  ems: number;
+  space: number;
+  after: "clause" | "space" | "word" | "end";
+  split: boolean;
+}
+
+/**
+ * `text` cut where a line may break: "clause" breaks after CJK punctuation and at spaces between
+ * Latin words, where a reader pauses anyway, "space" breaks at a space between CJK and Latin, and
+ * "word" breaks between two CJK words, as Intl.Segmenter finds them. Nothing breaks before
+ * closing punctuation, after opening punctuation, or between Latin words in a marked phrase.
+ */
+function atoms(text: string, marks: ReturnType<typeof marksIn>): Atom[] {
+  const inside = (i: number) => marks.some((m) => m.at < i && i < m.end);
+  const words = new Set(
+    [...new Intl.Segmenter("zh-Hant", { granularity: "word" }).segment(text)].map((s) => s.index),
+  );
+  const cuts: { at: number; kind: Atom["after"]; split: boolean }[] = [];
+  for (let i = 1; i < text.length; i++) {
+    const before = text[i - 1] as string;
+    const char = text[i] as string;
+    const split = inside(i);
+    if (char === " " || CLOSING.test(char) || OPENING.test(before)) continue;
+    if (before === " ") {
+      const latin = !CJK(text[i - 2] ?? "") && !CJK(char);
+      // Two Latin words in a marked phrase name one thing there.
+      if (!(latin && split)) cuts.push({ at: i, kind: latin ? "clause" : "space", split });
+    } else if (PAUSE.test(before)) cuts.push({ at: i, kind: "clause", split });
+    else if (words.has(i) || marks.some((m) => m.at === i || m.end === i)) {
+      if (CJK(before) || CJK(char)) cuts.push({ at: i, kind: "word", split });
+    }
+  }
+  return [...cuts, { at: text.length, kind: "end" as const, split: false }].map((cut, k) => {
+    const from = cuts[k - 1]?.at ?? 0;
+    const piece = text.slice(from, cut.at);
+    const word = piece.trimEnd();
+    return {
+      from,
+      letters: word.replace(/[\s\p{P}]/gu, "").length,
+      ems: heavyEms(word),
+      space: heavyEms(piece.slice(word.length)),
+      after: cut.kind,
+      split: cut.split,
+    };
+  });
+}
+
+/**
+ * The split of `list` into `count` lines, breaking only where `allowed` and at every end in
+ * `keep`, whose widest line is narrowest. A line that ends between two CJK words or inside a
+ * marked phrase counts as a fifth wider, so a break at punctuation or a space wins a near tie.
+ * With `least`, no line is narrower than that share of the widest or holds a single character.
+ * Returns where each line ends, or nothing when no split fits.
+ */
+function balance(
+  list: Atom[],
+  count: number,
+  allowed: (a: Atom) => boolean,
+  least = 0,
+  keep: readonly number[] = [],
+) {
+  const n = list.length;
+  const width = (from: number, to: number) => {
+    let w = 0;
+    for (let i = from; i < to; i++)
+      w += (list[i] as Atom).ems + (i < to - 1 ? (list[i] as Atom).space : 0);
+    return w;
+  };
+  const letters = (from: number, to: number) =>
+    list.slice(from, to).reduce((sum, atom) => sum + atom.letters, 0);
+  let floor = 0;
+  for (let round = 0; round < 8; round++) {
+    // best[j][i]: the narrowest widest line, setting the first i atoms in j lines.
+    const best = Array.from({ length: count + 1 }, () => new Array<number>(n + 1).fill(Infinity));
+    const from = Array.from({ length: count + 1 }, () => new Array<number>(n + 1).fill(-1));
+    (best[0] as number[])[0] = 0;
+    for (let j = 1; j <= count; j++) {
+      for (let i = j; i <= n; i++) {
+        if (i < n && !allowed(list[i - 1] as Atom)) continue;
+        for (let s = j - 1; s < i; s++) {
+          const prior = (best[j - 1] as number[])[s] as number;
+          if (prior === Infinity) continue;
+          const w = width(s, i);
+          if (w < floor || keep.some((end) => s < end && end < i)) continue;
+          if (least > 0 && count > 1 && letters(s, i) < 2) continue;
+          const end = list[i - 1] as Atom;
+          const weak = i < n && (end.after === "word" || end.split);
+          const cost = Math.max(prior, weak ? w * 1.2 : w);
+          if (cost < ((best[j] as number[])[i] as number)) {
+            (best[j] as number[])[i] = cost;
+            (from[j] as number[])[i] = s;
+          }
+        }
+      }
+    }
+    if ((best[count] as number[])[n] === Infinity) return undefined;
+    const ends: number[] = [];
+    for (let j = count, i = n; j > 0; i = (from[j] as number[])[i] as number, j--) ends.unshift(i);
+    const widths = ends.map((end, j) => width(ends[j - 1] ?? 0, end));
+    const widest = Math.max(...widths);
+    if (Math.min(...widths) >= least * widest - 1e-9) return { ends, widest };
+    floor = least * widest;
+  }
+  return undefined;
+}
+
+/** The line height a statement is set at. */
+export const STATEMENT_LEADING = 1.32;
+
+/**
+ * A card's statement set in explicit lines, with its `phrases` marked: the lines and the type
+ * size, at most the card's display size, for its content box's width and `height` of it. It breaks
+ * at punctuation and between Latin words first, in the fewest lines within a tenth of the largest
+ * size that allows. When that size is under 80 % of the display size, as for a long clause with
+ * no punctuation or two long clauses, it also breaks those lines between words, into the fewest
+ * balanced lines, at most four, that reach it, none shorter than 40 % of the widest, so every
+ * statement short enough fills the card with the same weight. A marked phrase stays on one line,
+ * at a smaller size if need be, and breaks between its words only when it cannot be set whole at
+ * a card heading's size. Widths are counted in `heavyEms`.
+ */
+export function setStatement(
+  text: string,
+  phrases: readonly string[],
+  layout: CardLayout,
+  height = layout.box.height,
+): { size: number; lines: Segment[][] } {
+  const max = layout.type("display");
+  const floor = 0.8 * max;
+  const width = layout.box.width * 0.96;
+  const lineHeight = STATEMENT_LEADING;
+  const marks = marksIn(text, phrases);
+  const list = atoms(text, marks);
+  const layouts = (allowed: (a: Atom) => boolean, least: number, keep: number[] = [], most = 8) =>
+    Array.from({ length: Math.min(most, list.length) }, (_, k) => {
+      const split = balance(list, k + 1, allowed, k === 0 ? 0 : least, keep);
+      if (!split) return undefined;
+      const size = Math.min(max, (width * 0.98) / split.widest, height / ((k + 1) * lineHeight));
+      return { ends: split.ends, size };
+    }).filter((layout) => layout !== undefined);
+  const clauses = layouts((a) => a.after === "clause" && !a.split, 0);
+  // The fewest lines within a tenth of the largest size: more lines must buy a larger size.
+  const largest = Math.max(...clauses.map((layout) => layout.size));
+  let pick = clauses.find((layout) => layout.size >= 0.9 * largest) as (typeof clauses)[number];
+  if (pick.size < floor) {
+    // Between words too, but only within the lines it broke into at punctuation.
+    const words = layouts((a) => a.after !== "end" && !a.split, 0.4, pick.ends, 4);
+    const reach = (layout: (typeof words)[number]) => layout.size >= floor;
+    const largest = (list: typeof words) => list.reduce((a, b) => (b.size > a.size ? b : a), pick);
+    pick = words.find(reach) ?? largest(words);
+    if (pick.size < layout.type("heading")) {
+      const across = layouts((a) => a.after !== "end", 0.4, pick.ends, 4);
+      pick = across.find(reach) ?? largest(across);
+    }
+  }
+  // Each line's text, without the space it broke at, in plain runs and marked phrases.
+  const lines = pick.ends.map((end, j) => {
+    const from = (list[pick.ends[j - 1] ?? 0] as Atom).from;
+    const to = from + text.slice(from, list[end]?.from ?? text.length).trimEnd().length;
+    const edges = [from, to];
+    for (const m of marks)
+      edges.push(Math.max(from, Math.min(to, m.at)), Math.max(from, Math.min(to, m.end)));
+    const cuts = [...new Set(edges)].sort((x, y) => x - y);
+    return cuts.slice(1).map((end, k): Segment => {
+      const start = cuts[k] as number;
+      const mark = marks.find((m) => m.at <= start && start < m.end)?.k ?? -1;
+      return { text: text.slice(start, end), mark, sweep: [0, 1] };
+    });
+  });
+  // A phrase's pieces share its sweep by their widths, in reading order.
+  for (const { k } of marks) {
+    const pieces = lines.flat().filter((segment) => segment.mark === k);
+    const total = pieces.reduce((sum, piece) => sum + heavyEms(piece.text), 0);
+    let done = 0;
+    for (const piece of pieces) {
+      const from = done;
+      done += heavyEms(piece.text);
+      piece.sweep = [from / total, pieces.at(-1) === piece ? 1 : done / total];
+    }
+  }
+  return { size: pick.size, lines };
+}
+
 /** The type size, at most `size`, at which `text` fits on one line `available` pixels wide. */
 export function fit(text: string, size: number, available: number): number {
   const width = ems(text) * size;
