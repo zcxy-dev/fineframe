@@ -22,10 +22,10 @@ import {
 import { family, fontFile } from "./captions/fonts.ts";
 import { buildCaptions, PRESETS, stageFonts } from "./captions/index.ts";
 import type { Rgb } from "./colour.ts";
-import { ffmpeg, run } from "./ffmpeg.ts";
+import { ffmpeg, QUIET, run } from "./ffmpeg.ts";
 import { everyKind, makeSource, projectOf } from "./fixtures.ts";
 import { cropPath } from "./framing.ts";
-import { captionFilter, QUIET, RAW_AUDIO, RAW_VIDEO } from "./graph/encode.ts";
+import { captionFilter, RAW_AUDIO, RAW_VIDEO } from "./graph/encode.ts";
 import {
   masterAudio,
   measureLoudness,

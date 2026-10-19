@@ -5,9 +5,8 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { MediaIndex, MusicIndex, Word } from "@video-editor/schema";
-import { ffmpeg, run } from "../ffmpeg.ts";
+import { ffmpeg, QUIET, run } from "../ffmpeg.ts";
 import { makeSource } from "../fixtures.ts";
-import { QUIET } from "../graph/encode.ts";
 
 /** One line per sentence as said; a Han character or an English word is one word, carrying the
  * punctuation after it. */

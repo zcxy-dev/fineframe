@@ -18,10 +18,9 @@ import { join, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { catalog, type TemplateId } from "@video-editor/effects";
 import type { Project, Source } from "@video-editor/schema";
-import { ffmpeg, run } from "../src/ffmpeg.ts";
+import { ffmpeg, QUIET, run } from "../src/ffmpeg.ts";
 import { everyKind, makeSource, projectOf, type SyntheticSpec } from "../src/fixtures.ts";
 import { autoGrade } from "../src/grade.ts";
-import { QUIET } from "../src/graph/encode.ts";
 import { render } from "../src/render.ts";
 
 const { values, positionals } = parseArgs({

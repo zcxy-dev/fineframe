@@ -5,8 +5,7 @@ import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { MediaIndex, Word } from "@video-editor/schema";
-import { ffmpeg } from "../ffmpeg.ts";
-import { QUIET } from "../graph/encode.ts";
+import { ffmpeg, QUIET } from "../ffmpeg.ts";
 import { PEAK_BLOCK, type PlaceSource } from "./place.ts";
 
 const RATE = 48_000;

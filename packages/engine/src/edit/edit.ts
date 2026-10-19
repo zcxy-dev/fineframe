@@ -8,8 +8,7 @@ import {
   type Progress,
   validateProgress,
 } from "@video-editor/schema";
-import { ffmpeg, run } from "../ffmpeg.ts";
-import { QUIET } from "../graph/encode.ts";
+import { ffmpeg, QUIET, run } from "../ffmpeg.ts";
 import type { LookId } from "../looks.ts";
 import {
   anthropicClaude,

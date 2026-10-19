@@ -3,8 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { ffmpeg, run } from "../ffmpeg.ts";
-import { QUIET } from "../graph/encode.ts";
+import { ffmpeg, QUIET, run } from "../ffmpeg.ts";
 import { PEAK_BLOCK } from "./place.ts";
 import { readStem } from "./stem.ts";
 

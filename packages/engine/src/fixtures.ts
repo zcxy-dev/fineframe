@@ -5,8 +5,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { MediaIndex, Project, Source } from "@video-editor/schema";
-import { ffmpeg, run } from "./ffmpeg.ts";
-import { QUIET } from "./graph/encode.ts";
+import { ffmpeg, QUIET, run } from "./ffmpeg.ts";
 
 export interface SyntheticSpec {
   id: string;

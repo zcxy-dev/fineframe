@@ -22,9 +22,8 @@ import {
 import { assTime } from "../src/captions/ass.ts";
 import { family, fontFile } from "../src/captions/fonts.ts";
 import { FONTS, PRESETS, stageFonts } from "../src/captions/index.ts";
-import { ffmpeg, run } from "../src/ffmpeg.ts";
+import { ffmpeg, QUIET, run } from "../src/ffmpeg.ts";
 import { cropPath } from "../src/framing.ts";
-import { QUIET } from "../src/graph/encode.ts";
 import { rebase, render } from "../src/render.ts";
 
 const { positionals } = parseArgs({ allowPositionals: true });

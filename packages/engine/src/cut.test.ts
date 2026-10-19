@@ -7,8 +7,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { type Project, validateProject, type Word } from "@video-editor/schema";
 import { cutEdit } from "./cut.ts";
-import { ffmpeg, run as runFfmpeg } from "./ffmpeg.ts";
-import { QUIET } from "./graph/encode.ts";
+import { ffmpeg, QUIET, run as runFfmpeg } from "./ffmpeg.ts";
 import { MARGIN, type PlaceSource } from "./plan/place.ts";
 import { project as projectOf, SECOND, scratch } from "./testing.ts";
 

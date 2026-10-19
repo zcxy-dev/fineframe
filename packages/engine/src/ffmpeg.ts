@@ -5,6 +5,9 @@ import { join } from "node:path";
 import type { Writable } from "node:stream";
 import { cacheDir, type DownloadProgress, pinnedFile } from "./download.ts";
 
+/** Flags every FFmpeg run shares: quiet unless something fails, and never reading the terminal. */
+export const QUIET = ["-hide_banner", "-nostdin", "-nostats", "-loglevel", "error"];
+
 /** Overrides the pinned build, e.g. with a system FFmpeg; it must pass the same feature check. */
 export const FFMPEG_ENV = "VIDEO_EDITOR_FFMPEG";
 
