@@ -12,10 +12,12 @@ import { PEAK_BLOCK, type PlaceSource } from "./place.ts";
 const RATE = 48_000;
 /** The denoised speech's level is read in frames this long, in seconds. */
 const FRAME = 0.01;
-/** Speech is where the denoised speech is within this many dB of the median level of the source's
- * words; in the footage measured (MEASUREMENTS.md), the denoiser leaves pauses 30 dB or more
- * under that level. */
-const SPEECH_RANGE_DB = 20;
+/** Speech is where the denoised speech is within SPEECH_RANGE_DB of the median level of the
+ * source's words, and at least ABOVE_PAUSES_DB over the median level where no word is, so noise
+ * the denoiser leaves in the pauses is not speech. On the real footage measured (MEASUREMENTS.md),
+ * the quietest 5 % of the words' frames sit 23 to 45 dB under that median. */
+const SPEECH_RANGE_DB = 30;
+const ABOVE_PAUSES_DB = 10;
 /** A dip in speech shorter than this is part of it, in seconds. */
 const DIP = 0.03;
 /** Speech shorter than this, in seconds, is a click or a breath and does not count. */
@@ -106,9 +108,11 @@ function unheardSpeech(power: readonly number[], words: readonly Word[]): [numbe
     const last = Math.min(db.length, Math.ceil(word.end / FRAME));
     for (let k = Math.max(0, Math.floor(word.start / FRAME)); k < last; k++) covered[k] = true;
   }
-  const said = db.filter((_, k) => covered[k]).sort((x, y) => x - y);
-  if (said.length === 0) return [];
-  const floor = (said[said.length >> 1] as number) - SPEECH_RANGE_DB;
+  const median = (levels: number[]) => levels.sort((x, y) => x - y)[levels.length >> 1] as number;
+  const said = db.filter((_, k) => covered[k]);
+  const unsaid = db.filter((_, k) => !covered[k]);
+  if (said.length === 0 || unsaid.length === 0) return [];
+  const floor = Math.max(median(said) - SPEECH_RANGE_DB, median(unsaid) + ABOVE_PAUSES_DB);
   const speech = db.map((level) => level > floor);
   for (const [a, b] of runs(speech.map((on) => !on))) {
     if (a > 0 && b < speech.length && b - a < DIP / FRAME) speech.fill(true, a, b);
