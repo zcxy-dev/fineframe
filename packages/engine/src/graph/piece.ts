@@ -123,7 +123,7 @@ export function pieceVideo(
  * A layer's picture, clocked and framed into `box`, as graph lines and the link they end in: one
  * chain from the source, or, where the layer's framing cuts to another crop size, to or from a
  * split screen, or to another scale (framingCuts()), one chain for each stretch between its cuts,
- * each with its own crop, taken one after the other. FFmpeg's crop keeps one size per chain.
+ * each with its own crop, joined end to end. FFmpeg's crop keeps one size per chain.
  */
 function framed(
   opened: ReturnType<typeof inputs>,
@@ -145,7 +145,6 @@ function framed(
     .map((t) => Math.ceil((t - late - clip.in) / frameTicks - 1e-9) - layer.fromFrame)
     .filter((n) => n > 0 && n < layer.frames);
   const edges = [0, ...new Set(cuts), layer.frames];
-  const { num, den } = output.fps;
   const stretches = edges.slice(1).map((end, k) => {
     const from = edges[k] as number;
     const start = clip.in + (layer.fromFrame + from) * frameTicks;
@@ -155,19 +154,18 @@ function framed(
       ...clock(offset, output.fps, end - from),
       ...fill(framing, box, clip.source, span, `${label}_${k}`),
       ...push(framing, span, box),
-      // Stamped with its own frame numbers in the layer, so the stretches interleave in order.
-      ...(edges.length > 2 ? [`settb=${den}/${num}`, `setpts=N+${from}`] : []),
     ];
     return `[${index}:v]${chain.join(",")}[${label}_${k}]`;
   });
   if (stretches.length === 1) return { lines: stretches, out: `[${label}_0]` };
   const parts = stretches.map((_, k) => `[${label}_${k}]`).join("");
+  const { num, den } = output.fps;
   return {
-    // interleave leaves the frame rate unset, which raw output would read as 25 fps; fps sets it,
-    // passing the last frame on.
+    // concat keeps the frame rate but counts time in microseconds; a dissolve's xfade needs the
+    // frame rate's own time base, as the other clip has.
     lines: [
       ...stretches,
-      `${parts}interleave=nb_inputs=${stretches.length},fps=${num}/${den}:eof_action=pass[${label}_all]`,
+      `${parts}concat=n=${stretches.length}:v=1:a=0,settb=${den}/${num}[${label}_all]`,
     ],
     out: `[${label}_all]`,
   };
