@@ -66,7 +66,7 @@
       "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{1,8})*$"
     },
     "Rect": {
-      "description": "A rectangle in normalised coordinates, from the top-left corner: 0..1 of the source's displayed width and height for a crop, of the output frame for a B-roll rect.",
+      "description": "A B-roll clip's place in the output frame, in fractions of its width and height, from its top-left corner.",
       "type": "object",
       "required": ["x", "y", "w", "h"],
       "additionalProperties": false,
@@ -75,6 +75,18 @@
         "y": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
         "w": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
         "h": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+      }
+    },
+    "CropRect": {
+      "description": "The part of the source a crop shows, in fractions of the source's displayed width and height, from its top-left corner. It may reach past the picture's edges, so that a subject the picture cuts off keeps room around it, or the whole picture shows in an area of another shape; there a blurred copy of the picture, enlarged to cover the area, shows instead. Some of it lies on the picture. `below`, when given, splits the area into a top and a bottom half: `rect` fills the top and `below` the bottom.",
+      "type": "object",
+      "required": ["x", "y", "w", "h"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "w": { "type": "number", "exclusiveMinimum": 0 },
+        "h": { "type": "number", "exclusiveMinimum": 0 }
       }
     },
     "Output": {
@@ -256,7 +268,7 @@
       "properties": {
         "crop": { "oneOf": [{ "$ref": "#/$defs/StaticCrop" }, { "$ref": "#/$defs/CropPath" }] },
         "scale": {
-          "description": "Punch-in: shows 1/scale of the crop, e.g. 1.12 to hide a jump cut; a path pushes in over time.",
+          "description": "Punch-in: shows 1/scale of the crop, e.g. 1.25 to hide a jump cut; a path pushes in over time, or changes the scale at a cut.",
           "oneOf": [{ "type": "number", "minimum": 1 }, { "$ref": "#/$defs/ScalePath" }]
         },
         "anchor": {
@@ -272,7 +284,7 @@
       }
     },
     "ScalePath": {
-      "description": "A slow push-in: the scale eases between keyframes along half a cosine, so it starts and stops without a jolt, and is held before the first and after the last.",
+      "description": "A slow push-in: the scale eases between keyframes along half a cosine, so it starts and stops without a jolt, and is held before the first and after the last. Two keyframes a tick apart change the scale at a cut.",
       "type": "object",
       "required": ["type", "keyframes"],
       "additionalProperties": false,
@@ -301,10 +313,14 @@
       "type": "object",
       "required": ["type", "rect"],
       "additionalProperties": false,
-      "properties": { "type": { "const": "static" }, "rect": { "$ref": "#/$defs/Rect" } }
+      "properties": {
+        "type": { "const": "static" },
+        "rect": { "$ref": "#/$defs/CropRect" },
+        "below": { "$ref": "#/$defs/CropRect" }
+      }
     },
     "CropPath": {
-      "description": "A moving crop: linear between keyframes, held before the first and after the last.",
+      "description": "A moving crop: linear between keyframes, held before the first and after the last. Its rects keep their size, and `below` stays present or absent, except across a cut: two keyframes a tick apart.",
       "type": "object",
       "required": ["type", "keyframes"],
       "additionalProperties": false,
@@ -326,7 +342,8 @@
           "description": "Source time, increasing from one keyframe to the next.",
           "$ref": "#/$defs/Ticks"
         },
-        "rect": { "$ref": "#/$defs/Rect" }
+        "rect": { "$ref": "#/$defs/CropRect" },
+        "below": { "$ref": "#/$defs/CropRect" }
       }
     },
     "Grade": {

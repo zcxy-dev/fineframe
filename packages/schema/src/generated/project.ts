@@ -164,7 +164,7 @@ export interface Dip {
 export interface Framing {
   crop?: StaticCrop | CropPath;
   /**
-   * Punch-in: shows 1/scale of the crop, e.g. 1.12 to hide a jump cut; a path pushes in over time.
+   * Punch-in: shows 1/scale of the crop, e.g. 1.25 to hide a jump cut; a path pushes in over time, or changes the scale at a cut.
    */
   scale?: number | ScalePath;
   /**
@@ -177,19 +177,20 @@ export interface Framing {
 }
 export interface StaticCrop {
   type: "static";
-  rect: Rect;
+  rect: CropRect;
+  below?: CropRect;
 }
 /**
- * A rectangle in normalised coordinates, from the top-left corner: 0..1 of the source's displayed width and height for a crop, of the output frame for a B-roll rect.
+ * The part of the source a crop shows, in fractions of the source's displayed width and height, from its top-left corner. It may reach past the picture's edges, so that a subject the picture cuts off keeps room around it, or the whole picture shows in an area of another shape; there a blurred copy of the picture, enlarged to cover the area, shows instead. Some of it lies on the picture. `below`, when given, splits the area into a top and a bottom half: `rect` fills the top and `below` the bottom.
  */
-export interface Rect {
+export interface CropRect {
   x: number;
   y: number;
   w: number;
   h: number;
 }
 /**
- * A moving crop: linear between keyframes, held before the first and after the last.
+ * A moving crop: linear between keyframes, held before the first and after the last. Its rects keep their size, and `below` stays present or absent, except across a cut: two keyframes a tick apart.
  */
 export interface CropPath {
   type: "path";
@@ -203,10 +204,11 @@ export interface CropKeyframe {
    * Source time, increasing from one keyframe to the next.
    */
   t: number;
-  rect: Rect;
+  rect: CropRect;
+  below?: CropRect;
 }
 /**
- * A slow push-in: the scale eases between keyframes along half a cosine, so it starts and stops without a jolt, and is held before the first and after the last.
+ * A slow push-in: the scale eases between keyframes along half a cosine, so it starts and stops without a jolt, and is held before the first and after the last. Two keyframes a tick apart change the scale at a cut.
  */
 export interface ScalePath {
   type: "path";
@@ -280,6 +282,15 @@ export interface BrollClip {
   gainDb?: number;
   framing?: Framing;
   grade?: Grade;
+}
+/**
+ * A B-roll clip's place in the output frame, in fractions of its width and height, from its top-left corner.
+ */
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 export interface CardClip {
   /**

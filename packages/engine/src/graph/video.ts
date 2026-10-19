@@ -2,22 +2,24 @@
 // colour and fades.
 
 import {
+  type CropKeyframe,
   type CropPath,
+  type CropRect,
   type FrameRate,
   type Framing,
   type Grade,
-  type Rect,
   type ScalePath,
+  type StaticCrop,
   TICKS_PER_SECOND,
 } from "@video-editor/schema";
-import { smallestScale } from "../framing.ts";
+import { cropAt, framingCuts, pastPicture, scaleRange } from "../framing.ts";
 import type { SourceFacts } from "../sources.ts";
 import type { Dip } from "../timeline.ts";
 import { decimal } from "./inputs.ts";
 
 /** A frame that starts this soon after an output frame still counts as on screen at it, which
  * absorbs container timestamp rounding (Matroska keeps whole milliseconds). */
-const ON_SCREEN_TOLERANCE = 0.001;
+export const ON_SCREEN_TOLERANCE = 0.001;
 
 export interface Box {
   width: number;
@@ -65,22 +67,31 @@ export interface SpanTime {
  * Crops the source to the box's shape and scales it to fill the box, in BT.709. The crop is the
  * framing's rect, narrowed around its centre to the box's shape, or the largest centred region
  * of that shape; a punch-in scale keeps 1/scale of it about the anchor, and a push-in's smallest
- * scale is where push() zooms in from, into a box enlarged by how far it zooms (pushRoom()). A
- * crop path moves the crop's centre frame by frame, `span` saying which source time each frame shows.
- * Expressions use the size and sample aspect FFmpeg sees after rotating the picture upright. HDR
- * is tone-mapped after scaling, which spares the 32-bit float stages most of a 4K frame's pixels.
- * Untagged SDR is read with the source's assumed matrix; FFmpeg alone would read every size as
- * BT.601.
+ * scale between the framing's cuts is where push() zooms in from, into a box enlarged by how far
+ * it zooms (pushRoom()). A crop path moves the crop's centre frame by frame, `span` saying which source
+ * time each frame shows; within a span the crop keeps the size it has at the span's first frame.
+ * A crop that reaches past the picture shows the part on it over a blurred copy of the whole
+ * picture, enlarged to cover the box (backdrop()); one that splits the box fills its halves
+ * (halves()). Expressions use the size and sample aspect FFmpeg sees after rotating the picture
+ * upright. HDR is tone-mapped after scaling, which spares the 32-bit float stages most of a 4K
+ * frame's pixels. Untagged SDR is read with the source's assumed matrix; FFmpeg alone would read
+ * every size as BT.601. `label` names the links of a graph that branches, unique in the graph.
  */
 export function fill(
   framing: Framing | undefined,
   box: Box,
-  { hdr, matrix }: Pick<SourceFacts, "hdr" | "matrix">,
+  source: Pick<SourceFacts, "hdr" | "matrix">,
   span?: SpanTime,
+  label = "fill",
 ): string[] {
   const crop = framing?.crop;
-  const { w, h }: Rect = (crop?.type === "path" ? crop.keyframes[0].rect : crop?.rect) ?? FULL;
-  const scale = smallestScale(framing?.scale);
+  if (crop?.type === "path" && !span) throw new Error("A crop path needs the span's source times");
+  const first = span ? span.start + ON_SCREEN_TOLERANCE * TICKS_PER_SECOND : 0;
+  const key = cropAt(crop, first);
+  if (key.below) return halves(crop, key.rect, key.below, box, source, span, label);
+  if (pastPicture(key.rect)) return backdrop(crop, key.rect, box, source, span, label);
+  const { w, h } = key.rect;
+  const [scale] = range(framing, span);
   const aspect = `${box.width}/${box.height}`;
   const width = `min(${w}*iw,${h}*ih*${aspect}/sar)/${scale}`;
   const height = `min(${h}*ih,${w}*iw*sar/(${aspect}))/${scale}`;
@@ -89,31 +100,137 @@ export function fill(
   const anchor = framing?.anchor;
   const toward = (axis: "x" | "y", size: string) =>
     anchor && scale > 1 ? `+(${decimal(anchor[axis] - 0.5)})*${size}*${decimal(scale - 1)}` : "";
-  let place: string;
-  if (crop?.type === "path") {
-    if (!span) throw new Error("A crop path needs the span's source times");
+  const place = centred(crop, key.rect, span, (axis) => toward(axis, axis === "x" ? "ow" : "oh"));
+  const size = enlarged(box, pushRoom(framing, span));
+  return [`crop=w='${width}':h='${height}':${place}`, ...scaled(size, source), "setsar=1"];
+}
+
+/** Scales to a size in BT.709, tone-mapping HDR after scaling; `options` are more of the scale
+ * filter's. */
+function scaled(
+  size: Box,
+  { hdr, matrix }: Pick<SourceFacts, "hdr" | "matrix">,
+  options = "flags=lanczos",
+): string[] {
+  const scale = `scale=${size.width}:${size.height}:${options}`;
+  return hdr
+    ? [scale, ...toneMap(hdr)]
+    : [`${scale}${matrix ? `:in_color_matrix=${matrix}` : ""}:out_color_matrix=bt709:out_range=tv`];
+}
+
+/** The crop filter's x and y: the centre of the crop's rect, or of `pick` of a path's rects,
+ * moved by `shift` on each axis. */
+function centred(
+  crop: StaticCrop | CropPath | undefined,
+  rect: CropRect,
+  span: SpanTime | undefined,
+  shift: (axis: "x" | "y") => string = () => "",
+  pick: (key: CropKeyframe) => CropRect = (key) => key.rect,
+): string {
+  if (crop?.type === "path" && span) {
     // Exact: whole-pixel steps; FFmpeg would otherwise move a 4:2:0 crop two pixels at a time.
-    place =
-      `x='(${along(crop, span, (r) => r.x + r.w / 2)})*iw-ow/2${toward("x", "ow")}':` +
-      `y='(${along(crop, span, (r) => r.y + r.h / 2)})*ih-oh/2${toward("y", "oh")}':exact=1`;
-  } else {
-    const { x, y } = crop?.rect ?? FULL;
-    place = `x='${x + w / 2}*iw-ow/2${toward("x", "ow")}':y='${y + h / 2}*ih-oh/2${toward("y", "oh")}'`;
+    const keyframes = crop.keyframes.map((key) => ({ ...key, rect: pick(key) }));
+    const path = { ...crop, keyframes: keyframes as CropPath["keyframes"] };
+    return (
+      `x='(${along(path, span, (r) => r.x + r.w / 2)})*iw-ow/2${shift("x")}':` +
+      `y='(${along(path, span, (r) => r.y + r.h / 2)})*ih-oh/2${shift("y")}':exact=1`
+    );
   }
-  const size = enlarged(box, pushRoom(framing));
+  return `x='${rect.x + rect.w / 2}*iw-ow/2${shift("x")}':y='${rect.y + rect.h / 2}*ih-oh/2${shift("y")}'`;
+}
+
+/**
+ * The two halves of a split screen: `top` fills the upper half of the box and `bottom` the lower,
+ * each narrowed around its centre to its half's shape.
+ */
+function halves(
+  crop: StaticCrop | CropPath | undefined,
+  top: CropRect,
+  bottom: CropRect,
+  box: Box,
+  source: Pick<SourceFacts, "hdr" | "matrix">,
+  span: SpanTime | undefined,
+  label: string,
+): string[] {
+  const upper = { width: box.width, height: Math.round(box.height / 4) * 2 };
+  const lower = { width: box.width, height: box.height - upper.height };
+  const half = (rect: CropRect, size: Box, pick: (key: CropKeyframe) => CropRect) => {
+    const aspect = `${size.width}/${size.height}`;
+    const width = `min(${rect.w}*iw,${rect.h}*ih*${aspect}/sar)`;
+    const height = `min(${rect.h}*ih,${rect.w}*iw*sar/(${aspect}))`;
+    const place = centred(crop, rect, span, undefined, pick);
+    return [`crop=w='${width}':h='${height}':${place}`, ...scaled(size, source)].join(",");
+  };
+  const l = (name: string) => `[${label}_${name}]`;
   return [
-    `crop=w='${width}':h='${height}':${place}`,
-    ...(hdr
-      ? [`scale=${size.width}:${size.height}:flags=lanczos`, ...toneMap(hdr)]
-      : [
-          `scale=${size.width}:${size.height}:flags=lanczos` +
-            `${matrix ? `:in_color_matrix=${matrix}` : ""}:out_color_matrix=bt709:out_range=tv`,
-        ]),
+    `split=2${l("a")}${l("b")};` +
+      `${l("a")}${half(top, upper, (key) => key.rect)}${l("top")};` +
+      `${l("b")}${half(bottom, lower, (key) => key.below ?? key.rect)}${l("bottom")};` +
+      `${l("top")}${l("bottom")}vstack`,
     "setsar=1",
   ];
 }
 
-const FULL: Rect = { x: 0, y: 0, w: 1, h: 1 };
+/** How much smaller than the box the blurred copy is drawn: blurring few pixels is cheap, and the
+ * blur hides the enlargement. */
+const BACKDROP_SHRINK = 8;
+const BACKDROP_BLUR = 6;
+
+/**
+ * A crop that reaches past the picture: the part of it on the picture, scaled to where it falls in
+ * the box, over the whole picture enlarged to cover the box and blurred. A path keeps the part on
+ * the picture one size, so it moves only along an axis on which the crop lies inside the picture.
+ */
+function backdrop(
+  crop: StaticCrop | CropPath | undefined,
+  rect: CropRect,
+  box: Box,
+  source: Pick<SourceFacts, "hdr" | "matrix">,
+  span: SpanTime | undefined,
+  label: string,
+): string[] {
+  const x0 = Math.max(rect.x, 0);
+  const y0 = Math.max(rect.y, 0);
+  const x1 = Math.min(rect.x + rect.w, 1);
+  const y1 = Math.min(rect.y + rect.h, 1);
+  const even = (v: number) => Math.max(2, Math.round(v / 2) * 2);
+  const shown = {
+    width: even((box.width * (x1 - x0)) / rect.w),
+    height: even((box.height * (y1 - y0)) / rect.h),
+  };
+  const at = {
+    x: Math.round((box.width * (x0 - rect.x)) / rect.w),
+    y: Math.round((box.height * (y0 - rect.y)) / rect.h),
+  };
+  const part = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  const place = centred(crop, part, span, undefined, (key) => ({
+    x: Math.max(key.rect.x, 0),
+    y: Math.max(key.rect.y, 0),
+    w: part.w,
+    h: part.h,
+  }));
+  const small = {
+    width: even(box.width / BACKDROP_SHRINK),
+    height: even(box.height / BACKDROP_SHRINK),
+  };
+  const l = (name: string) => `[${label}_${name}]`;
+  const blurred = [
+    ...scaled(small, source, "flags=bilinear:force_original_aspect_ratio=increase"),
+    `crop=${small.width}:${small.height}`,
+    `gblur=sigma=${BACKDROP_BLUR}`,
+    `scale=${box.width}:${box.height}:flags=bicubic`,
+  ].join(",");
+  const front = [`crop=w='${part.w}*iw':h='${part.h}*ih':${place}`, ...scaled(shown, source)].join(
+    ",",
+  );
+  return [
+    `split=2${l("a")}${l("b")};` +
+      `${l("a")}${blurred}${l("back")};` +
+      `${l("b")}${front}${l("front")};` +
+      `${l("back")}${l("front")}overlay=x=${at.x}:y=${at.y}`,
+    "setsar=1",
+  ];
+}
 
 /**
  * A value of a crop path's rect as an FFmpeg expression of the frame number `n` within the span:
@@ -123,7 +240,7 @@ const FULL: Rect = { x: 0, y: 0, w: 1, h: 1 };
  * pieces are chosen by halving, so a long path nests a few levels deep instead of one per
  * keyframe.
  */
-export function along(path: CropPath, span: SpanTime, value: (rect: Rect) => number): string {
+export function along(path: CropPath, span: SpanTime, value: (rect: CropRect) => number): string {
   // Read at the same moment the clock picks the frame on screen, so a cut in the path lands on
   // the frame that shows the new shot.
   const late = ON_SCREEN_TOLERANCE * TICKS_PER_SECOND;
@@ -158,11 +275,21 @@ export function along(path: CropPath, span: SpanTime, value: (rect: Rect) => num
   return tree(0, pieces.length);
 }
 
-/** How far a push-in zooms in from its smallest scale; 1 for framing that does not move. */
-function pushRoom(framing: Framing | undefined): number {
-  const scale = framing?.scale;
-  if (typeof scale !== "object") return 1;
-  return Math.max(...scale.keyframes.map((key) => key.scale)) / smallestScale(scale);
+/** How far a push-in zooms in from its smallest scale between the framing's cuts; 1 for framing
+ * that does not move. */
+function pushRoom(framing: Framing | undefined, span: SpanTime | undefined): number {
+  const [low, high] = range(framing, span);
+  return high / low;
+}
+
+/** The smallest and largest scale between the framing's cuts around a span, or over the whole
+ * clip without one: a push that pieces split carries on from the same crop. */
+function range(framing: Framing | undefined, span: SpanTime | undefined): [number, number] {
+  const at = span ? span.start + ON_SCREEN_TOLERANCE * TICKS_PER_SECOND : 0;
+  const cuts = framingCuts(framing);
+  const from = cuts.findLast((t) => t <= at) ?? 0;
+  const to = (cuts.find((t) => t > at) ?? Number.POSITIVE_INFINITY) - 1;
+  return scaleRange(framing?.scale, from, to);
 }
 
 /** The box enlarged by `k`, in even pixels. */
@@ -186,7 +313,7 @@ export function push(framing: Framing | undefined, span: SpanTime, box: Box): st
   const scale = framing?.scale;
   if (typeof scale !== "object") return [];
   const size = [`scale=${box.width}:${box.height}:flags=lanczos`];
-  const { zoom, still } = zoomAlong(scale, span, smallestScale(scale));
+  const { zoom, still } = zoomAlong(scale, span, range(framing, span)[0]);
   if (zoom === "1") return size;
   const z = `(${zoom})`;
   // The anchor (the centre without one) stays where it is: output pixel x shows source

@@ -20,7 +20,7 @@ import {
   type Word,
 } from "@video-editor/schema";
 import { LENGTH_RANGE } from "../edit/length.ts";
-import { cropPath } from "../framing.ts";
+import { CAMERA, cropPath } from "../framing.ts";
 import { type AutoGrade, autoGrade } from "../grade.ts";
 import { DEFAULT_LOOK } from "../looks.ts";
 import { type ColourSample, matchColour } from "../match.ts";
@@ -92,6 +92,7 @@ import {
   visualParts,
   visualPath,
 } from "./visuals.ts";
+import { callWindows } from "./windows.ts";
 
 export type Aspect = Project["output"]["aspect"];
 
@@ -732,10 +733,22 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
         }));
     }),
   );
-  // Each clip framed for the output's shape on the faces its source's index found.
+  // Each clip framed for the output's shape on the faces its source's index found, and in a
+  // video call on the windows they are in.
+  const windows = new Map<string, Map<number, Rect>>();
+  for (const clip of clips) {
+    const source = state.sources.get(clip.source);
+    if (!source?.index) continue;
+    const own = windows.get(source.id) ?? new Map<number, Rect>();
+    for (const [id, window] of await callWindows(source.path, source.index, clip)) {
+      own.set(id, window);
+    }
+    windows.set(source.id, own);
+  }
   const framed = <C extends { source: string; in: number; out: number }>(clip: C): C => {
     const index = state.sources.get(clip.source)?.index;
-    const crop = index && cropPath(index, clip, { width, height });
+    const crop =
+      index && cropPath(index, clip, { width, height }, CAMERA, windows.get(clip.source));
     return crop ? { ...clip, framing: { crop } } : clip;
   };
   const main = clips.map((clip) => framed({ source: clip.source, in: clip.in, out: clip.out }));
@@ -829,7 +842,7 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
   await mkdir(folder, { recursive: true });
   await writeFile(state.out, `${JSON.stringify(project, null, 2)}\n`);
   project = await planVoice(punchIns(await graded(state, project), shots(state)), state.out);
-  project = withVisuals(state, project, visuals, parts);
+  project = withVisuals(state, project, visuals, parts, windows);
   await writeFile(state.out, `${JSON.stringify(validateProject(project), null, 2)}\n`);
   return { path: state.out, project, assembly, state };
 }
@@ -844,6 +857,7 @@ function withVisuals(
   project: Project,
   visuals: readonly PlacedVisual[],
   parts: Awaited<ReturnType<typeof visualParts>>,
+  windows: ReadonlyMap<string, ReadonlyMap<number, Rect>>,
 ): Project {
   if (visuals.length === 0) return project;
   const speakers = speakerClips(
@@ -851,6 +865,7 @@ function withVisuals(
     project.main,
     (source) => state.sources.get(source)?.index ?? null,
     project.output,
+    (source) => windows.get(source),
   ).map((clip) => {
     let at = 0;
     const under = project.main.find((main) => {
@@ -878,13 +893,14 @@ function shots(state: PlanState): Map<string, ShotFacts> {
   for (const source of state.sources.values()) {
     if (!source.index) continue;
     const { width = 0, height = 0, sample_aspect: sampleAspect } = source.index.source.video ?? {};
-    const { transitions, framing } = source.index;
+    const { transitions, framing, transcript } = source.index;
     facts.set(source.id, {
       width,
       height,
       ...(sampleAspect ? { sampleAspect } : {}),
       transitions,
       ...(framing ? { framing } : {}),
+      words: transcript.words,
     });
   }
   return facts;

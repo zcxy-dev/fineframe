@@ -12,6 +12,7 @@ import { loadJson, type Project, TICKS_PER_SECOND, validateProject } from "@vide
 import { type Credit, cardCredits, creditText } from "./broll/credits.ts";
 import { buildCaptions, stageFonts } from "./captions/index.ts";
 import { ffmpeg, run } from "./ffmpeg.ts";
+import { pastPicture } from "./framing.ts";
 import { AAC, alignToAacFrames, encoderArgs, QUIET, RAW_AUDIO } from "./graph/encode.ts";
 import {
   linearReach,
@@ -94,12 +95,27 @@ export function unrendered(project: Project): string[] {
   ];
   for (const [path, clip] of clips) {
     const crop = clip.framing?.crop;
-    if (crop?.type === "path") {
-      const { w, h } = crop.keyframes[0].rect;
-      if (crop.keyframes.some((key) => key.rect.w !== w || key.rect.h !== h)) {
-        problems.push(`${path}/framing/crop: crop paths that change size`);
-      }
+    const keys = !crop ? [] : crop.type === "static" ? [crop] : crop.keyframes;
+    const scaled = (clip.framing?.scale ?? 1) !== 1;
+    if (keys.some((key) => key.below && (pastPicture(key.rect) || pastPicture(key.below)))) {
+      problems.push(`${path}/framing/crop: a split screen whose halves reach past the picture`);
     }
+    if (scaled && keys.some((key) => key.below || pastPicture(key.rect))) {
+      problems.push(`${path}/framing/scale: a zoom on a crop past the picture or a split screen`);
+    }
+    // The part on the picture keeps one size between cuts, so it moves only where it lies inside.
+    const moves = keys.some((key, k) => {
+      const next = keys[k + 1];
+      if (!next || next.rect.w !== key.rect.w || next.rect.h !== key.rect.h) return false;
+      // Keyframes a tick apart are a cut, drawn on either side of it on its own.
+      if ("t" in key && "t" in next && next.t - key.t <= 1) return false;
+      const past = (a: "x" | "y", size: "w" | "h") =>
+        key.rect[a] !== next.rect[a] &&
+        [key, next].some((k) => k.rect[a] < -1e-6 || k.rect[a] + k.rect[size] > 1 + 1e-6);
+      return past("x", "w") || past("y", "h");
+    });
+    if (moves)
+      problems.push(`${path}/framing/crop: a crop that moves along an axis it reaches past`);
   }
   return problems;
 }

@@ -29,7 +29,8 @@ test("the part of the source on screen follows the crop, its shape and its punch
     w: narrow / 1.25,
     h: 0.8,
   });
-  // A path, halfway between its keyframes; a crop past the edge is kept inside the picture.
+  // A path, halfway between its keyframes; a crop past the picture's edge shows past it, where
+  // the blurred copy is.
   const path: CropPath = {
     type: "path",
     keyframes: [
@@ -38,7 +39,7 @@ test("the part of the source on screen follows the crop, its shape and its punch
     ],
   };
   close(visible({ crop: path }, SECOND, WIDE, PORTRAIT), { x: 0.45 });
-  close(visible({ crop: path }, 9 * SECOND, WIDE, PORTRAIT), { x: 1 - narrow });
+  close(visible({ crop: path }, 9 * SECOND, WIDE, PORTRAIT), { x: 0.9, w: narrow });
   // A push-in about an anchor a quarter of the way across and 40 % down: at 1.25, the crop gives
   // up a fifth of its size, a quarter of that on the anchor's left and 40 % above it.
   const anchored: Framing = {

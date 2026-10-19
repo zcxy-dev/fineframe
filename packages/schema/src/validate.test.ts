@@ -125,19 +125,48 @@ test("a dip's fade in fits in its clip", async () => {
   rejects(project, "/main/3: its transitions need 100001 ticks, but it lasts 100000");
 });
 
-test("rects stay inside the frame", async () => {
+test("B-roll rects stay inside the frame", async () => {
+  const project = await exampleProject();
+  const broll = at(project.broll, 0);
+  if (broll.rect) broll.rect.h = 0.95;
+  rejects(project, "/broll/0/rect: x + w and y + h may not exceed 1");
+});
+
+test("a crop may reach past the picture but not lie wholly off it", async () => {
   const project = await exampleProject();
   const crop = at(project.main, 0).framing?.crop;
   assert.equal(crop?.type, "static");
-  if (crop?.type === "static") crop.rect.x = 0.9;
+  if (crop?.type === "static") {
+    crop.rect = { x: 0, y: -1.08, w: 1, h: 3.16 };
+    crop.below = { x: 0.2, y: 0, w: 0.3, h: 0.5 };
+  }
+  validateProject(project);
+  if (crop?.type === "static") crop.below = { x: 1.2, y: 0, w: 0.3, h: 0.5 };
+  rejects(project, "/main/0/framing/crop/below: lies wholly off the picture");
+});
+
+test("a crop path changes size or splits the area only at a cut", async () => {
+  const project = await exampleProject();
   const path = at(project.main, 2).framing?.crop;
   assert.equal(path?.type, "path");
-  if (path?.type === "path") at(path.keyframes, 1).rect.y = 0.5;
-  const broll = at(project.broll, 0);
-  if (broll.rect) broll.rect.h = 0.95;
-  rejects(project, "/main/0/framing/crop/rect: x + w and y + h may not exceed 1");
-  rejects(project, "/main/2/framing/crop/keyframes/1/rect: x + w and y + h may not exceed 1");
-  rejects(project, "/broll/0/rect: x + w and y + h may not exceed 1");
+  if (path?.type !== "path") return;
+  const [, second, third] = path.keyframes;
+  assert.ok(second && third);
+  third.rect = { ...third.rect, w: 0.5, h: 1.58 };
+  rejects(
+    project,
+    "/main/2/framing/crop/keyframes/2: changes size or split more than a tick after the keyframe before",
+  );
+  third.t = second.t + 1;
+  validateProject(project);
+  third.rect = { ...second.rect };
+  third.below = { ...second.rect };
+  validateProject(project);
+  third.t = second.t + 2;
+  rejects(
+    project,
+    "/main/2/framing/crop/keyframes/2: changes size or split more than a tick after the keyframe before",
+  );
 });
 
 test("loudness targets stay within what loudness normalisation can reach", async () => {

@@ -348,7 +348,7 @@ async function still(path: string, rect: Rect, from: number, to: number): Promis
   return vp > 0 && vq > 0 && cov / Math.sqrt(vp * vq) >= STILL_CORRELATION;
 }
 
-interface Grey {
+export interface Grey {
   pixels: Uint8Array;
   width: number;
   height: number;
@@ -356,7 +356,7 @@ interface Grey {
 
 /** The frame on screen at `seconds` in grey, STILL_WIDTH wide: a region's fractions of the
  * picture are the same whatever shape its pixels are. */
-async function grey(path: string, seconds: number, dir: string): Promise<Grey> {
+export async function grey(path: string, seconds: number, dir: string): Promise<Grey> {
   const out = join(dir, `grey-${seconds.toFixed(3)}.raw`);
   await run(await ffmpeg(), [
     ...QUIET,
