@@ -84,8 +84,8 @@ interface Run {
  * - Consecutive words of one source play on in one clip, unless a silence between them is longer
  *   than PAUSE_MAX: that is cut down to a breath of TAIL + LEAD.
  * - Where words are left out, the clip before ends in the first silence after its last word that
- *   a cut fits in, and the next one starts in the last such silence before its first, each at
- *   least MARGIN from the sound on either side. Up to TAIL and LEAD of silence stay with the
+ *   a cut fits in, and the next one starts in the last such silence before its first, or in the
+ *   longest silence there when none fits, each at least MARGIN from the sound on either side. Up to TAIL and LEAD of silence stay with the
  *   sound, less when the silence is shorter.
  * - A clip that would start or end on a jump in its source's sound, such as a splice the source
  *   was edited with, starts on the first frame after the jump or ends before it, where that
@@ -125,7 +125,9 @@ export function placeClips(
     const tail = words[last] as Word;
     const end = source.duration > 0 ? source.duration : Number.POSITIVE_INFINITY;
     const gap = cutGap(source.frameTicks);
-    const fits = (pause: boolean) => (width: number) => (pause ? width > PAUSE_MAX : width >= gap);
+    // A silence at the source's start or end needs no room: nothing plays beyond it.
+    const fits = (pause: boolean) => (a: number, b: number) =>
+      pause ? b - a > PAUSE_MAX : b - a >= gap || a <= 0 || b >= end;
 
     const [s0, s1] = nearest(silencesAfter(source, first - 1), fits(pauseBefore), true) ?? [
       words[first - 1]?.end ?? 0,
@@ -202,15 +204,18 @@ export function longestSilenceAfter(source: PlaceSource, i: number): number {
 }
 
 /** Of the silences on one side of a clip, the one nearest its words that `fits` (the last before
- * them, or the first after), else the nearest of any length; none where there is no silence. */
+ * them, or the first after), else the longest; none where there is no silence. */
 function nearest(
   silences: [number, number][],
-  fits: (width: number) => boolean,
+  fits: (a: number, b: number) => boolean,
   last: boolean,
 ): [number, number] | undefined {
-  const fitting = silences.filter(([a, b]) => fits(b - a));
-  const list = fitting.length > 0 ? fitting : silences;
-  return last ? list.at(-1) : list[0];
+  const fitting = silences.filter(([a, b]) => fits(a, b));
+  if (fitting.length > 0) return last ? fitting.at(-1) : fitting[0];
+  return silences.reduce<[number, number] | undefined>(
+    (best, silence) => (!best || silence[1] - silence[0] > best[1] - best[0] ? silence : best),
+    undefined,
+  );
 }
 
 /** Where the sound of `source` jumps by a click within [from, to] (seconds): the end of the last
