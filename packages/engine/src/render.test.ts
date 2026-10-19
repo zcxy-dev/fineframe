@@ -826,6 +826,65 @@ test("a punch-in that steps within a clip changes on the exact frame, each side 
   }
 });
 
+test("steps and a push-in in one clip at 29.97 fps render every frame, each at its scale", async (t) => {
+  const dir = await scratch(t, "steps-push-");
+  // A white square, 40 pixels wide, in the middle of a black frame.
+  const square = await makeSource(dir, {
+    id: "square",
+    pattern: "color",
+    filter: "drawbox=x=140:y=70:w=40:h=40:color=white:t=fill",
+    width: 320,
+    height: 180,
+    fps: 30000 / 1001,
+    seconds: 4,
+    sound: null,
+  });
+  const ntsc = { ...tiny, width: 320, height: 180, fps: { num: 30000, den: 1001 } } as const;
+  // A step to 1.25 at 1 s, a push from 1.25 to 1.325 over 1.5-2 s, and a step back at 2.5 s; and
+  // a clip of one step.
+  const pushed: ScalePath = {
+    type: "path",
+    keyframes: [
+      { t: SECOND - 1, scale: 1 },
+      { t: SECOND, scale: 1.25 },
+      { t: 1.5 * SECOND, scale: 1.25 },
+      { t: 2 * SECOND, scale: 1.325 },
+      { t: 2.5 * SECOND - 1, scale: 1.325 },
+      { t: 2.5 * SECOND, scale: 1 },
+    ],
+  };
+  const stepped: ScalePath = {
+    type: "path",
+    keyframes: [
+      { t: 3.4 * SECOND - 1, scale: 1 },
+      { t: 3.4 * SECOND, scale: 1.25 },
+    ],
+  };
+  const project = projectOf(
+    [square],
+    [
+      { ...clip("square", 0.5, 2.3), framing: { scale: pushed } },
+      { ...clip("square", 3, 0.8), framing: { scale: stepped } },
+    ],
+    ntsc,
+  );
+  const result = await render(await write(dir, project), join(dir, "out.mp4"));
+  const picture = await grey(result.video, 320, 180);
+  const frames = (seconds: number) => Math.round((seconds * 30000) / 1001);
+  assert.equal(picture.length, frames(2.3) + frames(0.8));
+  const width = (n: number) =>
+    (picture[n] as Uint8Array).subarray(90 * 320, 91 * 320).filter((v) => v > 128).length;
+  // Output frame n of the first clip shows source time 0.5 s + n frames.
+  const at = (seconds: number) => Math.ceil(((seconds - 0.5) * 30000) / 1001);
+  assert.equal(width(at(1) - 1), 40);
+  assert.equal(width(at(1)), 50);
+  assert.ok(Math.abs(width(at(2.2)) - 53) <= 1, `${width(at(2.2))}`);
+  assert.equal(width(at(2.5) - 1 + 1), 40);
+  const second = frames(2.3);
+  assert.equal(width(second + Math.ceil((0.4 * 30000) / 1001) - 1), 40);
+  assert.equal(width(second + Math.ceil((0.4 * 30000) / 1001)), 50);
+});
+
 test("a punch-in and a push-in about an anchor keep it still on screen", async (t) => {
   const dir = await scratch(t, "anchor-");
   // A white square, 40 pixels wide, centred at x = 60 of a 320-pixel frame: the anchor.

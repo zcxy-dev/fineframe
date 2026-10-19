@@ -222,7 +222,7 @@ test("a push-in zooms by perspective from the crop's smallest scale, eased frame
   const filled = fill({ scale: path }, box, facts);
   assert.match(filled[0] ?? "", /\/1\.1':h=.*\/1\.1':/);
   assert.match(filled[1] ?? "", /^scale=1408:792:/);
-  const [filter, size] = push({ scale: path }, span, box);
+  const [filter, size, square] = push({ scale: path }, span, box);
   const zoom = "if(lt((in-1),5),1,if(lt((in-1),15),1+(0.1)*(1-cos(PI*((in-1)-(5))/10))/2,1.1))";
   assert.equal(
     filter,
@@ -233,6 +233,8 @@ test("a push-in zooms by perspective from the crop's smallest scale, eased frame
       ":interpolation=cubic:eval=frame:enable='gte(n,5)'",
   );
   assert.equal(size, "scale=1280:720:flags=lanczos");
+  // The enlarged box, rounded to even pixels, is not quite the box's shape: pixels stay square.
+  assert.equal(square, "setsar=1");
   // A span wholly after the push holds its end; one wholly before it only comes back to size.
   assert.match(
     push({ scale: path }, { ...span, start: 80_000 }, box)[0] ?? "",
@@ -240,6 +242,7 @@ test("a push-in zooms by perspective from the crop's smallest scale, eased frame
   );
   assert.deepEqual(push({ scale: path }, { ...span, start: 0, frames: 4 }, box), [
     "scale=1280:720:flags=lanczos",
+    "setsar=1",
   ]);
 });
 

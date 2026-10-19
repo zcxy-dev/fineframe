@@ -312,7 +312,9 @@ function enlarged(box: Box, k: number): Box {
 export function push(framing: Framing | undefined, span: SpanTime, box: Box): string[] {
   const scale = framing?.scale;
   if (typeof scale !== "object") return [];
-  const size = [`scale=${box.width}:${box.height}:flags=lanczos`];
+  // The enlarged box is rounded to even pixels, so its shape differs from the box's a little:
+  // the picture fills the box all the same, with square pixels.
+  const size = [`scale=${box.width}:${box.height}:flags=lanczos`, "setsar=1"];
   const { zoom, still } = zoomAlong(scale, span, range(framing, span)[0]);
   if (zoom === "1") return size;
   const z = `(${zoom})`;
