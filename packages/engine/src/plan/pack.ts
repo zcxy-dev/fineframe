@@ -2,6 +2,7 @@
 
 import type { MediaIndex, Word } from "@video-editor/schema";
 import type { FillerCandidate } from "./fillers.ts";
+import { cutGap, longestSilenceAfter, type PlaceSource } from "./place.ts";
 import { endsSentence, joinWords } from "./text.ts";
 
 /** A silence this long ends a phrase. */
@@ -23,19 +24,20 @@ export interface Line {
 }
 
 /**
- * Groups a transcript into lines: a new line starts after a silence of PHRASE_SILENCE or more,
- * and also after a sentence's last word when the pause after it is at least `cutGap`, long
- * enough to cut in, so a short edit can start or stop at any sentence.
+ * Groups a source's transcript into lines: a new line starts after a silence of PHRASE_SILENCE or
+ * more, and also after a sentence's last word when a silence after it is long enough to cut in
+ * (cutGap), so a short edit can start or stop at any sentence. Silence leaves out the speech the
+ * transcript missed.
  */
-export function splitLines(source: string, words: readonly Word[], cutGap: number): Line[] {
+export function splitLines(source: PlaceSource): Line[] {
+  const { id, words } = source;
   const lines: Line[] = [];
   let first = 0;
   for (let i = 0; i < words.length; i++) {
     const word = words[i] as Word;
-    const next = words[i + 1];
-    const gap = next ? next.start - word.end : Number.POSITIVE_INFINITY;
-    if (gap >= PHRASE_SILENCE || (gap >= cutGap && endsSentence(word.text))) {
-      lines.push({ source, n: lines.length + 1, first, last: i });
+    const gap = i + 1 < words.length ? longestSilenceAfter(source, i) : Number.POSITIVE_INFINITY;
+    if (gap >= PHRASE_SILENCE || (gap >= cutGap(source.frameTicks) && endsSentence(word.text))) {
+      lines.push({ source: id, n: lines.length + 1, first, last: i });
       first = i + 1;
     }
   }

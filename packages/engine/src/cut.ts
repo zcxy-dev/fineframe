@@ -20,6 +20,7 @@ import {
   type PlaceSource,
   placeClips,
 } from "./plan/place.ts";
+import { stemMarks } from "./plan/stem.ts";
 import { joinWords } from "./plan/text.ts";
 import { gridTicks } from "./sources.ts";
 
@@ -47,8 +48,8 @@ export interface CutResult {
   outside: { range: number; words: string }[];
 }
 
-/** The words, length and frame grid of every analysed source on the main track, from the media
- * index the project names for it. */
+/** The words, length, frame grid and voice stem's marks of every analysed source on the main
+ * track, from the media index the project names for it. */
 export async function placeSources(
   project: Project,
   projectPath: string,
@@ -57,12 +58,14 @@ export async function placeSources(
   const sources = new Map<string, PlaceSource>();
   for (const source of project.sources) {
     if (!used.has(source.id) || !source.index) continue;
-    const index = await loadJson(resolve(dirname(projectPath), source.index), validateMediaIndex);
+    const indexPath = resolve(dirname(projectPath), source.index);
+    const index = await loadJson(indexPath, validateMediaIndex);
     sources.set(source.id, {
       id: source.id,
       words: index.transcript.words as Word[],
       duration: index.source.duration,
       frameTicks: gridTicks(index.source.video?.fps ?? 0),
+      ...(await stemMarks(index, indexPath)),
     });
   }
   return sources;

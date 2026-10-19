@@ -3,12 +3,21 @@ import { test } from "node:test";
 import type { FramedShot, MediaIndex, Word } from "@video-editor/schema";
 import { fillerCandidates, findWords } from "./fillers.ts";
 import { formatTime, packSource, splitLines } from "./pack.ts";
-import { CUT_GAP } from "./place.ts";
+import type { PlaceSource } from "./place.ts";
 import { joinWords, wordLanguage } from "./text.ts";
 
 /** Words from [text, start, end] triples. */
 const words = (...list: [string, number, number][]): Word[] =>
   list.map(([text, start, end]) => ({ text, start, end }));
+
+/** A source of `words` with no frame grid, whose cuts need CUT_GAP. */
+const placed = (id: string, list: Word[], unheard: [number, number][] = []): PlaceSource => ({
+  id,
+  words: list,
+  duration: 0,
+  frameTicks: null,
+  unheard,
+});
 
 const index = (transcript: Word[]): MediaIndex => ({
   version: 1,
@@ -39,7 +48,7 @@ test("lines break on a half-second silence, and at a sentence end with room to c
     // 0.6 s of silence ends a line, punctuation or not.
     ["開", 3.2, 3.4],
   );
-  const lines = splitLines("a", list, CUT_GAP);
+  const lines = splitLines(placed("a", list));
   assert.deepEqual(
     lines.map((line) => [line.n, line.first, line.last]),
     [
@@ -47,6 +56,22 @@ test("lines break on a half-second silence, and at a sentence end with room to c
       [2, 3, 6],
       [3, 7, 7],
     ],
+  );
+});
+
+test("speech the transcript missed is no silence to end a line in", () => {
+  const list = words(["好。", 1.0, 1.2], ["今", 2.0, 2.2], ["天。", 2.2, 2.4], ["我", 2.6, 2.8]);
+  // Speech from 1.3 to 1.9 s that no word covers leaves 0.1 s of silence on either side, and
+  // speech from 2.45 to 2.55 s none a cut fits in.
+  const lines = splitLines(
+    placed("a", list, [
+      [1.3, 1.9],
+      [2.45, 2.55],
+    ]),
+  );
+  assert.deepEqual(
+    lines.map((line) => [line.first, line.last]),
+    [[0, 3]],
   );
 });
 
@@ -62,7 +87,7 @@ test("a packed file lists its facts, then numbered lines with fillers marked", (
     ["個", 3.5, 3.7],
     ["好。", 3.7, 3.9],
   );
-  const lines = splitLines("talk", list, CUT_GAP);
+  const lines = splitLines(placed("talk", list));
   const packed = packSource("talk", index(list), lines, fillerCandidates("talk", list));
   assert.equal(
     packed,
@@ -134,7 +159,7 @@ test("a file's header says when it shows a screen recording, its shots next to e
     faces: [],
     speakers: [],
   });
-  const lines = splitLines("talk", media.transcript.words, CUT_GAP);
+  const lines = splitLines(placed("talk", media.transcript.words));
   assert.doesNotMatch(packSource("talk", media, lines, []), /Screen recording/);
   media.framing = {
     fps: 5,

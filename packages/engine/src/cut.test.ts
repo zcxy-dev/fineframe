@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { type Project, validateProject, type Word } from "@video-editor/schema";
 import { cutEdit } from "./cut.ts";
+import { ffmpeg, run as runFfmpeg } from "./ffmpeg.ts";
+import { QUIET } from "./graph/encode.ts";
 import { MARGIN, type PlaceSource } from "./plan/place.ts";
 import { project as projectOf, SECOND, scratch } from "./testing.ts";
 
@@ -268,9 +270,11 @@ test("pnpm render --cut says when the cut leaves the planned length", async (t) 
   const dir = await scratch(t, "render-cli-");
   const path = join(dir, "edit.project.json");
   await writeFile(path, JSON.stringify(edit()));
-  // The cut reads each source's words from its media index.
+  // The cut reads each source's words from its media index, and the voice stem it names.
   const example = new URL("../../schema/examples/media-index.example.json", import.meta.url);
   for (const name of ["a.json", "b.json"]) await copyFile(example, join(dir, name));
+  const stem = ["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo:d=12", "-c:a", "pcm_f32le"];
+  await runFfmpeg(await ffmpeg(), [...QUIET, ...stem, join(dir, "talk.voice.wav")]);
   const failed = await run("node", [cli, path, "--cut", "5-8", "-o", join(dir, "v2.mp4")]).catch(
     (e) => e,
   );

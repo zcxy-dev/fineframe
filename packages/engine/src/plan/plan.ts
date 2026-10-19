@@ -61,7 +61,6 @@ import {
   splitLines,
 } from "./pack.ts";
 import {
-  cutGap,
   cuttableAfter,
   lengthOf,
   type PlacedClip,
@@ -77,6 +76,7 @@ import {
   planSchema,
   planSystem,
 } from "./prompt.ts";
+import { stemMarks } from "./stem.ts";
 import { bare, joinWords } from "./text.ts";
 import {
   type Asset,
@@ -1226,21 +1226,23 @@ async function loadSources(inputs: readonly PlanInput[]): Promise<Map<string, Pl
       name.replace(/[^A-Za-z0-9._-]/g, "-").replace(/^[^A-Za-z0-9]+/, "") || `file-${i + 1}`;
     let id = base;
     for (let n = 2; sources.has(id); n++) id = `${base}-${n}`;
-    const words = (s.index?.transcript.words ?? []) as Word[];
-    const frameTicks = s.index ? gridTicks(s.index.source.video?.fps ?? 0) : null;
-    sources.set(id, {
+    const placed: PlaceSource = {
       id,
+      words: (s.index?.transcript.words ?? []) as Word[],
+      // A still shows for as long as a B-roll shot may.
+      duration: s.index ? s.index.source.duration : BROLL_MAX,
+      frameTicks: s.index ? gridTicks(s.index.source.video?.fps ?? 0) : null,
+      ...(s.index && s.indexPath ? await stemMarks(s.index, s.indexPath) : {}),
+    };
+    sources.set(id, {
+      ...placed,
       name,
       kind: s.index ? "video" : "image",
       path: s.path,
       indexPath: s.indexPath,
       index: s.index,
       fingerprint: s.fingerprint,
-      words,
-      lines: splitLines(id, words, cutGap(frameTicks)),
-      // A still shows for as long as a B-roll shot may.
-      duration: s.index ? s.index.source.duration : BROLL_MAX,
-      frameTicks,
+      lines: splitLines(placed),
       roomy: new Set(),
     });
   }
