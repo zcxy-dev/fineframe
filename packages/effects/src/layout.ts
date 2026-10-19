@@ -203,16 +203,18 @@ export function heavyEms(text: string): number {
 }
 
 /** A clause ends after these, so a line may too. */
-const PAUSE = /[，。、！？；：」』）》】]/;
+const PAUSE = /[，。、！？；：]/;
 /** Never at the start of a line. */
 const CLOSING = /[，。、！？；：」』）》】,.!?;:)\]…]/;
 /** Never at the end of a line. */
 const OPENING = /[「『（《【([]/;
 
-/** An unbreakable piece of a statement from `from`, with the space after it and the break that
- * follows, which with `split` falls inside a marked phrase. */
+/** An unbreakable piece of a statement from `from`, with its characters other than spaces and
+ * punctuation, the space after it and the break that follows, which with `split` falls inside a
+ * marked phrase. */
 interface Atom {
   from: number;
+  letters: number;
   ems: number;
   space: number;
   after: "clause" | "space" | "word" | "end";
@@ -251,6 +253,7 @@ function atoms(text: string, marks: ReturnType<typeof marksIn>): Atom[] {
     const word = piece.trimEnd();
     return {
       from,
+      letters: word.replace(/[\s\p{P}]/gu, "").length,
       ems: heavyEms(word),
       space: heavyEms(piece.slice(word.length)),
       after: cut.kind,
@@ -262,8 +265,9 @@ function atoms(text: string, marks: ReturnType<typeof marksIn>): Atom[] {
 /**
  * The split of `list` into `count` lines, breaking only where `allowed` and at every end in
  * `keep`, whose widest line is narrowest. A line that ends between two CJK words or inside a
- * marked phrase counts as a fifth wider, so a break at punctuation or a space wins a near tie. With `least`, no line is narrower
- * than that share of the widest. Returns where each line ends, or nothing when no split fits.
+ * marked phrase counts as a fifth wider, so a break at punctuation or a space wins a near tie.
+ * With `least`, no line is narrower than that share of the widest or holds a single character.
+ * Returns where each line ends, or nothing when no split fits.
  */
 function balance(
   list: Atom[],
@@ -279,6 +283,8 @@ function balance(
       w += (list[i] as Atom).ems + (i < to - 1 ? (list[i] as Atom).space : 0);
     return w;
   };
+  const letters = (from: number, to: number) =>
+    list.slice(from, to).reduce((sum, atom) => sum + atom.letters, 0);
   let floor = 0;
   for (let round = 0; round < 8; round++) {
     // best[j][i]: the narrowest widest line, setting the first i atoms in j lines.
@@ -293,6 +299,7 @@ function balance(
           if (prior === Infinity) continue;
           const w = width(s, i);
           if (w < floor || keep.some((end) => s < end && end < i)) continue;
+          if (least > 0 && count > 1 && letters(s, i) < 2) continue;
           const end = list[i - 1] as Atom;
           const weak = i < n && (end.after === "word" || end.split);
           const cost = Math.max(prior, weak ? w * 1.2 : w);
@@ -324,8 +331,9 @@ export const STATEMENT_LEADING = 1.32;
  * size that allows. When that size is under 80 % of the display size, as for a long clause with
  * no punctuation or two long clauses, it also breaks those lines between words, into the fewest
  * balanced lines, at most four, that reach it, none shorter than 40 % of the widest, so every
- * statement short enough fills the card with the same weight. It breaks a marked phrase only when
- * nothing else reaches that size. Widths are counted in `heavyEms`.
+ * statement short enough fills the card with the same weight. A marked phrase stays on one line,
+ * at a smaller size if need be, and breaks between its words only when it cannot be set whole at
+ * a card heading's size. Widths are counted in `heavyEms`.
  */
 export function setStatement(
   text: string,
@@ -353,12 +361,13 @@ export function setStatement(
   if (pick.size < floor) {
     // Between words too, but only within the lines it broke into at punctuation.
     const words = layouts((a) => a.after !== "end" && !a.split, 0.4, pick.ends, 4);
-    const across = layouts((a) => a.after !== "end", 0.4, pick.ends, 4);
     const reach = (layout: (typeof words)[number]) => layout.size >= floor;
-    pick =
-      words.find(reach) ??
-      across.find(reach) ??
-      words.reduce((a, b) => (b.size > a.size ? b : a), pick);
+    const largest = (list: typeof words) => list.reduce((a, b) => (b.size > a.size ? b : a), pick);
+    pick = words.find(reach) ?? largest(words);
+    if (pick.size < layout.type("heading")) {
+      const across = layouts((a) => a.after !== "end", 0.4, pick.ends, 4);
+      pick = across.find(reach) ?? largest(across);
+    }
   }
   // Each line's text, without the space it broke at, in plain runs and marked phrases.
   const lines = pick.ends.map((end, j) => {

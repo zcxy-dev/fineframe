@@ -205,6 +205,7 @@ function statement(text: string, phrases: string[], area = AREAS[0] as (typeof A
     width: layout.box.width,
     height: layout.box.height,
     floor: 0.8 * layout.type("display"),
+    heading: layout.type("heading"),
   };
 }
 
@@ -219,27 +220,59 @@ test("a one-line highlight statement breaks between words to fill a 9:16 card", 
   for (const w of widths(set)) assert.ok(w <= set.width, `${w} px overflows ${set.width}`);
 });
 
-test("a short statement in two clauses fills a card as a one-line statement does", () => {
+test("a highlight phrase stays on one line, at a smaller size if need be", () => {
   const text = "AI 不會取代你，但會用 AI 的人會。";
-  // At 9:16 its second clause, too long for the size, breaks inside the phrase, which sweeps one
-  // line after the other.
-  const portrait = statement(text, ["會用 AI 的人"]);
-  assert.deepEqual(portrait.text, ["AI 不會取代你，", "但會用", "AI 的人會。"]);
-  const oneLine = statement("未來剪輯師會被 AI 取代嗎？", ["AI 取代"]);
-  assert.ok(portrait.size >= 0.9 * oneLine.size, `${portrait.size} px against ${oneLine.size}`);
-  const marked = portrait.lines.flat().filter((segment) => segment.mark === 0);
-  assert.deepEqual(
-    marked.map((segment) => segment.text),
-    ["會用", "AI 的人"],
-  );
-  assert.equal(marked[0]?.sweep[0], 0);
-  assert.equal(marked[0]?.sweep[1], marked[1]?.sweep[0]);
-  assert.equal(marked[1]?.sweep[1], 1);
+  // Breaking inside 「會用 AI 的人」 or leaving 「會。」 alone would set it larger.
+  assert.deepEqual(statement(text, ["會用 AI 的人"]).text, [
+    "AI 不會取代你，",
+    "但會用 AI 的人會。",
+  ]);
   for (const area of AREAS) {
     const set = statement(text, ["會用 AI 的人"], area);
-    assert.ok(set.size >= set.floor, `${area}: ${set.size} px is under ${set.floor}`);
+    assert.ok(set.size >= set.heading, `${area}: ${set.size} px is under a heading`);
     for (const w of widths(set)) assert.ok(w <= set.width, `${area}: ${w} px overflows`);
     assert.ok(set.lines.length * STATEMENT_LEADING * set.size <= set.height, `${area}: too tall`);
+    assert.ok(
+      set.text.some((line) => line.includes("會用 AI 的人")),
+      `${area}: phrase split`,
+    );
+  }
+});
+
+test("a highlight phrase too long for one line at a heading's size sweeps one line after another", () => {
+  const phrase = "所有影片的剪輯流程全部交給自動化工具處理";
+  const set = statement(`我們決定把${phrase}`, [phrase]);
+  const marked = set.lines.flat().filter((segment) => segment.mark === 0);
+  assert.ok(marked.length > 1, set.text.join(" / "));
+  assert.equal(marked.map((segment) => segment.text).join(""), phrase);
+  assert.equal(marked[0]?.sweep[0], 0);
+  for (const [k, segment] of marked.entries()) {
+    if (k > 0) assert.equal(segment.sweep[0], marked[k - 1]?.sweep[1]);
+  }
+  assert.equal(marked.at(-1)?.sweep[1], 1);
+  for (const w of widths(set)) assert.ok(w <= set.width, `${w} px overflows`);
+});
+
+test("no line of a highlight statement starts with closing punctuation or holds one character", () => {
+  const statements: [string, string[]][] = [
+    ["未來剪輯師會被 AI 取代嗎？", ["AI 取代"]],
+    ["AI 不會取代你，但會用 AI 的人會。", ["會用 AI 的人"]],
+    ["我們花了整整三個月把團隊的剪輯流程從頭到尾重新設計過一遍", ["剪輯流程"]],
+    ["其實剪輯最花時間的不是剪，是找素材。", ["找素材"]],
+    ["「快」不是重點，「穩」才是。", ["「穩」"]],
+  ];
+  for (const area of AREAS) {
+    for (const [text, phrases] of statements) {
+      const set = statement(text, phrases, area);
+      for (const line of set.text) {
+        assert.doesNotMatch(line, /^[，。、！？；：」』）]/, `${area}: ${set.text.join(" / ")}`);
+        assert.doesNotMatch(
+          line,
+          /^[「『（]?.[，。、！？；：」』）]*$/u,
+          `${area}: ${set.text.join(" / ")}`,
+        );
+      }
+    }
   }
 });
 
