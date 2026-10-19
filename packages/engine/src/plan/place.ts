@@ -20,9 +20,10 @@ export const PAUSE_MAX = 0.75;
 export const ROOM = 0.5;
 /** Seconds of a source's sound per entry of PlaceSource.peaks. */
 export const PEAK_BLOCK = 0.005;
-/** A cut clicks when the sharpest jump in the sound within CLICK_WINDOW of it is CLICK times the
- * jumps around it, over CLICK_CONTEXT on each side, as `vebench render` counts clicks; its floor
- * keeps jumps in near-silence from counting. */
+/** A cut clicks when the sharpest jump in the sound within CLICK_WINDOW of it is more than CLICK
+ * times the median PEAK_BLOCK peak within CLICK_CONTEXT around it. `vebench render` reads clicks
+ * against the 99th percentile of the samples around instead, which this flags whenever it does
+ * (README.md, What code does). CLICK_FLOOR keeps jumps in near-silence from counting. */
 const CLICK = 4;
 const CLICK_FLOOR = 0.004;
 const CLICK_WINDOW = 0.005;
@@ -88,7 +89,7 @@ interface Run {
  *   sound, less when the silence is shorter.
  * - A clip that would start or end on a jump in its source's sound, such as a splice the source
  *   was edited with, starts on the first frame after the jump or ends before it, where that
- *   keeps MARGIN from its words: it would click however the cut is faded.
+ *   keeps MARGIN from the sound: it would click however the cut is faded.
  *
  * Each clip starts on a frame of its source and lasts whole output frames. The renderer then
  * moves neither end: it starts a clip on the source frame nearest its `in` and lays clips on the
@@ -141,7 +142,7 @@ export function placeClips(
         ticks(s1 - MARGIN),
         source.frameTicks,
       ),
-      ticks(head.start - MARGIN),
+      ticks(s1 - MARGIN),
     );
 
     const [t0, t1] = nearest(silencesAfter(source, last), fits(pauseAfter), false) ?? [
@@ -161,7 +162,7 @@ export function placeClips(
         closed ? ticks(t1 - MARGIN) : ticks(Math.min(end, 1e9)),
         outputFrameTicks,
       ),
-      ticks(tail.end + MARGIN),
+      ticks(t0 + MARGIN),
       outputFrameTicks,
     );
     return { source: source.id, in: clipIn, out: clipOut, first, last };
