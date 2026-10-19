@@ -409,6 +409,26 @@ test("two people side by side who both talk share the frame, one above the other
   }
 });
 
+test("two people too close for each half to hold a whole head are followed in turn instead", () => {
+  // Faces 0.3 of the picture tall need halves about 0.69 of it tall, 0.44 wide: centres 0.25
+  // apart would take in the other face, so there is no split.
+  const shot: FramedShot = {
+    start: 0,
+    end: 10,
+    layout: "two_shot",
+    faces: [head(0, 0, 10, 0.375, 0.2, 0.3), head(1, 0, 10, 0.625, 0.2, 0.3)],
+    speakers: [
+      { face: 0, start: 0.5, end: 4 },
+      { face: 1, start: 4.5, end: 9.5 },
+    ],
+  };
+  const crop = cropPath(indexOf([shot]), clip(0, 10), PORTRAIT);
+  const keys = crop?.type === "path" ? crop.keyframes : crop ? [crop] : [];
+  assert.ok(keys.length > 0 && keys.every((key) => !key.below), JSON.stringify(crop));
+  assert.ok(Math.abs(centre(crop, 2 * SECOND) - 0.375) < 0.01);
+  assert.ok(Math.abs(centre(crop, 8 * SECOND) - 0.625) < 0.01);
+});
+
 test("two people side by side of whom one talks keep the camera on the one who talks", () => {
   const shot: FramedShot = {
     start: 0,
@@ -468,6 +488,38 @@ test("in a video call the crop fills the frame with the window of whoever speaks
   const edit = project([{ source: "a", ...clip(0, 8), framing: { crop: crop as CropPath } }]);
   edit.output = { ...edit.output, aspect: "9:16", width: 720, height: 1280 };
   validateProject(edit);
+});
+
+test("a call of two windows side by side crops to the window of whoever speaks, not a split", () => {
+  // Two equal windows, each half the picture, as a two-shot of two people who take turns.
+  const shot: FramedShot = {
+    start: 0,
+    end: 10,
+    layout: "two_shot",
+    faces: [head(0, 0, 10, 0.25, 0.25, 0.25), head(1, 0, 10, 0.75, 0.25, 0.25)],
+    speakers: [
+      { face: 0, start: 0.5, end: 4 },
+      { face: 1, start: 4.5, end: 9.5 },
+    ],
+  };
+  const windows = new Map([
+    [0, { x: 0, y: 0.1, w: 0.5, h: 0.8 }],
+    [1, { x: 0.5, y: 0.1, w: 0.5, h: 0.8 }],
+  ]);
+  const crop = cropPath(indexOf([shot]), clip(0, 10), PORTRAIT, CAMERA, windows);
+  const keys = crop?.type === "path" ? crop.keyframes : crop ? [crop] : [];
+  assert.ok(keys.length > 0 && keys.every((key) => !key.below), JSON.stringify(crop));
+  const at = (t: number) => keys.findLast((key) => !("t" in key) || key.t <= t * SECOND)?.rect;
+  for (const [t, window] of [
+    [2, windows.get(0)],
+    [8, windows.get(1)],
+  ] as const) {
+    const rect = at(t);
+    assert.ok(rect && window, `${t}`);
+    // The window's whole height, inside it.
+    assert.ok(Math.abs(rect.h - 0.8) < 1e-6 && Math.abs(rect.y - 0.1) < 1e-6, JSON.stringify(rect));
+    assert.ok(rect.x >= window.x - 1e-6 && rect.x + rect.w <= window.x + window.w + 1e-6);
+  }
 });
 
 test("a portrait source in a landscape box moves up and down, eyes a third of the way down", () => {

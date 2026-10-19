@@ -2,9 +2,8 @@
 // centred with its eyes a third of the way down (`framing.anchor`). A cut inside one continuous
 // shot makes the picture jump; a change of framing at that cut reads as another camera angle, the
 // way editors hide jump cuts. In a landscape edit a long shot also changes framing between two
-// words, so
-// a talking head never holds one framing for long. A slow push-in lands on the moments the planner
-// marks as emphasis.
+// words, so a face never holds one framing for long. A slow push-in lands on the moments the
+// planner marks as emphasis.
 
 import {
   type FaceFraming,
@@ -22,7 +21,7 @@ import { closest, displayAspect, EYES, median, pastPicture, scaleAt, visible } f
 const PUNCH_IN = { landscape: 1.25, other: 1.12 };
 /** A smaller change of framing reads as the picture bumping rather than as another angle. */
 const MIN_PUNCH_IN = 1.08;
-/** In a landscape edit, the longest one framing of a talking head holds, in seconds, and the
+/** In a landscape edit, the longest one framing of a face holds, in seconds, and the
  * shortest stretch on either side of a change within a shot: a change lands between two words, at
  * the longest gap between them HOLD to LONGEST seconds after the last change, or failing that at
  * the first gap after. */
@@ -78,19 +77,21 @@ export function headroom(
  * Sets the scale of every main-track clip. At a jump cut, where a clip follows the one before it
  * by a hard cut within the same shot of the same source, the framing changes (level()); a clip
  * that plays on from where the one before it stopped keeps the framing that one ended at. In a
- * landscape edit, a shot held longer than LONGEST changes framing between two words too. On each moment
- * in `plan.emphasis`, the clip it starts in pushes in slowly. Footage already enlarged to fill the
- * box, as 1080p cut to 9:16 is, is never zoomed further; other footage goes up to its headroom or
- * the punch-in, whichever is more, and only as far as keeps the whole head of the face it centres
- * in view. A clip that shows no face, or a screen, or whose crop reaches past the picture or
- * splits the frame, keeps its framing. `shots` gives each video source's size, shot transitions,
- * faces and words, and a source without an entry is left wide; a source whose index has no faces
- * at all zooms about the crop's centre. Every other part of the framing is kept.
+ * landscape edit, a shot with a face held longer than LONGEST changes framing between two words
+ * too. On each moment in `plan.emphasis`, the clip it starts in pushes in slowly. In a 9:16 edit,
+ * footage already enlarged to fill the box, as landscape 1080p is, is never zoomed further;
+ * otherwise the scale goes up to the footage's headroom or the punch-in, whichever is more, and
+ * only as far as keeps the whole head of the face it centres in view. A shot of a screen or
+ * without a face shows wide, and a clip whose crop reaches past the picture or splits the frame
+ * keeps its framing. `shots` gives each video source's size, shot transitions, faces and words,
+ * and a source without an entry is left wide; a source whose index has no faces at all zooms
+ * about the crop's centre. Every other part of the framing is kept.
  */
 export function punchIns(project: Project, shots: ReadonlyMap<string, ShotFacts>): Project {
   const { output } = project;
   const frameTicks = ticksPerFrame(output.fps);
   const landscape = output.aspect === "16:9";
+  const portrait = output.aspect === "9:16";
   const punch = landscape ? PUNCH_IN.landscape : PUNCH_IN.other;
   const moments = [...(project.plan?.emphasis ?? [])].sort((a, b) => a.start - b.start);
   // Where each clip starts on the output timeline. A clip's own stretch ends where the next one
@@ -112,7 +113,7 @@ export function punchIns(project: Project, shots: ReadonlyMap<string, ShotFacts>
     const { scale: _, anchor: __, ...rest } = clip.framing ?? {};
     const facts = shots.get(clip.source);
     const face = facts?.framing ? speakerIn(facts.framing, clip, rest, facts, output) : null;
-    const room = facts ? roomFor(facts, rest, face, output, punch) : 1;
+    const room = facts ? roomFor(facts, rest, face, output, punch, portrait) : 1;
     // Shots of a screen, or without a face, show wide: the scale steps back at the shot change.
     const bare = bareIn(facts?.framing, clip, start);
     const isBare = (t: number) => bare.some(([a, b]) => t >= a && t < b);
@@ -182,10 +183,10 @@ export function punchIns(project: Project, shots: ReadonlyMap<string, ShotFacts>
 }
 
 /**
- * How far a clip's framing may zoom in: not at all where the crop already enlarges the footage,
- * shows no face, reaches past the picture or splits the frame; otherwise up to the
- * source's headroom or the punch-in, whichever is more, and no further than keeps the face's whole
- * head in view.
+ * How far a clip's framing may zoom in: not at all in a portrait edit whose crop already enlarges
+ * the footage, as 1080p landscape footage at 9:16 is, nor where it shows no face, reaches past the
+ * picture or splits the frame; otherwise up to the source's headroom or the punch-in, whichever is
+ * more, and no further than keeps the face's whole head in view.
  */
 function roomFor(
   facts: ShotFacts,
@@ -193,13 +194,14 @@ function roomFor(
   face: Face | null,
   box: { width: number; height: number },
   punch: number,
+  portrait: boolean,
 ): number {
   if (facts.framing && !face) return 1;
   const crop = framing.crop;
   const keys = !crop ? [] : crop.type === "static" ? [crop] : crop.keyframes;
   if (keys.some((key) => key.below || pastPicture(key.rect))) return 1;
   const pixels = headroom(facts, framing, box);
-  if (pixels < 1 - 1e-9) return 1;
+  if (portrait && pixels < 1 - 1e-9) return 1;
   return Math.min(Math.max(pixels, punch), face ? closest(face.h) : Number.POSITIVE_INFINITY);
 }
 

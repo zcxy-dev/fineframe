@@ -211,3 +211,14 @@ def test_a_callout_over_the_whole_picture_in_a_taller_frame_is_scored_where_it_s
     ]
     path.write_text(json.dumps(project))
     assert edit.score(path)["callouts"]["ious"] == [1.0]
+
+
+def test_the_part_on_screen_of_a_split_screen_is_its_top_half():
+    # A 9:16 frame split in two: the top half, 9:8, shows the top crop narrowed to that shape and
+    # ignores a scale, as the engine's visible() does.
+    aspect, shape = 16 / 9, 9 / 16
+    top = {"x": 0.1, "y": 0.2, "w": 0.4, "h": 0.6}
+    crop = {"type": "static", "rect": top, "below": {"x": 0.5, "y": 0.2, "w": 0.4, "h": 0.6}}
+    x, y, w, h = edit._visible({"crop": crop, "scale": 1.2}, 0, aspect, shape)
+    # 0.6 of the height is 0.6 × 9/8 of it wide, 0.3797 of the picture's width, centred on top's.
+    assert (round(x, 4), round(y, 4), round(w, 4), round(h, 4)) == (0.1102, 0.2, 0.3797, 0.6)

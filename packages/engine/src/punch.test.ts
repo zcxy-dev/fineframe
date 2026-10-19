@@ -71,6 +71,9 @@ test("footage without pixels to spare punches in a landscape edit; footage alrea
     new Map<string, ShotFacts>([["a", { width, height, transitions: [] }]]);
   const jump = project([clip("a", 0, 2), clip("a", 3, 5)]);
   assert.deepEqual(scales(punchIns(jump, sized(1280, 720))), [1, 1.25]);
+  // A 16:9 edit punches in whatever the footage's size: 720p in a 1080p edit too.
+  const full = { ...jump, output: { ...jump.output, width: 1920, height: 1080 } };
+  assert.deepEqual(scales(punchIns(full, sized(1280, 720))), [1, 1.25]);
   // 1080p edited at 9:16 is already enlarged 1.78 times to fill the frame: no punch-in, and no
   // push-in either. 4K has pixels to spare there, and punches in 12 %.
   const portrait = {

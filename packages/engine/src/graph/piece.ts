@@ -1,18 +1,19 @@
 // One piece's FFmpeg run: its inputs and its filter graph, for the video pass or the audio pass.
 
-import { type Grade, TICKS_PER_SECOND } from "@video-editor/schema";
+import { type Framing, type Grade, TICKS_PER_SECOND } from "@video-editor/schema";
+import { framingCuts } from "../framing.ts";
 import { lutKey } from "../looks.ts";
 import type { Piece } from "../pieces.ts";
 import { EDGE_FADE_SAMPLES } from "../pieces.ts";
 import type { SourceFacts } from "../sources.ts";
-import { type Timeline, ticksToSamples } from "../timeline.ts";
+import { type Timeline, type TimelineClip, ticksToSamples } from "../timeline.ts";
 import { fades, silence, soundClock, span } from "./audio.ts";
 import { brollSound, brollTiming, mix, overlay, panelRect, placement } from "./broll.ts";
 import { QUIET, RAW_AUDIO, RAW_VIDEO } from "./encode.ts";
 import { openSource } from "./inputs.ts";
 import { overlayInput, overlayTiming } from "./overlays.ts";
 import { crossfade, dissolve } from "./transitions.ts";
-import { clock, colour, dips, fill, push } from "./video.ts";
+import { clock, colour, dips, fill, ON_SCREEN_TOLERANCE, push } from "./video.ts";
 import { lead, voiceSound } from "./voice.ts";
 
 /** Collects inputs, numbering them as FFmpeg will. */
@@ -50,29 +51,19 @@ export function pieceVideo(
     if (!file) throw new Error("A clip's match or look has no LUT file");
     return file;
   };
-  const { output, frameTicks } = timeline;
+  const { output } = timeline;
   const { fps } = output;
   const opened = inputs(timeline);
   const graph: string[] = [];
   for (const [i, layer] of piece.main.entries()) {
     const { clip } = layer;
-    const start = clip.in + layer.fromFrame * frameTicks;
-    const { index, offset } = opened.open(clip.source, start);
+    const picture = framed(opened, layer, output, timeline, `m${i}`);
     const chain = [
-      ...clock(offset, fps, layer.frames),
-      ...fill(
-        clip.clip.framing,
-        output,
-        clip.source,
-        { start, frames: layer.frames, frameTicks },
-        `m${i}`,
-      ),
-      ...push(clip.clip.framing, { start, frames: layer.frames, frameTicks }, output),
       ...colour(clip.clip.grade, lut(clip.clip.grade)),
       "format=yuv420p",
       ...dips(layer.dipIn, layer.dipOut, layer.frames),
     ];
-    graph.push(`[${index}:v]${chain.join(",")}[m${i}]`);
+    graph.push(...picture.lines, `${picture.out}${chain.join(",")}[m${i}]`);
   }
   let base = "[m0]";
   if (piece.main.length === 2) {
@@ -82,22 +73,13 @@ export function pieceVideo(
   for (const [j, layer] of piece.broll.entries()) {
     const { clip } = layer;
     const at = placement(clip.clip.rect, output);
-    const start = clip.in + layer.fromFrame * frameTicks;
-    const { index, offset } = opened.open(clip.source, start);
-    const chain = [
-      ...clock(offset, fps, layer.frames),
-      ...fill(
-        clip.clip.framing,
-        at,
-        clip.source,
-        { start, frames: layer.frames, frameTicks },
-        `b${j}`,
-      ),
-      ...push(clip.clip.framing, { start, frames: layer.frames, frameTicks }, at),
-      ...colour(clip.clip.grade, lut(clip.clip.grade)),
-      ...brollTiming(layer, fps),
-    ];
-    graph.push(`[${index}:v]${chain.join(",")}[b${j}]`, `${base}[b${j}]${overlay(at)}[o${j}]`);
+    const picture = framed(opened, layer, at, timeline, `b${j}`);
+    const chain = [...colour(clip.clip.grade, lut(clip.clip.grade)), ...brollTiming(layer, fps)];
+    graph.push(
+      ...picture.lines,
+      `${picture.out}${chain.length > 0 ? chain.join(",") : "null"}[b${j}]`,
+      `${base}[b${j}]${overlay(at)}[o${j}]`,
+    );
     base = `[o${j}]`;
   }
   for (const [k, layer] of piece.cards.entries()) {
@@ -134,6 +116,60 @@ export function pieceVideo(
     ...RAW_VIDEO,
     "pipe:1",
   ];
+}
+
+/**
+ * A layer's picture, clocked and framed into `box`, as graph lines and the link they end in: one
+ * chain from the source, or, where the layer's framing cuts to another crop size, to or from a
+ * split screen, or to another scale (framingCuts()), one chain for each stretch between its cuts,
+ * each with its own crop, taken one after the other. FFmpeg's crop keeps one size per chain.
+ */
+function framed(
+  opened: ReturnType<typeof inputs>,
+  layer: {
+    clip: Pick<TimelineClip, "in" | "source"> & { clip: { framing?: Framing } };
+    fromFrame: number;
+    frames: number;
+  },
+  box: { width: number; height: number },
+  timeline: Timeline,
+  label: string,
+): { lines: string[]; out: string } {
+  const { frameTicks, output } = timeline;
+  const { clip } = layer;
+  const { framing } = clip.clip;
+  const late = ON_SCREEN_TOLERANCE * TICKS_PER_SECOND;
+  // The first frame of the layer that shows each cut.
+  const cuts = framingCuts(framing)
+    .map((t) => Math.ceil((t - late - clip.in) / frameTicks - 1e-9) - layer.fromFrame)
+    .filter((n) => n > 0 && n < layer.frames);
+  const edges = [0, ...new Set(cuts), layer.frames];
+  const { num, den } = output.fps;
+  const stretches = edges.slice(1).map((end, k) => {
+    const from = edges[k] as number;
+    const start = clip.in + (layer.fromFrame + from) * frameTicks;
+    const span = { start, frames: end - from, frameTicks };
+    const { index, offset } = opened.open(clip.source, start);
+    const chain = [
+      ...clock(offset, output.fps, end - from),
+      ...fill(framing, box, clip.source, span, `${label}_${k}`),
+      ...push(framing, span, box),
+      // Stamped with its own frame numbers in the layer, so the stretches interleave in order.
+      ...(edges.length > 2 ? [`settb=${den}/${num}`, `setpts=N+${from}`] : []),
+    ];
+    return `[${index}:v]${chain.join(",")}[${label}_${k}]`;
+  });
+  if (stretches.length === 1) return { lines: stretches, out: `[${label}_0]` };
+  const parts = stretches.map((_, k) => `[${label}_${k}]`).join("");
+  return {
+    // interleave leaves the frame rate unset, which raw output would read as 25 fps; fps sets it,
+    // passing the last frame on.
+    lines: [
+      ...stretches,
+      `${parts}interleave=nb_inputs=${stretches.length},fps=${num}/${den}:eof_action=pass[${label}_all]`,
+    ],
+    out: `[${label}_all]`,
+  };
 }
 
 /** The piece's sound, written to stdout as raw samples. */

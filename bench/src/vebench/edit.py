@@ -200,23 +200,29 @@ def _callouts(project: dict, base: Path) -> dict:
 
 def _visible(framing: dict | None, t: float, aspect: float, shape: float) -> tuple:
     """The part of the source on screen at source tick t, as (x, y, w, h) fractions of its
-    picture, reaching past it where the crop does: the engine's visible() in
-    packages/engine/src/framing.ts."""
+    picture, reaching past it where the crop does, and of a split screen the top half's: the
+    engine's visible() in packages/engine/src/framing.ts."""
     framing = framing or {}
     crop = framing.get("crop")
     rect = {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0}
+    split = False
     if crop and crop["type"] == "static":
-        rect = crop["rect"]
+        rect, split = crop["rect"], "below" in crop
     elif crop:
         keys = crop["keyframes"]
         after = next((i for i, key in enumerate(keys) if key["t"] > t), len(keys))
         if after == 0 or after == len(keys):
-            rect = keys[min(after, len(keys) - 1)]["rect"]
+            key = keys[min(after, len(keys) - 1)]
+            rect, split = key["rect"], "below" in key
         else:
             a, b = keys[after - 1], keys[after]
             f = (t - a["t"]) / (b["t"] - a["t"])
             rect = {k: a["rect"][k] + (b["rect"][k] - a["rect"][k]) * f for k in "xywh"}
-    scale = _scale(framing.get("scale"), t)
+            split = "below" in a and "below" in b
+    # A split screen's top half is twice as wide, for its height, as the frame, and not zoomed.
+    if split:
+        shape *= 2
+    scale = 1.0 if split else _scale(framing.get("scale"), t)
     anchor = framing.get("anchor", {"x": 0.5, "y": 0.5})
     w = min(rect["w"] * aspect, rect["h"] * shape) / scale
     h = min(rect["h"], rect["w"] * aspect / shape) / scale

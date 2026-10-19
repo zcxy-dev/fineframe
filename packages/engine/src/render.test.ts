@@ -9,6 +9,7 @@ import { test } from "node:test";
 import { promisify } from "node:util";
 import { COLORS, catalog, type renderOverlays, templateIds } from "@video-editor/effects";
 import {
+  type CropPath,
   type FaceBox,
   type FramedShot,
   loadJson,
@@ -553,6 +554,46 @@ test("a crop past the picture shows it whole over a blurred copy, from the exact
       assert.ok(Math.max(...steps) < 20, `frame ${k}, row ${y} is not smooth: ${row}`);
     }
   }
+});
+
+test("a crop that changes size during a dissolve renders each side of the cut with its own", async (t) => {
+  const dir = await scratch(t, "dissolve-cut-");
+  // A white square, 40 pixels wide, in the middle of a black frame.
+  const square = await makeSource(dir, {
+    id: "square",
+    pattern: "color",
+    filter: "drawbox=x=140:y=70:w=40:h=40:color=white:t=fill",
+    width: 320,
+    height: 180,
+    fps: 30,
+    seconds: 3,
+    sound: null,
+  });
+  // The second clip comes in over 0.4 s from 1 s of the source, and its crop cuts at 1.1 s to
+  // twice the picture's size, which shows the picture at half size over its blurred copy.
+  const keyframes: CropPath["keyframes"] = [
+    { t: 1.1 * SECOND - 1, rect: { x: 0, y: 0, w: 1, h: 1 } },
+    { t: 1.1 * SECOND, rect: { x: -0.5, y: -0.5, w: 2, h: 2 } },
+  ];
+  const project = projectOf(
+    [square],
+    [
+      clip("square", 0, 1),
+      {
+        ...clip("square", 1, 1),
+        transition: { type: "dissolve", duration: 0.4 * SECOND },
+        framing: { crop: { type: "path", keyframes } },
+      },
+    ],
+    { ...tiny, width: 320, height: 180 },
+  );
+  const result = await render(await write(dir, project), join(dir, "out.mp4"));
+  const picture = await grey(result.video, 320, 180);
+  assert.equal(picture.length, 48);
+  const width = (frame: Uint8Array) =>
+    frame.subarray(90 * 320, 91 * 320).filter((value) => value > 128).length;
+  assert.equal(width(picture[0] as Uint8Array), 40);
+  assert.equal(width(picture.at(-1) as Uint8Array), 20);
 });
 
 test("a split screen fills its top and bottom halves with their own crops", async (t) => {

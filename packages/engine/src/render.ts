@@ -33,7 +33,7 @@ import {
 } from "./graph/music.ts";
 import { pieceAudio, pieceVideo } from "./graph/piece.ts";
 import { cube, isLookId, lookIds, lutKey } from "./looks.ts";
-import { cutPieces, framedPieces } from "./pieces.ts";
+import { cutPieces } from "./pieces.ts";
 import { loadSources } from "./sources.ts";
 import { buildTimeline } from "./timeline.ts";
 
@@ -331,10 +331,8 @@ export async function render(
       args,
       { cwd: work, env: { ...process.env, ...fonts } },
       async (stdin) => {
-        const framed = framedPieces(pieces, timeline);
-        for (const [i, piece] of framed.entries()) {
-          const done = pieces.length + 1 + (i * pieces.length) / framed.length;
-          progress(done / steps, `Rendering ${i + 1}/${framed.length}`);
+        for (const [i, piece] of pieces.entries()) {
+          progress((pieces.length + 1 + i) / steps, `Rendering ${i + 1}/${pieces.length}`);
           // A crop path's expression can outgrow one command-line argument (128 KiB on Linux),
           // so FFmpeg reads the graph from a file.
           const args = pieceVideo(piece, timeline, overlays, luts, cards);

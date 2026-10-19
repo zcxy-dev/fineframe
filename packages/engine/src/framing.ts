@@ -200,6 +200,10 @@ function frame(
     return still(whole(geometry));
   }
   const turns = turnsOf(shot);
+  // A video call's layout frames the window of whoever speaks, whatever its people's layout.
+  if (shot.faces.some((face) => windows.has(face.id))) {
+    return simulate(shot, geometry, camera, windows, turns, undefined);
+  }
   const together = everyone(shot, geometry);
   const halves = together ? undefined : split2(shot, geometry, turns);
   if (halves) return still(...halves);
@@ -240,8 +244,9 @@ function everyone(shot: FramedShot, geometry: Geometry): number | undefined {
 
 /**
  * A split screen for two people side by side who both take turns to talk, in a portrait box: the
- * one on the left above, the one on the right below, each crop half the box's shape, eyes a third
- * of the way down, and narrow enough to leave out the other.
+ * one on the left above, the one on the right below, each crop half the box's shape, keeping its
+ * person's whole head with room above it, eyes a third of the way down, and at least MIN_PANE of
+ * the picture tall. Undefined when either half would take in the other's face.
  */
 function split2(
   shot: FramedShot,
@@ -259,16 +264,19 @@ function split2(
   const [a, b] = [left.box, right.box];
   // A half of the box is twice as wide, for its height, as the whole box.
   const shape = 2 * geometry.ratio;
-  const gap = b.x + b.w / 2 - (a.x + a.w / 2);
-  const h = Math.min(1, gap / shape, Math.max(MIN_PANE, needed(a).h, needed(b).h));
+  const h = Math.max(MIN_PANE, needed(a).h, needed(b).h);
   const w = h * shape;
+  if (h > 1 || w > 1) return;
   const pane = (box: Box): CropRect => ({
     x: round(clamp(box.x + box.w / 2 - w / 2, 0, 1 - w)),
     y: round(clamp(box.y + EYES * box.h - h / 3, 0, 1 - h)),
     w: round(w),
     h: round(h),
   });
-  return [pane(a), pane(b)];
+  const [top, bottom] = [pane(a), pane(b)];
+  // Each half leaves out the other's face; two people closer than that are followed instead.
+  if (top.x + top.w > b.x || bottom.x < a.x + a.w) return;
+  return [top, bottom];
 }
 
 /** The furthest a framing may zoom in on a face `height` of its own height tall and still keep
@@ -382,9 +390,9 @@ function simulate(
 
 /** The crop that holds one face: the largest of the box's shape in its window, in a video call;
  * otherwise the largest in the picture, widened past it where the whole head needs more room. The
- * eyes sit a third of the way down, where the crop can move that way; a crop of the picture's full
- * height moves down only for a head the picture cuts off at the top, which then gets room above
- * it. */
+ * eyes sit a third of the way down, where the crop can move that way; a crop as tall as the
+ * picture moves up past its top edge only where the head has less than ROOM above it there, as
+ * when the picture cuts it off. */
 function faceFrame(face: FaceTrack, geometry: Geometry, window: Rect | undefined): Frame {
   const box = medianBox(face);
   const { axis, ratio } = geometry;
