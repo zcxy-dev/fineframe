@@ -48,8 +48,8 @@ export interface CutResult {
   outside: { range: number; words: string }[];
 }
 
-/** The words, length, frame grid and voice stem's marks of every analysed source on the main
- * track, from the media index the project names for it. */
+/** The words, length, frame grid, shot changes and voice stem's marks of every analysed source on
+ * the main track, from the media index the project names for it. */
 export async function placeSources(
   project: Project,
   projectPath: string,
@@ -65,6 +65,7 @@ export async function placeSources(
       words: index.transcript.words as Word[],
       duration: index.source.duration,
       frameTicks: gridTicks(index.source.video?.fps ?? 0),
+      shots: index.transitions.map((t) => [t.start, t.end] as const),
       ...(await stemMarks(index, indexPath)),
     });
   }

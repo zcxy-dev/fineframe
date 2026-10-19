@@ -1232,6 +1232,7 @@ async function loadSources(inputs: readonly PlanInput[]): Promise<Map<string, Pl
       // A still shows for as long as a B-roll shot may.
       duration: s.index ? s.index.source.duration : BROLL_MAX,
       frameTicks: s.index ? gridTicks(s.index.source.video?.fps ?? 0) : null,
+      shots: (s.index?.transitions ?? []).map((t) => [t.start, t.end] as const),
       ...(s.index && s.indexPath ? await stemMarks(s.index, s.indexPath) : {}),
     };
     sources.set(id, {

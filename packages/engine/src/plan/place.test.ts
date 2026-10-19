@@ -286,3 +286,54 @@ test("with no silence a cut fits in, a clip starts in the widest one before its 
   assert.ok(clip);
   assert.ok(s(clip.in) >= 1.5 && s(clip.in) <= 1.6, `in at ${s(clip.in)} s`);
 });
+
+test("a clip starts after a jump anywhere in the silence it opens with", () => {
+  const words = spoken(2, [2]);
+  const plain = placeClips([{ source: "a", words: [1] }], map(source(words)), FRAME_30);
+  const at = s((plain[0] as PlacedClip).in) + 0.06;
+  const spliced = { ...source(words), peaks: peaks(60, [at]) };
+  const [clip] = placeClips([{ source: "a", words: [1] }], map(spliced), FRAME_30);
+  assert.ok(clip);
+  assert.ok(s(clip.in) > at, `in at ${s(clip.in)} s, before the jump at ${at} s`);
+  assert.ok(s(clip.in) <= (words[1] as Word).start - MARGIN);
+  assert.equal(clip.in % FRAME_25, 0);
+});
+
+test("a clip ends before a jump anywhere in the silence it closes with", () => {
+  const words = spoken(2, [2]);
+  const plain = placeClips([{ source: "a", words: [0] }], map(source(words)), FRAME_30);
+  const at = s((plain[0] as PlacedClip).out) - 0.06;
+  const spliced = { ...source(words), peaks: peaks(60, [at]) };
+  const [clip] = placeClips([{ source: "a", words: [0] }], map(spliced), FRAME_30);
+  assert.ok(clip);
+  assert.ok(s(clip.out) < at, `out at ${s(clip.out)} s, after the jump at ${at} s`);
+  assert.ok(s(clip.out) >= (words[0] as Word).end + MARGIN);
+});
+
+test("a jump too close to a word to start after it leaves the cut where it was", () => {
+  const words = spoken(2, [2]);
+  const plain = placeClips([{ source: "a", words: [1] }], map(source(words)), FRAME_30);
+  const spliced = { ...source(words), peaks: peaks(60, [(words[1] as Word).start - 0.02]) };
+  const [clip] = placeClips([{ source: "a", words: [1] }], map(spliced), FRAME_30);
+  assert.equal(clip?.in, plain[0]?.in);
+});
+
+test("a clip starts after a shot change in the silence it opens with, and ends before one", () => {
+  const words = spoken(2, [2, 2]);
+  const plain = placeClips([{ source: "a", words: [1] }], map(source(words)), FRAME_30);
+  const [first] = plain as [PlacedClip];
+  // Shot changes on the source's frame grid, 0.08 s inside the silence on each side.
+  const before = (Math.round(first.in / FRAME_25) + 2) * FRAME_25;
+  const after = (Math.round(first.out / FRAME_25) - 2) * FRAME_25;
+  const shots = [[s(before), s(before)] as const, [s(after), s(after)] as const];
+  const [clip] = placeClips(
+    [{ source: "a", words: [1] }],
+    map({ ...source(words), shots }),
+    FRAME_30,
+  );
+  assert.ok(clip);
+  assert.ok(clip.in >= before, `in at ${s(clip.in)} s, before the shot change at ${s(before)} s`);
+  assert.ok(clip.out <= after, `out at ${s(clip.out)} s, after the shot change at ${s(after)} s`);
+  assert.ok(s(clip.in) <= (words[1] as Word).start - MARGIN);
+  assert.ok(s(clip.out) >= (words[1] as Word).end + MARGIN);
+});

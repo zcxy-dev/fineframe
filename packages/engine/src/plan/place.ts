@@ -20,13 +20,12 @@ export const PAUSE_MAX = 0.75;
 export const ROOM = 0.5;
 /** Seconds of a source's sound per entry of PlaceSource.peaks. */
 export const PEAK_BLOCK = 0.005;
-/** A cut clicks when the sharpest jump in the sound within CLICK_WINDOW of it is more than CLICK
- * times the median PEAK_BLOCK peak within CLICK_CONTEXT around it. `vebench render` reads clicks
- * against the 99th percentile of the samples around instead, which this flags whenever it does
- * (README.md, What code does). CLICK_FLOOR keeps jumps in near-silence from counting. */
+/** A PEAK_BLOCK of sound clicks when its peak is more than CLICK times the median peak within
+ * CLICK_CONTEXT around it. `vebench render` reads a cut's clicks against the 99th percentile of
+ * the samples around it instead, which this flags whenever it does (README.md, What code does).
+ * CLICK_FLOOR keeps jumps in near-silence from counting. */
 const CLICK = 4;
 const CLICK_FLOOR = 0.004;
-const CLICK_WINDOW = 0.005;
 const CLICK_CONTEXT = 0.1;
 /** How far the renderer may place a clip's sound from its planned time: Matroska times packets
  * in whole milliseconds. */
@@ -47,6 +46,9 @@ export interface PlaceSource {
   /** The sharpest jump in the source's sound in each PEAK_BLOCK from its start (the largest
    * second difference of its samples), or none when unknown. */
   peaks?: Float32Array;
+  /** Seconds, in order: the source's shot changes, each from its first frame to the first frame
+   * of the new shot alone (the same for a hard cut). */
+  shots?: readonly (readonly [number, number])[];
 }
 
 /** Words of one source to play in a row, by index, ascending. */
@@ -87,9 +89,11 @@ interface Run {
  *   a cut fits in, and the next one starts in the last such silence before its first, or in the
  *   longest silence there when none fits, each at least MARGIN from the sound on either side. Up to TAIL and LEAD of silence stay with the
  *   sound, less when the silence is shorter.
- * - A clip that would start or end on a jump in its source's sound, such as a splice the source
- *   was edited with, starts on the first frame after the jump or ends before it, where that
- *   keeps MARGIN from the sound: it would click however the cut is faded.
+ * - A clip whose opening silence holds a click in its source's sound or a shot change, such as a
+ *   splice the source was edited with, starts on the first frame after the last of them, and one
+ *   whose closing silence holds one ends on the last output frame before the first, where that
+ *   keeps MARGIN from the sound; otherwise the cut stays. A cut on a click would click however
+ *   it is faded, and one before a shot change would open on frames of the shot before.
  *
  * Each clip starts on a frame of its source and lasts whole output frames. The renderer then
  * moves neither end: it starts a clip on the source frame nearest its `in` and lays clips on the
@@ -136,7 +140,7 @@ export function placeClips(
     const bounded = s0 > 0 || first > 0;
     const lead = source.roomy?.has(first) ? ROOM : LEAD * breath;
     const wantIn = s1 - Math.min(lead, bounded ? (s1 - s0) / 2 : s1 - s0);
-    const clipIn = pastJump(
+    const clipIn = pastSplices(
       source,
       startOnFrame(
         ticks(Math.max(0, wantIn)),
@@ -144,7 +148,7 @@ export function placeClips(
         ticks(s1 - MARGIN),
         source.frameTicks,
       ),
-      ticks(s1 - MARGIN),
+      s1,
     );
 
     const [t0, t1] = nearest(silencesAfter(source, last), fits(pauseAfter), false) ?? [
@@ -154,7 +158,7 @@ export function placeClips(
     const closed = t1 < end;
     const trail = source.roomy?.has(last) ? ROOM : TAIL * breath;
     const wantOut = t0 + Math.min(trail, closed ? (t1 - t0) / 2 : t1 - t0);
-    const clipOut = beforeJump(
+    const clipOut = beforeSplices(
       source,
       clipIn,
       endOnFrame(
@@ -164,7 +168,7 @@ export function placeClips(
         closed ? ticks(t1 - MARGIN) : ticks(Math.min(end, 1e9)),
         outputFrameTicks,
       ),
-      ticks(t0 + MARGIN),
+      t0,
       outputFrameTicks,
     );
     return { source: source.id, in: clipIn, out: clipOut, first, last };
@@ -218,61 +222,76 @@ function nearest(
   );
 }
 
-/** Where the sound of `source` jumps by a click within [from, to] (seconds): the end of the last
- * PEAK_BLOCK holding one, or the start of the first, or null for none. */
-function jump(source: PlaceSource, from: number, to: number, last: boolean): number | null {
+/** Which PEAK_BLOCKs of each source's sound click, worked out as they are asked for. */
+const clicking = new WeakMap<Float32Array, Int8Array>();
+
+/** The clicks in the sound of `source` within [from, to] (seconds), as the PEAK_BLOCKs holding
+ * them, [start, end] in seconds, in order. */
+function clicks(source: PlaceSource, from: number, to: number): [number, number][] {
   const peaks = source.peaks;
-  if (!peaks) return null;
-  const a = Math.max(0, Math.floor(from / PEAK_BLOCK));
-  const b = Math.min(peaks.length - 1, Math.floor(to / PEAK_BLOCK));
+  if (!peaks) return [];
+  let known = clicking.get(peaks);
+  if (!known) {
+    known = new Int8Array(peaks.length).fill(-1);
+    clicking.set(peaks, known);
+  }
   const reach = Math.round(CLICK_CONTEXT / PEAK_BLOCK);
-  const around = [
-    ...peaks.subarray(Math.max(0, a - reach), a),
-    ...peaks.subarray(b + 1, b + 1 + reach),
-  ].sort((x, y) => x - y);
-  const base = around.length > 0 ? (around[around.length >> 1] as number) : 0;
-  const limit = CLICK * Math.max(base, CLICK_FLOOR / CLICK);
-  let found: number | null = null;
-  for (let k = a; k <= b; k++) {
-    if ((peaks[k] as number) <= limit) continue;
-    if (!last) return k * PEAK_BLOCK;
-    found = (k + 1) * PEAK_BLOCK;
+  const found: [number, number][] = [];
+  const last = Math.min(peaks.length - 1, Math.floor(to / PEAK_BLOCK));
+  for (let k = Math.max(0, Math.floor(from / PEAK_BLOCK)); k <= last; k++) {
+    if (known[k] === -1) {
+      const around = [
+        ...peaks.subarray(Math.max(0, k - reach), k),
+        ...peaks.subarray(k + 1, k + 1 + reach),
+      ].sort((x, y) => x - y);
+      const base = around.length > 0 ? (around[around.length >> 1] as number) : 0;
+      known[k] = (peaks[k] as number) > CLICK * Math.max(base, CLICK_FLOOR / CLICK) ? 1 : 0;
+    }
+    if (known[k] === 1) found.push([k * PEAK_BLOCK, (k + 1) * PEAK_BLOCK]);
   }
   return found;
 }
 
-/** `clipIn`, or the first source frame after the jumps in the sound where it would click, when
- * that is no later than `latest`. */
-function pastJump(source: PlaceSource, clipIn: number, latest: number): number {
+/** `clipIn`, or the first source frame after every click and shot change between it and
+ * `sound` (seconds), where the clip's sound starts, when that keeps MARGIN from the sound. */
+function pastSplices(source: PlaceSource, clipIn: number, sound: number): number {
+  const latest = ticks(sound - MARGIN);
   let at = clipIn;
   for (;;) {
     const t = at / TICKS_PER_SECOND;
-    const found = jump(source, t - SOUND_SLACK, t + CLICK_WINDOW, true);
-    if (found === null) return at;
-    const after = ticks(found + SOUND_SLACK);
-    const next = source.frameTicks
-      ? Math.ceil(after / source.frameTicks) * source.frameTicks
-      : after;
+    const ends = [
+      ...clicks(source, t - SOUND_SLACK, sound).map(([, b]) => b + SOUND_SLACK),
+      ...(source.shots ?? []).flatMap(([, b]) => (b > t && b <= sound ? [b] : [])),
+    ];
+    if (ends.length === 0) return at;
+    const after = ticks(Math.max(...ends));
+    const grid = source.frameTicks;
+    const next = grid ? Math.ceil(after / grid) * grid : after;
     if (next <= at || next > latest) return clipIn;
     at = next;
   }
 }
 
-/** `clipOut`, or the last whole output frame from `clipIn` before the jumps in the sound where it
- * would click, when that is no earlier than `earliest`. */
-function beforeJump(
+/** `clipOut`, or the last whole output frame from `clipIn` before every click and shot change
+ * between `sound` (seconds), where the clip's sound ends, and it, when that keeps MARGIN from
+ * the sound. */
+function beforeSplices(
   source: PlaceSource,
   clipIn: number,
   clipOut: number,
-  earliest: number,
+  sound: number,
   frame: number,
 ): number {
+  const earliest = ticks(sound + MARGIN);
   let at = clipOut;
   for (;;) {
     const t = at / TICKS_PER_SECOND;
-    const found = jump(source, t - CLICK_WINDOW, t + SOUND_SLACK, false);
-    if (found === null) return at;
-    const next = clipIn + Math.floor((ticks(found - SOUND_SLACK) - clipIn) / frame) * frame;
+    const starts = [
+      ...clicks(source, sound, t + SOUND_SLACK).map(([a]) => a - SOUND_SLACK),
+      ...(source.shots ?? []).flatMap(([a]) => (a >= sound && a < t ? [a] : [])),
+    ];
+    if (starts.length === 0) return at;
+    const next = clipIn + Math.floor((ticks(Math.min(...starts)) - clipIn) / frame) * frame;
     if (next >= at || next < earliest || next <= clipIn) return clipOut;
     at = next;
   }
