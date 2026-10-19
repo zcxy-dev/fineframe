@@ -29,9 +29,8 @@ import {
   validateProject,
 } from "@video-editor/schema";
 import { deltaE2000, type Rgb, rgbToLab } from "../src/colour.ts";
-import { ffmpeg, run } from "../src/ffmpeg.ts";
+import { ffmpeg, QUIET, run } from "../src/ffmpeg.ts";
 import { autoGrade } from "../src/grade.ts";
-import { QUIET } from "../src/graph/encode.ts";
 import { lookIds } from "../src/looks.ts";
 import { matchColour } from "../src/match.ts";
 import { isJumpCut, type ShotFacts } from "../src/punch.ts";

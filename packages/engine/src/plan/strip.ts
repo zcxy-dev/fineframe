@@ -3,8 +3,7 @@
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { ffmpeg, run } from "../ffmpeg.ts";
-import { QUIET } from "../graph/encode.ts";
+import { ffmpeg, QUIET, run } from "../ffmpeg.ts";
 import { decimal } from "../graph/inputs.ts";
 
 const STRIP_FRAMES = 8;

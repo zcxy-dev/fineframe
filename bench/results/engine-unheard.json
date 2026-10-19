@@ -1,0 +1,30 @@
+{
+  "doc": "packages/engine/MEASUREMENTS.md",
+  "columns": ["Footage", "Asked", "Made", "Clicks, drift", "Edges checked", "Claude"],
+  "rows": [
+    [
+      "real-4: street walk, Taiwanese Mandarin, 7.0 min",
+      "60 s, 9:16",
+      "60.0 s (-0.0 %)",
+      "0 of 6, 0.0 ms",
+      "13: none inside a word; 1 unclear (above)",
+      "$0.22"
+    ],
+    [
+      "real-3: video call, Mandarin and English, 10.4 min",
+      "60 s, 9:16",
+      "60.9 s (+1.4 %)",
+      "0 of 6, 0.0 ms",
+      "14: none inside a word",
+      "$0.17"
+    ],
+    [
+      "real-9: couch conversation, English, 16.5 min",
+      "3 min, 16:9",
+      "171.3 s (-4.8 %)",
+      "0 of 5, 0.0 ms",
+      "12: none inside a word",
+      "$0.23"
+    ]
+  ]
+}

@@ -10,6 +10,8 @@ import {
   lengthOf,
   MARGIN,
   PAUSE_MAX,
+  PEAK_BLOCK,
+  type PlacedClip,
   type PlaceSource,
   placeClips,
   ROOM,
@@ -175,4 +177,163 @@ test("a word a review found clipped keeps up to ROOM of the pause beside it", ()
   assert.ok(s(c.in) < s(a.in) && Math.abs(1 - s(c.in) - ROOM) <= 0.025, `in at ${s(c.in)}`);
   assert.ok(s(c.out) > s(a.out) && Math.abs(s(c.out) - 1.2 - ROOM) <= 0.04, `out at ${s(c.out)}`);
   assert.ok(s(d.in) < s(b.in));
+});
+
+test("a clip starts before speech the transcript missed, never inside it", () => {
+  // Speech from 2.4 s to 2.95 s that no word covers runs into w1.
+  const words = [
+    { text: "w0", start: 1, end: 1.2 },
+    { text: "w1", start: 3, end: 3.2 },
+  ];
+  const missed = { ...source(words), unheard: [[2.4, 2.95]] as const };
+  const [clip] = placeClips([{ source: "a", words: [1] }], map(missed), FRAME_30);
+  assert.ok(clip);
+  assert.ok(s(clip.in) <= 2.4 - MARGIN && s(clip.in) >= 1.2 + MARGIN, `in at ${s(clip.in)} s`);
+});
+
+test("a clip ends after speech the transcript missed, never inside it", () => {
+  const words = [
+    { text: "w0", start: 1, end: 1.2 },
+    { text: "w1", start: 3, end: 3.2 },
+  ];
+  const missed = { ...source(words), unheard: [[1.22, 1.6]] as const };
+  const [clip] = placeClips([{ source: "a", words: [0] }], map(missed), FRAME_30);
+  assert.ok(clip);
+  assert.ok(s(clip.out) >= 1.6 + MARGIN && s(clip.out) <= 3 - MARGIN, `out at ${s(clip.out)} s`);
+});
+
+test("a pause is cut down in its silence, around the speech the transcript missed", () => {
+  // The words heard are 2.4 s apart, but the speaker said more right after w0 and right before
+  // w1, leaving 1.4 s of silence between.
+  const words = [
+    { text: "w0", start: 1, end: 1.2 },
+    { text: "w1", start: 3.6, end: 3.8 },
+  ];
+  const missed = { ...source(words), unheard: [[1.25, 1.7] as const, [3.1, 3.55] as const] };
+  const clips = placeClips([{ source: "a", words: [0, 1] }], map(missed), FRAME_30);
+  assert.equal(clips.length, 2);
+  const [a, b] = clips as [(typeof clips)[0], (typeof clips)[0]];
+  assert.ok(s(a.out) >= 1.7 + MARGIN && s(a.out) <= 3.1 - MARGIN, `out at ${s(a.out)} s`);
+  assert.ok(s(b.in) >= 1.7 + MARGIN && s(b.in) <= 3.1 - MARGIN, `in at ${s(b.in)} s`);
+});
+
+test("a pause the transcript missed speech in plays on when no silence in it is dead air", () => {
+  const words = [
+    { text: "w0", start: 1, end: 1.2 },
+    { text: "w1", start: 2.6, end: 2.8 },
+  ];
+  const missed = { ...source(words), unheard: [[1.5, 2.2]] as const };
+  const clips = placeClips([{ source: "a", words: [0, 1] }], map(missed), FRAME_30);
+  assert.equal(clips.length, 1);
+});
+
+test("no cut fits where the transcript missed speech that leaves no room", () => {
+  const words = [
+    { text: "w0", start: 1, end: 1.2 },
+    { text: "w1", start: 1.6, end: 1.8 },
+  ];
+  assert.ok(cuttableAfter(source(words), 0));
+  assert.ok(!cuttableAfter({ ...source(words), unheard: [[1.3, 1.5]] }, 0));
+});
+
+/** A source's sound as placeClips reads it: one second-difference peak per PEAK_BLOCK, all
+ * alike, but for a jump at each of `jumps` (seconds). */
+function peaks(seconds: number, jumps: number[]): Float32Array {
+  const blocks = new Float32Array(Math.round(seconds / PEAK_BLOCK)).fill(0.01);
+  for (const t of jumps) blocks[Math.floor(t / PEAK_BLOCK)] = 0.3;
+  return blocks;
+}
+
+test("a clip that would start on a jump in the source's sound starts after it", () => {
+  const words = spoken(2, [2]);
+  const plain = placeClips([{ source: "a", words: [1] }], map(source(words)), FRAME_30);
+  const at = s((plain[0] as PlacedClip).in) + 0.003;
+  const spliced = { ...source(words), peaks: peaks(60, [at]) };
+  const [clip] = placeClips([{ source: "a", words: [1] }], map(spliced), FRAME_30);
+  assert.ok(clip);
+  assert.ok(s(clip.in) > at, `in at ${s(clip.in)} s, on the jump at ${at} s`);
+  assert.ok(s(clip.in) <= (words[1] as Word).start - MARGIN);
+  assert.equal(clip.in % FRAME_25, 0);
+});
+
+test("a clip that would end on a jump in the source's sound ends before it", () => {
+  const words = spoken(2, [2]);
+  const plain = placeClips([{ source: "a", words: [0] }], map(source(words)), FRAME_30);
+  const at = s((plain[0] as PlacedClip).out) - 0.003;
+  const spliced = { ...source(words), peaks: peaks(60, [at]) };
+  const [clip] = placeClips([{ source: "a", words: [0] }], map(spliced), FRAME_30);
+  assert.ok(clip);
+  assert.ok(s(clip.out) < at, `out at ${s(clip.out)} s, on the jump at ${at} s`);
+  assert.ok(s(clip.out) >= (words[0] as Word).end + MARGIN);
+  assert.equal((clip.out - clip.in) % FRAME_30, 0);
+});
+
+test("a clip whose first word follows missed speech from the source's start starts there", () => {
+  // Speech from 0.03 s runs into w0 with only dips of a few milliseconds.
+  const words = [{ text: "w0", start: 0.642, end: 0.8 }];
+  const missed = { ...source(words), unheard: [[0.03, 0.52] as const, [0.55, 0.64] as const] };
+  const [clip] = placeClips([{ source: "a", words: [0] }], map(missed), FRAME_30);
+  assert.equal(clip?.in, 0);
+});
+
+test("with no silence a cut fits in, a clip starts in the widest one before its words", () => {
+  const words = [
+    { text: "w0", start: 1, end: 1.2 },
+    { text: "w1", start: 2, end: 2.2 },
+  ];
+  const missed = { ...source(words), unheard: [[1.21, 1.5] as const, [1.6, 1.99] as const] };
+  const [clip] = placeClips([{ source: "a", words: [1] }], map(missed), FRAME_30);
+  assert.ok(clip);
+  assert.ok(s(clip.in) >= 1.5 && s(clip.in) <= 1.6, `in at ${s(clip.in)} s`);
+});
+
+test("a clip starts after a jump anywhere in the silence it opens with", () => {
+  const words = spoken(2, [2]);
+  const plain = placeClips([{ source: "a", words: [1] }], map(source(words)), FRAME_30);
+  const at = s((plain[0] as PlacedClip).in) + 0.06;
+  const spliced = { ...source(words), peaks: peaks(60, [at]) };
+  const [clip] = placeClips([{ source: "a", words: [1] }], map(spliced), FRAME_30);
+  assert.ok(clip);
+  assert.ok(s(clip.in) > at, `in at ${s(clip.in)} s, before the jump at ${at} s`);
+  assert.ok(s(clip.in) <= (words[1] as Word).start - MARGIN);
+  assert.equal(clip.in % FRAME_25, 0);
+});
+
+test("a clip ends before a jump anywhere in the silence it closes with", () => {
+  const words = spoken(2, [2]);
+  const plain = placeClips([{ source: "a", words: [0] }], map(source(words)), FRAME_30);
+  const at = s((plain[0] as PlacedClip).out) - 0.06;
+  const spliced = { ...source(words), peaks: peaks(60, [at]) };
+  const [clip] = placeClips([{ source: "a", words: [0] }], map(spliced), FRAME_30);
+  assert.ok(clip);
+  assert.ok(s(clip.out) < at, `out at ${s(clip.out)} s, after the jump at ${at} s`);
+  assert.ok(s(clip.out) >= (words[0] as Word).end + MARGIN);
+});
+
+test("a jump too close to a word to start after it leaves the cut where it was", () => {
+  const words = spoken(2, [2]);
+  const plain = placeClips([{ source: "a", words: [1] }], map(source(words)), FRAME_30);
+  const spliced = { ...source(words), peaks: peaks(60, [(words[1] as Word).start - 0.02]) };
+  const [clip] = placeClips([{ source: "a", words: [1] }], map(spliced), FRAME_30);
+  assert.equal(clip?.in, plain[0]?.in);
+});
+
+test("a clip starts after a shot change in the silence it opens with, and ends before one", () => {
+  const words = spoken(2, [2, 2]);
+  const plain = placeClips([{ source: "a", words: [1] }], map(source(words)), FRAME_30);
+  const [first] = plain as [PlacedClip];
+  // Shot changes on the source's frame grid, 0.08 s inside the silence on each side.
+  const before = (Math.round(first.in / FRAME_25) + 2) * FRAME_25;
+  const after = (Math.round(first.out / FRAME_25) - 2) * FRAME_25;
+  const shots = [[s(before), s(before)] as const, [s(after), s(after)] as const];
+  const [clip] = placeClips(
+    [{ source: "a", words: [1] }],
+    map({ ...source(words), shots }),
+    FRAME_30,
+  );
+  assert.ok(clip);
+  assert.ok(clip.in >= before, `in at ${s(clip.in)} s, before the shot change at ${s(before)} s`);
+  assert.ok(clip.out <= after, `out at ${s(clip.out)} s, after the shot change at ${s(after)} s`);
+  assert.ok(s(clip.in) <= (words[1] as Word).start - MARGIN);
+  assert.ok(s(clip.out) >= (words[1] as Word).end + MARGIN);
 });

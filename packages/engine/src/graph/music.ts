@@ -1,12 +1,12 @@
 // Background music: each track's range at its gain, faded and ducked under speech, mixed into one
 // bed. The finished mix adds the bed to the main sound before loudness is measured (see
 // ./master.ts), so normalisation covers both and keeps the voice's lead over the music.
-
+import { QUIET } from "../ffmpeg.ts";
 import { EDGE_FADE_SAMPLES } from "../pieces.ts";
 import { SAMPLE_RATE, type Timeline, type TimelineMusic, ticksToSamples } from "../timeline.ts";
 import { soundClock } from "./audio.ts";
 import { mix } from "./broll.ts";
-import { QUIET, RAW_AUDIO } from "./encode.ts";
+import { RAW_AUDIO } from "./encode.ts";
 
 /** Samples per second of a ducking envelope, which FFmpeg resamples to the mix's rate: its ramps
  * take tenths of a second, so a millisecond step is far below anything heard, and an hour's

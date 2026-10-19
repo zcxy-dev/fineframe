@@ -5,6 +5,7 @@
 
 import type { Project } from "@video-editor/schema";
 import { FONTS } from "../captions/index.ts";
+import { QUIET } from "../ffmpeg.ts";
 import { SAMPLE_RATE } from "../timeline.ts";
 
 /** Raw frames as the pieces write them and the encoder reads them. */
@@ -25,9 +26,6 @@ const BT709 = [
   "-color_range",
   "tv",
 ];
-
-/** Flags every FFmpeg run shares: quiet unless something fails, and never reading the terminal. */
-export const QUIET = ["-hide_banner", "-nostdin", "-nostats", "-loglevel", "error"];
 
 /** The sound's encoding in every output. */
 export const AAC = ["-c:a", "aac", "-b:a", "192k", "-ar", String(SAMPLE_RATE)];

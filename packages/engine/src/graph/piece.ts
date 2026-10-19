@@ -1,6 +1,7 @@
 // One piece's FFmpeg run: its inputs and its filter graph, for the video pass or the audio pass.
 
 import { type Framing, type Grade, TICKS_PER_SECOND } from "@video-editor/schema";
+import { QUIET } from "../ffmpeg.ts";
 import { framingCuts } from "../framing.ts";
 import { lutKey } from "../looks.ts";
 import type { Piece } from "../pieces.ts";
@@ -9,7 +10,7 @@ import type { SourceFacts } from "../sources.ts";
 import { type Timeline, type TimelineClip, ticksToSamples } from "../timeline.ts";
 import { fades, silence, soundClock, span } from "./audio.ts";
 import { brollSound, brollTiming, mix, overlay, panelRect, placement } from "./broll.ts";
-import { QUIET, RAW_AUDIO, RAW_VIDEO } from "./encode.ts";
+import { RAW_AUDIO, RAW_VIDEO } from "./encode.ts";
 import { openSource } from "./inputs.ts";
 import { overlayInput, overlayTiming } from "./overlays.ts";
 import { crossfade, dissolve } from "./transitions.ts";
