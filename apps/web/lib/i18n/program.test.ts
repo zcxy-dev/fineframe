@@ -18,6 +18,7 @@ const SAID = [
   // vework, as the engine passes its steps on (edit/analyze.ts).
   "Probing",
   "Detecting shots",
+  "Detecting shots 40%",
   "Finding speech",
   "Measuring loudness",
   "Measuring loudness and sections",

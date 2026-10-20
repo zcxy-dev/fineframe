@@ -478,6 +478,7 @@ export const en = {
   progress: {
     probe: "Probing",
     shots: "Detecting shots",
+    shotsDone: (percent: string) => `Detecting shots ${percent}%`,
     speech: "Finding speech",
     loudness: "Measuring loudness",
     sections: "Measuring loudness and sections",

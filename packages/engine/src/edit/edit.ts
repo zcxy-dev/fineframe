@@ -437,7 +437,6 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
   }
 }
 
-/** Fails, naming the file, unless FFmpeg decodes a picture from it. */
 /** A video's length as its container states it; null when FFmpeg cannot say. */
 async function durationOf(file: MediaFile): Promise<number | null> {
   const args = ["-hide_banner", "-nostdin", "-i", file.path, "-t", "0", "-f", "null", "-"];
@@ -446,6 +445,7 @@ async function durationOf(file: MediaFile): Promise<number | null> {
   return hours === undefined ? null : Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds);
 }
 
+/** Fails, naming the file, unless FFmpeg decodes a picture from it. */
 async function checkImage(file: MediaFile): Promise<void> {
   try {
     await run(await ffmpeg(), [...QUIET, "-i", file.path, "-frames:v", "1", "-f", "null", "-"]);

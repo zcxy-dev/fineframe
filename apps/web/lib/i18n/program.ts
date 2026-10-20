@@ -11,6 +11,7 @@ const SAID: [RegExp, (words: Words, said: Groups, t: Messages) => string][] = [
   // vework's steps, as the engine passes them on with a capital (edit/analyze.ts).
   [/^Probing$/, (w) => w.probe],
   [/^Detecting shots$/, (w) => w.shots],
+  [/^Detecting shots (\d+)%$/, (w, [p]) => w.shotsDone(p)],
   [/^Finding speech$/, (w) => w.speech],
   [/^Measuring loudness$/, (w) => w.loudness],
   [/^Measuring loudness and sections$/, (w) => w.sections],

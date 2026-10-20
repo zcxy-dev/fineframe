@@ -373,6 +373,13 @@ test("the edit's captions take the style asked for, and each analysis step is na
     [...new Set(steps)],
     ["probe", "shots", "speech", "loudness", "events", "faces", "denoise", "transcribe", "align"],
   );
+  // Shot detection moves the bar as it goes.
+  const shots = lines.filter((line) => "step" in line && line.step === "shots");
+  assert.deepEqual(
+    shots.map((line) => line.message),
+    ["Detecting shots", "Detecting shots 50%"],
+  );
+  assert.ok((shots[1]?.fraction ?? 0) > (shots[0]?.fraction ?? 0));
 });
 
 test("cloud speech reaches the analysis without the context prompt, in an index of its own", async (t) => {

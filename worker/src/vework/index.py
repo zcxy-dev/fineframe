@@ -48,7 +48,7 @@ def build(
     transitions = []
     if info.video:
         progress("detecting shots")
-        transitions = shots.detect(path)
+        transitions = shots.detect(path, progress)
     progress("finding speech")
     # Loudness is read from the same decode at the source's full band and in its own channels,
     # which the speech models' 16 kHz mono mix would lose.

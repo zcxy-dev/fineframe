@@ -98,7 +98,7 @@ export function indexName(
  * transcribing and aligning the rest. */
 const STEPS: [RegExp, AnalysisStep, (n: number) => number][] = [
   [/^probing/, "probe", () => 0],
-  [/^detecting shots/, "shots", () => 0],
+  [/^detecting shots(?: (\d+)%)?$/, "shots", (n) => 0.2 * n],
   [/^finding speech/, "speech", () => 0.2],
   [/^measuring loudness/, "loudness", () => 0.2],
   [/^finding audio events/, "events", () => 0.21],
@@ -255,8 +255,9 @@ async function vework(
         log(line);
         return;
       }
+      // How far into the step: chunk n of `of` is starting, or n % is done.
       const [, n, of] = said.match(step[0]) ?? [];
-      const fraction = step[2](of ? (Number(n) - 1) / Number(of) : 0);
+      const fraction = step[2](of ? (Number(n) - 1) / Number(of) : n ? Number(n) / 100 : 0);
       reached = fraction;
       on = step[1];
       report(fraction, said.charAt(0).toUpperCase() + said.slice(1), undefined, on);

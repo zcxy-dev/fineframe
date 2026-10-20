@@ -65,6 +65,13 @@ def test_thumbnail_times_follow_display_order_without_usable_timestamps(tmp_path
         assert np.median(np.diff(times)) == pytest.approx(0.04), name
 
 
+def test_thumbnails_report_how_far_they_are(shots_video):
+    said = []
+    count = len(list(shots.thumbnails(shots_video, [], said.append)))
+    assert count == 360
+    assert said == [f"detecting shots {p}%" for p in range(5, 100, 5)]
+
+
 def test_cover_art_audio_has_no_shots(cover_art_audio):
     with pytest.raises(ValueError, match="no video stream"):
         next(shots.thumbnails(cover_art_audio, []))

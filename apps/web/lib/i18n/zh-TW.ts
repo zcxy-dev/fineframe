@@ -451,6 +451,7 @@ export const zhTW: Messages = {
   progress: {
     probe: "讀取檔案中",
     shots: "偵測鏡頭中",
+    shotsDone: (percent) => `偵測鏡頭中 ${percent}%`,
     speech: "偵測人聲中",
     loudness: "測量音量中",
     sections: "測量音量與段落中",

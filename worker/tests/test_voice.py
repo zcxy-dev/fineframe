@@ -1,3 +1,7 @@
+import hashlib
+import io
+import tarfile
+
 import numpy as np
 import pytest
 from conftest import ffmpeg
@@ -181,3 +185,28 @@ def test_chunks_join_without_a_step(monkeypatch):
         assert level(noisy[around]) - level(out[around]) > 20
     # Written over its own input, chunk by chunk, it comes out the same.
     np.testing.assert_array_equal(denoise.enhance(noisy.copy(), in_place=True), out)
+
+
+def test_a_new_denoiser_pin_replaces_the_old_ones_folder(tmp_path, monkeypatch):
+    parts = io.BytesIO()
+    with tarfile.open(fileobj=parts, mode="w:gz") as tar:
+        for part in denoise.PARTS:
+            info = tarfile.TarInfo(f"export/{part}.onnx")
+            info.size = 4
+            tar.addfile(info, io.BytesIO(b"onnx"))
+    archive = parts.getvalue()
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    monkeypatch.setattr(denoise, "SHA256", hashlib.sha256(archive).hexdigest())
+    monkeypatch.setattr(denoise.download, "url", lambda url, name: archive)
+    cache = tmp_path / "video-editor"
+    for name in (
+        "deepfilternet3-000000000000",
+        "deepfilternet3-111111111111",
+        "ffmpeg-222222222222",
+    ):
+        (cache / name).mkdir(parents=True)
+    folder = denoise._download()
+    assert sorted(path.name for path in cache.iterdir()) == sorted(
+        [folder.name, "ffmpeg-222222222222"]
+    )
+    assert all((folder / f"{part}.onnx").read_bytes() == b"onnx" for part in denoise.PARTS)
