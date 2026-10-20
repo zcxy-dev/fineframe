@@ -373,6 +373,13 @@ test("the edit's captions take the style asked for, and each analysis step is na
     [...new Set(steps)],
     ["probe", "shots", "speech", "loudness", "events", "faces", "denoise", "transcribe", "align"],
   );
+  // Shot detection moves the bar as it goes.
+  const shots = lines.filter((line) => "step" in line && line.step === "shots");
+  assert.deepEqual(
+    shots.map((line) => line.message),
+    ["Detecting shots", "Detecting shots 50%"],
+  );
+  assert.ok((shots[1]?.fraction ?? 0) > (shots[0]?.fraction ?? 0));
 });
 
 test("cloud speech reaches the analysis without the context prompt, in an index of its own", async (t) => {
@@ -422,7 +429,22 @@ test("inputs that cannot make the edit fail before any analysis, saying why", as
   assert.equal((await analyses()).length, 0, "nothing was analysed");
 });
 
-test("a file the analysis cannot read, or a length past the footage, fails clearly", async (t) => {
+test("footage shorter than the length is refused before any analysis", async (t) => {
+  const dir = await scratch(t, "edit-short-");
+  const { options, lines, purposes, analyses } = await footage(dir);
+  await assert.rejects(
+    edit({ ...options, length: 120 }),
+    (error: Error) =>
+      error instanceof EditError &&
+      error.message ===
+        "The footage lasts 25.0 s in all, too short for a 120 s edit: ask for a shorter edit or add footage",
+  );
+  assert.equal(lines.at(-1)?.stage, "error");
+  assert.deepEqual(await analyses(), [], "nothing was analysed");
+  assert.deepEqual(purposes, [], "Claude was not asked");
+});
+
+test("a file the analysis cannot read, or a length past the speech, fails clearly", async (t) => {
   const dir = await scratch(t, "edit-unreadable-");
   const { options, lines, purposes } = await footage(dir);
   const broken = join(dir, "broken.mp4");
@@ -435,9 +457,10 @@ test("a file the analysis cannot read, or a length past the footage, fails clear
         `${broken}: the analysis failed: ${broken}: Invalid data found when processing input`,
   );
   assert.equal(lines.at(-1)?.stage, "error");
+  // 26 s fits in the 25 s talk within 5 %, but its speech does not.
   await assert.rejects(
-    edit({ ...options, length: 120 }),
-    (error: Error) => error instanceof PlanError && /Ask for at most \d+ s/.test(error.message),
+    edit({ ...options, length: 26 }),
+    (error: Error) => error instanceof PlanError && /Ask for at most 24 s/.test(error.message),
   );
   assert.deepEqual(purposes, [], "Claude was not asked");
 });

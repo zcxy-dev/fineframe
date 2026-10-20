@@ -3,11 +3,11 @@
 import { randomUUID } from "node:crypto";
 import { createWriteStream, existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, rm, stat, statfs, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
+import { cacheDir } from "@video-editor/engine/download";
 import {
   editLength,
   OVERLAY_TEXT,
@@ -1146,7 +1146,7 @@ function gigabytes(bytes: number): string {
 
 /** Where jobs go unless VIDEO_EDITOR_JOBS says otherwise: beside the engine's own cache. */
 export function defaultRoot(): string {
-  return process.env.VIDEO_EDITOR_JOBS ?? join(homedir(), ".cache", "video-editor", "jobs");
+  return process.env.VIDEO_EDITOR_JOBS ?? join(cacheDir(), "jobs");
 }
 
 /** The server's one store. Each route is bundled on its own, so the store lives on globalThis

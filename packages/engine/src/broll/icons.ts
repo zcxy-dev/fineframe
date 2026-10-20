@@ -5,7 +5,7 @@
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { cacheDir, pinnedFile, untar } from "../download.ts";
+import { cacheDir, pinnedFile, removeOtherPins, untar } from "../download.ts";
 import type { Credit } from "./credits.ts";
 
 export type IconSet = "lucide" | "tabler" | "simple-icons";
@@ -281,6 +281,7 @@ function unpacked(set: IconSet, dir: string): Promise<string> {
       await rm(partial, { recursive: true, force: true });
     }
     await rm(tarball, { force: true });
+    await removeOtherPins(root, `${set}-`);
     return root;
   });
 }

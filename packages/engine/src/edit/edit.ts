@@ -21,7 +21,7 @@ import {
   type Usage,
 } from "../plan/claude.ts";
 import type { MusicInput } from "../plan/music.ts";
-import { type Aspect, LENGTH_RANGE, type PlanInput, plan } from "../plan/plan.ts";
+import { type Aspect, LENGTH_RANGE, type PlanInput, plan, TOLERANCE } from "../plan/plan.ts";
 import { MAX_REVIEW_PASSES, review } from "../plan/review.ts";
 import type { Visuals } from "../plan/visuals.ts";
 import { render } from "../render.ts";
@@ -248,6 +248,16 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
   const tracks = await collectMusic(options.music ?? [], options.musicLicense);
   // Images are only decoded, which is quick: a bad one fails before the long analysis.
   for (const file of files.filter((f) => f.kind === "image")) await checkImage(file);
+  // An edit is cut from the footage, so footage shorter than it fails now rather than after
+  // minutes of analysis. A file whose length FFmpeg cannot read is left to the analysis.
+  const lengths = await Promise.all(videos.map(durationOf));
+  const footage = lengths.reduce<number>((sum, seconds) => sum + (seconds ?? Infinity), 0);
+  if (footage < options.length * (1 - TOLERANCE)) {
+    throw new EditError(
+      `The footage lasts ${footage.toFixed(1)} s in all, too short for a ${options.length} s ` +
+        "edit: ask for a shorter edit or add footage",
+    );
+  }
   await mkdir(dirname(video), { recursive: true });
   let asked = options.claude;
   if (!asked) {
@@ -425,6 +435,14 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
   } finally {
     await rm(work, { recursive: true, force: true });
   }
+}
+
+/** A video's length as its container states it; null when FFmpeg cannot say. */
+async function durationOf(file: MediaFile): Promise<number | null> {
+  const args = ["-hide_banner", "-nostdin", "-i", file.path, "-t", "0", "-f", "null", "-"];
+  const said = await run(await ffmpeg(), args).catch(() => ({ stderr: "" }));
+  const [, hours, minutes, seconds] = said.stderr.match(/Duration: (\d+):(\d+):([\d.]+)/) ?? [];
+  return hours === undefined ? null : Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds);
 }
 
 /** Fails, naming the file, unless FFmpeg decodes a picture from it. */

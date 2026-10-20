@@ -63,6 +63,8 @@ select = ["E", "F", "I", "B", "UP"]
 "src/vework/music_index.py" = ["E501"]
 
 [tool.pytest.ini_options]
+# Each test's tmp_path is removed when the run ends, failed or not.
+tmp_path_retention_policy = "none"
 markers = [
     "ml: needs the ml group and downloads model weights",
     "big: loads the speech model, too big for CI",

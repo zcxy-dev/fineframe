@@ -167,6 +167,19 @@ Measured before rich visuals, with what is now `--visuals minimal`, on a 60 s 9:
 
 On frames from each version the captions showed the words then said and lit the word being said, the keyword added landed on its word, and every frame after the cut matched the planned edit's frame 4.133 s later, captions included.
 
+## Analysis measurements
+
+Three openly licensed 1080p web recordings, each analysed cold (`vework analyze --asr cloud`, no index cached) on the reference machine with nothing else running (1-minute load average under 0.4 at the start), one after another. Each step's time is from the progress lines. Transcription is OpenRouter's response time.
+
+| Source | Length | Codec, fps | Analysis | Shots | Faces | Transcription | Alignment |
+|---|---|---|---|---|---|---|---|
+| Recording A | 6.9 min | AV1, 60 | 309 s (0.75×) | 152 s | 46 s | 15 s | 69 s |
+| Recording B | 13.9 min | H.264, 30 | 415 s (0.50×) | 135 s | 46 s | 54 s | 119 s |
+| Recording C, two people talking | 20.9 min | AV1, 60 | 789 s (0.63×) | 403 s | 111 s | 31 s | 176 s |
+
+- **Under the source's length:** every analysis took less than the source lasts. The same files took 2 to 5 times their length in the step 3 checks (#113), with three edits running at once (load average about 24): 5 to 8 times as long as here.
+- **Shot detection** is the longest step, a third to a half of the run, and grows with the frame count: 60 fps footage takes twice as long a minute as 30 fps. It now says how far it is every 5 % of the frames. Decoding the frames in a thread of their own while TransNetV2 scores them, and flushing subnormal floats to zero, left it as fast as before (150 vs 152 s, 138 vs 135 s and 424 vs 403 s), so neither was kept. Scoring fewer frames of 60 fps footage would halve it but changes what TransNetV2 sees; it was not tried.
+
 ## Framing measurements
 
 On the synthetic corpus's three conversations, framed 9:16, the face of the person talking is inside the crop 99.4 % of the time it is on screen, missing only replies too short to turn to; a centre crop holds it 80.5 % of the time, and in the wide shots shows the empty space between the two people. Each talker is taken as the face the analysis names most while the corpus's truth has them talking in a shot. With split screens, 31 s of the three clips' wide shots, where both people take turns, show both at once, one above the other, and the share is the same 99.4 % of 3,131 samples; in 106 s of close shots, where a drawn head touches the picture's top, the crop reaches past the picture under a blurred band. Cut together from eight clips, the moving crops add no clicks and no drift (`vebench render`: 0 of 7 cuts, 0.0 ms).

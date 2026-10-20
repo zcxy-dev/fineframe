@@ -1,4 +1,4 @@
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 
 import av
@@ -13,11 +13,14 @@ THRESHOLD = 0.5
 WINDOW, STEP, CONTEXT = 100, 50, 25
 
 
-def thumbnails(path: Path, times: list[float]) -> Iterator[np.ndarray]:
+def thumbnails(
+    path: Path, times: list[float], progress: Callable[[str], None] = lambda message: None
+) -> Iterator[np.ndarray]:
     """Every frame as 48x27 RGB, the input TransNetV2 was trained on, one at a time.
 
     A two-hour 60 fps source is 1.7 GB of thumbnails, so they are never held together. Each
-    frame's time is appended to `times`, which is sorted once the frames run out.
+    frame's time is appended to `times`, which is sorted once the frames run out. Every 5 % of
+    the frames the stream states, or its duration implies, is reported to `progress`.
     """
     with av.open(str(path)) as container:
         zero = start_time(container)
@@ -26,6 +29,9 @@ def thumbnails(path: Path, times: list[float]) -> Iterator[np.ndarray]:
             raise ValueError(f"{path.name}: no video stream")
         stream.thread_type = "AUTO"
         step = 1 / float(stream.average_rate or stream.guessed_rate or 25)
+        seconds = container.duration / av.time_base if container.duration else 0.0
+        total = stream.frames or round(seconds / step)
+        said = 0
         for frame in container.decode(stream):
             # Raw elementary streams carry no timestamps; continue from the previous frame.
             # FFmpeg rounds the start time to whole microseconds, so a first frame can come
@@ -33,6 +39,11 @@ def thumbnails(path: Path, times: list[float]) -> Iterator[np.ndarray]:
             times.append(max(0.0, frame.time - zero) if frame.time is not None else
                          (times[-1] + step if times else 0.0))  # fmt: skip
             yield frame.to_ndarray(width=48, height=27, format="rgb24")
+            # Never 100 %: the stated count can fall short of the frames there are.
+            reached = min(len(times) * 20 // total, 19) * 5 if total else 0
+            if reached > said:
+                said = reached
+                progress(f"detecting shots {reached}%")
     # Frames come out in display order, but some containers (AVI with B-frames) label them
     # with timestamps in decode order; sorting restores which time belongs to which frame.
     times.sort()
@@ -117,8 +128,9 @@ def transitions(
     return result
 
 
-def detect(path: Path) -> list[dict]:
-    """Shot transitions in a video file, in seconds from its time zero."""
+def detect(path: Path, progress: Callable[[str], None] = lambda message: None) -> list[dict]:
+    """Shot transitions in a video file, in seconds from its time zero, reporting how far it is
+    to `progress`."""
     times: list[float] = []
-    center, inside = predict(thumbnails(path, times))
+    center, inside = predict(thumbnails(path, times, progress))
     return transitions(center, inside, np.array(times))

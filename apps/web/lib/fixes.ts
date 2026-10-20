@@ -3,7 +3,15 @@
 
 import { en, type Messages } from "./i18n/en.ts";
 
-export type FixKind = "key" | "openrouter" | "credit" | "disk" | "file" | "missing" | "network";
+export type FixKind =
+  | "key"
+  | "openrouter"
+  | "credit"
+  | "disk"
+  | "file"
+  | "missing"
+  | "network"
+  | "length";
 
 export interface Fix {
   kind: FixKind;
@@ -28,6 +36,7 @@ const FIXES: [FixKind, RegExp][] = [
     "network",
     /connection error|cannot reach|could not download|ENOTFOUND|ECONNRESET|ETIMEDOUT|temporary failure in name resolution/i,
   ],
+  ["length", /^The footage lasts [\d.]+ s in all, too short for a \d+ s edit/],
 ];
 
 /** The step that fixes an edit that failed with `message`, in `t`'s words, or null when there is

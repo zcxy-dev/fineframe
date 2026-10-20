@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { cp, mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { cp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { test } from "node:test";
+import { type TestContext, test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { scratch } from "../testing.ts";
 import {
   type AnalysisOptions,
   cachedIndex,
@@ -15,8 +15,8 @@ import {
 const WORKER = fileURLToPath(new URL("../../../../worker/", import.meta.url));
 
 /** A copy of the worker's hashed files, to change one thing at a time. */
-async function copy(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "worker-"));
+async function copy(t: TestContext): Promise<string> {
+  const dir = await scratch(t, "worker-");
   for (const file of ["pyproject.toml", "uv.lock", "src"]) {
     await cp(join(WORKER, file), join(dir, file), { recursive: true });
   }
@@ -29,8 +29,8 @@ async function edit(file: string, from: RegExp, to: string): Promise<void> {
   await writeFile(file, text.replace(from, to));
 }
 
-test("a release's version bump keeps the cached indexes, a change to the code does not", async () => {
-  const dir = await copy();
+test("a release's version bump keeps the cached indexes, a change to the code does not", async (t) => {
+  const dir = await copy(t);
   const before = await workerVersion(dir);
 
   await edit(join(dir, "pyproject.toml"), /^version = "[^"]+"$/m, 'version = "9.9.9"');
@@ -41,15 +41,15 @@ test("a release's version bump keeps the cached indexes, a change to the code do
   assert.notEqual(await workerVersion(dir), before);
 });
 
-test("a change to a dependency's locked version changes the worker's version", async () => {
-  const dir = await copy();
+test("a change to a dependency's locked version changes the worker's version", async (t) => {
+  const dir = await copy(t);
   const before = await workerVersion(dir);
   await edit(join(dir, "uv.lock"), /(\nname = "numpy"\nversion = )"[^"]+"/, '$1"0.0.1"');
   assert.notEqual(await workerVersion(dir), before);
 });
 
-test("a Windows checkout, with CRLF line endings, has the same version as any other", async () => {
-  const dir = await copy();
+test("a Windows checkout, with CRLF line endings, has the same version as any other", async (t) => {
+  const dir = await copy(t);
   const before = await workerVersion(dir);
   for (const file of ["pyproject.toml", "uv.lock"]) {
     const path = join(dir, file);
@@ -59,8 +59,8 @@ test("a Windows checkout, with CRLF line endings, has the same version as any ot
   assert.equal(await workerVersion(dir), before);
 });
 
-test("a file analysed before is read from the cache, without running vework again", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "cached-"));
+test("a file analysed before is read from the cache, without running vework again", async (t) => {
+  const dir = await scratch(t, "cached-");
   const source = join(dir, "talk.mp4");
   await writeFile(source, "footage");
   // What the stand-in for vework copies to the index it is asked for.
@@ -81,8 +81,8 @@ test("a file analysed before is read from the cache, without running vework agai
   assert.equal((await readFile(calls, "utf8")).trim().split("\n").length, 1);
 });
 
-test("the glossary reaches vework only where it uses it, and keys the index only there", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "names-"));
+test("the glossary reaches vework only where it uses it, and keys the index only there", async (t) => {
+  const dir = await scratch(t, "names-");
   const source = join(dir, "talk.mp4");
   await writeFile(source, "footage");
   await writeFile(join(dir, "talk.index.json"), "{}");

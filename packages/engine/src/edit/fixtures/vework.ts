@@ -29,7 +29,8 @@ if (command === "analyze-music") {
   await writeFile(out, JSON.stringify(index));
   process.exit(0);
 }
-const steps = ["probing", "detecting shots", "finding speech", "measuring loudness"];
+const steps = ["probing", "detecting shots", "detecting shots 50%", "finding speech"];
+steps.push("measuring loudness");
 steps.push("finding audio events", "finding faces", "removing noise from speech");
 steps.push("downloading Qwen/Qwen3-ASR-0.6B-hf: 0 of 4000 bytes");
 steps.push("downloading Qwen/Qwen3-ASR-0.6B-hf: 4000 of 4000 bytes");

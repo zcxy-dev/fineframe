@@ -178,8 +178,8 @@ function AnalysisSteps({ job }: { job: Job }) {
                     : "pending"
                 : "pending";
           const count =
-            state === "active" && (step === "transcribe" || step === "align")
-              ? job.progress?.message.match(/(\d+\/\d+)/)?.[1]
+            state === "active" && (step === "shots" || step === "transcribe" || step === "align")
+              ? job.progress?.message.match(/(\d+\/\d+|\d+%)/)?.[1]
               : undefined;
           return (
             <li key={step} className={styles.substep} data-state={state}>

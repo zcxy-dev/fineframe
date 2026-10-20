@@ -30,7 +30,7 @@ def talking_video(tmp_path):
 @pytest.fixture
 def stub_models(monkeypatch):
     """Model results in the shapes the real models return, without loading a model."""
-    monkeypatch.setattr(shots, "detect", lambda path: [{"start": 1.0, "end": 1.0}])
+    monkeypatch.setattr(shots, "detect", lambda path, progress: [{"start": 1.0, "end": 1.0}])
     monkeypatch.setattr(speech, "segments", lambda samples: [{"start": 0.25, "end": 1.5}])
     words = [{"text": "好", "start": 0.3, "end": 0.6}, {"text": "。", "start": 0.6, "end": 0.6}]
     monkeypatch.setattr(
@@ -110,7 +110,7 @@ def test_a_source_without_a_picture_has_no_framing(cover_art_audio, stub_models,
 
 
 def test_a_corrected_index_records_its_corrections(talking_video, monkeypatch, tmp_path):
-    monkeypatch.setattr(shots, "detect", lambda path: [])
+    monkeypatch.setattr(shots, "detect", lambda path, progress: [])
     monkeypatch.setattr(speech, "segments", lambda samples: [{"start": 0.25, "end": 1.5}])
     monkeypatch.setattr(events, "detect", lambda samples: [])
     monkeypatch.setattr(framing, "analyze", lambda *args: {"fps": 5.0, "shots": []})
@@ -143,7 +143,7 @@ def test_a_corrected_index_records_its_corrections(talking_video, monkeypatch, t
 
 
 def test_a_cloud_index_records_the_model_and_what_it_cost(talking_video, monkeypatch, tmp_path):
-    monkeypatch.setattr(shots, "detect", lambda path: [])
+    monkeypatch.setattr(shots, "detect", lambda path, progress: [])
     monkeypatch.setattr(speech, "segments", lambda samples: [{"start": 0.25, "end": 1.5}])
     monkeypatch.setattr(events, "detect", lambda samples: [])
     monkeypatch.setattr(framing, "analyze", lambda *args: {"fps": 5.0, "shots": []})

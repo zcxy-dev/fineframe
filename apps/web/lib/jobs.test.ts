@@ -1,6 +1,25 @@
 import assert from "node:assert/strict";
+import { join } from "node:path";
 import { test } from "node:test";
-import { footageToPrune, secondsLeft } from "./jobs.ts";
+import { defaultRoot, footageToPrune, secondsLeft } from "./jobs.ts";
+
+test("jobs go beside the engine's cache, which XDG_CACHE_HOME moves", (t) => {
+  const saved = { jobs: process.env.VIDEO_EDITOR_JOBS, cache: process.env.XDG_CACHE_HOME };
+  t.after(() => {
+    for (const [name, value] of [
+      ["VIDEO_EDITOR_JOBS", saved.jobs],
+      ["XDG_CACHE_HOME", saved.cache],
+    ] as const) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  });
+  delete process.env.VIDEO_EDITOR_JOBS;
+  process.env.XDG_CACHE_HOME = join("/", "elsewhere");
+  assert.equal(defaultRoot(), join("/", "elsewhere", "video-editor", "jobs"));
+  process.env.VIDEO_EDITOR_JOBS = join("/", "jobs");
+  assert.equal(defaultRoot(), join("/", "jobs"));
+});
 
 test("a download's time left is its bytes left at the rate since it started", () => {
   const start = { at: 0, bytes: 1000 };

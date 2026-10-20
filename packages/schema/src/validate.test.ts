@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -244,8 +244,9 @@ test("progress lines validate, and done carries the outputs", () => {
   );
 });
 
-test("loading names the file that failed", async () => {
+test("loading names the file that failed", async (t) => {
   const dir = await mkdtemp(join(tmpdir(), "schema-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
   const broken = join(dir, "broken.json");
   await writeFile(broken, "{");
   await assert.rejects(loadJson(broken, validateProject), (error: Error) =>

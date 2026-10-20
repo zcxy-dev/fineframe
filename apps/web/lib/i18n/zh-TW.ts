@@ -451,6 +451,7 @@ export const zhTW: Messages = {
   progress: {
     probe: "讀取檔案中",
     shots: "偵測鏡頭中",
+    shotsDone: (percent) => `偵測鏡頭中 ${percent}%`,
     speech: "偵測人聲中",
     loudness: "測量音量中",
     sections: "測量音量與段落中",
@@ -564,6 +565,10 @@ export const zhTW: Messages = {
       network: {
         summary: "Fineframe 無法連上網路。",
         next: "請檢查網路連線，再重新開始剪輯：已分析或已下載的內容會保留。",
+      },
+      length: {
+        summary: "素材比要剪的長度還短。",
+        next: "請選短一點的長度，或加入更多素材，再重新開始。",
       },
     },
   },

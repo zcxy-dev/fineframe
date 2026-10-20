@@ -1,6 +1,7 @@
 import hashlib
 import io
 import os
+import shutil
 import tarfile
 from collections.abc import Callable
 from functools import cache
@@ -251,4 +252,8 @@ def _download() -> Path:
                 partial = folder / f"{name}.partial"
                 partial.write_bytes(data)
                 partial.rename(folder / name)
+    # A folder an earlier pin left is never read again.
+    for old in folder.parent.glob("deepfilternet3-*"):
+        if old != folder:
+            shutil.rmtree(old, ignore_errors=True)
     return folder

@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
-import { copyFile, readFile } from "node:fs/promises";
+import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { test } from "node:test";
-import { pinnedFile, untar } from "./download.ts";
+import { pinnedFile, removeOtherPins, untar } from "./download.ts";
 import { scratch } from "./testing.ts";
 
 test("a program another download put in place first is kept, even while it runs", async (t) => {
@@ -99,4 +99,20 @@ test("unpacks a tar archive's files, long paths included", () => {
     [...untar(tar(files))].map(([path, data]) => [path, data.toString()]),
   );
   assert.deepEqual(read, files);
+});
+
+test("a new pin's download deletes what earlier pins of it left, and nothing else", async (t) => {
+  const dir = await scratch(t, "pins-");
+  for (const name of ["ffmpeg-000000000000", "ffmpeg-e7e7fb30477f", "fonts-f8d157532fbf"]) {
+    await mkdir(join(dir, name));
+  }
+  await writeFile(join(dir, "ffmpeg-111111111111.tgz"), "an earlier tarball");
+  // Another process still downloading the same pin.
+  await writeFile(join(dir, "ffmpeg-e7e7fb30477f.tgz.123.partial"), "on its way");
+  await removeOtherPins(join(dir, "ffmpeg-e7e7fb30477f"), "ffmpeg-");
+  assert.deepEqual((await readdir(dir)).sort(), [
+    "ffmpeg-e7e7fb30477f",
+    "ffmpeg-e7e7fb30477f.tgz.123.partial",
+    "fonts-f8d157532fbf",
+  ]);
 });

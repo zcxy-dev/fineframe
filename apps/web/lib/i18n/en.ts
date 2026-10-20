@@ -478,6 +478,7 @@ export const en = {
   progress: {
     probe: "Probing",
     shots: "Detecting shots",
+    shotsDone: (percent: string) => `Detecting shots ${percent}%`,
     speech: "Finding speech",
     loudness: "Measuring loudness",
     sections: "Measuring loudness and sections",
@@ -607,6 +608,10 @@ export const en = {
       network: {
         summary: "Fineframe could not reach the internet.",
         next: "Check the connection and start the edit again: what was analysed or downloaded is kept.",
+      },
+      length: {
+        summary: "The footage is shorter than the edit.",
+        next: "Choose a shorter length, or add footage, and start again.",
       },
     },
   },

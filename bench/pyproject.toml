@@ -67,5 +67,7 @@ line-length = 100
 select = ["E", "F", "I", "B", "UP"]
 
 [tool.pytest.ini_options]
+# Each test's tmp_path is removed when the run ends, failed or not.
+tmp_path_retention_policy = "none"
 testpaths = ["tests"]
 markers = ["synth: needs the synth extra and downloads the speech model"]
