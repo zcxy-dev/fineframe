@@ -83,26 +83,30 @@ def ahead(frames: Iterable[np.ndarray], size: int = 2 * WINDOW) -> Iterator[np.n
     stop = threading.Event()
     end = object()
 
+    def put(item: object) -> bool:
+        """Waits for room, unless the reader has stopped."""
+        while not stop.is_set():
+            try:
+                held.put(item, timeout=0.1)
+                return True
+            except queue.Full:
+                pass
+        return False
+
     def decode() -> None:
         try:
             for frame in frames:
-                while not stop.is_set():
-                    try:
-                        held.put(frame, timeout=0.1)
-                        break
-                    except queue.Full:
-                        continue
-                if stop.is_set():
+                if not put(frame):
                     return
-            held.put(end)
-        except BaseException as exc:  # noqa: BLE001 - handed to the reading thread
-            held.put(exc)
+            put(end)
+        except Exception as exc:  # handed to the reading thread
+            put(exc)
 
     thread = threading.Thread(target=decode, daemon=True)
     thread.start()
     try:
         while (item := held.get()) is not end:
-            if isinstance(item, BaseException):
+            if isinstance(item, Exception):
                 raise item
             yield item
     finally:

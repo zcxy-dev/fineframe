@@ -4,7 +4,7 @@ Analyzes a source file into a media index: the facts about the footage that the 
 
 Setup and the speech-model choice are in the [README quick start](../README.md#quick-start). `--bench-run DIR` also writes the outputs [vebench](../bench/) scores. `vework draft-truth` drafts a corpus clip's transcript for a person to correct ([workflow](../bench/README.md#ground-truth)). `vework analyze-music` analyses a music track for the edit ([below](#music)).
 
-Each step is a `vework: <step>` line on stderr. Messages and the files vework writes are UTF-8 on every system, Windows included. A model downloaded on its first use reports its bytes as it arrives, as `vework: downloading <model>: <bytes> of <total> bytes` lines ([`download.py`](src/vework/download.py)); a model already in the cache, or the cache read offline, prints none.
+Each step is a `vework: <step>` line on stderr; shot detection, the longest step on a CPU with cloud speech, also says how far it is every 5 % of the frames (`vework: detecting shots 40%`). Messages and the files vework writes are UTF-8 on every system, Windows included. A model downloaded on its first use reports its bytes as it arrives, as `vework: downloading <model>: <bytes> of <total> bytes` lines ([`download.py`](src/vework/download.py)); a model already in the cache, or the cache read offline, prints none.
 
 ## Media index
 
