@@ -335,11 +335,11 @@ export async function render(
 
     const encoded = join(work, "out.mp4");
     let fonts: NodeJS.ProcessEnv = {};
-    if (captions) {
+    if (captions?.ass && captions.font) {
       await writeFile(join(work, "captions.ass"), captions.ass);
       fonts = await stageFonts(work, [captions.font]);
     }
-    const subtitles = captions ? "captions.ass" : undefined;
+    const subtitles = captions?.ass ? "captions.ass" : undefined;
     const args = encoderArgs(project.output, finished, timeline.samples, encoded, subtitles);
     const frames = await encode(
       bin,

@@ -365,9 +365,9 @@ test("terms help the analysis hear the speech but never name a lower third", asy
 test("the edit's captions take the style asked for, and each analysis step is named", async (t) => {
   const dir = await scratch(t, "edit-captions-");
   const { options, lines } = await footage(dir);
-  const result = await edit({ ...options, captions: "boxed" });
+  const result = await edit({ ...options, captions: "creator" });
   const project = await loadJson(result.outputs.project, validateProject);
-  assert.equal(project.captions?.preset, "boxed");
+  assert.equal(project.captions?.preset, "creator");
   const steps = lines.flatMap((line) => ("step" in line && line.step ? [line.step] : []));
   assert.deepEqual(
     [...new Set(steps)],
@@ -671,7 +671,7 @@ test("the command reports arguments it cannot use as an error line too", async (
     [[".", "--length", "60", "--aspect", "9:16", "-o", "x.mp4", "--look", "neon"], /neon/],
     [
       [".", "--length", "60", "--aspect", "9:16", "-o", "x.mp4", "--captions", "comic"],
-      /bold, spotlight, sweep, boxed, not comic/,
+      /bold, creator, minimal, pop, none, not comic/,
     ],
   ] as const) {
     const { code, stdout } = await runCli([...args]);

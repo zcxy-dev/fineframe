@@ -20,7 +20,7 @@ import {
   validateProject,
 } from "@video-editor/schema";
 import { family, fontFile } from "./captions/fonts.ts";
-import { buildCaptions, PRESETS, stageFonts } from "./captions/index.ts";
+import { buildCaptions, PRESETS, type Preset, stageFonts } from "./captions/index.ts";
 import type { Rgb } from "./colour.ts";
 import { ffmpeg, QUIET, run } from "./ffmpeg.ts";
 import { everyKind, makeSource, projectOf } from "./fixtures.ts";
@@ -1293,7 +1293,7 @@ test("captions show on exactly the frames they are laid out on, at 30 and 29.97 
 test("every caption preset is drawn in the face its layout was measured in", async (t) => {
   const dir = await scratch(t, "faces-");
   const bin = await ffmpeg();
-  for (const [name, preset] of Object.entries(PRESETS)) {
+  for (const [name, preset] of Object.entries(PRESETS) as [keyof typeof PRESETS, Preset][]) {
     const edit = fakeProject([clip("a", 0, 0.5)], {
       captions: {
         preset: name,
@@ -1303,7 +1303,7 @@ test("every caption preset is drawn in the face its layout was measured in", asy
     });
     edit.output = { ...edit.output, ...tiny };
     const built = await buildCaptions(edit, { main: [], broll: [], frames: 15, frameTicks: 4000 });
-    assert.ok(built);
+    assert.ok(built?.ass && built.font);
     const folder = join(dir, name);
     await mkdir(folder);
     await writeFile(join(folder, "captions.ass"), built.ass);

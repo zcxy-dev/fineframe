@@ -1,4 +1,5 @@
-// Renders a planned edit with every caption preset at every aspect, for checking captions by eye:
+// Renders a planned edit in every caption style that draws, at every aspect, for checking
+// captions by eye:
 //
 //   node scripts/caption-samples.ts <project.json> <out folder>
 //
@@ -63,7 +64,7 @@ for (const [aspect, [width, height]] of Object.entries(SIZES) as [
     const kept = crop ? { ...rest, crop } : rest;
     return Object.keys(kept).length > 0 ? { ...clip, framing: kept } : clip;
   };
-  for (const preset of Object.keys(PRESETS)) {
+  for (const preset of Object.keys(PRESETS) as (keyof typeof PRESETS)[]) {
     const name = `${preset}-${aspect.replace(":", "x")}`;
     const edit: Project = {
       ...project,

@@ -29,7 +29,7 @@ import {
 } from "@video-editor/schema";
 import { pickSfx } from "../broll/sfx.ts";
 import { faceZones } from "../captions/faces.ts";
-import { buildCaptions } from "../captions/index.ts";
+import { captionAreas } from "../captions/index.ts";
 import { chrome } from "../chrome.ts";
 import { fingerprintOf, loadSources } from "../sources.ts";
 import { buildTimeline } from "../timeline.ts";
@@ -80,7 +80,7 @@ const CADENCE = { portrait: [2, 4], landscape: [5, 8] } as const;
 /** What a graphic must keep clear of, and when the picture already changes, on the output
  * timeline: the context a request writes graphics in and a check checks them against. */
 interface Context {
-  /** Captions as drawn, in output frames and pixels. */
+  /** Where captions may be drawn, in any style, in output frames and pixels. */
   captions: { start: number; end: number; box: Box }[];
   /** Faces on screen, in output frames and pixels. */
   faces: { start: number; end: number; boxes: Box[] }[];
@@ -90,13 +90,16 @@ interface Context {
   taken: { start: number; end: number; what: string }[];
 }
 
-/** The project's captions and faces as rendered, and what already changes and covers the
- * picture. */
+/** Where the project's captions may be drawn in any style, its faces as rendered, and what
+ * already changes and covers the picture. */
 async function contextOf(project: Project, projectPath: string): Promise<Context> {
   const sources = await loadSources(project, projectPath);
   const timeline = buildTimeline(project, sources);
-  const files = await buildCaptions(project, timeline);
-  const captions = (files?.boxes ?? []).map(({ start, end, ...box }) => ({ start, end, box }));
+  const captions = (await captionAreas(project, timeline)).map(({ start, end, ...box }) => ({
+    start,
+    end,
+    box,
+  }));
   const faces = faceZones(timeline, project.output).map((zone) => ({
     start: zone.start,
     end: zone.end,

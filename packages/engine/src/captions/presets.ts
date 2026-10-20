@@ -1,9 +1,9 @@
-// The caption presets project.json selects by `captions.preset`, and the type scale and safe
-// areas they share. Lengths are in ems of the caption face, so a preset looks the same at every
-// output size; the aspect sets the em.
+// The caption styles project.json selects by `captions.preset`, the presets that draw them, and
+// the type scale and safe areas they share. Lengths are in ems of the caption face, so a preset
+// looks the same at every output size; the aspect sets the em.
 
 import { COLORS } from "@video-editor/effects/layout";
-import type { Project } from "@video-editor/schema";
+import type { Captions, Project } from "@video-editor/schema";
 import type { Weight } from "./fonts.ts";
 
 type Aspect = Project["output"]["aspect"];
@@ -39,11 +39,11 @@ export const TYPE_SCALE: Record<Aspect, TypeScale> = {
 export const LEADING = 1.3;
 
 /** Motion shared by every preset, in milliseconds. A caption after a pause arrives with an
- * ease-out over ENTER, a highlight moves to the next word over WORD, and a caption followed by a
- * pause leaves over EXIT, faster than it came. */
+ * ease-out over ENTER, and a caption followed by a pause leaves over EXIT, faster than it came.
+ * A word of the pop style settles to its size over POP. */
 export const ENTER = 160;
-export const WORD = 80;
 export const EXIT = 100;
+export const POP = 140;
 /** A caption stays up this long after its last word, unless the next one starts first, so the
  * end of a sentence can still be read; its last word stays lit TAIL after its sound ends. */
 export const HOLD = 500;
@@ -55,8 +55,10 @@ export const EASE_OUT = 0.5;
  * and one accent. */
 const { paper: WHITE, ink: INK, accent: ACCENT } = COLORS;
 
+/** A caption style: the id `captions.preset` holds. */
+export type CaptionStyle = Captions["preset"];
+
 export interface Preset {
-  description: string;
   weight: Weight;
   /** Size against the aspect's em; the longest row shrinks or grows to match. */
   scale: number;
@@ -64,83 +66,83 @@ export interface Preset {
    * spacing is not 0, which keeps every row the width it was measured at. */
   tracking: number;
   text: string;
-  /** The word being spoken; with `sweep`, every word already spoken. */
+  /** The word being spoken. */
   active: string;
   /** Opacity of words not spoken yet. */
   upcoming: number;
   stroke?: { width: number; color: string };
   /** A soft drop shadow under the text. */
   shadow?: { color: string; opacity: number; offset: number; blur: number; spread: number };
-  /** A blurred halo around the text, without offset. */
-  glow?: { color: string; opacity: number; width: number; blur: number };
-  /** A rounded plate behind each row. */
+  /** A rounded box behind the caption's one row. */
   plate?: { color: string; opacity: number; padX: number; padY: number; radius: number };
-  /** A rounded pill behind the word being spoken, which is drawn in `active` without a stroke. */
-  pill?: { color: string; padX: number; padY: number; radius: number };
-  /** The colour sweeps through each word as it is spoken (karaoke), instead of jumping. */
-  sweep?: boolean;
+  /** The colour of numbers, and of English words in a Chinese line. */
+  keyword?: string;
+  /** A caption is one row of at most `chars` Chinese characters' width and `words` English
+   * words, instead of the aspect's rows. */
+  chunk?: { chars: number; words: number };
   /** How a caption arrives: settling from slightly smaller, or fading in. */
   entrance: { pop: number } | "fade";
+  /** Each word appears as it is spoken, shrinking from this scale to its size over POP. */
+  wordPop?: number;
 }
 
-export const PRESETS: Record<string, Preset> = {
-  bold: {
-    description: "Heavy white type with a dark stroke; the word being spoken turns amber",
-    weight: 900,
-    scale: 1,
-    tracking: 0.02,
-    text: WHITE,
-    active: ACCENT,
-    upcoming: 1,
-    stroke: { width: 0.085, color: INK },
-    shadow: { color: "#000000", opacity: 0.5, offset: 0.05, blur: 0.12, spread: 0.02 },
-    entrance: { pop: 0.9 },
-  },
-  spotlight: {
-    description: "White type on a soft dark halo; the word being spoken sits on an amber pill",
-    weight: 900,
-    scale: 0.96,
-    tracking: 0.06,
-    text: WHITE,
-    active: INK,
-    upcoming: 1,
-    glow: { color: INK, opacity: 0.55, width: 0.06, blur: 0.18 },
-    pill: { color: ACCENT, padX: 0.12, padY: 0.1, radius: 0.2 },
-    entrance: "fade",
-  },
-  sweep: {
-    description: "Karaoke: amber sweeps through each word as it is spoken",
-    weight: 900,
-    scale: 1,
-    tracking: 0.02,
-    text: WHITE,
-    active: ACCENT,
-    upcoming: 1,
-    stroke: { width: 0.085, color: INK },
-    shadow: { color: "#000000", opacity: 0.5, offset: 0.05, blur: 0.12, spread: 0.02 },
-    sweep: true,
-    entrance: "fade",
-  },
-  boxed: {
-    description: "Bold type on a dark rounded plate; words brighten as they are spoken",
-    weight: 700,
-    scale: 0.9,
-    tracking: 0.04,
-    text: WHITE,
-    active: WHITE,
-    upcoming: 0.5,
-    plate: { color: INK, opacity: 0.7, padX: 0.32, padY: 0.16, radius: 0.22 },
-    entrance: "fade",
-  },
+/** The styles that draw on the picture; `none` draws nothing. */
+export type DrawnStyle = Exclude<CaptionStyle, "none">;
+
+const BOLD: Preset = {
+  weight: 900,
+  scale: 1,
+  tracking: 0.02,
+  text: WHITE,
+  active: ACCENT,
+  upcoming: 1,
+  stroke: { width: 0.085, color: INK },
+  shadow: { color: "#000000", opacity: 0.5, offset: 0.05, blur: 0.12, spread: 0.02 },
+  entrance: { pop: 0.9 },
 };
 
-export function preset(id: string): Preset {
-  const found = PRESETS[id];
-  if (!found) {
-    throw new Error(
-      `/captions/preset: no caption preset ${JSON.stringify(id)}; the presets are ` +
-        Object.keys(PRESETS).join(", "),
-    );
-  }
-  return found;
+export const PRESETS: Record<DrawnStyle, Preset> = {
+  /** Word by word: heavy white type with a dark stroke; the word being spoken turns amber. */
+  bold: BOLD,
+  /** A few words at a time, big, in a dark box; numbers and English words in a Chinese line are
+   * amber. Each caption pops in from 80 %. */
+  creator: {
+    weight: 900,
+    scale: 1.4,
+    tracking: 0.02,
+    text: WHITE,
+    active: WHITE,
+    upcoming: 1,
+    plate: { color: INK, opacity: 0.88, padX: 0.28, padY: 0.16, radius: 0.16 },
+    keyword: ACCENT,
+    chunk: { chars: 6, words: 3 },
+    entrance: { pop: 0.8 },
+  },
+  /** Small white type with a thin dark stroke and a soft shadow, no highlight. */
+  minimal: {
+    weight: 700,
+    scale: 0.72,
+    tracking: 0.02,
+    text: WHITE,
+    active: WHITE,
+    upcoming: 1,
+    stroke: { width: 0.06, color: INK },
+    shadow: { color: "#000000", opacity: 0.6, offset: 0.04, blur: 0.12, spread: 0.02 },
+    entrance: "fade",
+  },
+  /** As bold, without the highlight: each word pops in from 125 % as it is said. */
+  pop: { ...BOLD, scale: 1.05, active: WHITE, upcoming: 0, entrance: "fade", wordPop: 1.25 },
+};
+
+/** Every style, in the order a person picks from. */
+export const CAPTION_STYLES: readonly CaptionStyle[] = [
+  ...(Object.keys(PRESETS) as DrawnStyle[]),
+  "none",
+];
+
+/** The style an edit starts with unless another is asked for. */
+export const DEFAULT_CAPTIONS: CaptionStyle = "bold";
+
+export function isCaptionStyle(id: string): id is CaptionStyle {
+  return (CAPTION_STYLES as readonly string[]).includes(id);
 }

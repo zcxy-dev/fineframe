@@ -1,11 +1,17 @@
 // What the page asks for, checked the same way in the browser and on the server.
-import { PRESETS } from "@video-editor/engine/captions";
+import {
+  CAPTION_STYLES,
+  type CaptionStyle,
+  DEFAULT_CAPTIONS,
+  isCaptionStyle,
+} from "@video-editor/engine/captions";
 import { LENGTH_RANGE, parseLength } from "@video-editor/engine/length";
 import { type LookId, lookIds } from "@video-editor/engine/looks";
 import { kindOf } from "@video-editor/engine/media";
 import { en, type Messages } from "./i18n/en.ts";
 
-export { LENGTH_RANGE, parseLength };
+/** The captions' style (`--captions`): bold, creator, minimal, pop or none. */
+export { CAPTION_STYLES, DEFAULT_CAPTIONS, LENGTH_RANGE, parseLength };
 
 export const ASPECTS = ["9:16", "1:1", "16:9"] as const;
 export type Aspect = (typeof ASPECTS)[number];
@@ -31,6 +37,12 @@ export function styleName(style: Style, t: Messages = en): string {
   return t.looks[style]?.name ?? style;
 }
 
+/** A caption style's name. One 0.4.0 had and this version does not (spotlight, sweep, boxed)
+ * now renders as bold, and is named so. */
+export function captionStyleName(id: string, t: Messages = en): string {
+  return t.captions[isCaptionStyle(id) ? id : DEFAULT_CAPTIONS].name;
+}
+
 /** Where the speech is heard: by the model on this computer, or on OpenRouter (`--asr cloud`). */
 const ASRS = ["local", "cloud"] as const;
 export type Asr = (typeof ASRS)[number];
@@ -43,10 +55,6 @@ export const DEFAULT_VISUALS: Visuals = "rich";
 /** The model that plans (`--quality`): Claude Opus, or Claude Sonnet for about half the cost. */
 export const QUALITIES = ["best", "economy"] as const;
 export type Quality = (typeof QUALITIES)[number];
-
-/** The captions' look (`--captions`): one of the engine's caption presets. */
-export const CAPTION_STYLES = Object.keys(PRESETS);
-export const DEFAULT_CAPTIONS = "bold";
 
 export interface Settings {
   /** Seconds, LENGTH_RANGE inclusive. */
@@ -66,7 +74,7 @@ export interface Settings {
   /** Edits from before the advanced settings had none of these: best, uncorrected and bold. */
   quality?: Quality;
   correct?: boolean;
-  captions?: string;
+  captions?: CaptionStyle;
   /** What the user asks of the edit, in their words, trimmed; absent when they ask nothing. */
   instructions?: string;
 }
@@ -130,7 +138,7 @@ export function checkSettings(
   if (!QUALITIES.includes(chosenQuality as Quality)) return `Quality is ${QUALITIES.join(" or ")}`;
   if (typeof (correct ?? false) !== "boolean") return "Transcript correction is on or off";
   const chosenCaptions = captions ?? DEFAULT_CAPTIONS;
-  if (!CAPTION_STYLES.includes(chosenCaptions as string)) {
+  if (typeof chosenCaptions !== "string" || !isCaptionStyle(chosenCaptions)) {
     return `The caption style is ${CAPTION_STYLES.join(", ")}`;
   }
   const lists: Record<"names" | "terms", string[]> = { names: [], terms: [] };
@@ -168,7 +176,7 @@ export function checkSettings(
     visuals: shown as Visuals,
     quality: chosenQuality as Quality,
     correct: (correct ?? false) as boolean,
-    captions: chosenCaptions as string,
+    captions: chosenCaptions,
     ...(asked.trim() ? { instructions: asked.trim() } : {}),
   };
 }

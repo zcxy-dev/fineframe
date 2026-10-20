@@ -1,20 +1,18 @@
 // Pages as an ASS script for libass. Each row is drawn as a stack of layers that share its text,
 // so the glyphs line up exactly:
 //
-//   0 plate   a rounded box behind the rows
-//   1 shadow  a soft drop shadow
-//   2 glow    a blurred halo around the text
-//   3 pill    a rounded box behind the word being spoken
-//   4 face    the crisp text, with its stroke
+//   0 plate   a rounded box behind the caption
+//   1 shadow  a soft drop shadow, a blurred glyph border
+//   2 face    the crisp text, with its stroke
 //
-// Shadow and glow are blurred glyph borders. The plate and the pill are drawn from the measured
-// layout instead of from thick glyph borders: a border follows each glyph, so a plate would dip
-// around 一 and a pill would change shape from word to word.
-// Every row is its own event, placed by its centre, so the rows' spacing is the preset's.
+// The plate is drawn from the measured layout instead of from a thick glyph border, which would
+// follow each glyph and dip around 一.
+// Every row is its own event, placed by its centre, so the rows' spacing is the preset's. A preset
+// whose words pop in draws each word as its own event instead, placed where the row puts it.
 
 import { family, type Metrics } from "./fonts.ts";
 import type { Page, Row } from "./layout.ts";
-import { EASE_OUT, ENTER, EXIT, LEADING, type Preset, WORD } from "./presets.ts";
+import { EASE_OUT, ENTER, EXIT, LEADING, POP, type Preset } from "./presets.ts";
 
 /** Where a page's rows go, in output pixels. */
 export interface Geometry {
@@ -30,9 +28,7 @@ type State = "spoken" | "active" | "upcoming";
 
 const PLATE = 0;
 const SHADOW = 1;
-const GLOW = 2;
-const PILL = 3;
-const FACE = 4;
+const FACE = 2;
 
 /** `#rrggbb` as ASS's &HBBGGRR&. */
 function colour(hex: string): string {
@@ -114,6 +110,17 @@ export function writeAss(
     events.push(
       `Dialogue: ${layer},${assTime(start, frameTicks)},${assTime(end, frameTicks)},Caption,,0,0,0,,${text}`,
     );
+  const tracking = `\\fsp${round(preset.tracking * em)}`;
+  const stroke = preset.stroke
+    ? `\\bord${round(preset.stroke.width * em)}\\3c${colour(preset.stroke.color)}`
+    : "\\bord0";
+  /** The shadow layer's tags, for text at `opacity`. */
+  const shadow = (opacity: number) => {
+    if (!preset.shadow) return null;
+    const { color, opacity: strength, offset, blur, spread } = preset.shadow;
+    const border = round(((preset.stroke?.width ?? 0) + spread) * em);
+    return `\\1a&HFF&\\3a&HFF&\\4a${alpha(strength * opacity)}\\4c${colour(color)}\\bord${border}\\xshad0\\yshad${round(offset * em)}\\blur${round(blur * em)}`;
+  };
 
   for (const [p, page] of pages.entries()) {
     const bottom = bottoms[p] as number;
@@ -127,7 +134,9 @@ export function writeAss(
     const geometryOf = (r: number) => {
       const row = page.rows[r] as Row;
       const top = bottom - em - (page.rows.length - 1 - r) * LEADING * em;
-      return { row, top, left: width / 2 - (row.width * em) / 2 };
+      const lineTop = top - (metrics.ascent - metrics.emTop) * em;
+      const centre = lineTop + ((metrics.ascent + metrics.descent) * em) / 2;
+      return { row, top, centre, left: width / 2 - (row.width * em) / 2 };
     };
 
     /** Entrance and exit, for an event of this page from frame `from`. The entrance starts a
@@ -158,98 +167,89 @@ export function writeAss(
 
     if (preset.plate) {
       const { padX, padY, radius, color, opacity } = preset.plate;
-      // One drawing for every row, so where the rows' plates overlap they fill once.
-      const shapes = page.rows.map((_, r) => {
+      // One drawing for every row, so where the rows' plates overlap they fill once. libass
+      // centres a drawing by the box from (0, 0) to its far corner, so it starts at the origin
+      // and is placed by its centre, about which the entrance scales it with the text.
+      const boxes = page.rows.map((_, r) => {
         const { row, top, left } = geometryOf(r);
-        return roundedRect(
+        return [
           left - padX * em,
           top - padY * em,
           left + (row.width - preset.tracking + padX) * em,
           top + em + padY * em,
-          radius * em,
-        );
+        ] as const;
       });
-      const tags = `\\an7\\pos(0,0)\\bord0\\shad0\\1c${colour(color)}\\1a${alpha(opacity)}`;
+      const x0 = Math.min(...boxes.map((box) => box[0]));
+      const y0 = Math.min(...boxes.map((box) => box[1]));
+      const x1 = Math.max(...boxes.map((box) => box[2]));
+      const y1 = Math.max(...boxes.map((box) => box[3]));
+      const shapes = boxes.map(([a, b, c, d]) =>
+        roundedRect(a - x0, b - y0, c - x0, d - y0, radius * em),
+      );
+      const tags = `\\an5\\pos(${round((x0 + x1) / 2)},${round((y0 + y1) / 2)})\\bord0\\shad0\\1c${colour(color)}\\1a${alpha(opacity)}`;
       event(
         PLATE,
         page.start,
         page.end,
-        `{${tags}${motion(page.start, false)}\\p1}${shapes.join(" ")}`,
+        `{${tags}${motion(page.start, true)}\\p1}${shapes.join(" ")}`,
       );
     }
 
-    // The frames at which the word being spoken changes; karaoke sweeps on its own instead.
+    if (preset.wordPop) {
+      // Each word from its first frame to the end of the page, shrinking to its size from
+      // wordPop, at its place in the row, so the row does not move as it fills.
+      const pop = round(preset.wordPop * 100);
+      for (const [r] of page.rows.entries()) {
+        const { centre, left } = geometryOf(r);
+        for (const word of wordsOf(page, r, metrics, preset.tracking)) {
+          const from =
+            word.word === null ? page.start : (page.words[word.word]?.start ?? page.start);
+          const x = left + (word.x + word.width / 2) * em;
+          const tags = `\\an5\\pos(${round(x)},${round(centre)})${tracking}${motion(from, false)}\\fscx${pop}\\fscy${pop}\\t(0,${POP},${EASE_OUT},\\fscx100\\fscy100)`;
+          const below = shadow(1);
+          if (below) event(SHADOW, from, page.end, `{${tags}${below}}${word.text}`);
+          event(
+            FACE,
+            from,
+            page.end,
+            `{${tags}\\1c${colour(preset.text)}${stroke}\\shad0}${word.text}`,
+          );
+        }
+      }
+      continue;
+    }
+
+    // The frames at which the word being spoken changes.
     const changes = new Set([page.start, page.end]);
-    if (!preset.sweep) for (const word of page.words) changes.add(word.start).add(word.end);
+    for (const word of page.words) changes.add(word.start).add(word.end);
     const times = [...changes].sort((a, b) => a - b);
     for (let i = 0; i + 1 < times.length; i++) {
       const from = times[i] as number;
       const to = times[i + 1] as number;
-      const lit = page.words.findIndex((word) => word.start <= from && from < word.end);
-      const active = preset.sweep ? -1 : lit;
+      const active = page.words.findIndex((word) => word.start <= from && from < word.end);
       const states = pageStates(page, from, active);
       for (const [r, row] of page.rows.entries()) {
-        const { top, left } = geometryOf(r);
-        const lineTop = top - (metrics.ascent - metrics.emTop) * em;
-        const centre = lineTop + ((metrics.ascent + metrics.descent) * em) / 2;
-        const anchor = `\\an5\\pos(${round(width / 2)},${round(centre)})\\fsp${round(preset.tracking * em)}`;
+        const { centre } = geometryOf(r);
+        const anchor = `\\an5\\pos(${round(width / 2)},${round(centre)})${tracking}`;
         const rowStates = states[r] as State[];
         const visibility = (state: State) => (state === "upcoming" ? preset.upcoming : 1);
-        const onPill = (state: State) => preset.pill !== undefined && state === "active";
-        const layer = (index: number, tags: (state: State) => string) => {
-          const text = row.segments.map(
-            (segment, s) => `{${tags(rowStates[s] as State)}}${segment.text}`,
-          );
+        const layer = (index: number, tags: (s: number) => string) => {
+          const text = row.segments.map((segment, s) => `{${tags(s)}}${segment.text}`);
           event(index, from, to, `{${anchor}${motion(from, true)}}${text.join("")}`);
         };
         if (preset.shadow) {
-          const { color, opacity, offset, blur, spread } = preset.shadow;
-          const border = round(((preset.stroke?.width ?? 0) + spread) * em);
-          layer(SHADOW, (state) => {
-            const seen = onPill(state) ? 0 : opacity * visibility(state);
-            return `\\1a&HFF&\\3a&HFF&\\4a${alpha(seen)}\\4c${colour(color)}\\bord${border}\\xshad0\\yshad${round(offset * em)}\\blur${round(blur * em)}`;
-          });
+          layer(SHADOW, (s) => shadow(visibility(rowStates[s] as State)) as string);
         }
-        if (preset.glow) {
-          const { color, opacity, width: spread, blur } = preset.glow;
-          layer(GLOW, (state) => {
-            const seen = onPill(state) ? 0 : opacity * visibility(state);
-            return `\\1a&HFF&\\3a${alpha(seen)}\\3c${colour(color)}\\bord${round(spread * em)}\\shad0\\blur${round(blur * em)}`;
-          });
-        }
-        const stroke = (state: State) =>
-          preset.stroke && !onPill(state)
-            ? `\\bord${round(preset.stroke.width * em)}\\3c${colour(preset.stroke.color)}`
-            : "\\bord0";
-        if (preset.sweep) {
-          const face = karaoke(page, row, preset, frameTicks);
-          event(
-            FACE,
-            from,
-            to,
-            `{${anchor}${motion(from, true)}${stroke("spoken")}\\shad0}${face}`,
-          );
-        } else {
-          layer(FACE, (state) => {
-            const fill = state === "active" ? preset.active : preset.text;
-            return `\\1c${colour(fill)}\\alpha${alpha(visibility(state))}${stroke(state)}\\shad0`;
-          });
-        }
-        const word = row.segments.find((segment) => active >= 0 && segment.word === active);
-        if (preset.pill && word) {
-          const { padX, padY, radius, color } = preset.pill;
-          const w = (word.width - preset.tracking + 2 * padX) * em;
-          const h = (1 + 2 * padY) * em;
-          const x = left + (word.x - padX) * em + w / 2;
-          const y = top + em / 2;
-          // The pill lands on the word and swells to size, starting a frame early so the word's
-          // first frame already shows it almost whole. libass centres a drawing by the box from
-          // (0, 0) to its far corner, so the shape starts at the origin.
-          const swell = `\\fscx85\\fscy85\\t(${round(-frameMs)},${round(WORD - frameMs)},${EASE_OUT},\\fscx100\\fscy100)`;
-          const tags = `\\an5\\pos(${round(x)},${round(y)})${swell}\\bord0\\shad0\\1c${colour(color)}${motion(from, false)}`;
-          const shape = roundedRect(0, 0, w, h, radius * em);
-          event(PILL, from, to, `{${tags}\\p1}${shape}`);
-        }
+        layer(FACE, (s) => {
+          const state = rowStates[s] as State;
+          const fill =
+            preset.keyword && row.segments[s]?.keyword
+              ? preset.keyword
+              : state === "active"
+                ? preset.active
+                : preset.text;
+          return `\\1c${colour(fill)}\\alpha${alpha(visibility(state))}${stroke}\\shad0`;
+        });
       }
     }
   }
@@ -278,6 +278,45 @@ export function writeAss(
 }
 
 /**
+ * The words of a page's row `r` as the pop style draws them, each with the punctuation after it
+ * (or, at the start, before it), where the row puts it, in ems from the row's left edge. Spaces
+ * are left out: libass drops them at either end of an event, and the place keeps their width.
+ */
+function wordsOf(
+  page: Page,
+  r: number,
+  metrics: Metrics,
+  tracking: number,
+): { text: string; word: number | null; x: number; width: number }[] {
+  const row = page.rows[r] as Row;
+  const blank = (char: string) => (metrics.advance(char.codePointAt(0) as number) ?? 0) + tracking;
+  const words: { text: string; word: number | null; x: number; width: number }[] = [];
+  for (const segment of row.segments) {
+    let { text, x, width } = segment;
+    for (; /^\s/u.test(text); text = text.slice(1)) {
+      x += blank(text[0] as string);
+      width -= blank(text[0] as string);
+    }
+    for (; /\s$/u.test(text); text = text.slice(0, -1)) width -= blank(text.at(-1) as string);
+    if (!text) continue;
+    const last = words.at(-1);
+    const touching = last && Math.abs(last.x + last.width - x) < 1e-9;
+    // Punctuation goes with the word before it, as does the rest of a word split into runs.
+    if (last && touching && (segment.word === null || segment.word === last.word)) {
+      last.text += text;
+      last.width += width;
+    } else if (last && touching && last.word === null) {
+      last.text += text;
+      last.width += width;
+      last.word = segment.word;
+    } else {
+      words.push({ text, word: segment.word, x, width });
+    }
+  }
+  return words;
+}
+
+/**
  * The state of every segment of a page from frame `from`, while word `active` is lit (-1: none).
  * A word is spoken once it has started. Spaces and punctuation between words go with the word
  * before them, or the one after at the start, and count as spoken once it is: only words take
@@ -299,41 +338,4 @@ function pageStates(page: Page, from: number, active: number): State[][] {
       return owner === active && segment.word !== null ? "active" : "spoken";
     }),
   );
-}
-
-/**
- * A row's text for karaoke: each word's colour sweeps from the text colour to the active one
- * (\kf) while it is said, from its start until its sound ends, and holds through the pause
- * before the next. Times count in centiseconds from the page's first event. Text before a row's
- * first word sweeps with that word; text after a word, with it. A row with no timed words stays
- * in the text colour.
- */
-function karaoke(page: Page, row: Row, preset: Preset, frameTicks: number): string {
-  const all = row.segments.map((segment) => segment.text).join("");
-  if (row.segments.every((segment) => segment.word === null)) {
-    return `{\\1c${colour(preset.text)}}${all}`;
-  }
-  const cs = (frame: number) =>
-    Math.round((ms(frame, frameTicks) - clock(page.start, frameTicks)) / 10);
-  let text = `{\\1c${colour(preset.active)}\\2c${colour(preset.text)}}`;
-  let at = 0;
-  let pending = "";
-  let started = false;
-  for (const segment of row.segments) {
-    if (segment.word === null) {
-      if (started) text += segment.text;
-      else pending += segment.text;
-      continue;
-    }
-    const word = page.words[segment.word] as Page["words"][number];
-    const start = cs(word.start);
-    if (start > at) text += `{\\k${start - at}}`;
-    at = Math.max(at, start);
-    const sweep = Math.max(1, cs(word.said) - at);
-    text += `{\\kf${sweep}}${pending}${segment.text}`;
-    pending = "";
-    started = true;
-    at += sweep;
-  }
-  return text;
 }

@@ -90,7 +90,7 @@ render ─▶ review.ts  a strip around each cut ─▶ claude-haiku-5-5, doubtf
 
 **Length** (`fit.ts`). A target longer than all of the footage's speech, with every pause cut to the longest breath, fails before any request and says the longest the footage allows, or to add footage when that is under 15 s. Claude is asked for about 1.25 times the target. Code then aims for the target itself, not just ±5 %. It weighs each way to shorten the edit in priority order: drop the segment with the highest priority number, the later one among equals, or keep only that segment's first lines; a segment whose dropping would undershoot stays whole, and the next is tried. For each, it stretches or shrinks the breath at every join, by 0.6 to 1.6 times, to come nearest the target, and keeps the nearest within ±5 %; of those within 0.5 % of it, the one that keeps the most. A choice that trims a segment while a less important one plays whole counts only when none in priority order lands within ±5 %. An edit that is still short gets one more request, with what the first answer came to; still short after two, the planner fails, says how long the edit came out, and what to ask for instead. An edit that cannot get short enough without cutting inside a line fails saying the shortest length its lines allow. `plan.fit` records the length and how many steps it took, and `plan.dropped` every stretch of a source left out, whole files included, with why: a filler, a pause, a retake or mistake, a lower priority, or not chosen.
 
-**Captions** are the kept words on the output timeline, as they were said, one line per transcript line or sentence, tagged `zh-TW` or `en` by the language most of their words are in, with any word in the other language tagged too. A line runs on past a pause or a full stop where it would otherwise end inside a word (ICU's, as in 打。開) or on a word that leads into the next (要不然會 | 太冷), and a mark the transcript put inside a word makes no pause. A Chinese line drops its commas and full stops, as Taiwanese subtitles do, with a full-width space where one fell inside it; question and exclamation marks and quotes stay, half-width after an English word, and English words stay in English. An English line sets its punctuation half-width. Edits start with the `bold` preset unless `pnpm edit --captions` names another. Fitting lines to the screen is the [caption renderer's](#captions).
+**Captions** are the kept words on the output timeline, as they were said, one line per transcript line or sentence, tagged `zh-TW` or `en` by the language most of their words are in, with any word in the other language tagged too. A line runs on past a pause or a full stop where it would otherwise end inside a word (ICU's, as in 打。開) or on a word that leads into the next (要不然會 | 太冷), and a mark the transcript put inside a word makes no pause. A Chinese line drops its commas and full stops, as Taiwanese subtitles do, with a full-width space where one fell inside it; question and exclamation marks and quotes stay, half-width after an English word, and English words stay in English. An English line sets its punctuation half-width. Edits start with the `bold` style unless `pnpm edit --captions` names another. Fitting lines to the screen is the [caption renderer's](#captions).
 
 **Music** comes only from tracks the user supplies, each analysed with the licence it is used under. Claude picks the track whose mood fits the content, from its name, tempo and how loud each section is, and the section the edit opens on, or none. Code fits it (`music.ts`):
 - **Phrases.** A phrase is 4 bars from the start of a section. The music ends on the track's own ending, the end of its sound, at the edit's last frame. It enters on a bar line of the chosen section within a bar of the edit's start, and skips whole phrases forward, or loops back to the section's first phrase from where the track's last section starts, to reach the length, each join a 40 ms cross-fade 50 ms before the downbeats it joins, so the beat runs on as one grid. An entry on a phrase fades in over a beat; one a bar or more into a phrase fades in until the next phrase starts. Only when no such path fits, as in an edit shorter than the track's last phrase, does the music start at the section and fade out from the last bar line at least 2 s before the end. Paths with fewer joins win, then entries on a phrase.
@@ -290,18 +290,21 @@ The path depends only on the source, so two clips cut from one shot frame it the
 
 ## Captions
 
-`captions.lines` are drawn over the finished picture by libass, word by word, in the preset `captions.preset` names:
+`captions.lines` are drawn over the finished picture by libass in the style `captions.preset` names:
 
-| Preset | Type | The word being spoken |
+| Style | Type | Words |
 |---|---|---|
-| `bold` | Heavy white type with a dark stroke and a soft shadow; a caption settles in from 90 % | turns amber |
-| `spotlight` | Heavy white type on a soft dark halo | sits on an amber pill |
-| `sweep` | As `bold`, without the settle | amber sweeps through it as it is said (karaoke) |
-| `boxed` | Bold white type on a dark rounded plate | brightens: words not said yet show at half strength |
+| `bold` | Heavy white type with a dark stroke and a soft shadow; a caption settles in from 90 % | the word being spoken turns amber |
+| `creator` | 1.4 × the size, heavy white type in a dark rounded box, one row of at most 6 Chinese characters' width and 3 English words; each caption pops in from 80 % | numbers, and English words in a Chinese line, are amber |
+| `minimal` | 0.72 × the size, bold white type with a thin dark stroke and a soft shadow | no highlight |
+| `pop` | As `bold`, 1.05 × the size | each word appears as it is said, shrinking from 125 % to its size over 140 ms, where the finished row puts it, so the row never moves |
+| `none` | Nothing on the picture | the SubRip file is still written, broken as `bold` breaks it |
 
-The presets share the effect templates' palette (white, near-black and one amber accent) and one motion. Fades bracket silence: a caption after a pause fades in over 160 ms, easing out, and one before a pause fades out over 100 ms, while back-to-back captions switch at full strength so the text never dims between phrases. The highlight moves to the next word in 80 ms. The values are in [`src/captions/presets.ts`](src/captions/presets.ts).
+A number is digits, or Chinese numerals with 十, 百, 千, 萬 or 億 in them (三十, 二十七), never the 一 of 一直. The styles share the effect templates' palette (white, near-black and one amber accent) and one motion. Fades bracket silence: a caption after a pause fades in over 160 ms, easing out, and one before a pause fades out over 100 ms, while back-to-back captions switch at full strength so the text never dims between phrases. The values are in [`src/captions/presets.ts`](src/captions/presets.ts).
 
-**Size and place.** The type is sized from the frame's shorter side, and each aspect has its place and row length:
+**Changing the style.** The style is the render's alone: changing `captions.preset` re-renders with no new plan. So graphics are planned clear of the captions of every style: the area they keep off, in each stretch, holds where each style would draw.
+
+**Size and place.** The type is sized from the frame's shorter side, times the style's size, and each aspect has its place and row length (the longest row in `bold`'s size; every style keeps to the same width and place):
 
 | Aspect | Type size | Longest row | Rows | Bottom of the last row |
 |---|---|---|---|---|
@@ -314,14 +317,14 @@ At 9:16 the rows keep to about the middle 70 % of the width, and even when moved
 **Line breaking.** Each line is split into captions of one or two rows:
 - at its pauses first (a full-width space or punctuation), so a caption holds whole phrases;
 - otherwise between words: Chinese where ICU's dictionary ends a word (`Intl.Segmenter`), English at spaces. An English word is never split, and a Chinese word only when it is wider than a row;
-- never with closing punctuation (，。」？！… and the like) at the start of a row or opening punctuation at its end;
+- never with closing punctuation (，。」？！… and the like) at the start of a row or opening punctuation at its end, nor inside a number (二 | 十);
 - into two rows as close in width as those breaks allow, rather than end a row on a word that leads into the next (都不, 最, 在) or start one with a particle (的, 了, 嗎).
 
 **Timing.** A caption shows from the first frame of its first word. One caption shows at a time; a line's last caption stays up 0.5 s after its last word unless the next line starts sooner. Each word is lit from the first output frame at or after its start until the next word starts, and a line's last word for 150 ms after its sound ends. ASS counts centiseconds and FFmpeg hands libass each frame's time cut to a whole millisecond, so every event time is rounded down from a millisecond before its frame: each caption and highlight appears and leaves on exactly the frame it was laid out on, at every common frame rate from 23.976 to 60 fps.
 
 **Font.** Noto Sans CJK TC (OFL-1.1), Bold and Black: the full CJK font rather than the smaller Noto Sans TC, which lacks rarer ideographs such as 𠮷. It is downloaded on first use from a pinned commit, checked against its SHA-256 and kept in `~/.cache/video-editor/`. The render hands libass the face files itself, so captions are drawn in the faces their layout was measured in whatever fonts the machine has; a line with a character they lack fails the render, naming the line, before anything is rendered.
 
-**Samples.** `node scripts/caption-samples.ts <project.json> <folder>` renders a planned edit in every preset at every aspect, each with a strip of eight frames on which a word starts, labelled with the frame, its time and the word.
+**Samples.** `node scripts/caption-samples.ts <project.json> <folder>` renders a planned edit in every style that draws, at every aspect, each with a strip of eight frames on which a word starts, labelled with the frame, its time and the word.
 
 ## How it renders
 

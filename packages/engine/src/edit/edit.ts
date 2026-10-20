@@ -8,6 +8,7 @@ import {
   type Progress,
   validateProgress,
 } from "@video-editor/schema";
+import type { CaptionStyle } from "../captions/presets.ts";
 import { ffmpeg, QUIET, run } from "../ffmpeg.ts";
 import type { LookId } from "../looks.ts";
 import {
@@ -58,8 +59,8 @@ export interface EditOptions {
   /** A UTF-8 file of terms said in the footage, one per line, such as brands and jargon: they
    * only help the speech model and the correction hear them. */
   terms?: string;
-  /** The caption preset (../captions/presets.ts): bold unless given. */
-  captions?: string;
+  /** The caption style (../captions/presets.ts): bold unless given. */
+  captions?: CaptionStyle;
   /** What the user asks of this edit, in their words, such as "open with the demo" or "keep
    * the part about pricing", passed on to the planner. */
   instructions?: string;

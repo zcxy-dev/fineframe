@@ -98,6 +98,48 @@ test("a word wider than a row breaks between its characters, and an English word
   assert.deepEqual(shown(english), [["supercalifragilistic"], ["很長"]]);
 });
 
+test("a row never breaks inside a number", () => {
+  // Six to a row would split 二 | 十 to keep the rows even.
+  const pages = lay([line("十幾歲或二十幾歲的朋友")], { maxWidth: 6, maxRows: 1 });
+  const rows = shown(pages).flat();
+  assert.equal(rows.join(""), "十幾歲或二十幾歲的朋友");
+  for (const [i, row] of rows.slice(1).entries()) {
+    assert.ok(!/[二十幾]$/.test(rows[i] as string) || !/^[十幾]/.test(row), rows.join(" | "));
+  }
+  assert.deepEqual(
+    shown(lay([line("我今年二十七歲了")], { maxWidth: 3, maxRows: 1 })).flat()[1],
+    "二十七",
+  );
+});
+
+test("a row holds at most maxWords English words", () => {
+  const text = "I want to focus on this one thing";
+  const rows = shown(lay([line(text)], { maxWidth: 30, maxRows: 1, maxWords: 3 })).flat();
+  assert.deepEqual(rows, ["I want to", "focus on this", "one thing"]);
+  // Chinese characters do not count.
+  const mixed = shown(
+    lay([line("我會更想要 focus 在我去 tackle")], { maxWidth: 30, maxRows: 1, maxWords: 1 }),
+  );
+  assert.equal(mixed.length, 2);
+  for (const row of mixed.flat()) assert.equal(row.match(/[A-Za-z]+/g)?.length, 1, row);
+});
+
+test("keywords are numbers, and English words in a Chinese line", () => {
+  const marked = (pages: Page[]) =>
+    pages.flatMap((page) =>
+      page.rows.flatMap((row) => row.segments.filter((s) => s.keyword).map((s) => s.text)),
+    );
+  const zh = lay([line("我二十七歲 用 4P 跟 workflow 一直剪")], { maxWidth: 30, keywords: true });
+  assert.deepEqual(marked(zh), ["二", "十", "七", "4P", "workflow"]);
+  const en = lay([{ ...line("I edit 3 videos a day"), language: "en" }], {
+    maxWidth: 30,
+    keywords: true,
+  });
+  assert.deepEqual(marked(en), ["3"]);
+  // Without the option nothing is marked, and the segments are as before.
+  assert.deepEqual(marked(lay([line("用 workflow 剪 3 支")], { maxWidth: 30 })), []);
+});
+
 const CLOSING = "、。，：；？！）」』》…,.!?:;)";
 const OPENING = "（「『《([";
 
@@ -169,8 +211,8 @@ test("pages start with their first word, and words are lit from their first fram
   const [page] = lay([line("你好", 1)]);
   assert.equal(page?.start, 30);
   assert.deepEqual(page?.words, [
-    { start: 30, end: 36, said: 36 },
-    { start: 36, end: 42, said: 42 },
+    { start: 30, end: 36 },
+    { start: 36, end: 42 },
   ]);
   // A word that starts inside a frame is lit from the next frame start.
   const late = line("你好", 1);
@@ -194,7 +236,7 @@ test("a caption holds after its last word unless the next starts, and never runs
     ],
   );
   // The second's last word is lit 0.1 s past its sound, then none is.
-  assert.deepEqual(pages[1]?.words.at(-1), { start: 54, end: 63, said: 60 });
+  assert.deepEqual(pages[1]?.words.at(-1), { start: 54, end: 63 });
   assert.deepEqual(
     lay([first, second], { hold, tail, frames: 70 }).map((page) => page.end),
     [48, 70],
@@ -217,11 +259,14 @@ test("a line the caption font cannot draw, or whose words are not in it, fails n
 
 test("a full caption at its resting place stays below the band overlays may draw in", () => {
   const sizes = { "16:9": [1920, 1080], "1:1": [1080, 1080], "9:16": [1080, 1920] } as const;
-  const biggest = Math.max(...Object.values(PRESETS).map((preset) => preset.scale));
   for (const [aspect, [width, height]] of Object.entries(sizes)) {
     const type = TYPE_SCALE[aspect as keyof typeof sizes];
-    const em = (type.em * biggest * Math.min(width, height)) / height;
-    const top = type.bottom - em * (1 + LEADING * (type.rows - 1));
+    const top = Math.min(
+      ...Object.values(PRESETS).map((preset) => {
+        const em = (type.em * preset.scale * Math.min(width, height)) / height;
+        return type.bottom - em * (1 + LEADING * ((preset.chunk ? 1 : type.rows) - 1));
+      }),
+    );
     const overlays =
       1 - layoutFor(aspect as keyof typeof sizes, width, height).safe.bottom / height;
     assert.ok(

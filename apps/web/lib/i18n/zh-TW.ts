@@ -156,7 +156,7 @@ export const zhTW: Messages = {
     correctionHelp:
       "Claude 會參照你的人名與專有名詞讀過每份逐字稿，在對齊字詞時間點之前，修正語音模型聽錯的地方。會增加 Claude 費用。",
     captionStyle: "字幕樣式",
-    sample: ["字幕", "逐字", "準時", "出現"],
+    sample: ["剪片", "只要", "10", "分鐘"],
     sampleGap: "",
     license: "配樂授權",
     licenseHelp:
@@ -179,13 +179,14 @@ export const zhTW: Messages = {
     },
   },
   captions: {
-    bold: { name: "粗體", description: "粗重白字加深色描邊；正在說的字變成琥珀色。" },
-    spotlight: {
-      name: "聚光",
-      description: "白字襯著柔和的深色光暈；正在說的字放在琥珀色膠囊底上。",
+    bold: { name: "逐字亮起", description: "粗白字逐字出現；正在說的字變成琥珀色。" },
+    creator: {
+      name: "粗體重點",
+      description: "一次幾個字，大字放在深色框裡；數字和英文用琥珀色標出。",
     },
-    sweep: { name: "掃色", description: "卡拉 OK：說到哪個字，琥珀色就掃過哪個字。" },
-    boxed: { name: "底框", description: "粗體字放在深色圓角底板上；說到的字會變亮。" },
+    minimal: { name: "極簡", description: "小號白字，不標亮。" },
+    pop: { name: "跳字", description: "每個字在說出來時跳出來。" },
+    none: { name: "無字幕", description: "影片上不放字幕；仍會產生字幕檔（.srt）。" },
   },
   keys: {
     anthropic: {
@@ -384,7 +385,6 @@ export const zhTW: Messages = {
     noMusic: "這次剪輯沒有配樂。",
     look: "風格",
     captionStyle: "字幕樣式",
-    preview: ["說得", "清楚", "一點"],
     overlays: "疊加元素",
     keep: "保留",
     remove: "移除",

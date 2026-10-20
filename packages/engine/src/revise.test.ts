@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { catalog } from "@video-editor/effects";
-import { type Project, validateProject, type Word } from "@video-editor/schema";
-import { PRESETS } from "./captions/presets.ts";
+import { type Project, projectSchema, validateProject, type Word } from "@video-editor/schema";
+import { CAPTION_STYLES, PRESETS } from "./captions/presets.ts";
 import type { PlaceSource } from "./plan/place.ts";
-import { CAPTION_PRESETS, fixWord, OVERLAY_TEXT, removables, revise } from "./revise.ts";
+import { fixWord, OVERLAY_TEXT, removables, revise } from "./revise.ts";
 import { project as projectOf, SECOND } from "./testing.ts";
 
 const s = (seconds: number) => Math.round(seconds * SECOND);
@@ -89,8 +89,18 @@ function edit(): Project {
   );
 }
 
-test("the panel's caption styles and text limits are the engine's and the catalog's", () => {
-  assert.deepEqual([...CAPTION_PRESETS].sort(), Object.keys(PRESETS).sort());
+test("the caption styles are the schema's, and the text limits the catalog's", () => {
+  const schema = projectSchema as unknown as {
+    $defs: { Captions: { properties: { preset: { enum: string[] } } } };
+  };
+  assert.deepEqual(
+    [...CAPTION_STYLES].sort(),
+    [...schema.$defs.Captions.properties.preset.enum].sort(),
+  );
+  assert.deepEqual(
+    CAPTION_STYLES.filter((style) => style !== "none").sort(),
+    Object.keys(PRESETS).sort(),
+  );
   for (const [template, limits] of Object.entries(OVERLAY_TEXT)) {
     const params = (
       catalog as unknown as Record<
@@ -122,7 +132,7 @@ test("one revision restyles, retitles, relevels the music and changes the look",
   const { project, removed } = revise(
     edit(),
     {
-      captions: "boxed",
+      captions: "creator",
       words: [{ line: 0, word: 1, text: "one" }],
       overlays: [{ index: 0, params: { text: "Hi there", subtitle: "" } }],
       music: { gainDb: -3 },
@@ -131,7 +141,7 @@ test("one revision restyles, retitles, relevels the music and changes the look",
     sources,
   );
   validateProject(project);
-  assert.equal(project.captions?.preset, "boxed");
+  assert.equal(project.captions?.preset, "creator");
   assert.match(project.captions?.lines[0]?.text ?? "", /^w0 one w2/);
   assert.deepEqual(project.overlays?.[0]?.params, { text: "Hi there" });
   assert.equal(project.audio.music?.[0]?.gainDb, -23);

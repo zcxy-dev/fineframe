@@ -2,53 +2,51 @@
 
 import { copyFile, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { type Project, secondsToTicks } from "@video-editor/schema";
+import { type Captions, type Project, secondsToTicks } from "@video-editor/schema";
 import type { Timeline } from "../timeline.ts";
 import { writeAss } from "./ass.ts";
 import { faceZones, visualZones } from "./faces.ts";
 import { fontFile, metrics } from "./fonts.ts";
 import { layoutCaptions, type Page, rowText } from "./layout.ts";
 import { placeBlocks } from "./place.ts";
-import { HOLD, LEADING, preset, TAIL, TYPE_SCALE } from "./presets.ts";
+import { type DrawnStyle, HOLD, LEADING, PRESETS, TAIL, TYPE_SCALE } from "./presets.ts";
 
-export { PRESETS } from "./presets.ts";
+export { type CaptionStyle, PRESETS, type Preset } from "./presets.ts";
+
+type Box = { start: number; end: number; x: number; y: number; width: number; height: number };
 
 export interface CaptionFiles {
-  /** The ASS script libass draws. */
-  ass: string;
-  /** The same pages as SubRip: the same text, broken into the same rows, on the same frames. */
+  /** The ASS script libass draws, or null for the style `none`. */
+  ass: string | null;
+  /** The pages as SubRip: the same text, broken into the same rows, on the same frames as the
+   * picture shows them; for `none`, as `bold` would. */
   srt: string;
   pages: Page[];
-  /** Where each page is drawn, in output pixels, over output frames [start, end): what a graphic
-   * keeps its text off. */
-  boxes: { start: number; end: number; x: number; y: number; width: number; height: number }[];
-  /** The face file the script is drawn in, for stageFonts. */
-  font: string;
+  /** The face file the script is drawn in, for stageFonts; null with no script. */
+  font: string | null;
 }
 
 /** Room kept around a caption's em boxes when moving it clear of a face, in ems. */
 const CLEARANCE = 0.3;
 
-/**
- * Lays out, places and writes the project's captions. Fails, naming the line, on a character the
- * caption font cannot draw, so a caption never shows a box.
- */
-export async function buildCaptions(
-  project: Project,
-  timeline: Pick<Timeline, "main" | "broll" | "frames" | "frameTicks"> &
-    Partial<Pick<Timeline, "graphics">>,
-): Promise<CaptionFiles | null> {
-  const { captions, output } = project;
-  if (!captions) return null;
-  const chosen = preset(captions.preset);
+type Placeable = Pick<Timeline, "main" | "broll" | "frames" | "frameTicks"> &
+  Partial<Pick<Timeline, "graphics">>;
+
+/** The pages of `style`, where each is drawn, and what drawing them takes. */
+async function place(project: Project, timeline: Placeable, style: DrawnStyle) {
+  const { captions, output } = project as Project & { captions: Captions };
+  const chosen = PRESETS[style];
   const scale = TYPE_SCALE[output.aspect];
   const { frameTicks } = timeline;
   const font = await fontFile(chosen.weight);
   const face = await metrics(font);
   const em = scale.em * Math.min(output.width, output.height) * chosen.scale;
   const pages = layoutCaptions(captions, face, {
-    maxWidth: Math.floor(scale.chars / chosen.scale) * (1 + chosen.tracking),
-    maxRows: scale.rows,
+    maxWidth:
+      (chosen.chunk?.chars ?? Math.floor(scale.chars / chosen.scale)) * (1 + chosen.tracking),
+    maxRows: chosen.chunk ? 1 : scale.rows,
+    ...(chosen.chunk ? { maxWords: chosen.chunk.words } : {}),
+    keywords: chosen.keyword !== undefined,
     tracking: chosen.tracking,
     frameTicks,
     hold: secondsToTicks(HOLD / 1000),
@@ -76,8 +74,7 @@ export async function buildCaptions(
     [scale.band[0] * output.height, scale.band[1] * output.height],
     [...faceZones(timeline, output), ...visualZones(timeline, output)],
   ).map((bottom) => bottom - CLEARANCE * em);
-  const geometry = { width: output.width, height: output.height, em, frameTicks };
-  const boxes = blocks.map((block, i) => {
+  const boxes = blocks.map((block, i): Box => {
     const bottom = (bottoms[i] as number) + CLEARANCE * em;
     return {
       start: block.start,
@@ -88,13 +85,75 @@ export async function buildCaptions(
       height: block.height,
     };
   });
-  return {
-    ass: writeAss(pages, bottoms, chosen, face, geometry),
-    srt: toSrt(pages, frameTicks),
-    pages,
-    boxes,
-    font,
+  return { chosen, font, face, em, pages, bottoms, boxes };
+}
+
+/**
+ * Lays out, places and writes the project's captions. Fails, naming the line, on a character the
+ * caption font cannot draw, so a caption never shows a box.
+ */
+export async function buildCaptions(
+  project: Project,
+  timeline: Placeable,
+): Promise<CaptionFiles | null> {
+  const { captions, output } = project;
+  if (!captions) return null;
+  const style = captions.preset === "none" ? null : captions.preset;
+  const { chosen, font, face, em, pages, bottoms } = await place(
+    project,
+    timeline,
+    style ?? "bold",
+  );
+  const geometry = {
+    width: output.width,
+    height: output.height,
+    em,
+    frameTicks: timeline.frameTicks,
   };
+  return {
+    ass: style ? writeAss(pages, bottoms, chosen, face, geometry) : null,
+    srt: toSrt(pages, timeline.frameTicks),
+    pages,
+    font: style ? font : null,
+  };
+}
+
+/**
+ * Where the project's captions may be drawn, in output pixels over output frames [start, end):
+ * in each stretch, the box that holds the captions of every style there. The style changes with
+ * a render alone, so a graphic keeps its text off all of them. Empty without captions.
+ */
+export async function captionAreas(project: Project, timeline: Placeable): Promise<Box[]> {
+  if (!project.captions) return [];
+  const all: Box[] = [];
+  for (const style of Object.keys(PRESETS) as DrawnStyle[]) {
+    all.push(...(await place(project, timeline, style)).boxes);
+  }
+  const times = [...new Set(all.flatMap((box) => [box.start, box.end]))].sort((a, b) => a - b);
+  const areas: Box[] = [];
+  for (const [i, start] of times.entries()) {
+    const end = times[i + 1];
+    if (end === undefined) break;
+    const here = all.filter((box) => box.start < end && box.end > start);
+    if (here.length === 0) continue;
+    const x = Math.min(...here.map((box) => box.x));
+    const y = Math.min(...here.map((box) => box.y));
+    const width = Math.max(...here.map((box) => box.x + box.width)) - x;
+    const height = Math.max(...here.map((box) => box.y + box.height)) - y;
+    const last = areas.at(-1);
+    if (
+      last?.end === start &&
+      last.x === x &&
+      last.y === y &&
+      last.width === width &&
+      last.height === height
+    ) {
+      last.end = end;
+    } else {
+      areas.push({ start, end, x, y, width, height });
+    }
+  }
+  return areas;
 }
 
 /** A frame's start as a SubRip time: the millisecond before it, as assTime does, so a player

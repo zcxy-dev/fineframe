@@ -318,3 +318,17 @@ test("a project Fineframe 0.4.0 wrote opens without its cards and keyword pops",
     dropped: { cards: 0, keywords: 0 },
   });
 });
+
+test("a project Fineframe 0.4.0 captioned in a preset since removed is captioned in bold", async () => {
+  const current = await exampleProject();
+  for (const preset of ["spotlight", "sweep", "boxed"]) {
+    const old = structuredClone(current) as unknown as { captions: { preset: string } };
+    old.captions.preset = preset;
+    const project = validateProject(old);
+    assert.deepEqual(project.captions, { ...current.captions, preset: "bold" });
+  }
+  // Any other unknown style is still refused.
+  const wrong = structuredClone(current) as unknown as { captions: { preset: string } };
+  wrong.captions.preset = "karaoke";
+  assert.throws(() => validateProject(wrong), SchemaError);
+});

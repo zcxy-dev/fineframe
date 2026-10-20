@@ -1,9 +1,13 @@
 // Stands in for `pnpm render` in tests: prints its progress as the engine's command does, then
 // writes the video and captions at -o beside the project it was given. With $FAKE_RENDER_FAIL it
-// fails as the engine does, naming the problem.
-import { writeFile } from "node:fs/promises";
+// fails as the engine does, naming the problem. With $FAKE_RENDER_LOG it adds its arguments to
+// that file, a line a render.
+import { appendFile, writeFile } from "node:fs/promises";
 
 const args = process.argv.slice(2);
+if (process.env.FAKE_RENDER_LOG) {
+  await appendFile(process.env.FAKE_RENDER_LOG, `${JSON.stringify(args)}\n`);
+}
 const out = args[args.indexOf("-o") + 1] ?? "";
 process.stderr.write("10% Checking sources\n");
 process.stderr.write("60% Rendering pieces\n");

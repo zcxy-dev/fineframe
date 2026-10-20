@@ -37,7 +37,7 @@ const job = (current: number): Job => ({
       length: 30,
       aspect: "1:1",
       look: "film",
-      captions: "boxed",
+      captions: "creator",
       claude: cost(0.1, 0.02),
     },
   ],
@@ -51,7 +51,7 @@ test("the summary is the shown version's: its length, aspect, look, captions and
   assert.equal(row(replanned, "Length"), "Target 30 s");
   assert.equal(row(replanned, "Aspect"), "1:1");
   assert.equal(row(replanned, "Style"), "Film");
-  assert.equal(row(replanned, "Captions"), "Boxed");
+  assert.equal(row(replanned, "Captions"), "Bold");
   assert.equal(row(replanned, "Claude, planning"), "$0.10");
   assert.equal(row(replanned, "Claude, checking cuts"), "$0.02");
   // Every version's cost together, labelled as the total.
@@ -61,13 +61,15 @@ test("the summary is the shown version's: its length, aspect, look, captions and
   const reedited = summaryRows(job(2));
   assert.equal(row(reedited, "Aspect"), "9:16");
   assert.equal(row(reedited, "Style"), "Film");
+  // A caption preset 0.4.0 had and this version does not renders, and is named, as bold.
+  assert.equal(row(reedited, "Captions"), "Highlight");
   assert.equal(row(reedited, "Claude, planning"), undefined);
   assert.equal(row(reedited, "Claude"), "None: changed without a new plan");
 
   const first = summaryRows(job(1));
   assert.equal(row(first, "Length"), "Target 1 min");
   assert.equal(row(first, "Style"), "Warm");
-  assert.equal(row(first, "Captions"), "Bold");
+  assert.equal(row(first, "Captions"), "Highlight");
   assert.equal(row(first, "Claude, planning"), "$0.19");
 
   // An edit never changed has no total, which would only repeat its own cost.

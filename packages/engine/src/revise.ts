@@ -7,13 +7,10 @@ import { cutEdit } from "./cut.ts";
 
 export { placeSources } from "./cut.ts";
 
+import { type CaptionStyle, isCaptionStyle } from "./captions/presets.ts";
 import { isLookId, type LookId } from "./looks.ts";
 import type { PlaceSource } from "./plan/place.ts";
 import { joinWords } from "./plan/text.ts";
-
-/** The caption presets, by `captions.preset`; captions/presets.ts draws them. */
-export const CAPTION_PRESETS = ["bold", "spotlight", "sweep", "boxed"] as const;
-export type CaptionPreset = (typeof CAPTION_PRESETS)[number];
 
 /** The text params of the overlays the panel retitles, with their longest length, as the effect
  * templates' catalog caps them. */
@@ -41,7 +38,7 @@ export interface Revision {
   /** Raises or lowers every music track by this many dB, or takes the music out. */
   music?: { gainDb: number } | "remove";
   look?: LookId | "none";
-  captions?: CaptionPreset;
+  captions?: CaptionStyle;
 }
 
 export interface RevisionResult {
@@ -68,7 +65,7 @@ export function revise(
 ): RevisionResult {
   let out: Project = structuredClone(project);
   if (revision.captions !== undefined) {
-    if (!CAPTION_PRESETS.includes(revision.captions)) {
+    if (!isCaptionStyle(revision.captions)) {
       throw new Error(`No caption style ${JSON.stringify(revision.captions)}`);
     }
     if (!out.captions) throw new Error("This edit has no captions to restyle");

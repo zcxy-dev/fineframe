@@ -1,5 +1,6 @@
 "use client";
 
+import { CAPTION_STYLES, type CaptionStyle } from "@video-editor/engine/captions";
 import { lookIds } from "@video-editor/engine/looks";
 import type { Revision } from "@video-editor/engine/revise";
 import {
@@ -18,6 +19,7 @@ import type { EditView, Job } from "../lib/jobs.ts";
 import { formatClock, formatDollars } from "../lib/settings.ts";
 import { dollarsOf } from "../lib/summary.ts";
 import { spacedWords } from "../lib/transcript.ts";
+import { CaptionPreview } from "./CaptionPreview.tsx";
 import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
 import { useLocale, useT } from "./I18n.tsx";
@@ -26,7 +28,6 @@ import { Replan } from "./Replan.tsx";
 /** Ticks in a second, as project.json counts time. */
 const TICKS = 120_000;
 const LOOKS = [...lookIds, "none"] as const;
-const CAPTION_STYLES = ["bold", "spotlight", "sweep", "boxed"] as const;
 
 /** The changes waiting for Apply. Words are by their place in the whole transcript. */
 interface Draft {
@@ -36,7 +37,7 @@ interface Draft {
   remove: string[];
   music?: { gainDb: number } | "remove";
   look?: string;
-  captions?: string;
+  captions?: CaptionStyle;
 }
 const EMPTY: Draft = { cuts: [], words: {}, titles: {}, remove: [] };
 
@@ -603,12 +604,8 @@ export function ReEdit({
                   change(style === view.captions ? rest : { ...draft, captions: style });
                 }}
               >
-                <span className={styles.captionPreview} data-style={style} aria-hidden="true">
-                  <span>{words.preview[0]}</span>
-                  <span data-active="true">{words.preview[1]}</span>
-                  <span>{words.preview[2]}</span>
-                </span>
-                {t.captions[style]?.name ?? style}
+                <CaptionPreview style={style} />
+                {t.captions[style].name}
               </button>
             ))}
           </div>
@@ -888,8 +885,7 @@ function describe(draft: Draft, t: Messages): string {
       : draft.music && words.music(`${draft.music.gainDb > 0 ? "+" : ""}${draft.music.gainDb}`),
     draft.look &&
       words.look(draft.look, t.looks[draft.look as keyof Messages["looks"]]?.name ?? draft.look),
-    draft.captions &&
-      words.captions(draft.captions, t.captions[draft.captions]?.name ?? draft.captions),
+    draft.captions && words.captions(draft.captions, t.captions[draft.captions].name),
   ].filter((part): part is string => Boolean(part));
   const text = parts.join(t.list);
   return text ? text[0]?.toUpperCase() + text.slice(1) : words.none;
