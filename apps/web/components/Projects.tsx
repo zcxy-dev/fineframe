@@ -70,7 +70,7 @@ export function Projects({ onOpen }: { onOpen: (id: string) => void }) {
                 {project.shorts === undefined
                   ? formatLength(project.length, t)
                   : words.shorts(project.shorts)}{" "}
-                · {project.aspect} ·{words.status[project.status]} · {formatBytes(project.bytes)}
+                · {project.aspect} · {words.status[project.status]} · {formatBytes(project.bytes)}
                 {project.status === "done" && !project.footage && words.footageRemoved}
               </span>
             </span>
