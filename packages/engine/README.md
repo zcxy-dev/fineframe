@@ -98,12 +98,11 @@ render ─▶ review.ts  a strip around each cut ─▶ claude-haiku-5-5, doubtf
 - **Beats.** B-roll cuts need not fall between words, so its start moves to the nearest beat within 150 ms of its line, and its end to the last beat its length allows, both on the frame grid. Each music range records the track's licence and, when its beats keep one tempo within 20 ms, the beat grid they were snapped to.
 
 **Effects** come from the [effect templates](../effects/), sparingly: Claude decides which moments get one and what it says, and code times and checks it (`effects.ts`).
-- **Keyword pops** on a few of the moments to emphasise, at most three a minute: the word or number, as said, at the top of the frame, its swipe starting 0.15 s before the word is said and lasting 1.5 s, or less to end before the shot changes after the word: at a cut to another source or another of its shots, or at the source's own shot change. A jump cut inside one shot is not a change.
 - **A title** over the opening of an edit of a minute or more that keeps the whole story, from its first word for 3 s. A short edit opens on its hook instead, and in an edit under a minute a title would take too much of it.
 - **Chapters** in an edit of two minutes or more: Claude names each and gives the line that opens it, and code marks it with the chapter template (its name and number, for 3.5 s from that line's first word, or from the opening for the first chapter) and hides the cut into each after the first with a wipe centred on it. The shortest section joins the one before it until each runs 30 s or more and there are at most 12; a chapter whose name runs past the template's 20 characters is left out before they are numbered, and with fewer than three there are none. The first marker waits up to 4 s for the title to leave. A shorter edit is not told of chapters at all.
 - **Lower thirds** with a person's name and role, 4 s from a second after the line where they first speak, only when names are given (`pnpm edit --names`) and only a name from that list. It shows in the first shot, while that line is said, where the index's faces show someone on screen talking for at least 2 s (all of a source without faces counts), and ends before that shot or that talking does, coming in sooner than a second, but not before they speak, to fit; with no such shot it is left out, so a cut to the listener never carries the speaker's name. One waits up to 3 s for an effect already on screen, or B-roll covering the speaker, to leave.
 - **Callouts** on screen recordings, where a file's header says it shows one (its framing's `screen` and `screen_cam` shots): Claude gives the line, the words that name the thing, what to look for in a few words and a label, at most one every 20 s. Code (`locate.ts`) sends `claude-haiku-5-5` the frame on screen as the first of those words is said, when that falls in a screen shot, at most 1280 pixels wide, with the line, and gets back the thing's box in pixels, or none. The answer is cached on disk under `~/.cache/video-editor/regions/` by the file's SHA-256, the moment, the target and the line, so planning the footage again asks nothing; a request Claude declines or that fails leaves that callout out. Code then outlines the box from 0.3 s before the words for 3 s, at most three a minute, and only when the box is between 0.05 % and 25 % of the frame, no B-roll covers it, and the clips under it all play that source's screen recording under one still crop with the whole box inside, so it runs on across a jump cut. At the first and last frame each of them plays, the box must look as on the frame it was found on: its pixels change by under 4 grey levels on average, or still correlate by 0.8, so a pointer passing over it is fine and scrolling is not. A screen recording keeps a still crop in the middle, so in a 9:16 edit most of a 16:9 screen is outside it.
-- **One at a time,** title first, then chapters, then lower thirds, then callouts, then keywords: at 9:16 the lower third, the chapter marker and a keyword share the top of the frame. Only a wipe and the chapter marker after it overlap. An effect that would overlap another, run shorter than its template's minimum before the edit ends, or break its template's params (a keyword over 12 characters, say) is left out; a subtitle, role or label too long is left out alone.
+- **One at a time,** title first, then chapters, then lower thirds, then callouts: at 9:16 the lower third and the chapter marker share the top of the frame. Only a wipe and the chapter marker after it overlap. An effect that would overlap another, run shorter than its template's minimum before the edit ends, or break its template's params (a chapter name over 20 characters, say) is left out; a subtitle, role or label too long is left out alone.
 
 **Output.** The requested aspect at the largest of 1080, 720, 540 or 360 lines that the footage fills, at the frame rate of the file with the most speech, or at 30 fps when that file runs slower than 23.976 fps, whose frames do not fit in a cut's gap.
 
@@ -139,7 +138,7 @@ A rich edit (`visuals: "rich"`, the default; `pnpm edit --visuals`) shows what t
   - A split across a cut is one speaker clip per main clip.
   - Other aspects have no split.
   - A still is cropped in its box's shape around the words it was captured for, at most 0.75 of their width and never past its own pixels, and pushes in by 8 % over its time on screen. Every change is a hard cut.
-- **Effects** are planned twice: first as before, which the visuals keep clear of except keyword pops, then with the visuals as spans no effect may overlap, which leaves out the keyword pops a visual would cover.
+- **Effects** are planned first, and the visuals keep clear of them.
 - **Sound.** A visual that asks for a sound gets the next file of that kind from the [CC0 set](#b-roll-sourcing) on its first frame, at most one every 6 s: -16 dB for a click, tap or stop, -14 for a tone or air, -12 for paper, under the voice. They play with the music bed, not ducked.
 
 **Graphics** (`graphics.ts`). Once the edit is fitted, one request writes all of its graphics, or one for each 3 minutes of a longer edit, with the planning model at medium effort. The request carries:
@@ -155,7 +154,7 @@ Claude answers, for each graphic:
 - its HTML and CSS in the [house look](../effects/README.md#look).
 
 It is told the rules:
-- A graphic shows only keywords, numbers, comparisons or lists the speaker says, never the sentence being said.
+- A graphic shows only keywords, numbers, comparisons or lists the speaker says, never the sentence being said. It may mark them with the bundled icons, and show a brand's logo only when the speaker names the brand.
 - At 16:9 the picture changes at least every 5 to 8 s, and labels and lower thirds carry most points with the speaker in shot.
 - At 9:16 it changes every 2 to 4 s, mostly with panels: the graphic on top and the speaker below.
 - Full-frame graphics are for a thesis, a list, a number or a comparison that reads on its own, and take at most a quarter of the edit.
@@ -168,10 +167,12 @@ Code then times and checks each graphic:
   - A panel splits the screen with the speaker below it, as a capture's split does.
 - **Checks.** Each graphic is drawn in Chrome against the captions as they will be laid out, with its panel's split in place, and the faces under it ([checks](../effects/README.md#graphics)). Its text is also checked against the speech:
   - each word it shows must be said in the 20 s before it or the 10 s after it, a number in digits or in Chinese numerals, joined at most by small words such as 的 and 不;
-  - no run of eight characters may be the sentence being said while it shows.
+  - no run of eight Chinese characters or four Latin words may be the sentence being said while it shows;
+  - each logo it shows must be of a brand named in the 20 s before it or the 10 s after it.
 
   The graphics that fail go back to Claude once, together, each with its problems and a half-size screenshot. A fix that still fails is left out, and its line keeps the speaker. After a review fits the edit again, the graphics are placed on the words that remain and checked again, and one that fails is left out without another request.
 - **Sound.** A graphic that asks for a sound gets one on its first frame, at most one every 6 s with the visuals' sounds.
+- **Credits.** The render adds each icon and logo a graphic draws to `<name>.broll.txt`, a logo with its trademark note.
 
 A request that fails leaves the edit without graphics there.
 - **Credits.** Each capture, clip and sound is a source with its `credit`; the renderer writes those the video plays to `<name>.broll.txt`.

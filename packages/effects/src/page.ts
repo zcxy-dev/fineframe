@@ -1,7 +1,9 @@
 // The page an effect renders as: its markup and styles in a document that loads the house
-// stylesheet and fonts from the render's own folder and nothing else, sized to what it fills.
+// stylesheet, the fonts and the bundled icons and logos from the render's own folder and nothing
+// else, sized to what it fills.
 
 import type { FrameRate } from "@video-editor/schema";
+import { markOf } from "./icons.ts";
 
 /** A region of the frame, in output pixels. */
 export interface Box {
@@ -26,10 +28,10 @@ export interface PageSpec {
   css: string;
 }
 
-/** No request leaves the page but for its stylesheets and fonts, and no script runs but the
- * renderer's own. */
+/** No request leaves the page but for its stylesheets, fonts and the bundled icons and logos, all
+ * in its own folder, and no script runs but the renderer's own. */
 const POLICY =
-  "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src data:; " +
+  "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; " +
   "script-src 'self' 'unsafe-inline'";
 
 /** The whole document for one effect. The renderer seeks its CSS animations frame by frame. */
@@ -53,11 +55,20 @@ ${spec.css}
 }
 
 /** Why the markup or styles Claude wrote cannot be drawn as they are, or null: scripts, event
- * handlers and anything loaded from elsewhere are not allowed. The page's policy blocks them
- * anyway; this says so before a render. */
+ * handlers and anything loaded from elsewhere are not allowed, and the only images are the
+ * bundled icons and logos. The page's policy blocks the rest anyway; this says so before a
+ * render. */
 export function markupProblem(html: string, css: string): string | null {
-  if (/<\s*(script|iframe|object|embed|link|meta|base|img|video|audio|style)\b/i.test(html)) {
-    return "it uses an element graphics may not use (script, iframe, img, link, style and the like)";
+  if (
+    /<\s*(script|iframe|object|embed|link|meta|base|video|audio|style|picture|source)\b/i.test(html)
+  ) {
+    return "it uses an element graphics may not use (script, iframe, link, style and the like)";
+  }
+  for (const [image] of html.matchAll(/<\s*img\b[^>]*>/gi)) {
+    const src = image.match(/\ssrc\s*=\s*["']([^"']*)["']/i)?.[1];
+    if (!src || /\ssrcset\s*=/i.test(image) || !markOf(src)) {
+      return `its image ${src ? `"${src}"` : "without a src"} is not one of the bundled icons or logos`;
+    }
   }
   if (/\son\w+\s*=/i.test(html)) return "it has an event handler";
   if (/javascript:/i.test(html + css)) return "it has a javascript: address";

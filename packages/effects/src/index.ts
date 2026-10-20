@@ -4,7 +4,6 @@ export {
   catalog,
   guidance,
   isTemplateId,
-  type KeywordParams,
   type LowerThirdParams,
   type Template,
   type TemplateId,
@@ -28,7 +27,7 @@ export {
   panelShare,
   SLIDE,
 } from "./graphics.ts";
-export { type IconName, iconNames, LOGOS, type LogoName, logoNames } from "./icons.ts";
+export { type IconName, iconNames, LOGOS, type LogoName, logoNames, marksIn } from "./icons.ts";
 export { type Aspect, COLORS, layoutFor } from "./layout.ts";
 export type { Box } from "./page.ts";
 export {

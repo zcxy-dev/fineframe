@@ -3,7 +3,7 @@
 The edit's motion graphics and effect overlays, drawn as web pages and rendered to video with [HyperFrames](https://github.com/heygen-com/hyperframes) in Chrome Headless Shell:
 
 - **Graphics** Claude writes for each edit as HTML and CSS: corner labels and lower thirds over the speaker, the upper panel of a 9:16 split screen, and full-frame graphics ([graphics](#graphics)).
-- **Templates** for titles, people's names, keyword pops, chapter markers, callouts and wipes ([templates](#templates)).
+- **Templates** for titles, people's names, chapter markers, callouts and wipes ([templates](#templates)).
 
 Each entry in a [`project.json`](../schema/README.md#projectjson)'s `graphics` or `overlays` becomes one page. The renderer draws it as video and lays it over exactly the output frames it covers ([engine](../engine/README.md#how-it-renders)).
 
@@ -34,11 +34,14 @@ Claude writes each edit's graphics for that video, as markup and its own CSS on 
 | `panel` | The top 880 of every 1920 rows of a 9:16 frame, with the speaker below it | 3–8 s | Opaque, at the panel's size |
 | `full` | The whole frame | 4–12 s | Opaque, at the frame's size |
 
-**What runs.** A graphic's page runs no script but the renderer's own, and loads nothing but the house stylesheet and the fonts beside it.
+**What runs.** A graphic's page runs no script but the renderer's own, and loads nothing but the house stylesheet, the fonts and the icons and logos beside it.
 - A Content-Security-Policy in every page enforces that.
-- [`markupProblem`](src/page.ts) refuses, before any render, markup with a script, an event handler, an image, an embedded page or a `url()`.
+- [`markupProblem`](src/page.ts) refuses, before any render, markup with a script, an event handler, an embedded page, a `url()`, or an image that is not one of the bundled icons and logos.
+
+**Icons and logos.** [`src/icons.ts`](src/icons.ts) holds a subset of Lucide's icons and Simple Icons' brand logos ([notices](../../THIRD_PARTY_NOTICES.md#icons-copied-into-the-source)). They are written as SVG files beside the pages, and a graphic shows one as an image: `icons/<name>.svg` in the house white, `icons/accent/<name>.svg` in the accent, `logos/<name>.svg` in the brand's colour, or the accent where that colour would vanish on the dark stage.
 
 **Checks.** [`checkGraphics`](src/check.ts) loads each graphic in the same Chrome, seeks its animations to each part's start and end and to its last frame, and reports each problem as a sentence. It reports text that:
+- has a character none of the fonts has;
 - runs off the frame or out of its box;
 - lies where the captions are drawn;
 - overlaps other text;
@@ -48,7 +51,9 @@ Claude writes each edit's graphics for that video, as markup and its own CSS on 
 It also reports:
 - a label that covers a face or leaves the safe area;
 - a panel or full-frame graphic whose text spans too little of it, or whose largest text is under 12 units;
-- a part that does not enter, enters for longer than 0.8 s or keeps moving.
+- a part that does not enter, enters for longer than 0.8 s or keeps moving;
+- a box that shows empty for more than 0.8 s before its text;
+- an icon or logo that does not load.
 
 It returns:
 - the text the graphic shows, for the engine to check against the speech;
@@ -69,7 +74,6 @@ const [file] = await renderGraphics([{ layout, html, css, box, output, frames }]
 |---|---|---|
 | `title` | Names the video or a major section in large type, over a soft pool of shade | `text`, `subtitle` |
 | `lower-third` | A person's name and role in a dark pill with an accent bar; at 9:16 at the top of the frame ([why](#safe-area)) | `name`, `role` |
-| `keyword` | A highlighter swipe that lands on the word a sentence turns on | `text`, `position`: `upper` or `lower` |
 | `chapter` | The chapter's number and name, under one segment per chapter that shows how far through the video it is | `title`, `index`, `total` |
 | `callout` | Outlines a region of a screen recording, dims the rest and labels it | `rect`, `label`, `dim` |
 | `wipe` | Two bands sweep across the frame and cover the cut in the middle of the wipe | `direction`, `color` |
@@ -79,7 +83,7 @@ Every template also takes `accent`, a `#rrggbb` that replaces the house amber. E
 ```ts
 import { catalog, guidance, overlayProblems } from "@video-editor/effects";
 
-const keyword = catalog.keyword; // purpose, whenToUse, avoid, timing, seconds, params, example
+const chapter = catalog.chapter; // purpose, whenToUse, avoid, timing, seconds, params, example
 const problems = overlayProblems(project.overlays ?? []); // [] when every overlay is valid
 ```
 
@@ -98,7 +102,7 @@ const problems = overlayProblems(project.overlays ?? []); // [] when every overl
 
 Overlays keep to a safe area inside the frame's edges. The bottom margin leaves the lower part of the frame to the captions, which are drawn over everything.
 
-At 9:16 the margins also clear what short-form apps lay over the video: the header, the buttons down the right, and the description at the bottom. That pushes the band above the captions up to where a talking head's mouth and chin fall. So at 9:16 the lower third sits at the top of the frame instead, and a `lower` keyword suits only shots with no one on camera.
+At 9:16 the margins also clear what short-form apps lay over the video: the header, the buttons down the right, and the description at the bottom. That pushes the band above the captions up to where a talking head's mouth and chin fall. So at 9:16 the lower third sits at the top of the frame instead.
 
 The timings, curves, type sizes and margins live in [`src/layout.ts`](src/layout.ts).
 

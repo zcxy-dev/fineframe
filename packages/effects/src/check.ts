@@ -1,6 +1,6 @@
 // Checks each graphic as drawn, in the same Chrome the renderer uses: its text stays on the frame
 // and off the captions and faces, nothing overlaps or is cut off, a full-frame graphic fills its
-// frame, and every part enters and stays. What it says is returned for the caller to check against
+// frame, every part enters and stays, each icon or logo loads and the fonts have every character. What it says is returned for the caller to check against
 // the speech.
 
 import { readFile, rm, writeFile } from "node:fs/promises";
@@ -57,6 +57,8 @@ interface Drawn {
   snapshots: Snapshot[];
   /** When every part has entered. */
   settled: number;
+  /** The images that did not load. */
+  broken: string[];
 }
 
 /** Checks each graphic in one browser at `chrome`, and returns what it found in their order. */
@@ -66,6 +68,7 @@ export async function checkGraphics(
 ): Promise<GraphicCheck[]> {
   if (jobs.length === 0) return [];
   const dir = await site();
+  const fonts = coverage(await readFile(join(dir, "fonts.css"), "utf8"));
   const server = await serve(dir);
   const browser = await puppeteer.launch({
     executablePath: chrome,
@@ -93,7 +96,7 @@ export async function checkGraphics(
       try {
         await tab.setViewport(frame);
         await tab.goto(`${server.url}/${name}`, { waitUntil: "load" });
-        results.push(await inspect(tab, job, frame));
+        results.push(await inspect(tab, job, frame, fonts));
       } finally {
         await tab.close();
         await rm(join(dir, name), { force: true });
@@ -110,10 +113,16 @@ async function inspect(
   tab: import("puppeteer-core").Page,
   job: GraphicCheckJob,
   frame: { width: number; height: number },
+  fonts: readonly [number, number][],
 ): Promise<GraphicCheck> {
   const seconds = (job.frames * job.output.fps.den) / job.output.fps.num;
   const drawn = (await tab.evaluate(async (seconds: number) => {
     await document.fonts.ready;
+    const images = [...document.images];
+    await Promise.all(images.map((image) => image.decode().catch(() => {})));
+    const broken = images
+      .filter((image) => image.naturalWidth === 0)
+      .map((image) => image.getAttribute("src") ?? "");
     const animations = document.getAnimations();
     for (const animation of animations) animation.pause();
     const timings = animations.map((animation) => {
@@ -199,7 +208,7 @@ async function inspect(
     snapshots.push(snapshot(last));
     // Left showing what the graphic looks like once every part has entered.
     snapshot(settled);
-    return { animations: timings, snapshots, settled };
+    return { animations: timings, snapshots, settled, broken };
   }, seconds)) as Drawn;
   const final = drawn.snapshots.at(-1) as Snapshot;
   const settled = drawn.snapshots.find((s) => s.t === drawn.settled) ?? final;
@@ -239,6 +248,15 @@ async function inspect(
     );
   }
   if (final.texts.length === 0) problems.push("It shows no text once its parts have entered.");
+  if (drawn.broken.length > 0) problems.push(`${quote(drawn.broken)} does not load.`);
+  const missing = [...new Set(texts.map((t) => t.text).join(""))].filter(
+    (char) => !/\s/u.test(char) && !covered(char.codePointAt(0) as number, fonts),
+  );
+  if (missing.length > 0) {
+    problems.push(
+      `The fonts have no ${quote(missing)}: it would show as a box; use words, digits or common punctuation.`,
+    );
+  }
   // The longest any box shows with none of its text yet.
   let empty = 0;
   for (const [i] of (drawn.snapshots[0]?.frames ?? []).entries()) {
@@ -369,6 +387,24 @@ const GLANCE = 5;
 /** The longest a box may show before its text, in seconds. */
 const EMPTY = 0.8;
 
+/** The code points the page's fonts cover, from their stylesheet's unicode ranges. */
+function coverage(css: string): [number, number][] {
+  const ranges: [number, number][] = [];
+  for (const [, list] of css.matchAll(/unicode-range:\s*([^;}]+)/gi)) {
+    for (const part of (list as string).split(",")) {
+      const [from, to = from] = part.trim().replace(/^U\+/i, "").split("-") as [string, string?];
+      // A wildcard range, such as U+4??, spans every value its ? stand for.
+      const low = Number.parseInt(from.replace(/\?/g, "0"), 16);
+      const high = Number.parseInt((to as string).replace(/^U\+/i, "").replace(/\?/g, "f"), 16);
+      if (Number.isFinite(low) && Number.isFinite(high)) ranges.push([low, high]);
+    }
+  }
+  return ranges;
+}
+
+const covered = (code: number, ranges: readonly [number, number][]) =>
+  ranges.some(([low, high]) => code >= low && code <= high);
+
 const quote = (texts: string[]) => [...new Set(texts)].map((t) => `"${t}"`).join(", ");
 
 function intersects(a: Box, b: Box): boolean {
@@ -411,6 +447,7 @@ const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".woff2": "font/woff2",
+  ".svg": "image/svg+xml",
 };
 
 /** Serves `dir` to the checking browser on a local port, files only, nothing above it. */

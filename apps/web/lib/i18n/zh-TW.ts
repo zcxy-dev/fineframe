@@ -392,6 +392,8 @@ export const zhTW: Messages = {
     replanHelp:
       "調整順序、放回已刪除的段落、長度差距超過 5 %、更換畫面比例或配樂，都無法在這裡修改：Claude 會用同樣的素材重新規劃剪輯，分析結果會保留，所以只需一兩分鐘，外加一次規劃費用。",
     replan: "重新規劃…",
+    older:
+      "這支影片是用舊版剪的：重新輸出時會拿掉原本的動態圖卡和關鍵字特效。重新規劃就會換上新的動態圖卡。",
     fallback: "無法完成修改。",
     renderFallback: "無法輸出新版本。",
     rendering: (n, message) => `正在輸出版本 ${n} · ${message}`,
@@ -522,7 +524,6 @@ export const zhTW: Messages = {
     templates: {
       title: "標題",
       "lower-third": "人名條",
-      keyword: "關鍵字",
       chapter: "章節",
       callout: "標注",
       wipe: "轉場",

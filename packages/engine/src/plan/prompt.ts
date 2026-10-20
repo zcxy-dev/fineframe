@@ -130,8 +130,7 @@ segment; empty when there is no B-roll. Give the B-roll file, the seconds of it 
 8 s), and the file and line it covers.
 - emphasis: the strongest beats of the edit, about one every 15 to 30 seconds: a key number, a \
 punchline, the promise of the video. Give the file, the line and the words exactly as they \
-appear in it. Code pushes the picture in there. Give a keyword (see Effects) for the few that \
-carry the argument, and an empty one for the rest.
+appear in it. Code pushes the picture in there.
 - content: in two or three sentences, what the footage is and the story the edit tells.
 
 ## Length
@@ -161,9 +160,6 @@ the length by priority.
 Animated text over the picture marks what the viewer must notice or remember, so most of the \
 edit has none. Code times each effect on the speech, shows one at a time and drops what does \
 not fit.
-- keyword, on an emphasis moment: ${catalog.keyword.purpose} ${catalog.keyword.whenToUse} \
-Avoid: ${catalog.keyword.avoid} Give the word or number as said, in the speaker's language, at \
-most ${most("keyword", "text")} characters.
 - title, when the request asks for one: ${catalog.title.purpose} It shows over the edit's \
 opening. A short phrase of at most ${most("title", "text")} characters in the video's language, \
 and optionally a subtitle of at most ${most("title", "subtitle")} that says what the viewer gets; \
@@ -258,12 +254,11 @@ const PLAN_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["source", "line", "text", "keyword", "reason"],
+        required: ["source", "line", "text", "reason"],
         properties: {
           source: { type: "string" },
           line: { type: "integer" },
           text: { type: "string" },
-          keyword: { type: "string", description: "The word to pop on screen, or empty." },
           reason: { type: "string" },
         },
       },
@@ -409,8 +404,7 @@ export interface Decisions {
     line: number;
     reason: string;
   }[];
-  /** `keyword` is empty for a moment that gets no keyword pop. */
-  emphasis: { source: string; line: number; text: string; keyword?: string; reason: string }[];
+  emphasis: { source: string; line: number; text: string; reason: string }[];
   /** Present when music was offered. */
   music?: { track: string; section: number; reason: string };
   /** Present for a long edit; an empty text is no title. */

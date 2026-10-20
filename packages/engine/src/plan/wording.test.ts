@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { normalized, repeated, unsaid } from "./wording.ts";
+import { normalized, repeated, unnamed, unsaid } from "./wording.ts";
 
 test("numbers read the same in Chinese numerals and digits", () => {
   assert.equal(normalized("二十七歲"), "27歲");
@@ -36,4 +36,11 @@ test("a graphic that spells out the sentence being said repeats the captions", (
   assert.equal(repeated(["concrete"], english), null);
   assert.equal(repeated(["outdoor patio"], english), null);
   assert.equal(repeated(["the outdoor patio of"], english), "the outdoor patio of");
+});
+
+test("a logo shows only a brand the speaker names", () => {
+  const html =
+    '<img src="logos/github.svg"><img src="logos/notion.svg"><img src="icons/rocket.svg">';
+  assert.deepEqual(unnamed(html, "我把程式碼放在 GitHub 上"), ["Notion"]);
+  assert.deepEqual(unnamed(html, "github 跟 Notion 都用"), []);
 });

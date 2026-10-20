@@ -764,9 +764,8 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
     if (rect) placed.set(wishKey(wish), rect);
   }
   const edit = lengthOf(clips);
-  const first = plannedOverlays(state, words, edit, covered, cuts, placed, changes, speaking);
-  // Visuals keep clear of the B-roll placed and of every effect but a keyword, which they then
-  // keep off themselves.
+  const overlays = plannedOverlays(state, words, edit, covered, cuts, placed, changes, speaking);
+  // Visuals keep clear of the B-roll placed and of every effect.
   const visuals = state.extras.visuals
     ? placeVisuals(state.decisions.visuals ?? [], state.assets, {
         words,
@@ -775,7 +774,7 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
         edit,
         frame: ticksPerFrame(state.fps),
         aspect: state.aspect,
-        blocked: [...covered, ...first.filter((o) => o.template !== "keyword")].map((o) => ({
+        blocked: [...covered, ...overlays].map((o) => ({
           start: o.start,
           end: o.start + o.duration,
         })),
@@ -783,21 +782,6 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
           state.progress(`Left out the ${wish.kind} visual on line ${wish.line}: ${reason}`),
       })
     : [];
-  const shown = visuals.map((v) => ({ start: v.start, duration: v.end - v.start }));
-  const overlays =
-    visuals.length > 0
-      ? plannedOverlays(
-          state,
-          words,
-          edit,
-          [...covered, ...shown],
-          cuts,
-          placed,
-          changes,
-          speaking,
-          shown,
-        )
-      : first;
   const output = { aspect: state.aspect, width, height };
   const parts = await visualParts(visuals, output, (file) => visualPath(folder, file));
   sources.push(...parts.sources);

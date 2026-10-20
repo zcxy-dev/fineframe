@@ -5,7 +5,6 @@
 import type {
   CalloutParams,
   ChapterParams,
-  KeywordParams,
   LowerThirdParams,
   TemplateId,
   TemplateParams,
@@ -52,8 +51,6 @@ export function templateMarkup<Id extends TemplateId>(
       return title(params as TitleParams, layout);
     case "lower-third":
       return lowerThird(params as LowerThirdParams, layout);
-    case "keyword":
-      return keyword(params as KeywordParams, layout);
     case "chapter":
       return chapter(params as ChapterParams, layout);
     case "callout":
@@ -100,23 +97,6 @@ ${params.role ? `<div class="role ff-muted">${escaped(params.role)}</div>` : ""}
 @keyframes ff-grow { from { transform: scaleY(0); } }
 .name { font-size: ${type("name")}px; line-height: 1.25; white-space: nowrap; max-width: ${room}px; overflow: hidden; text-overflow: clip; ${enter("ff-rise", MOTION.reveal, MOTION.stagger * 2)} }
 .role { margin-top: ${0.5 * u}px; font-size: ${type("role")}px; line-height: 1.35; white-space: nowrap; max-width: ${room}px; overflow: hidden; ${enter("ff-rise", MOTION.reveal, MOTION.stagger * 3)} }`;
-  return { html, css };
-}
-
-/** A highlighter swipe: the accent block sweeps in from the left and the word appears in its
- * wake, settling from a touch larger. */
-function keyword(params: KeywordParams, layout: Layout): Markup {
-  const { u, safe, type } = layout;
-  const accent = params.accent ?? PALETTE.accent;
-  const upper = (params.position ?? "upper") === "upper";
-  const html = `<div class="row"><div class="word"><div class="swipe"></div><span>${escaped(params.text)}</span></div></div>`;
-  const css = `
-.row { position: absolute; left: ${safe.left}px; right: ${safe.right}px; ${upper ? `top: ${safe.top + 2 * u}px;` : `bottom: ${safe.bottom + 2 * u}px;`} display: flex; justify-content: center; }
-.word { position: relative; ${enter("ff-settle", MOTION.reveal, 0)} }
-@keyframes ff-settle { from { transform: scale(1.06); } }
-.swipe { position: absolute; inset: 0; border-radius: ${0.8 * u}px; background: ${accent}; box-shadow: 0 0 ${3 * u}px rgba(255, 181, 71, 0.45); transform-origin: left; ${enter("ff-draw", MOTION.draw, 0)} }
-.word span { position: relative; display: block; padding: ${0.3 * u}px ${1.8 * u}px ${0.5 * u}px; color: ${PALETTE.ink}; font-size: ${type("keyword")}px; font-weight: 900; line-height: 1.2; white-space: nowrap; max-width: ${layout.safeWidth}px; overflow: hidden; ${enter("ff-wake", MOTION.draw, MOTION.stagger / 2)} }
-@keyframes ff-wake { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }`;
   return { html, css };
 }
 

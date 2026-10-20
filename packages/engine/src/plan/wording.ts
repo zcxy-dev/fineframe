@@ -1,5 +1,8 @@
 // Whether a graphic says what the speaker says: each Chinese word on it found in the speech, or
-// joined by a small word; each Latin word and number said, a number in either script.
+// joined by a small word; each Latin word and number said, a number in either script; and each
+// brand whose logo it shows named.
+
+import { LOGOS, marksIn } from "@video-editor/effects";
 
 /** Characters a graphic may use to join the speaker's words without their having said them. */
 const JOINERS = new Set("的了和與及或也都就很更最不沒是在有個嗎呢啊吧把被從到對").add("vs");
@@ -121,4 +124,12 @@ export function repeated(pieces: readonly string[], speech: string): string | nu
     const spaced = i > 0 && weight(unit) === 2 && weight(best[i - 1] as string) === 2;
     return text + (spaced ? " " : "") + unit;
   }, "");
+}
+
+/** The brands whose logos the graphic's markup shows that the speech does not name, by title. */
+export function unnamed(html: string, speech: string): string[] {
+  const said = normalized(speech);
+  return marksIn(html)
+    .logos.filter((name) => !said.includes(normalized(LOGOS[name].title)) && !said.includes(name))
+    .map((name) => LOGOS[name].title);
 }

@@ -148,7 +148,6 @@ export interface Removable extends Removal {
 const TEMPLATE_NAMES: Record<string, [string, string?]> = {
   title: ["Title", "text"],
   "lower-third": ["Lower third", "name"],
-  keyword: ["Keyword", "text"],
   chapter: ["Chapter", "title"],
   callout: ["Callout", "label"],
   wipe: ["Wipe"],

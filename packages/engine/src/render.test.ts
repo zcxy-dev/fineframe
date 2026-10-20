@@ -1523,10 +1523,10 @@ test("overlays land on exact output frames, across cuts and dissolves", async (t
       ],
       { ...tiny, width: 64, height: 36, fps },
     );
-    // At 30 fps: pieces 0-24, the dissolve 24-30, 30-54 and 54-84; the keyword covers frames
-    // 15-60 and the wipe 66-84, cut where the edit ends.
+    // At 30 fps: pieces 0-24, the dissolve 24-30, 30-54 and 54-84; the title covers frames
+    // 15-63 and the wipe 66-84, cut where the edit ends.
     project.overlays = [
-      { template: "keyword", params: { text: "三倍" }, start: SECOND / 2, duration: 1.5 * SECOND },
+      { template: "title", params: { text: "三倍" }, start: SECOND / 2, duration: 1.6 * SECOND },
       { template: "wipe", params: {}, start: 2.2 * SECOND, duration: SECOND },
     ];
     const path = await write(dir, project);
@@ -1543,14 +1543,14 @@ test("overlays land on exact output frames, across cuts and dissolves", async (t
     const placed = timeline.overlays.map((o) => [o.start, o.end]);
     if (fps.den === 1) {
       assert.deepEqual(placed, [
-        [15, 60],
+        [15, 63],
         [66, 84],
       ]);
     }
     assert.deepEqual(
       jobs.map((job) => [job.template, job.frames, job.width, job.height, job.fps]),
       [
-        ["keyword", (placed[0]?.[1] ?? 0) - (placed[0]?.[0] ?? 0), 64, 36, fps],
+        ["title", (placed[0]?.[1] ?? 0) - (placed[0]?.[0] ?? 0), 64, 36, fps],
         ["wipe", (placed[1]?.[1] ?? 0) - (placed[1]?.[0] ?? 0), 64, 36, fps],
       ],
     );
@@ -1736,7 +1736,7 @@ test(
         assert.ok(!lit[start - 1] && !lit[start] && !lit[end], at);
         assert.equal(lit[end - 1], overlay.template !== "wipe", `${at}: its last frame`);
         // These leave the bottom-right corner clear, so the picture shows through it.
-        if (["lower-third", "keyword", "chapter"].includes(overlay.template)) {
+        if (["lower-third", "chapter"].includes(overlay.template)) {
           for (const frame of picture.slice(start, end)) {
             const value = corner(frame) ?? 0;
             assert.ok(Math.abs(value - ground) <= 2, `${at}: the corner shows ${value}`);
@@ -1748,7 +1748,7 @@ test(
 );
 
 test(
-  "graphics render with HyperFrames: a label in its box, a panel pushed down, a full frame",
+  "graphics render with HyperFrames: a label in its box, a panel pushed down, a full frame, an icon",
   chrome,
   async (t) => {
     const dir = await scratch(t, "graphics-");
@@ -1760,10 +1760,10 @@ test(
       width,
       height,
       fps: 30,
-      seconds: 12,
+      seconds: 14,
       sound: 220,
     });
-    const project = projectOf([source], [clip("grey", 0, 11)], {
+    const project = projectOf([source], [clip("grey", 0, 13)], {
       aspect: "9:16",
       width,
       height,
@@ -1777,6 +1777,15 @@ test(
       { layout: "label", html: chip, css: "", box, start: SECOND, duration: 2 * SECOND },
       { layout: "panel", html: stage, css: "", start: 4 * SECOND, duration: 3 * SECOND },
       { layout: "full", html: stage, css: "", start: 8 * SECOND, duration: 2 * SECOND },
+      // A bundled icon alone, loaded from the pages' own folder.
+      {
+        layout: "label",
+        html: `<img src="icons/accent/rocket.svg" style="position:absolute;left:${0.1 * width + 4}px;top:${0.3 * height + 4}px;width:calc(var(--u)*20);height:calc(var(--u)*20);animation:ff-fade .4s both">`,
+        css: "",
+        box: { x: 0.1, y: 0.3, w: 0.3, h: 0.2 },
+        start: 10.5 * SECOND,
+        duration: 2 * SECOND,
+      },
     ];
     const path = await write(dir, project);
     const result = await render(path, join(dir, "graphics.mp4"));
@@ -1820,5 +1829,8 @@ test(
       changed(picture[241], 0, 0, width / 2, height) <
         changed(picture[241], width / 2, 0, width, height),
     );
+    // The icon draws its strokes in its box.
+    assert.ok(changed(picture[360], 0.1 * width, 0.3 * height, 0.4 * width, 0.5 * height) > 30);
+    assert.equal(changed(picture[360], 0, 0.5 * height + 2, width, height), 0);
   },
 );

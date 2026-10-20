@@ -13,7 +13,7 @@ import {
   validateOverlays,
 } from "@video-editor/effects";
 import { loadJson, type Project, TICKS_PER_SECOND, validateProject } from "@video-editor/schema";
-import { type Credit, creditText } from "./broll/credits.ts";
+import { type Credit, creditText, markCredits } from "./broll/credits.ts";
 import { buildCaptions, stageFonts } from "./captions/index.ts";
 import { chrome } from "./chrome.ts";
 import { ffmpeg, ffprobe, QUIET, run } from "./ffmpeg.ts";
@@ -522,8 +522,8 @@ async function effectBinaries(
   };
 }
 
-/** The credits of the sources the video shows as B-roll or plays as sound effects, in the order
- * they first play. */
+/** The credits of the sources the video shows as B-roll, of the icons and logos its graphics
+ * draw, and of the sound effects it plays, in the order they first play. */
 function brollCredits(project: Project, timeline: ReturnType<typeof buildTimeline>): Credit[] {
   const ticks = timeline.frameTicks;
   const byId = new Map(project.sources.map((source) => [source.id, source]));
@@ -537,6 +537,10 @@ function brollCredits(project: Project, timeline: ReturnType<typeof buildTimelin
   };
   const played: [number, Credit[]][] = [
     ...timeline.broll.map((clip): [number, Credit[]] => [clip.start * ticks, of(clip.clip.source)]),
+    ...timeline.graphics.map((clip): [number, Credit[]] => [
+      clip.start * ticks,
+      markCredits(clip.graphic.html),
+    ]),
     ...(project.audio.sfx ?? []).map((sfx): [number, Credit[]] => [sfx.start, of(sfx.source)]),
   ];
   return played.sort((a, b) => a[0] - b[0]).flatMap(([, credits]) => credits);

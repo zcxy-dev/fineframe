@@ -120,7 +120,7 @@ test("each graphic is checked as drawn", browser, async () => {
   };
   const chip = (left: number, top: number, size = 6) =>
     `<div class="ff-chip" style="position:absolute;left:${left}px;top:${top}px;animation:ff-from-left .5s var(--enter) .1s both"><span style="font-size:calc(var(--u)*${size})">二十七歲</span></div>`;
-  const [good, onFace, bad, small, empty] = await checkGraphics(
+  const [good, onFace, bad, small, empty, marked, emoji] = await checkGraphics(
     [
       { layout: "label", html: chip(90, 760), css: "", output, frames: 90, ...around },
       { layout: "label", html: chip(350, 400), css: "", output, frames: 90, ...around },
@@ -137,6 +137,25 @@ test("each graphic is checked as drawn", browser, async () => {
         layout: "label",
         html: chip(90, 760).replace("<span ", '<span class="late" '),
         css: ".late { display: inline-block; animation: ff-fade .5s 1.5s both }",
+        output,
+        frames: 90,
+        ...around,
+      },
+      {
+        layout: "label",
+        html: chip(90, 760).replace(
+          "<span",
+          '<img src="icons/accent/rocket.svg" style="width:calc(var(--u)*5);height:calc(var(--u)*5)"><span',
+        ),
+        css: "",
+        output,
+        frames: 90,
+        ...around,
+      },
+      {
+        layout: "label",
+        html: chip(90, 760).replace("二十七歲", "二十七歲😀"),
+        css: "",
         output,
         frames: 90,
         ...around,
@@ -163,6 +182,12 @@ test("each graphic is checked as drawn", browser, async () => {
     assert.match(problems, expected);
   }
   assert.match(small?.problems.join("\n") ?? "", /Its largest text is 3\.5 units/);
+  // A bundled icon loads and draws; a character no font has would show as a box.
+  assert.deepEqual(marked?.problems, []);
+  assert.ok((marked?.box?.width ?? 0) > (good?.box?.width ?? 0));
+  assert.deepEqual(emoji?.problems, [
+    'The fonts have no "😀": it would show as a box; use words, digits or common punctuation.',
+  ]);
   // The chip is in by 0.6 s, its text only at 2 s.
   assert.deepEqual(empty?.problems, [
     "A box shows empty for 1.4 s before its text enters: bring the text in with its box, within 0.8 s.",

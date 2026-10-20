@@ -415,6 +415,8 @@ export const en = {
     replanHelp:
       "Reordering, putting removed parts back, a length more than 5 % off, another aspect or another music track cannot be changed here: Claude plans the edit again from the same footage, whose analysis is kept, so it takes a minute or two and one more plan.",
     replan: "Re-plan…",
+    older:
+      "This edit was made with an earlier version: its motion-graphics cards and keyword pops are left out when it renders again. Re-plan it for the new motion graphics.",
     fallback: "The changes could not be made.",
     renderFallback: "The new version could not be rendered.",
     rendering: (n: number, message: string) => `Rendering version ${n} · ${message}`,
@@ -563,7 +565,6 @@ export const en = {
     templates: {
       title: "Title",
       "lower-third": "Lower third",
-      keyword: "Keyword",
       chapter: "Chapter",
       callout: "Callout",
       wipe: "Wipe",

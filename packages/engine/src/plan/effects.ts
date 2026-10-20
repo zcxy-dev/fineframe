@@ -11,22 +11,17 @@ import {
   ticksPerFrame,
 } from "@video-editor/schema";
 import type { TimedWord } from "./captions.ts";
-import { findWords } from "./fillers.ts";
 import { CALLOUT_LEAD, type Located, wishKey } from "./locate.ts";
 import type { PlanState } from "./plan.ts";
 import { bare } from "./text.ts";
 
-/** Keyword pops per minute of edit at most, the top of the catalog's one to three, and callouts:
- * one every 20 s, as the planner is told. */
-const KEYWORDS_PER_MINUTE = 3;
+/** Callouts per minute of edit at most: one every 20 s, as the planner is told. */
 const CALLOUTS_PER_MINUTE = 3;
-/** A keyword's swipe lands as its word is said, so it starts this much sooner (catalog). */
-const KEYWORD_LEAD = 0.15;
 /** A lower third waits this long after its person starts speaking (catalog). */
 const NAME_DELAY = 1;
 /** How much longer a lower third or a chapter marker waits for an effect already on screen to
- * leave: a chapter marker long enough for the title over the opening. A keyword belongs to its
- * word, the title to the opening and a wipe to its cut, so none of them moves. */
+ * leave: a chapter marker long enough for the title over the opening. The title belongs to the
+ * opening and a wipe to its cut, so neither moves. */
 const WAIT: Partial<Record<TemplateId, number>> = { "lower-third": 3, chapter: 4 };
 /** Each chapter runs at least this long, and an edit has at most this many (catalog). */
 const CHAPTER_MIN = 30;
@@ -36,8 +31,7 @@ const CHAPTERS_MAX = 12;
  * The overlays of an edit `edit` ticks long whose kept words are `words`: a title over the
  * opening when one was asked for, a marker as each chapter starts with a wipe over the cut into
  * it, a lower third the first time each named person speaks, a callout on each thing pointed at
- * on a screen recording that was found there, and keyword pops on the emphasised moments, in
- * that order of precedence. One that would overlap another, run shorter than its template allows
+ * on a screen recording that was found there, in that order of precedence. One that would overlap another, run shorter than its template allows
  * or break its params is left out; an optional param that breaks them (a subtitle, role or label
  * too long) is left out alone. `broll` is where B-roll covers the speaker, which a lower third
  * waits for or else is left out, and which hides a callout's region; `cuts` are where the clips
@@ -47,9 +41,7 @@ const CHAPTERS_MAX = 12;
  * `speaking`, where someone on screen talks. A lower third shows in the first shot, while its
  * person's line is said, where someone on screen talks for as long as its template needs, and
  * ends before that shot does or the talking stops, coming in sooner than usual, but not before
- * they speak, to fit; with no such shot it is left out. A keyword pop ends before the shot
- * changes after its word. `visuals` are where the edit cuts to a capture or footage on
- * its points, which no effect may overlap.
+ * they speak, to fit; with no such shot it is left out.
  */
 export function plannedOverlays(
   state: PlanState,
@@ -60,7 +52,6 @@ export function plannedOverlays(
   placed: ReadonlyMap<string, Rect> = new Map(),
   changes: readonly number[] = cuts,
   speaking: readonly { start: number; end: number }[] = [{ start: 0, end: edit }],
-  visuals: readonly { start: number; duration: number }[] = [],
 ): Overlay[] {
   const frame = ticksPerFrame(state.fps);
   const onFrame = (ticks: number) => Math.max(0, Math.round(ticks / frame) * frame);
@@ -101,7 +92,7 @@ export function plannedOverlays(
       : 0;
   };
 
-  const { title, people, emphasis } = state.decisions;
+  const { title, people } = state.decisions;
   if (state.extras.title && title?.text.trim() && words[0]) {
     add("title", words[0].start, {
       text: title.text.trim(),
@@ -150,34 +141,12 @@ export function plannedOverlays(
       });
     }
   }
-  for (const item of emphasis) {
-    const keyword = item.keyword?.trim();
-    const source = state.sources.get(item.source);
-    const line = source?.lines.find((l) => l.n === item.line);
-    if (!keyword || !source || !line) continue;
-    // On the keyword as it is said, or else on the moment it belongs to.
-    const at =
-      findWords(source.words, line.first, line.last, keyword) ??
-      findWords(source.words, line.first, line.last, item.text);
-    const word = at && words.find((w) => w.source === source.id && w.index === at[0]);
-    if (!word) continue;
-    // It ends before the shot changes after its word, or else pops over another shot.
-    const end = Math.floor((changes.find((c) => c > word.start) ?? edit) / frame) * frame;
-    add(
-      "keyword",
-      word.start - secondsToTicks(KEYWORD_LEAD),
-      { text: keyword, position: "upper" },
-      end,
-    );
-  }
-
-  // One at a time, the earlier-listed first: at 9:16 the lower third, the chapter marker and an
-  // upper keyword share the top of the frame, and two effects at once compete for the eye. A
+  // One at a time, the earlier-listed first: at 9:16 the lower third and the chapter marker
+  // share the top of the frame, and two effects at once compete for the eye. A
   // wipe covers the cut just before its chapter's marker comes in, so those two may overlap.
   const kept: Overlay[] = [];
   const perMinute = (n: number) => Math.max(1, Math.floor((n * edit) / secondsToTicks(60)));
   const left: Partial<Record<TemplateId, number>> = {
-    keyword: perMinute(KEYWORDS_PER_MINUTE),
     callout: perMinute(CALLOUTS_PER_MINUTE),
   };
   const paired = (a: string, b: string) =>
@@ -188,7 +157,6 @@ export function plannedOverlays(
     [
       ...kept.filter((k) => !paired(template, k.template)),
       ...(template === "lower-third" || template === "callout" ? broll : []),
-      ...visuals,
     ].filter((k) => start < k.start + k.duration && k.start < start + duration);
   for (const wish of wanted) {
     const quota = left[wish.template as TemplateId];

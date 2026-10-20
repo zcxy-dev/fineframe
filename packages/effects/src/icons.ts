@@ -1,7 +1,11 @@
-// The icons the cards draw, copied from their sets so only these are bundled. UI icons are
-// Lucide 1.50.0 (ISC; some derived from Feather, MIT); brand logos are Simple Icons 16.33.0 (CC0),
-// and each logo is its owner's trademark. Licences: THIRD_PARTY_NOTICES.md. Generated once from
-// the npm packages: add an icon by copying its nodes or path from the same versions.
+// The icons and brand logos graphics may show, copied from their sets so only these are bundled,
+// and written as SVG files beside the pages: a graphic loads them as images from its own folder.
+// UI icons are Lucide 1.50.0 (ISC; some derived from Feather, MIT); brand logos are Simple Icons
+// 16.33.0 (CC0), and each logo is its owner's trademark. Licences: THIRD_PARTY_NOTICES.md.
+// Generated once from the npm packages: add an icon by copying its nodes or path from the same
+// versions.
+
+import { PALETTE } from "./style.ts";
 
 /** A Lucide icon: SVG elements on a 24-unit grid, stroked in currentColor. */
 type IconNode = [tag: string, attrs: Record<string, string>][];
@@ -775,3 +779,64 @@ export type IconName = keyof typeof ICONS;
 export type LogoName = keyof typeof LOGOS;
 export const iconNames = Object.keys(ICONS) as IconName[];
 export const logoNames = Object.keys(LOGOS) as LogoName[];
+
+/** A logo in its brand's colour where that shows on the dark stage, else in the accent: logos in
+ * black or near it would vanish. */
+function brandColor(name: LogoName): string {
+  const n = Number.parseInt(LOGOS[name].hex.slice(1), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 70 ? LOGOS[name].hex : PALETTE.accent;
+}
+
+const SVG = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"';
+
+function iconSvg(name: IconName, color: string): string {
+  const nodes = (ICONS[name] as IconNode)
+    .map(([tag, attrs]) => {
+      const list = Object.entries(attrs).map(([key, value]) => `${key}="${value}"`);
+      return `<${tag} ${list.join(" ")}/>`;
+    })
+    .join("");
+  return `<svg ${SVG} fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${nodes}</svg>`;
+}
+
+/** Every icon and logo file a graphic may load, by its path in the pages' folder: each icon in
+ * the house white (`icons/<name>.svg`) and in the accent (`icons/accent/<name>.svg`), each logo
+ * in its brand's colour (`logos/<name>.svg`). */
+export function markFiles(): Map<string, string> {
+  const files = new Map<string, string>();
+  for (const name of iconNames) {
+    files.set(`icons/${name}.svg`, iconSvg(name, PALETTE.text));
+    files.set(`icons/accent/${name}.svg`, iconSvg(name, PALETTE.accent));
+  }
+  for (const name of logoNames) {
+    files.set(
+      `logos/${name}.svg`,
+      `<svg ${SVG} fill="${brandColor(name)}"><path d="${LOGOS[name].path}"/></svg>`,
+    );
+  }
+  return files;
+}
+
+/** The icon or logo a graphic's image source names, or null when it is not one of them. */
+export function markOf(
+  src: string,
+): { kind: "icon"; name: IconName } | { kind: "logo"; name: LogoName } | null {
+  const icon = src.match(/^icons\/(?:accent\/)?([a-z0-9-]+)\.svg$/);
+  if (icon && (icon[1] as string) in ICONS) return { kind: "icon", name: icon[1] as IconName };
+  const logo = src.match(/^logos\/([a-z0-9-]+)\.svg$/);
+  if (logo && (logo[1] as string) in LOGOS) return { kind: "logo", name: logo[1] as LogoName };
+  return null;
+}
+
+/** The icons and logos a graphic's markup shows, by its images' sources. */
+export function marksIn(html: string): { icons: IconName[]; logos: LogoName[] } {
+  const icons = new Set<IconName>();
+  const logos = new Set<LogoName>();
+  for (const [, src] of html.matchAll(/<img\b[^>]*\bsrc\s*=\s*["']([^"']*)["']/gi)) {
+    const mark = markOf(src as string);
+    if (mark?.kind === "icon") icons.add(mark.name);
+    if (mark?.kind === "logo") logos.add(mark.name);
+  }
+  return { icons: [...icons], logos: [...logos] };
+}

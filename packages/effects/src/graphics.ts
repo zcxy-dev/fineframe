@@ -2,6 +2,7 @@
 // move, and the page each renders as.
 
 import type { Project } from "@video-editor/schema";
+import { iconNames, LOGOS, logoNames } from "./icons.ts";
 import { type Aspect, layoutFor } from "./layout.ts";
 import { type Box, page } from "./page.ts";
 import { HOUSE_CSS } from "./style.ts";
@@ -112,7 +113,7 @@ export function graphicsGuide(aspect: Aspect, width: number, height: number): st
   const u = Math.min(width, height) / 100;
   return `## How graphics look
 
-Dark near-black stages lit by a soft amber bloom, frosted glass panels with a thin light edge, white bold type, one amber accent. Big, confident type that fills its box: no small UI floating in empty space, no icons, emoji, logos or pictures.
+Dark near-black stages lit by a soft amber bloom, frosted glass panels with a thin light edge, white bold type, one amber accent. Big, confident type that fills its box: no small UI floating in empty space, no emoji or pictures.
 
 Layouts:
 ${layouts.join("\n")}
@@ -125,8 +126,9 @@ ${HOUSE_CSS.trim()}
 \`\`\`
 - \`--u\` is 1 % of the frame's short side (${u} px here). Size everything in \`calc(var(--u) * n)\`. Type sizes in units: small print 2.6 to 3.2, body 4 to 5, a heading 6 to 8, a hero word or number 12 to 24; never under ${minType(aspect)}.
 - A full or panel graphic starts with \`<div class="ff-stage"></div>\` and puts its content over it. A label or a lower third draws nothing but its chip or pill: the rest stays transparent over the footage.
+- Icons and logos are the only images: \`<img src="icons/NAME.svg">\` draws a line icon in white and \`<img src="icons/accent/NAME.svg">\` in the accent, \`<img src="logos/NAME.svg">\` a brand's logo in its colour; size each with width and height in \`--u\`, beside the words it marks, never alone. A logo shows only a brand the speaker names near it. Icons: ${iconNames.join(", ")}. Logos: ${logoNames.map((name) => `${name} (${LOGOS[name].title})`).join(", ")}.
 - Your HTML goes inside a box the size of the frame (or of the panel), positioned at its top-left corner; place things with \`position: absolute\`, flex or grid inside it.
 - The safe area for labels and lower thirds is x ${Math.round(safe.left)} to ${Math.round(width - safe.right)} and y ${Math.round(safe.top)} to ${Math.round(height - safe.bottom)}${aspect === "9:16" ? " (the app's header is above it and its buttons to the right)" : ""}.
 
-Motion: every part enters with a CSS animation of 0.3 to 0.8 s, \`animation-fill-mode: both\`, at a delay in seconds from the graphic's start; the stylesheet's keyframes ff-rise, ff-fade, ff-from-left, ff-from-right, ff-pop and ff-draw and the timing \`var(--enter)\` are there to use, or write your own @keyframes. Entrances only: nothing animates out, loops or keeps moving; the graphic is cut away at its end. A full or panel graphic is slid in by the renderer over its first ${SLIDE} s, so start its parts at 0.25 s or later and build them in order, each on the word that names it; a box enters with its text, never empty. A number may count up with an @property integer and a counter. No scripts, no images, no url(): only HTML and CSS.`;
+Motion: every part enters with a CSS animation of 0.3 to 0.8 s, \`animation-fill-mode: both\`, at a delay in seconds from the graphic's start; the stylesheet's keyframes ff-rise, ff-fade, ff-from-left, ff-from-right, ff-pop and ff-draw and the timing \`var(--enter)\` are there to use, or write your own @keyframes. Entrances only: nothing animates out, loops or keeps moving; the graphic is cut away at its end. A full or panel graphic is slid in by the renderer over its first ${SLIDE} s, so start its parts at 0.25 s or later and build them in order, each on the word that names it; a box enters with its text, never empty. A number may count up with an @property integer and a counter. No scripts, no url(), and no images but those icons and logos: only HTML and CSS.`;
 }

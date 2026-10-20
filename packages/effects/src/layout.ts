@@ -43,10 +43,9 @@ const TYPE_SCALE: Record<Aspect, number> = { "16:9": 1, "1:1": 1.05, "9:16": 1.1
 const step = (n: number) => 3.2 * 1.25 ** n;
 
 /** Type sizes by role, before the aspect's scale: a template's small print, its body, the heading
- * on a plate, a keyword and a title. */
+ * on a plate and a title. */
 export const TYPE = {
   title: step(5),
-  keyword: step(4),
   name: step(2),
   chapter: step(2),
   subtitle: step(1),

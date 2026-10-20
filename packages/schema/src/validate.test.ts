@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import type { Project } from "./generated/project.ts";
+import { upgradeProject } from "./upgrade.ts";
 import {
   loadJson,
   SchemaError,
@@ -253,4 +254,66 @@ test("loading names the file that failed", async () => {
   const wrong = join(dir, "wrong.json");
   await writeFile(wrong, JSON.stringify({ version: 2 }));
   await assert.rejects(loadJson(wrong, validateMediaIndex), SchemaError);
+});
+
+test("a project Fineframe 0.4.0 wrote opens without its cards and keyword pops", async () => {
+  const current = await exampleProject();
+  const tap = {
+    id: "sfx-tap",
+    kind: "audio",
+    path: "sfx/tap.ogg",
+    fingerprint: { bytes: 1, sha256: "0".repeat(64) },
+  };
+  // As 0.4.0 wrote it: a full-frame card, a panel card with the speaker below it as B-roll of
+  // the main track's own source, each card's sound, and a keyword pop.
+  const old = {
+    ...structuredClone(current),
+    sources: [...current.sources, tap],
+    cards: [
+      { card: "stat", params: { value: 3 }, start: 300_000, duration: 420_000, placement: "full" },
+      {
+        card: "list",
+        params: { items: [] },
+        start: 900_000,
+        duration: 600_000,
+        placement: "panel",
+      },
+    ],
+    broll: [
+      ...(current.broll ?? []),
+      {
+        source: "talk-a",
+        in: 1_044_000,
+        out: 1_644_000,
+        start: 900_000,
+        rect: { x: 0, y: 0.458, w: 1, h: 0.542 },
+      },
+    ],
+    overlays: [
+      ...(current.overlays ?? []),
+      { template: "keyword", params: { text: "三倍" }, start: 1_700_000, duration: 180_000 },
+    ],
+    audio: {
+      ...current.audio,
+      sfx: [
+        { source: "sfx-tap", start: 300_000, gainDb: -16 },
+        { source: "sfx-tap", start: 900_000, gainDb: -16 },
+        { source: "sfx-tap", start: 1_800_000, gainDb: -16 },
+      ],
+    },
+  };
+  assert.deepEqual(upgradeProject(old).dropped, { cards: 2, keywords: 1 });
+  const project = validateProject(old);
+  assert.equal("cards" in project, false);
+  // The cuts, framing, captions and the other B-roll, overlays and sounds stay as they were.
+  assert.deepEqual(project.main, current.main);
+  assert.deepEqual(project.captions, current.captions);
+  assert.deepEqual(project.broll, current.broll);
+  assert.deepEqual(project.overlays, current.overlays);
+  assert.deepEqual(project.audio.sfx, [{ source: "sfx-tap", start: 1_800_000, gainDb: -16 }]);
+  // A current project is read as it is.
+  assert.deepEqual(upgradeProject(current), {
+    project: current,
+    dropped: { cards: 0, keywords: 0 },
+  });
 });

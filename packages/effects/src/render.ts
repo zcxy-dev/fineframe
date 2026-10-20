@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 import type { FrameRate } from "@video-editor/schema";
 import type { TemplateId, TemplateParams } from "./catalog.ts";
 import { type GraphicJob, graphicPage } from "./graphics.ts";
+import { markFiles } from "./icons.ts";
 import type { Aspect } from "./layout.ts";
 import { page } from "./page.ts";
 import { fontAssets, HOUSE_CSS } from "./style.ts";
@@ -50,29 +51,33 @@ export function cacheDir(): string {
   return join(cache, "video-editor", "effects");
 }
 
-let assets: Promise<{ key: string; css: string; files: Map<string, string> }> | undefined;
+let assets:
+  | Promise<{ key: string; css: string; files: Map<string, string>; marks: Map<string, string> }>
+  | undefined;
 
-/** The fonts and the house stylesheet every page loads, with a hash of them and of the renderer's
- * version: a change to any of them changes how effects look, so it starts a fresh cache. */
+/** The fonts, the house stylesheet, the icons and the logos every page may load, with a hash of
+ * them and of the renderer's version: a change to any of them changes how effects look, so it
+ * starts a fresh cache. */
 function siteAssets() {
   assets ??= (async () => {
     const fonts = await fontAssets((path) => readFile(path, "utf8"));
+    const marks = markFiles();
     const producer = JSON.parse(await readFile(join(PACKAGE, "package.json"), "utf8")).dependencies[
       "@hyperframes/producer"
     ];
     const key = createHash("sha256")
-      .update(JSON.stringify([producer, HOUSE_CSS, fonts.css]))
+      .update(JSON.stringify([producer, HOUSE_CSS, fonts.css, [...marks]]))
       .digest("hex")
       .slice(0, 16);
-    return { key, ...fonts };
+    return { key, ...fonts, marks };
   })();
   return assets;
 }
 
-/** The folder pages render from, with the stylesheets and fonts they load, made once per
- * version: built beside it and renamed into place, so a concurrent render never reads half. */
+/** The folder pages render from, with the stylesheets, fonts, icons and logos they load, made once
+ * per version: built beside it and renamed into place, so a concurrent render never reads half. */
 export async function site(): Promise<string> {
-  const { key, css, files } = await siteAssets();
+  const { key, css, files, marks } = await siteAssets();
   const dir = join(cacheDir(), `site-${key}`);
   if (await exists(join(dir, "house.css"))) return dir;
   const partial = `${dir}.${process.pid}.partial`;
@@ -80,6 +85,10 @@ export async function site(): Promise<string> {
     await mkdir(join(partial, "files"), { recursive: true });
     for (const [name, from] of files) await copyFile(from, join(partial, "files", name));
     await writeFile(join(partial, "fonts.css"), css);
+    for (const [path, svg] of marks) {
+      await mkdir(dirname(join(partial, path)), { recursive: true });
+      await writeFile(join(partial, path), svg);
+    }
     // Written last: the folder is complete once it is there.
     await writeFile(join(partial, "house.css"), HOUSE_CSS);
     await rename(partial, dir).catch(async (error: NodeJS.ErrnoException) => {

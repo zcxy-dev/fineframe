@@ -60,29 +60,3 @@ test("a lower third shows while someone on screen talks, in one shot, or is left
     ["Ben Ito", 7.2, 9.48],
   ]);
 });
-
-test("a keyword pop ends before the shot changes, or is left out", () => {
-  const state = talk();
-  const emphasis = (keyword: string, line: number) => ({
-    source: "a",
-    line,
-    text: keyword,
-    keyword,
-    reason: "",
-  });
-  const lines = [
-    { n: 1, first: 0, last: 0 },
-    { n: 2, first: 1, last: 1 },
-  ];
-  const said = [{ text: "novel" }, { text: "data" }];
-  state.sources.set("a", { id: "a", lines, words: said } as never);
-  state.decisions = { people: [], emphasis: [emphasis("novel", 1), emphasis("data", 2)] } as never;
-  // "novel" is said 1 s before the cut, "data" 0.5 s before the next.
-  const words: TimedWord[] = [
-    { source: "a", index: 0, text: "novel", start: 2 * T, end: 2.6 * T },
-    { source: "a", index: 1, text: "data", start: 9.5 * T, end: 9.9 * T },
-  ];
-  const overlays = plannedOverlays(state, words, 60 * T, [], [3 * T, 10 * T], new Map());
-  const spans = overlays.map((o) => [o.params.text, o.start / T, (o.start + o.duration) / T]);
-  assert.deepEqual(spans, [["novel", 1.84, 3]]);
-});

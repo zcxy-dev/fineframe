@@ -25,7 +25,7 @@ const sources = new Map<string, PlaceSource>(
 );
 
 /** Source a for 5 s, then source b for 3 s, captioned word by word, with a title over the
- * opening, a keyword at 1.2 s and at 6 s, and music under all of it. */
+ * opening, a wipe at 1.2 s and at 6 s, and music under all of it. */
 function edit(): Project {
   const captionWords = (offset: number, count: number) =>
     words.slice(0, count).map((word) => ({
@@ -43,9 +43,9 @@ function edit(): Project {
       words: timed,
     };
   };
-  const keyword = (start: number) => ({
-    template: "keyword",
-    params: { text: "w", position: "upper" },
+  const wipe = (start: number) => ({
+    template: "wipe",
+    params: {},
     start: s(start),
     duration: s(0.5),
   });
@@ -68,8 +68,8 @@ function edit(): Project {
       captions: { preset: "clean", srt: true, lines: [line(0, 10), line(5, 6)] },
       overlays: [
         { template: "title", params: { text: "T" }, start: 0, duration: s(3) },
-        keyword(1.2),
-        keyword(6),
+        wipe(1.2),
+        wipe(6),
       ],
       audio: {
         loudness: { integratedLufs: -14, truePeakDbtp: -1 },
@@ -114,15 +114,15 @@ test("a cut inside a clip splits it in the pauses beside the words kept", () => 
   assert.equal(line?.end, s(4.9 + 0.3 - 1));
   assert.equal(next?.start, s(4.1));
 
-  // The keyword wholly inside the cut goes; the title and the later one move up with the speech.
+  // The wipe wholly inside the cut goes; the title and the later one move up with the speech.
   assert.deepEqual(
     project.overlays?.map((overlay) => [overlay.template, overlay.start]),
     [
       ["title", 0],
-      ["keyword", s(5)],
+      ["wipe", s(5)],
     ],
   );
-  assert.ok(notes.some((note) => /\/overlays\/1 \(keyword\)/.test(note)));
+  assert.ok(notes.some((note) => /\/overlays\/1 \(wipe\)/.test(note)));
   // The music plays on without a gap and ends where the edit does, with its fade.
   assert.deepEqual(project.audio.music?.[0], { ...edit().audio.music?.[0], out: s(17) });
 });
@@ -180,7 +180,7 @@ test("a cut over a whole clip drops it and the captions on it", () => {
   assert.equal(project.captions?.lines.length, 1);
   assert.deepEqual(
     project.overlays?.map((overlay) => overlay.template),
-    ["title", "keyword"],
+    ["title", "wipe"],
   );
 });
 

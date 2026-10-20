@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { catalog, templateIds } from "./catalog.ts";
 import { graphicFrame, graphicPage, graphicsGuide } from "./graphics.ts";
+import { markFiles, marksIn } from "./icons.ts";
 import { markupProblem, page } from "./page.ts";
-import { HOUSE_CSS } from "./style.ts";
+import { HOUSE_CSS, PALETTE } from "./style.ts";
 import { templateMarkup } from "./templates.ts";
 import { graphicProblems } from "./validate.ts";
 
@@ -56,9 +57,17 @@ test("markup that would load or run anything is refused", () => {
     null,
   );
   assert.equal(markupProblem("<b>x</b>", "b { background: url(data:image/png;base64,AA) }"), null);
+  // The bundled icons and logos are the only images.
+  const marks =
+    '<img src="icons/rocket.svg"><img src="icons/accent/rocket.svg"><img src="logos/github.svg">';
+  assert.equal(markupProblem(marks, ""), null);
   for (const [html, css] of [
     ["<script>alert(1)</script>", ""],
     ['<img src="https://x.com/a.png">', ""],
+    ['<img src="icons/no-such-icon.svg">', ""],
+    ['<img src="logos/github.svg" srcset="https://x.com/a.png 2x">', ""],
+    ['<img src="fonts.css">', ""],
+    ["<img>", ""],
     ['<b onclick="x()">x</b>', ""],
     ['<a href="javascript:x()">x</a>', ""],
     ["<b>x</b>", "@import url(https://fonts.example/a.css);"],
@@ -88,7 +97,9 @@ test("the guide for Claude gives the house stylesheet, the safe area and the mot
   assert.match(portrait, /x 76 to 918 and y 211 to 1152/);
   assert.match(portrait, /0\.3 to 0\.8 s/);
   assert.match(portrait, /Entrances only/);
-  assert.match(portrait, /No scripts, no images, no url\(\)/);
+  assert.match(portrait, /No scripts, no url\(\), and no images but those icons and logos/);
+  assert.match(portrait, /Icons: arrow-down, .*rocket/);
+  assert.match(portrait, /Logos: anthropic \(Anthropic\), .*github \(GitHub\)/);
   assert.doesNotMatch(graphicsGuide("16:9", 1920, 1080), /panel:/);
 });
 
@@ -133,11 +144,27 @@ test("graphics are checked: no markup that loads anything, a box for a label, a 
       "16:9",
     ),
     [
-      "/graphics/0: it uses an element graphics may not use (script, iframe, img, link, style and the like)",
+      "/graphics/0: it uses an element graphics may not use (script, iframe, link, style and the like)",
       "/graphics/1/box: a label needs the region it is drawn in",
       "/graphics/2/layout: a panel splits only a 9:16 frame",
       "/graphics/3/duration: 13 s, longer than a full's 12 s",
       "/graphics/4/box: x + w and y + h may not exceed 1",
     ],
+  );
+});
+
+test("each icon is a file in white and in the accent, each logo in its brand's colour where it shows", () => {
+  const files = markFiles();
+  assert.match(files.get("icons/rocket.svg") ?? "", new RegExp(`stroke="${PALETTE.text}"`));
+  assert.match(
+    files.get("icons/accent/rocket.svg") ?? "",
+    new RegExp(`stroke="${PALETTE.accent}"`),
+  );
+  // WhatsApp's green shows on the dark stage; GitHub's near-black would not, so it takes the accent.
+  assert.match(files.get("logos/whatsapp.svg") ?? "", /fill="#25D366"/);
+  assert.match(files.get("logos/github.svg") ?? "", new RegExp(`fill="${PALETTE.accent}"`));
+  assert.deepEqual(
+    marksIn('<img src="logos/github.svg"><img src="icons/accent/rocket.svg"><img src="x.png">'),
+    { icons: ["rocket"], logos: ["github"] },
   );
 });

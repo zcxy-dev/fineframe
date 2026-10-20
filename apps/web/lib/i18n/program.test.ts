@@ -241,7 +241,7 @@ test("every overlay, graphic and B-roll label says its kind in Chinese", () => {
     overlays: [
       ...templateIds.map((template) => ({ ...at, template, params: {} })),
       { ...at, template: "lower-third", params: { name: "王小明" } },
-      { ...at, template: "keyword", params: { text: "Claude" } },
+      { ...at, template: "title", params: { text: "Claude" } },
     ],
     graphics: [
       ...GRAPHIC_LAYOUTS.map((layout) => ({ ...at, layout, html: "", css: "" })),
@@ -257,7 +257,7 @@ test("every overlay, graphic and B-roll label says its kind in Chinese", () => {
     assert.doesNotMatch(chinese.replace(/B-roll|screen\.mp4|Claude/g, ""), /[A-Za-z]{2,}/, label);
   }
   assert.ok(labels.map((label) => overlayLabel(label, zh)).includes("人名條：王小明"));
-  assert.ok(labels.map((label) => overlayLabel(label, zh)).includes("關鍵字：Claude"));
+  assert.ok(labels.map((label) => overlayLabel(label, zh)).includes("標題：Claude"));
   assert.ok(labels.map((label) => overlayLabel(label, zh)).includes("圖卡（滿版）：營收"));
   assert.ok(labels.map((label) => overlayLabel(label, zh)).includes("B-roll：screen.mp4"));
 });

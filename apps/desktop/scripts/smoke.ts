@@ -6,7 +6,7 @@
 // cloud speech and its key, adds a synthetic spoken clip, makes a 15 s edit and checks the video,
 // then quits the app and checks nothing it started is left running. Claude and OpenRouter are
 // local stand-ins that answer as they would, so it costs nothing: the plan keeps the lines in
-// order and pops one keyword, the graphics are one label on the first word said, every cut passes
+// order, the graphics are one label on the first word said, every cut passes
 // its check, and each speech chunk is heard as one of the clip's sentences. Everything else is
 // real: the analysis's models, FFmpeg, ffprobe and Chrome Headless Shell download on first use,
 // and the clip is analysed, planned, rendered with its graphic and checked.
@@ -167,7 +167,7 @@ async function follow(id: string, signal: AbortSignal): Promise<void> {
 }
 
 /** The plan for the files the request lists: every line in order, earlier lines first to keep,
- * and the first line's longest word popped on screen. */
+ * and the first line its emphasis. */
 function planFor(packed: string, schema: Schema): unknown {
   const decisions = plainest(schema) as Record<string, unknown>;
   const segments: object[] = [];
@@ -183,23 +183,15 @@ function planFor(packed: string, schema: Schema): unknown {
     segments.push({ source, first: n, last: n, priority: Math.min(5, Math.ceil(n / 2)), reason });
     if (emphasis.length === 0) {
       const words = (numbered[2] as string).replace(/[⟨⟩]/g, "").split(/\s+/);
-      // The longest word a keyword pop can show (the catalog's 12 characters at most): chunks
-      // are heard in the order they arrive, not said, so line 1 may be any of the sentences.
-      const keyword =
-        words
-          .map((word) => word.replace(/\W/g, ""))
-          .filter((word) => word.length <= 12)
-          .sort((a, b) => b.length - a.length)[0] ?? "";
-      emphasis.push({ source, line: n, text: words.slice(0, 3).join(" "), keyword, reason });
-      say(`asked to pop "${keyword}" on line ${n}: ${numbered[2]}`);
+      emphasis.push({ source, line: n, text: words.slice(0, 3).join(" "), reason });
     }
   }
   return { ...decisions, content: "A short spoken test.", segments, emphasis };
 }
 
-/** The edit's graphics: one label of 2 s on the first word of the speech the request lists, which
- * it gives as `word@seconds`, whose label keeps clear of what the request lists as taken (a
- * keyword pop, B-roll), as Claude is told to; in the safe area at either aspect. */
+/** The edit's graphics: one label of 2 s, with a bundled icon, on the first word of the speech
+ * the request lists, which it gives as `word@seconds`, whose label keeps clear of what the request
+ * lists as taken (an effect, B-roll), as Claude is told to; in the safe area at either aspect. */
 function graphicsFor(request: string): unknown {
   const listed = request.split("Taken, no graphic over these:")[1] ?? "";
   const taken = [...listed.matchAll(/^([\d.]+)–([\d.]+) s: /gm)].map((m) => [
@@ -227,7 +219,7 @@ function graphicsFor(request: string): unknown {
         quotes: [word],
         shows: "The first word said.",
         sfx: "none",
-        html: `<div class="ff-chip" style="position:absolute;left:calc(var(--u)*12);top:calc(var(--u)*24);animation:ff-rise .5s var(--enter) both"><div class="ff-dot"></div><span style="font-size:calc(var(--u)*6)">${word}</span></div>`,
+        html: `<div class="ff-chip" style="position:absolute;left:calc(var(--u)*12);top:calc(var(--u)*24);animation:ff-rise .5s var(--enter) both"><img src="icons/accent/sparkles.svg" style="width:calc(var(--u)*5);height:calc(var(--u)*5)"><span style="font-size:calc(var(--u)*6)">${word}</span></div>`,
         css: "",
       },
     ],

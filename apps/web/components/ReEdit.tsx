@@ -650,6 +650,7 @@ export function ReEdit({
       <div className={styles.section}>
         <h3 className={styles.sectionTitle}>{words.replanTitle}</h3>
         <p className={styles.help}>{words.replanHelp}</p>
+        {view.older && <p className={styles.help}>{words.older}</p>}
         {replanning ? (
           <Replan job={job} onJob={onJob} onClose={() => setReplanning(false)} />
         ) : (

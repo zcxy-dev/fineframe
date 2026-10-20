@@ -37,7 +37,7 @@ import type { TimedWord } from "./captions.ts";
 import { type Claude, totalUsage, type Usage } from "./claude.ts";
 import { bare, joinWords } from "./text.ts";
 import { projectCredit, sfxCredit, visualPath } from "./visuals.ts";
-import { repeated, unsaid } from "./wording.ts";
+import { repeated, unnamed, unsaid } from "./wording.ts";
 
 /** The sounds a graphic may ask for: one for something landing, a list, a check or an X. */
 const GRAPHIC_SFX = ["none", "tap", "paper", "tone", "stop"] as const;
@@ -662,8 +662,12 @@ export async function withGraphics(
       const { graphic } = list[i] as Placed;
       const missing = unsaid(result.text, speechNear(words, graphic));
       const echoed = repeated(result.pieces, speechDuring(words, graphic));
+      const brands = unnamed(graphic.html, speechNear(words, graphic));
       const problems = [
         ...result.problems,
+        ...brands.map(
+          (brand) => `It shows the ${brand} logo, but the speaker does not name ${brand} near it.`,
+        ),
         ...(missing.length > 0
           ? [
               `It says ${missing.map((m) => `"${m}"`).join(", ")}, which the speaker does not say near it.`,

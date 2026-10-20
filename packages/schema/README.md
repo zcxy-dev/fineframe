@@ -28,6 +28,12 @@ const project: Project = await loadJson("edit/project.json", validateProject);
 - A source has at most one voice decision, and an image's clips start at 0.
 - The output frame rate has a whole number of ticks per frame, and the size matches the aspect.
 
+**Projects from 0.4.0.** `validateProject` first reads a project as this version would have written it (`upgradeProject`). A project Fineframe 0.4.0 wrote keeps its cuts, framing, captions, B-roll, music and sounds, and loses what this version no longer draws:
+- its motion-graphics `cards`, with the speaker clips that played below a panel card and the sound that started with each card;
+- its `keyword` overlays.
+
+`upgradeProject` returns how many of each it took out, so a caller can say that planning the edit again gives it the new motion graphics.
+
 ## Time
 
 `project.json` counts time in **ticks**, integers at 120 000 per second. Every common frame rate has a whole number of ticks per frame, NTSC rates included (30000/1001 fps is 4004 ticks), so frame times are exact and long timelines do not drift. A frame rate is a fraction, `{"num": 30000, "den": 1001}`.
