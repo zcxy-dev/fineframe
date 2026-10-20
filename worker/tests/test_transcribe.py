@@ -5,7 +5,14 @@ import pytest
 from conftest import tone
 
 from vework import transcribe
-from vework.transcribe import attach_punctuation, plan_chunks, repair_durations, to_traditional
+from vework.transcribe import (
+    attach_punctuation,
+    digits_by_latin,
+    plan_chunks,
+    repair_durations,
+    separate_latin,
+    to_traditional,
+)
 
 
 def seg(start, end):
@@ -66,6 +73,43 @@ def test_words_the_aligner_normalizes_appear_once_as_written():
     ]  # fmt: skip
 
 
+@pytest.mark.ml
+def test_a_latin_word_after_full_width_punctuation_is_a_word_of_its_own():
+    # Without a space the aligner reads "？OK，Let's" as one word, which a caption cannot break.
+    assert display(separate_latin("到底值不值得？OK，Let's go")) == [
+        "到", "底", "值", "不", "值", "得？", "OK，", "Let's", "go"
+    ]  # fmt: skip
+    assert display(separate_latin("就這個感覺。Current relationship"))[-3:] == [
+        "覺。", "Current", "relationship"
+    ]  # fmt: skip
+    assert separate_latin("Ian。Hello，get your coat") == "Ian。 Hello， get your coat"
+    assert separate_latin("他說「OK」") == "他說「OK」"
+
+
+def timed(*texts):
+    return [{"text": t, "start": float(i), "end": float(i + 1)} for i, t in enumerate(texts)]
+
+
+def texts(*words):
+    return [w["text"] for w in digits_by_latin(timed(*words))]
+
+
+def test_chinese_numerals_next_to_latin_words_are_written_in_digits():
+    words = digits_by_latin(timed("這", "就", "是", "Pocket", "四", "P", "雙"))
+    assert [(w["text"], w["start"], w["end"]) for w in words] == [
+        ("這", 0, 1), ("就", 1, 2), ("是", 2, 3), ("Pocket", 3, 4), ("4P", 4, 6), ("雙", 6, 7)
+    ]  # fmt: skip
+    assert texts("獨", "立", "的", "六", "十", "mm", "的") == ["獨", "立", "的", "60mm", "的"]
+    assert texts("從", "Pocket", "三", "等", "到", "四") == ["從", "Pocket", "3", "等", "到", "四"]
+    assert texts("iPhone", "十", "五", "Pro") == ["iPhone", "15", "Pro"]
+    assert texts("一", "百", "二", "十", "fps。") == ["120fps。"]
+    assert texts("兩", "千", "mAh") == ["2000mAh"]
+    assert texts("二", "零", "二", "四", "iPad") == ["2024", "iPad"]
+    # Numerals away from Latin text stay as said.
+    assert texts("三", "個", "人") == ["三", "個", "人"]
+    assert texts("App。", "三", "個") == ["App。", "三", "個"]
+
+
 def test_tokens_that_do_not_match_the_text_keep_their_timing_without_punctuation():
     words = attach_punctuation("hello world", [("hello", 0, 1), ("there", 1, 2), ("world", 2, 3)])
     assert [(w["text"], w["start"]) for w in words] == [("hello", 0), ("there", 1), ("world", 2)]
@@ -124,6 +168,72 @@ def test_a_lone_zero_length_word_stays_put():
 
 def test_traditional_uses_taiwan_vocabulary_and_leaves_english():
     assert to_traditional("这个软件用 Claude API 处理视频") == "這個軟體用 Claude API 處理影片"
+    # Computing terms still take their Taiwan names.
+    assert to_traditional("程序员用数据库和打印机") == "程式設計師用資料庫和印表機"
+
+
+@pytest.mark.parametrize(
+    ("simplified", "traditional"),
+    [
+        # Everyday words that s2twp swaps for a computing term.
+        ("这边的船很多类型", "這邊的船很多類型"),
+        ("申请程序", "申請程序"),
+        ("比赛项目", "比賽項目"),
+        ("看数据", "看數據"),
+        ("我很支持你", "我很支持你"),
+        ("这份文件", "這份文件"),
+        ("找对象", "找對象"),
+        ("看菜单", "看菜單"),
+        ("地球运行", "地球運行"),
+        ("传信息给我", "傳訊息給我"),
+        ("股票代码", "股票代碼"),
+        ("添加糖", "添加糖"),
+        ("我们社区", "我們社區"),
+        ("打开门", "打開門"),
+        ("保存期限", "保存期限"),
+        ("摄影设备", "攝影設備"),
+        ("车的性能", "車的性能"),
+        ("查看一下", "查看一下"),
+        ("高级餐厅", "高級餐廳"),
+        ("低级错误", "低級錯誤"),
+        ("比赛进程", "比賽進程"),
+        ("血液循环", "血液循環"),
+        ("连接起来", "連接起來"),
+        ("局部麻醉", "局部麻醉"),
+        ("全局观", "全局觀"),
+        ("实例", "實例"),
+        ("没有权限", "沒有權限"),
+        ("他默认了", "他默認了"),
+        ("发表声明", "發表聲明"),
+        ("好消息", "好消息"),
+        ("马在奔驰", "馬在奔馳"),
+        ("发布新品", "發布新品"),
+        ("导入制度", "導入制度"),
+        ("优化流程", "優化流程"),
+        ("扩展业务", "擴展業務"),
+        ("触摸他的手", "觸摸他的手"),
+        ("刷新纪录", "刷新紀錄"),
+        ("挂断电话", "掛斷電話"),
+        ("呼出空气", "呼出空氣"),
+        ("银行窗口", "銀行窗口"),
+        ("审核通过", "審核通過"),
+        # Characters s2t picks wrong in everyday speech.
+        ("嘴巴里面", "嘴巴裡面"),
+        ("这边真的很赞", "這邊真的很讚"),
+        ("给他点赞", "給他點讚"),
+        ("我赞成", "我贊成"),
+        ("赞助商", "贊助商"),
+        ("系安全带", "繫安全帶"),
+        ("系领带", "繫領帶"),
+        ("凉面的面很有嚼劲", "涼麵的麵很有嚼勁"),
+        ("面的口感", "麵的口感"),
+        ("面体很粗", "麵體很粗"),
+        # A bare 面 can be a face or a side as well as noodles, so it stays.
+        ("见面", "見面"),
+    ],
+)
+def test_traditional_keeps_everyday_words(simplified, traditional):
+    assert to_traditional(simplified) == traditional
 
 
 def fake_models(monkeypatch, text, language, item_times=None):

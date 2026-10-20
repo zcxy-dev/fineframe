@@ -1,7 +1,10 @@
+import json
+import tempfile
 import unicodedata
 from collections import Counter
 from collections.abc import Callable, Iterator
 from functools import cache
+from pathlib import Path
 
 import numpy as np
 
@@ -139,6 +142,92 @@ def attach_punctuation(text: str, items: list[tuple[str, float, float]]) -> list
     return words
 
 
+def separate_latin(text: str) -> str:
+    """`text` with a space after each full-width mark that runs into a Latin letter or digit, as
+    in "？OK，Let's": the aligner splits words only at spaces and Han characters, and would time
+    "OKLet's" as one word. Opening marks stay with the word after them."""
+    out = []
+    for ch, after in zip(text, text[1:] + " ", strict=True):
+        out.append(ch)
+        if (
+            ch not in _OPENING
+            and unicodedata.category(ch).startswith("P")
+            and unicodedata.east_asian_width(ch) in "FW"
+            and after.isascii()
+            and after.isalnum()
+        ):
+            out.append(" ")
+    return "".join(out)
+
+
+_NUMERALS = {"零": 0, "〇": 0, "一": 1, "二": 2, "兩": 2, "三": 3, "四": 4, "五": 5, "六": 6,
+             "七": 7, "八": 8, "九": 9}  # fmt: skip
+_POWERS = {"十": 10, "百": 100, "千": 1000, "萬": 10000}
+# Units and suffixes written straight after a number: 60mm, 4K, 4P, 120fps.
+_UNITS = {"mm", "cm", "km", "kg", "mg", "ml", "fps", "hz", "khz", "mhz", "ghz", "kb", "mb", "gb",
+          "tb", "mah", "px"}  # fmt: skip
+
+
+def _value(numerals: str) -> int:
+    """二零二四 -> 2024 read digit by digit; 一百二十 -> 120 and 十五 -> 15 by place."""
+    if not any(ch in _POWERS for ch in numerals):
+        return int("".join(str(_NUMERALS[ch]) for ch in numerals))
+    total = section = digit = 0
+    for ch in numerals:
+        if ch in _NUMERALS:
+            digit = _NUMERALS[ch]
+        elif ch == "萬":
+            total += (section + digit) * 10000
+            section = digit = 0
+        else:
+            section += (digit or 1) * _POWERS[ch]
+            digit = 0
+    return total + section + digit
+
+
+def _latin(ch: str) -> bool:
+    return ch.isascii() and ch.isalpha()
+
+
+def digits_by_latin(words: list[dict]) -> list[dict]:
+    """Chinese numerals said next to a Latin word, as in a product name or a measure, written in
+    digits as the name is ("Pocket 三" -> "Pocket 3"), joined to a unit or a one-letter suffix
+    after them ("四 P" -> "4P", "六十 mm" -> "60mm"). Numerals elsewhere stay as said."""
+    out: list[dict] = []
+    i = 0
+    while i < len(words):
+        j = i
+        while (
+            j < len(words)
+            and words[j]["text"]
+            and all(ch in _NUMERALS or ch in _POWERS for ch in words[j]["text"])
+        ):
+            j += 1
+        if j == i:
+            out.append(words[i])
+            i += 1
+            continue
+        before = out[-1]["text"] if out else ""
+        after = words[j]["text"] if j < len(words) else ""
+        letters = after
+        while letters and unicodedata.category(letters[-1]).startswith("P"):
+            letters = letters[:-1]
+        joins = (
+            letters.isascii()
+            and letters.isalpha()
+            and (len(letters) == 1 or letters.lower() in _UNITS)
+        )
+        if not _latin(before[-1:]) and not _latin(after[:1]):
+            out.extend(words[i:j])
+            i = j
+            continue
+        number = str(_value("".join(w["text"] for w in words[i:j])))
+        last = words[j] if joins else words[j - 1]
+        out.append({**words[i], "text": number + (after if joins else ""), "end": last["end"]})
+        i = j + 1 if joins else j
+    return out
+
+
 def _syllable(word: dict) -> bool:
     """Whether `word` is one Han character, marks aside."""
     letters = [ch for ch in word["text"] if _kept(ch)]
@@ -184,11 +273,41 @@ def to_traditional(text: str) -> str:
     return _converter().convert(text)
 
 
+# OpenCC's s2twp with two of our dictionaries, each a match of its own step: the longest match
+# wins and on a tie ours does. everyday_s2t.txt fixes characters s2t picks wrong in everyday
+# speech (很赞 -> 很讚, 系安全带 -> 繫安全帶, 嘴巴里面 -> 嘴巴裡面, noodles' 麵); everyday_tw.txt
+# keeps everyday words that s2twp's Taiwan phrases turn into computing terms (类型 -> 型別,
+# 项目 -> 專案, 对象 -> 物件), while longer computing terms (数据库 -> 資料庫) still convert.
+EVERYDAY = Path(__file__).with_name("everyday_s2t.txt"), Path(__file__).with_name("everyday_tw.txt")
+
+
 @cache
 def _converter():
     import opencc
 
-    return opencc.OpenCC("s2twp")
+    stock = Path(opencc.OpenCC("s2twp").config)
+    config = json.loads(stock.read_text(encoding="utf-8"))
+
+    def resolve(node):
+        if isinstance(node, dict):
+            if node.get("type") == "ocd2":
+                return {**node, "file": str(stock.parent / node["file"])}
+            return {key: resolve(value) for key, value in node.items()}
+        if isinstance(node, list):
+            return [resolve(value) for value in node]
+        return node
+
+    config = resolve(config)
+    s2t, tw = ({"type": "text", "file": str(path)} for path in EVERYDAY)
+    phrases = config["segmentation"]["dict"]["dicts"]
+    phrases.insert(0, s2t)
+    config["conversion_chain"][0]["dict"]["dicts"][0]["dicts"].insert(0, s2t)
+    taiwan = config["conversion_chain"][1]["dict"]["dicts"]
+    taiwan[0] = {"type": "group", "match_policy": "union", "dicts": [tw, taiwan[0]]}
+    with tempfile.TemporaryDirectory() as folder:
+        path = Path(folder) / "s2twp-everyday.json"
+        path.write_text(json.dumps(config), encoding="utf-8")
+        return opencc.OpenCC(str(path))
 
 
 def default_asr_model() -> str:
@@ -292,13 +411,14 @@ def transcribe_chunks(
     floor = timing.noise_floor(samples, speech)
     for n, chunk in enumerate(chunks, 1):
         progress(f"aligning {n}/{len(chunks)}")
-        start, end, text, language = chunk["start"], chunk["end"], chunk["text"], chunk["language"]
+        start, end, language = chunk["start"], chunk["end"], chunk["language"]
+        text = separate_latin(chunk["text"])
         # Padding added to a short chunk is not audio; keep words inside the real speech.
         items = [
             (token, round(min(start + s, end), 3), round(min(start + e, end), 3))
             for token, s, e in align(chunk["wav"], text)
         ]
-        words = repair_durations(attach_punctuation(text, items))
+        words = digits_by_latin(repair_durations(attach_punctuation(text, items)))
         # After the repair: a word the aligner gave no time would read as a pause around it.
         words = timing.refine(words, samples, speech, end, floor=floor)
         yield {"start": start, "end": end, "language": language, "text": text, "words": words}
