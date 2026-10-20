@@ -66,8 +66,11 @@ export function Projects({ onOpen }: { onOpen: (id: string) => void }) {
                 {project.name || words.untitled}
               </span>
               <span className={styles.fileMeta}>
-                {t.date(project.created)} · {formatLength(project.length, t)} · {project.aspect} ·{" "}
-                {words.status[project.status]} · {formatBytes(project.bytes)}
+                {t.date(project.created)} ·{" "}
+                {project.shorts === undefined
+                  ? formatLength(project.length, t)
+                  : words.shorts(project.shorts)}{" "}
+                · {project.aspect} · {words.status[project.status]} · {formatBytes(project.bytes)}
                 {project.status === "done" && !project.footage && words.footageRemoved}
               </span>
             </span>

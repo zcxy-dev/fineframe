@@ -11,7 +11,7 @@ const worker = new URL("../../worker/", here);
 const check = process.argv.includes("--check");
 
 const files = new Map<URL, string>();
-for (const name of ["media-index", "music-index", "progress", "project"]) {
+for (const name of ["media-index", "music-index", "progress", "project", "shorts"]) {
   const schema = fileURLToPath(new URL(`${name}.schema.json`, here));
   const types = await compileFromFile(schema, {
     bannerComment: `// Generated from ${name}.schema.json by \`pnpm gen\`; do not edit.`,

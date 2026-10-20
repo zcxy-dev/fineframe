@@ -1,4 +1,4 @@
-import { checkOrigin, errorResponse } from "../../../../../lib/http.ts";
+import { checkOrigin, errorResponse, shortParam } from "../../../../../lib/http.ts";
 import { LOCALES } from "../../../../../lib/i18n/locale.ts";
 import { JobError, jobs } from "../../../../../lib/jobs.ts";
 import { checkRevision } from "../../../../../lib/versions.ts";
@@ -25,7 +25,10 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
         return typeof said === "string" ? [[locale, said.slice(0, 200)]] : [];
       }),
     );
-    return Response.json(await jobs().revise((await ctx.params).id, revision, summary, summaries));
+    const id = (await ctx.params).id;
+    return Response.json(
+      await jobs().revise(id, revision, summary, summaries, shortParam(request)),
+    );
   } catch (error) {
     return errorResponse(error, request);
   }

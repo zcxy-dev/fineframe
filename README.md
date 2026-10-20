@@ -65,6 +65,7 @@ A single web page drives it: drop the files, pick the length and aspect ratio, p
 - **Render:** [`project.json` to MP4](packages/engine/README.md#how-it-renders) with frame- and sample-exact cuts, transitions, B-roll, grading and loudness ([measurements](packages/engine/MEASUREMENTS.md#render-measurements)).
 - **Music:** tracks you supply, fitted to the edit and ducked under speech ([details](packages/engine/README.md#planning), [measurements](packages/engine/MEASUREMENTS.md#music-measurements)).
 - **One command:** [`pnpm edit`](packages/engine/README.md#editing-footage) turns a folder of footage into the finished video at the length and aspect asked ([measurements](packages/engine/MEASUREMENTS.md#edit-measurements)).
+- **Several shorts:** [`pnpm edit --shorts`](packages/engine/README.md#editing-footage) and the page make up to 10 shorts from one long video, each from one stretch of it, with a title, a description and hashtags.
 - **Desktop app:** [installers](#install) for Apple silicon Macs, Windows and Linux run the web page with nothing else to install ([details](apps/desktop/README.md)).
 - **Web page:** [one page](apps/web/README.md) runs `pnpm edit` on dropped footage, with live progress, cost estimates and downloads.
 - **Changing an edit:** [`pnpm render`](packages/engine/README.md#changing-an-edit) renders a changed `project.json` again, and the [agent skill](#use-it-from-an-ai-agent) changes an edit by conversation.

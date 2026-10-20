@@ -6,9 +6,13 @@
 // ANTHROPIC_API_KEY is $FAKE_EDIT_KEY, and records the OpenRouter key it was given in
 // openrouter.txt and the Pexels and Pixabay ones in stock.txt.
 // $FAKE_EDIT_NO_CAPTIONS leaves the captions file empty, as the engine does when no speech is kept.
+// With --shorts it makes two shorts, fewer than asked, from the first file in out/01 and out/02,
+// each playing a stretch of that file, whose media index says it lasts 100 s. After the first it
+// waits while $FAKE_SHORTS_HOLD names a file that exists, and with $FAKE_SHORTS_STOP it stops
+// there at the cost limit.
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 
 const args = process.argv.slice(2);
 await writeFile("args.json", JSON.stringify(args));
@@ -32,6 +36,71 @@ say({ stage: "analyze", fraction: 0.1, message: "Transcribing", file, step: "tra
 process.stderr.write("vework: transcribing\n");
 const hold = process.env.FAKE_EDIT_HOLD;
 while (hold && existsSync(hold)) await new Promise((done) => setTimeout(done, 20));
+const cost = { plan: { dollars: 0.07, requests: 1 }, check: { dollars: 0.012, requests: 9 } };
+if (args.includes("--shorts")) {
+  const out = args[args.indexOf("-o") + 1] ?? "out";
+  const source = args[0] ?? "";
+  await writeFile("index.json", JSON.stringify({ source: { duration: 100 } }));
+  const shorts = {
+    version: 1,
+    asked: Number(args[args.indexOf("--shorts") + 1]),
+    range: (args[args.indexOf("--length") + 1] ?? "").split("-").map(Number),
+    shorts: [] as object[],
+  };
+  const made = [
+    { title: "剪輯的一天：從 0 到 1?", start: 12.5, end: 61.25, length: 45 },
+    { title: "Why we cut. ", start: 80, end: 99, length: 30 },
+  ];
+  for (const [i, short] of made.entries()) {
+    const folder = `0${i + 1}`;
+    const number = { n: i + 1, of: made.length };
+    say({ stage: "render", fraction: 0.5 + i * 0.2, message: "Rendering", short: number });
+    await mkdir(join(out, folder), { recursive: true });
+    await writeFile(join(out, folder, "edit.mp4"), Buffer.alloc(1000 + i, 7));
+    await writeFile(join(out, folder, "edit.srt"), `1\n00:00:00,000 --> 00:00:01,000\n短片 ${i}\n`);
+    const project = JSON.parse(
+      await readFile(
+        new URL("../../../../packages/schema/examples/project.example.json", import.meta.url),
+        "utf8",
+      ),
+    );
+    project.sources = project.sources.filter((each: { kind: string }) => each.kind === "video");
+    delete project.audio.music;
+    project.sources[0].path = relative(join(out, folder), source);
+    project.sources[0].index = relative(join(out, folder), "index.json");
+    await writeFile(join(out, folder, "edit.project.json"), JSON.stringify(project));
+    shorts.shorts.push({
+      folder,
+      ...short,
+      description: `Description ${i + 1}.`,
+      hashtags: ["#one", "#two", "#three"],
+      source,
+      seconds: short.length - 0.5,
+    });
+    await writeFile(join(out, "shorts.json"), JSON.stringify(shorts));
+    say({
+      stage: "short",
+      fraction: 0.6 + i * 0.2,
+      message: `Short ${i + 1}`,
+      short: number,
+      claude: cost,
+    });
+    const held = process.env.FAKE_SHORTS_HOLD;
+    while (held && existsSync(held)) await new Promise((done) => setTimeout(done, 20));
+    if (process.env.FAKE_SHORTS_STOP) {
+      await writeFile(join(out, "shorts.json"), JSON.stringify({ ...shorts, stopped: "cost" }));
+      break;
+    }
+  }
+  say({
+    stage: "done",
+    fraction: 1,
+    message: "Made 2 shorts",
+    claude: { find: { dollars: 0.1, requests: 1 }, ...cost },
+    outputs: { shorts: join(out, "shorts.json") },
+  });
+  process.exit(0);
+}
 say({ stage: "plan", fraction: 0.6, message: "Planning" });
 say({ stage: "render", fraction: 0.55, message: "Rendering" });
 const out = args[args.indexOf("-o") + 1] ?? "out/edit.mp4";
@@ -70,6 +139,6 @@ say({
   stage: "done",
   fraction: 1,
   message: "Finished",
-  claude: { plan: { dollars: 0.07, requests: 1 }, check: { dollars: 0.012, requests: 9 } },
+  claude: cost,
   outputs: { video: out, project, captions, ...(broll ? { broll } : {}) },
 });

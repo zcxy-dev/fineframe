@@ -41,6 +41,8 @@ const SAID = [
   "Reading the file",
   "Reading 3 files",
   "Analysed before",
+  "Finding the moments that stand alone as shorts",
+  "Found 12 moments",
   // The plan and its review.
   "Planning a short edit with claude-opus-4-1",
   "Planning a long edit with claude-opus-4-1",
@@ -55,6 +57,7 @@ const SAID = [
   "Found 2 of 3 things to point at with claude-sonnet-4-5 (3 requests, $0.01)",
   "Found 2 of 3 things to point at with claude-sonnet-4-5 (all cached)",
   "The edit lasts 12.3 s; asking for more material",
+  "The edit lasts 46.7 s after 2 requests; fitting it to 47 s, within the range asked",
   "Left out the stock visual on line 12: no clip matched",
   "The plan's visuals are not JSON; the edit has none",
   "The plan's visuals are not a list; the edit has none",
@@ -175,8 +178,8 @@ function written(path: string): string[][] {
   return found;
 }
 
-/** The done line's message, which the page never shows. */
-const UNSHOWN = /^Finished: /;
+/** The done line's message and a short's line, which the page never shows. */
+const UNSHOWN = /^(Finished: |Made |Short )/;
 
 test("every progress line the engine, the effects, vework and the server write is listed", () => {
   const worker = join("worker", "src", "vework");

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { estimateCost } from "./estimate.ts";
+import { estimateCost, estimateShortsCost } from "./estimate.ts";
 
 test("the estimate's range holds what whole edits cost in the measured runs", () => {
   // packages/engine/MEASUREMENTS.md's edit measurements: footage, length, what Claude cost.
@@ -32,4 +32,29 @@ test("a longer edit from more footage costs more", () => {
   assert.ok(long.low > short.high);
   assert.ok(estimateCost(600, 60).high < estimateCost(600, 600).high);
   assert.ok(estimateCost(600, 60).high < estimateCost(3600, 60).high);
+});
+
+test("the shorts estimate's range holds what the measured runs of shorts cost", () => {
+  // packages/engine/MEASUREMENTS.md's shorts measurements: footage, shorts asked, range, Claude.
+  const runs: [number, number, [number, number], number][] = [
+    [831, 5, [30, 60], 2.04],
+    [418, 5, [30, 60], 1.2],
+    [418, 2, [15, 30], 0.75],
+  ];
+  for (const [footage, count, range, dollars] of runs) {
+    const { low, high } = estimateShortsCost(footage, count, range);
+    assert.ok(low <= dollars && dollars <= high, `${footage} s, ${count}: ${low}–${high}`);
+  }
+  // Finding the moments in an hour of footage stays under its $1 cap.
+  assert.ok(estimateShortsCost(3600, 1, [15, 30], "minimal").high < 1);
+  // The upper bound counts the moments a run may try and leave out: from 4 minutes, one short may
+  // be tried twice, each try planned twice; from 2 minutes, it is tried once.
+  const twice = estimateShortsCost(240, 1, [30, 60]).high;
+  const once = estimateShortsCost(120, 1, [30, 60]).high;
+  assert.ok(twice - once > 0.15, `${twice} − ${once}`);
+  // No more shorts than the footage gives: one per 2 minutes.
+  assert.equal(
+    estimateShortsCost(240, 10, [30, 60]).high,
+    estimateShortsCost(240, 2, [30, 60]).high,
+  );
 });

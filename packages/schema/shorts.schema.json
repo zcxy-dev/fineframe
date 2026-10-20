@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/zcxy-dev/fineframe/blob/main/packages/schema/shorts.schema.json",
+  "title": "Shorts",
+  "description": "The shorts `pnpm edit --shorts` made from one long video, written beside their folders and again as each one finishes.",
+  "type": "object",
+  "required": ["version", "asked", "range", "shorts"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "asked": {
+      "description": "How many shorts were asked for. Fewer are made when the footage holds fewer distinct moments.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "range": {
+      "description": "The shortest and longest a short may be, in seconds.",
+      "type": "array",
+      "items": { "type": "number", "exclusiveMinimum": 0 },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "shorts": {
+      "description": "The shorts made so far, best first.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/Short" }
+    },
+    "stopped": {
+      "description": "Why the run made fewer than it could: \"cost\" when Claude's cost reached the run's limit. Absent otherwise.",
+      "enum": ["cost"]
+    }
+  },
+  "$defs": {
+    "Short": {
+      "type": "object",
+      "required": [
+        "folder",
+        "title",
+        "description",
+        "hashtags",
+        "source",
+        "start",
+        "end",
+        "length",
+        "seconds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "folder": {
+          "description": "Its folder beside this file, holding edit.mp4, edit.project.json and edit.srt as a normal edit writes them: 01, 02, …",
+          "type": "string",
+          "pattern": "^[0-9]{2}$"
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "hashtags": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^#\\S+$" },
+          "minItems": 3,
+          "maxItems": 5
+        },
+        "source": {
+          "description": "The footage file it is cut from, as it was given.",
+          "type": "string",
+          "minLength": 1
+        },
+        "start": {
+          "description": "Where its stretch of the file starts, in seconds.",
+          "type": "number",
+          "minimum": 0
+        },
+        "end": {
+          "description": "Where its stretch ends, in seconds.",
+          "type": "number",
+          "minimum": 0
+        },
+        "length": {
+          "description": "The length Claude chose for it within the range, in seconds: the target its video is cut to within 5 %.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "seconds": {
+          "description": "Its video's length, in seconds.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    }
+  }
+}

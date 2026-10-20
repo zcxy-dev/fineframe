@@ -4,13 +4,13 @@ import { type RefObject, useEffect, useState } from "react";
 import type { Job } from "../lib/jobs.ts";
 import { shownPlan } from "../lib/paths.ts";
 import { formatClock } from "../lib/settings.ts";
+import { jobApi } from "../lib/shorts.ts";
 import styles from "./editor.module.css";
 import { useT } from "./I18n.tsx";
 
 /** The finished video in the page's player. */
 export function Player({ job, video }: { job: Job; video: RefObject<HTMLVideoElement | null> }) {
   const t = useT();
-  const base = `/api/jobs/${job.id}`;
   return (
     <section className={`${styles.card} ${styles.player}`} aria-label={t.done.player}>
       <div className={styles.screen} data-aspect={shownPlan(job).aspect}>
@@ -18,7 +18,7 @@ export function Player({ job, video }: { job: Job; video: RefObject<HTMLVideoEle
         <video
           ref={video}
           className={styles.video}
-          src={`${base}/video?v=${job.current ?? 1}`}
+          src={jobApi(job, "video", { v: job.current ?? 1 })}
           controls
           playsInline
           preload="metadata"
@@ -32,17 +32,18 @@ export function Player({ job, video }: { job: Job; video: RefObject<HTMLVideoEle
 export function useVideoLength(job: Job): number | null {
   const [seconds, setSeconds] = useState<number | null>(null);
   const version = job.current ?? 1;
+  const src = jobApi(job, "video", { v: version });
   useEffect(() => {
     const probe = document.createElement("video");
     probe.preload = "metadata";
     probe.onloadedmetadata = () => setSeconds(probe.duration);
-    probe.src = `/api/jobs/${job.id}/video?v=${version}`;
+    probe.src = src;
     return () => {
       probe.onloadedmetadata = null;
       probe.removeAttribute("src");
       probe.load();
     };
-  }, [job.id, version]);
+  }, [src]);
   return seconds;
 }
 

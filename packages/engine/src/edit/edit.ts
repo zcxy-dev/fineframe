@@ -1,12 +1,15 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import {
   type ClaudeCost,
   type DoneProgress,
   type Progress,
+  type ShortNumber,
+  type Shorts,
   validateProgress,
+  validateShorts,
 } from "@video-editor/schema";
 import type { CaptionStyle } from "../captions/presets.ts";
 import { ffmpeg, QUIET, run } from "../ffmpeg.ts";
@@ -21,8 +24,16 @@ import {
   totalUsage,
   type Usage,
 } from "../plan/claude.ts";
+import { findMoments, type Moment } from "../plan/moments.ts";
 import type { MusicInput } from "../plan/music.ts";
-import { type Aspect, LENGTH_RANGE, type PlanInput, plan, TOLERANCE } from "../plan/plan.ts";
+import {
+  type Aspect,
+  LENGTH_RANGE,
+  PlanError,
+  type PlanInput,
+  plan,
+  TOLERANCE,
+} from "../plan/plan.ts";
 import { MAX_REVIEW_PASSES, review } from "../plan/review.ts";
 import type { Visuals } from "../plan/visuals.ts";
 import { render } from "../render.ts";
@@ -41,6 +52,7 @@ import {
 } from "./analyze.ts";
 import { EditError } from "./error.ts";
 import { collectInputs, type MediaFile } from "./inputs.ts";
+import { SHORTS_COUNT, SHORTS_RANGE } from "./length.ts";
 import { collectMusic } from "./music.ts";
 
 export type Stage = "analyze" | "plan" | "render" | "check";
@@ -50,6 +62,11 @@ export interface EditOptions {
   inputs: string[];
   /** Seconds, LENGTH_RANGE inclusive. */
   length: number;
+  /** Cuts only from this stretch of the one video given, in seconds into it. */
+  within?: { start: number; end: number };
+  /** Plans the edit as one short of a longer video, about this, in a sentence or two: hook
+   * first, with no opening title, as `--shorts` made it. */
+  short?: string;
   aspect: Aspect;
   /** The video to write. `<name>.project.json`, `<name>.srt` and `edit_cuts.json` go beside it. */
   out: string;
@@ -114,6 +131,8 @@ const ANALYZE_SHARE = 0.9;
 const SHARES = { plan: 0.3, render: 0.3, check: 0.4 };
 /** The share of each review pass before its render of the fixes. */
 const CHECK_SHARE = 0.3;
+/** How finely FFmpeg's header states a file's length, in seconds. */
+const FFMPEG_TICK = 0.01;
 
 /**
  * Edits footage to a finished video: analyses each file (or takes its index from the cache),
@@ -128,20 +147,7 @@ const CHECK_SHARE = 0.3;
  */
 export async function edit(options: EditOptions): Promise<EditResult> {
   const emit = options.onProgress ?? (() => {});
-  let last = 0;
-  const report: Reporter = (stage, fraction, message, file, download, step) => {
-    last = Math.max(last, Math.min(1, Math.round(fraction * 10_000) / 10_000));
-    emit(
-      validateProgress({
-        stage,
-        fraction: last,
-        message,
-        ...(file ? { file } : {}),
-        ...(download ? { download } : {}),
-        ...(step ? { step } : {}),
-      }),
-    );
-  };
+  const { report, last } = reporter(emit);
   // Every request's usage, whichever step made it, so a failed edit still says what it cost.
   const spent: Usage[] = [];
   try {
@@ -157,9 +163,32 @@ export async function edit(options: EditOptions): Promise<EditResult> {
   } catch (error) {
     const message = (error as Error).message;
     const claude = spent.length > 0 ? { claude: costByStage(spent) } : {};
-    emit(validateProgress({ stage: "error", fraction: last, message, ...claude }));
+    emit(validateProgress({ stage: "error", fraction: last(), message, ...claude }));
     throw error;
   }
+}
+
+/** Stage lines to `emit`, the bar never going back: `report` writes one, `short` one that names
+ * the short it is about, and `last` says where the bar is. */
+function reporter(emit: (line: Progress) => void) {
+  let last = 0;
+  const line =
+    (short?: ShortNumber): Reporter =>
+    (stage, fraction, message, file, download, step) => {
+      last = Math.max(last, Math.min(1, Math.round(fraction * 10_000) / 10_000));
+      emit(
+        validateProgress({
+          stage,
+          fraction: last,
+          message,
+          ...(file ? { file } : {}),
+          ...(download ? { download } : {}),
+          ...(step ? { step } : {}),
+          ...(short ? { short } : {}),
+        }),
+      );
+    };
+  return { report: line(), short: line, last: () => last };
 }
 
 type Reporter = (
@@ -192,20 +221,45 @@ export function costByStage(usages: readonly Usage[]): ClaudeCost {
     const total = totalUsage(usages.filter((usage) => purposes.includes(usage.purpose)));
     return { dollars: total.dollars, requests: total.calls };
   };
+  const find = usages.some((usage) => usage.purpose === "find");
   return {
+    ...(find ? { find: stage(["find"]) } : {}),
     plan: stage(["plan", "locate"]),
     graphics: stage(["graphics"]),
     check: stage(["check", "judge"]),
   };
 }
 
-async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Promise<EditResult> {
-  const [shortest, longest] = LENGTH_RANGE;
-  if (!(options.length >= shortest && options.length <= longest)) {
-    throw new EditError(
-      `The length must be ${shortest} s to ${longest / 3600} h, not ${options.length} s`,
-    );
-  }
+/** What every edit of a run shares: the footage checked and analysed, the music and the names,
+ * and Claude counting what each request costs. */
+interface Prepared {
+  options: EditOptions;
+  files: MediaFile[];
+  videos: MediaFile[];
+  indexes: Map<MediaFile, { path: string; bytes: number; cached: boolean }>;
+  music: MusicInput[];
+  names: string[];
+  claude: Claude;
+  /** Called before each request to Claude, which it stops by throwing. */
+  limit: { check: () => void };
+  log: (line: string) => void;
+  timings: Record<Stage, number>;
+  timed: <T>(stage: Stage, work: () => Promise<T>) => Promise<T>;
+  /** The share of the progress bar the analysis took. */
+  analyzed: number;
+}
+
+/**
+ * Checks the inputs, then analyses each file or takes its index from the cache. `refuse` fails
+ * on the footage's length, read before the long analysis, when it cannot make what is asked.
+ */
+async function prepare(
+  options: EditOptions,
+  output: string,
+  refuse: (footage: number, videos: MediaFile[], lengths: (number | null)[]) => void,
+  report: Reporter,
+  spent: Usage[],
+): Promise<Prepared> {
   const log = options.onLog ?? (() => {});
   const timings: Record<Stage, number> = { analyze: 0, plan: 0, render: 0, check: 0 };
   const timed = async <T>(stage: Stage, work: () => Promise<T>): Promise<T> => {
@@ -217,15 +271,7 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
     }
   };
 
-  const video = resolve(options.out);
-  const stem = basename(video, extname(video));
-  if (existsSync(video) && !existsSync(join(dirname(video), `${stem}.project.json`))) {
-    throw new EditError(
-      `${options.out}: already there, and not an earlier edit; name the video something else, ` +
-        "so no footage is written over",
-    );
-  }
-  const files = await collectInputs(options.inputs, video);
+  const files = await collectInputs(options.inputs, output);
   const audio = files.filter((file) => file.kind === "audio").map((file) => file.given);
   if (audio.length > 0) {
     throw new EditError(
@@ -249,17 +295,11 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
   const tracks = await collectMusic(options.music ?? [], options.musicLicense);
   // Images are only decoded, which is quick: a bad one fails before the long analysis.
   for (const file of files.filter((f) => f.kind === "image")) await checkImage(file);
-  // An edit is cut from the footage, so footage shorter than it fails now rather than after
+  // An edit is cut from the footage, so footage too short for it fails now rather than after
   // minutes of analysis. A file whose length FFmpeg cannot read is left to the analysis.
   const lengths = await Promise.all(videos.map(durationOf));
   const footage = lengths.reduce<number>((sum, seconds) => sum + (seconds ?? Infinity), 0);
-  if (footage < options.length * (1 - TOLERANCE)) {
-    throw new EditError(
-      `The footage lasts ${footage.toFixed(1)} s in all, too short for a ${options.length} s ` +
-        "edit: ask for a shorter edit or add footage",
-    );
-  }
-  await mkdir(dirname(video), { recursive: true });
+  refuse(footage, videos, lengths);
   let asked = options.claude;
   if (!asked) {
     report("analyze", 0, "Checking that Claude can plan the edit");
@@ -267,7 +307,9 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
     asked = anthropicClaude();
   }
   const ask = asked;
+  const limit = { check: () => {} };
   const claude: Claude = async (request) => {
+    limit.check();
     const reply = await ask(request);
     spent.push(reply.usage);
     return reply;
@@ -295,7 +337,7 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
   report("analyze", 0, `Reading ${files.length === 1 ? "the file" : `${files.length} files`}`);
   const indexes = new Map<MediaFile, { path: string; bytes: number; cached: boolean }>();
   const music: MusicInput[] = [];
-  const analyzeShare = await timed("analyze", async () => {
+  const analyzed = await timed("analyze", async () => {
     await mkdir(cache, { recursive: true });
     // Music first: it takes seconds, so a track vework cannot read fails before the footage's
     // minutes. Its share of the progress is too small to count.
@@ -332,17 +374,76 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
     }
     return share;
   });
+  return {
+    options,
+    files,
+    videos,
+    indexes,
+    music,
+    // The people a lower third may name, never the terms. The names file is in the glossary's
+    // format, where blank lines and lines starting with # are not names.
+    names: (names?.text.split(/\r?\n/) ?? [])
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#")),
+    claude,
+    limit,
+    log,
+    timings,
+    timed,
+    analyzed,
+  };
+}
 
-  const rest = 1 - analyzeShare;
-  const planAt = analyzeShare;
-  const renderAt = planAt + rest * SHARES.plan;
-  const checkAt = renderAt + rest * SHARES.render;
-  const work = join(dirname(video), `.${stem}.edit`);
-  const inputs: PlanInput[] = files.flatMap((file): PlanInput[] => {
-    const index = indexes.get(file);
+/** What the planner reads of `files`: each video's index, and each still. */
+function planInputs(prepared: Prepared, files: readonly MediaFile[]): PlanInput[] {
+  return files.flatMap((file): PlanInput[] => {
+    const index = prepared.indexes.get(file);
     if (index) return [{ index: index.path, source: file.path }];
     return file.kind === "image" ? [{ image: file.path }] : [];
   });
+}
+
+/** One edit to cut from prepared footage. */
+interface Cut {
+  inputs: PlanInput[];
+  /** The video to write; its project, captions and other files go beside it. */
+  video: string;
+  length: number;
+  within?: { start: number; end: number };
+  short?: boolean;
+  about?: string;
+  /** The shortest it may be fitted to when its plan reaches less than `length`. */
+  least?: number;
+}
+
+interface Rendered {
+  outputs: DoneProgress["outputs"];
+  /** The length it was planned for, and its video's. */
+  length: number;
+  seconds: number;
+  reviews: number;
+}
+
+/**
+ * Plans `cut`, renders it, then reviews every cut and renders the fixes, at most
+ * MAX_REVIEW_PASSES times, its progress running from `from` to `to` of the bar.
+ */
+async function cutEdit(
+  prepared: Prepared,
+  cut: Cut,
+  report: Reporter,
+  from: number,
+  to: number,
+): Promise<Rendered> {
+  const { options, timed, log } = prepared;
+  const rest = to - from;
+  const planAt = from;
+  const renderAt = planAt + rest * SHARES.plan;
+  const checkAt = renderAt + rest * SHARES.render;
+  const video = cut.video;
+  const stem = basename(video, extname(video));
+  const work = join(dirname(video), `.${stem}.edit`);
+  await mkdir(dirname(video), { recursive: true });
   // The work folder holds the project as planned and as fixed; nothing else needs it after.
   try {
     let planned = 0;
@@ -353,22 +454,22 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
     };
     const edit = await timed("plan", () =>
       plan({
-        inputs,
-        length: options.length,
+        inputs: cut.inputs,
+        length: cut.length,
         aspect: options.aspect,
         out: join(work, "project.json"),
         ...(options.look
           ? { look: options.look === "none" ? null : { id: options.look, intensity: 1 } }
           : {}),
-        music,
-        // The people a lower third may name, never the terms. The names file is in the
-        // glossary's format, where blank lines and lines starting with # are not names.
-        names: (names?.text.split(/\r?\n/) ?? [])
-          .map((line) => line.trim())
-          .filter((line) => line && !line.startsWith("#")),
+        music: prepared.music,
+        names: prepared.names,
         ...(options.captions ? { captions: options.captions } : {}),
         ...(options.instructions ? { instructions: options.instructions } : {}),
-        claude,
+        ...(cut.within ? { within: cut.within } : {}),
+        ...(cut.short ? { short: true } : {}),
+        ...(cut.about ? { about: cut.about } : {}),
+        ...(cut.least === undefined ? {} : { least: cut.least }),
+        claude: prepared.claude,
         ...(options.quality ? { quality: options.quality } : {}),
         ...(options.visuals ? { visuals: options.visuals } : {}),
         onProgress: (message) => planProgress(message),
@@ -382,7 +483,7 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
       }),
     );
 
-    const passSpan = (1 - checkAt) / MAX_REVIEW_PASSES;
+    const passSpan = (to - checkAt) / MAX_REVIEW_PASSES;
     let reviews = 0;
     for (;;) {
       const at = checkAt + reviews * passSpan;
@@ -410,8 +511,6 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
         }),
       );
     }
-
-    const cached = [...indexes.values()].filter((index) => index.cached).length;
     return {
       outputs: {
         video: rendered.video,
@@ -420,11 +519,8 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
         ...(rendered.music ? { music: rendered.music } : {}),
         ...(rendered.broll ? { broll: rendered.broll } : {}),
       },
+      length: edit.state.length,
       seconds: rendered.seconds,
-      timings,
-      usage: totalUsage(spent),
-      analyzed: indexes.size - cached,
-      cached,
       reviews,
     };
   } catch (error) {
@@ -436,6 +532,344 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
   } finally {
     await rm(work, { recursive: true, force: true });
   }
+}
+
+/** Files analysed in this run, and files whose index an earlier run left. */
+function counted(prepared: Prepared): { analyzed: number; cached: number } {
+  const cached = [...prepared.indexes.values()].filter((index) => index.cached).length;
+  return { analyzed: prepared.indexes.size - cached, cached };
+}
+
+async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Promise<EditResult> {
+  const [shortest, longest] = LENGTH_RANGE;
+  if (!(options.length >= shortest && options.length <= longest)) {
+    throw new EditError(
+      `The length must be ${shortest} s to ${longest / 3600} h, not ${options.length} s`,
+    );
+  }
+  const video = resolve(options.out);
+  const stem = basename(video, extname(video));
+  if (existsSync(video) && !existsSync(join(dirname(video), `${stem}.project.json`))) {
+    throw new EditError(
+      `${options.out}: already there, and not an earlier edit; name the video something else, ` +
+        "so no footage is written over",
+    );
+  }
+  const { within } = options;
+  const prepared = await prepare(
+    options,
+    video,
+    (footage, videos, lengths) => {
+      if (within) {
+        const [file] = videos;
+        const seconds = lengths[0] ?? Infinity;
+        if (videos.length !== 1 || !file) {
+          throw new EditError(`--within cuts from one video, not ${videos.length}`);
+        }
+        // FFmpeg's header gives the length to the centisecond; the media index, to the microsecond.
+        const end = seconds + FFMPEG_TICK;
+        if (!(within.start >= 0 && within.start < within.end && within.end <= end)) {
+          throw new EditError(
+            `${file.given} lasts ${seconds.toFixed(1)} s: the stretch ${within.start}-` +
+              `${within.end} s is not inside it`,
+          );
+        }
+        footage = within.end - within.start;
+      }
+      if (footage < options.length * (1 - TOLERANCE)) {
+        throw new EditError(
+          `The ${within ? "stretch" : "footage"} lasts ${footage.toFixed(1)} s${within ? "" : " in all"}, ` +
+            `too short for a ${options.length} s edit: ask for a shorter edit or ` +
+            `${within ? "a longer stretch" : "add footage"}`,
+        );
+      }
+    },
+    report,
+    spent,
+  );
+  const { length: _, ...rendered } = await cutEdit(
+    prepared,
+    {
+      inputs: planInputs(prepared, prepared.files),
+      video,
+      length: options.length,
+      ...(within ? { within } : {}),
+      ...(options.short ? { short: true, about: options.short } : {}),
+    },
+    report,
+    prepared.analyzed,
+    1,
+  );
+  return {
+    ...rendered,
+    timings: prepared.timings,
+    usage: totalUsage(spent),
+    ...counted(prepared),
+  };
+}
+
+/** US dollars Claude may cost: each short, and finding the moments for each hour of footage. */
+const SHORT_CAP = 1;
+const FIND_CAP_PER_HOUR = 1;
+/** The share of the progress bar after the analysis that finding the moments takes. */
+const FIND_SHARE = 0.05;
+
+export interface ShortsOptions extends Omit<EditOptions, "length" | "within" | "short" | "out"> {
+  /** How many shorts to make, SHORTS_COUNT inclusive: the best moments, fewer when the footage
+   * holds fewer. */
+  count: number;
+  /** The shortest and longest a short may be, in seconds, within SHORTS_RANGE. */
+  range: readonly [number, number];
+  /** The folder to write: shorts.json, and each short in a folder of its own, 01, 02, … */
+  out: string;
+}
+
+export interface ShortsResult {
+  outputs: { shorts: string };
+  shorts: Shorts;
+  timings: Record<Stage, number>;
+  usage: ReturnType<typeof totalUsage>;
+  analyzed: number;
+  cached: number;
+  /** Review passes, of every short. */
+  reviews: number;
+  /** Why the run stopped at its cost limit, when it did. */
+  stopped?: string;
+}
+
+/** Stops a run of shorts at its cost limit; the message says which limit and the spend. */
+class CostLimit extends Error {
+  override name = "CostLimit";
+}
+
+/**
+ * Makes up to `count` shorts from footage: analyses each file (or takes its index from the
+ * cache), has Claude find the moments that stand alone as shorts, best first, then edits each
+ * from its own stretch of one file, hook first, as `edit` makes a short edit, into `01/edit.mp4`
+ * and the files beside it. `shorts.json` lists each short as it is done, with the title,
+ * description and hashtags Claude wrote for it. A short whose plan reaches less than the length
+ * Claude picked is fitted to the length it reaches, within the range; a moment the planner cannot
+ * make is left out and the next one made instead.
+ *
+ * Progress lines name the short each is about, a `short` line says each one is done, and the last
+ * line is `done` or `error`. Claude's cost for finding the moments, and for any short, is held
+ * under its cap: past it, the run stops with an error, keeping the shorts made.
+ */
+export async function editShorts(options: ShortsOptions): Promise<ShortsResult> {
+  const emit = options.onProgress ?? (() => {});
+  const lines = reporter(emit);
+  const spent: Usage[] = [];
+  try {
+    const result = await makeShorts(options, lines, emit, spent);
+    const made = result.shorts.shorts.length;
+    const message = result.stopped
+      ? `Made ${made} shorts, not ${options.count}: stopped at the cost limit, as ${result.stopped}`
+      : made < options.count
+        ? `Made ${made} shorts, not ${options.count}: only ${made} moments of the footage ` +
+          `could be made into shorts of ${options.range[0]}-${options.range[1]} s`
+        : `Made ${made} shorts in ${basename(dirname(result.outputs.shorts))}`;
+    emit(
+      validateProgress({
+        stage: "done",
+        fraction: 1,
+        message,
+        claude: costByStage(spent),
+        outputs: result.outputs,
+      }),
+    );
+    return result;
+  } catch (error) {
+    const message = (error as Error).message;
+    const claude = spent.length > 0 ? { claude: costByStage(spent) } : {};
+    emit(validateProgress({ stage: "error", fraction: lines.last(), message, ...claude }));
+    throw error;
+  }
+}
+
+async function makeShorts(
+  options: ShortsOptions,
+  { report, short: shortReport, last }: ReturnType<typeof reporter>,
+  emit: (line: Progress) => void,
+  spent: Usage[],
+): Promise<ShortsResult> {
+  const [shortest, longest] = options.range;
+  if (
+    !(Number.isInteger(options.count) && options.count >= SHORTS_COUNT[0]) ||
+    options.count > SHORTS_COUNT[1]
+  ) {
+    throw new EditError(
+      `Make ${SHORTS_COUNT[0]} to ${SHORTS_COUNT[1]} shorts, not ${options.count}`,
+    );
+  }
+  if (!(shortest >= SHORTS_RANGE[0] && longest <= SHORTS_RANGE[1] && shortest < longest)) {
+    throw new EditError(
+      `A short lasts ${SHORTS_RANGE[0]} s to ${SHORTS_RANGE[1] / 60} min, between a shortest ` +
+        `and a longer longest, not ${shortest}-${longest} s`,
+    );
+  }
+  const folder = resolve(options.out);
+  if ((await readdir(folder).catch(() => [])).length > 0) {
+    throw new EditError(
+      `${options.out}: already holds files; name another folder for the shorts, so nothing is ` +
+        "written over",
+    );
+  }
+  const prepared = await prepare(
+    { ...options, length: shortest, out: folder },
+    folder,
+    (footage) => {
+      if (footage < shortest * (1 - TOLERANCE)) {
+        throw new EditError(
+          `The footage lasts ${footage.toFixed(1)} s in all, too short for a short of ` +
+            `${shortest}-${longest} s: ask for shorter ones or add footage`,
+        );
+      }
+    },
+    report,
+    spent,
+  );
+  const findAt = prepared.analyzed;
+  const shortsAt = findAt + (1 - findAt) * FIND_SHARE;
+  report("plan", findAt, "Finding the moments that stand alone as shorts");
+  const videos = planInputs(prepared, prepared.videos);
+  const { moments, seconds: footage } = await prepared.timed("plan", () =>
+    findMoments({
+      inputs: videos,
+      range: options.range,
+      claude: prepared.claude,
+      ...(options.quality ? { quality: options.quality } : {}),
+      ...(options.instructions ? { instructions: options.instructions } : {}),
+      usage: [],
+    }),
+  );
+  const found = totalUsage(spent.filter((usage) => usage.purpose === "find")).dollars ?? 0;
+  const findCap = FIND_CAP_PER_HOUR * Math.max(1, footage / 3600);
+  if (found > findCap) {
+    throw new EditError(
+      `Finding the moments cost $${found.toFixed(2)}, over the $${findCap.toFixed(2)} it may ` +
+        "for this footage, so no short was made",
+    );
+  }
+  report("plan", shortsAt, `Found ${moments.length} moments`);
+  if (moments.length === 0) {
+    throw new EditError(
+      `No moment of the footage stands alone as a short of ${shortest}-${longest} s`,
+    );
+  }
+
+  const shorts: Shorts = {
+    version: 1,
+    asked: options.count,
+    range: [shortest, longest],
+    shorts: [],
+  };
+  const list = join(folder, "shorts.json");
+  const images = prepared.files.filter((file) => file.kind === "image");
+  // Each moment tried, made or not, costs; the run may spend what finding them may, and a short's
+  // cap for each short asked, on at most twice as many moments as shorts asked for.
+  const runCap = findCap + SHORT_CAP * options.count;
+  const tries = Math.min(moments.length, 2 * options.count);
+  let reviews = 0;
+  let next = 0;
+  let failure: string | null = null;
+  let stopped: string | null = null;
+  for (let n = 1; n <= options.count && next < tries; ) {
+    const moment = moments[next++] as Moment;
+    const of = Math.min(options.count, n - 1 + tries - next + 1);
+    const number = { n, of };
+    const span = (1 - shortsAt) / of;
+    const from = Math.max(last(), shortsAt + (n - 1) * span);
+    const file = prepared.videos.find((video) => video.path === moment.path) as MediaFile;
+    const name = String(n).padStart(2, "0");
+    const before = spent.length;
+    prepared.limit.check = () => {
+      const own = totalUsage(spent.slice(before)).dollars ?? 0;
+      const all = totalUsage(spent).dollars ?? 0;
+      if (own > SHORT_CAP) {
+        throw new CostLimit(
+          `a short reached $${own.toFixed(2)}, over the $${SHORT_CAP} a short may`,
+        );
+      }
+      if (all > runCap) {
+        throw new CostLimit(
+          `the run reached $${all.toFixed(2)}, over the $${runCap.toFixed(2)} it may`,
+        );
+      }
+    };
+    let rendered: Rendered;
+    try {
+      rendered = await cutEdit(
+        prepared,
+        {
+          inputs: planInputs(prepared, [file, ...images]),
+          video: join(folder, name, "edit.mp4"),
+          length: moment.length,
+          within: { start: moment.start, end: moment.end },
+          short: true,
+          about: `${moment.title}. ${moment.description}`,
+          least: shortest,
+        },
+        shortReport(number),
+        from,
+        shortsAt + n * span,
+      );
+    } catch (error) {
+      await rm(join(folder, name), { recursive: true, force: true });
+      if (error instanceof CostLimit) {
+        stopped = error.message;
+        break;
+      }
+      if (!(error instanceof PlanError)) throw error;
+      // A moment the planner cannot cut to a length in the range; the next one is made instead.
+      failure = error.message;
+      prepared.log(`The moment "${moment.title}" was left out: ${error.message}`);
+      continue;
+    } finally {
+      prepared.limit.check = () => {};
+    }
+    reviews += rendered.reviews;
+    shorts.shorts.push({
+      folder: name,
+      title: moment.title,
+      description: moment.description,
+      hashtags: moment.hashtags as Shorts["shorts"][number]["hashtags"],
+      source: file.given,
+      start: moment.start,
+      end: moment.end,
+      length: rendered.length,
+      seconds: rendered.seconds,
+    });
+    await writeFile(list, `${JSON.stringify(validateShorts(shorts), null, 2)}\n`);
+    emit(
+      validateProgress({
+        stage: "short",
+        fraction: last(),
+        message: `Short ${n} of ${of}: ${rendered.seconds.toFixed(1)} s, "${moment.title}"`,
+        short: number,
+        claude: costByStage(spent.slice(before)),
+      }),
+    );
+    n++;
+  }
+  const made = shorts.shorts.length;
+  if (stopped !== null) {
+    if (made === 0) throw new EditError(`Stopped at the cost limit after 0 shorts: ${stopped}`);
+    shorts.stopped = "cost";
+    await writeFile(list, `${JSON.stringify(validateShorts(shorts), null, 2)}\n`);
+  } else if (made === 0) {
+    throw new EditError(
+      `None of the ${tries} moments tried could be cut to a length in the range${failure ? `: ${failure}` : ""}`,
+    );
+  }
+  return {
+    outputs: { shorts: list },
+    shorts,
+    ...(stopped === null ? {} : { stopped }),
+    reviews,
+    timings: prepared.timings,
+    usage: totalUsage(spent),
+    ...counted(prepared),
+  };
 }
 
 /** A video's length as its container states it; null when FFmpeg cannot say. */

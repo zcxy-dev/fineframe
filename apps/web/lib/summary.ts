@@ -9,13 +9,17 @@ import {
   formatClock,
   formatDollars,
   formatLength,
+  formatRange,
   type Style,
   styleName,
 } from "./settings.ts";
 
 /** What Claude cost in all; null when a price is unknown. Edits from before graphics had none. */
 export function dollarsOf(cost: ClaudeCost): number | null {
-  const parts = [cost.plan, cost.graphics ?? { dollars: 0 }, cost.check].map((s) => s.dollars);
+  const none = { dollars: 0 };
+  const parts = [cost.find ?? none, cost.plan, cost.graphics ?? none, cost.check].map(
+    (s) => s.dollars,
+  );
   return parts.includes(null) ? null : parts.reduce<number>((sum, d) => sum + (d ?? 0), 0);
 }
 
@@ -35,10 +39,14 @@ export function summaryRows(
   const videos = job.files.filter((file) => file.use === "video").length;
   const photos = job.files.filter((file) => file.use === "image").length;
   const offered = job.files.filter((file) => file.use === "music").length;
+  const { shorts } = job.settings;
   const rows: [string, string][] = [
     [
       words.length,
-      `${words.target(formatLength(length, t))}${actual ? words.actual(formatClock(actual)) : ""}`,
+      // The run of shorts, rather than one of them: the range each lies in.
+      shorts && !job.short
+        ? words.each(formatRange(shorts.min, shorts.max, t))
+        : `${words.target(formatLength(length, t))}${actual ? words.actual(formatClock(actual)) : ""}`,
     ],
     [words.aspect, aspect],
     [words.style, styleName(look, t)],
@@ -79,6 +87,7 @@ export function summaryRows(
   // one.
   const cost = first ? job.claude : shown?.claude;
   if (cost) {
+    if (cost.find) rows.push([words.finding, formatDollars(cost.find.dollars, t)]);
     rows.push([words.planning, formatDollars(cost.plan.dollars, t)]);
     if (cost.graphics) rows.push([words.graphics, formatDollars(cost.graphics.dollars, t)]);
     rows.push([words.checking, formatDollars(cost.check.dollars, t)]);

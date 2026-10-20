@@ -27,11 +27,11 @@ const WORD = 0.22;
 const GAPS = { word: 0.02, comma: 0.16, sentence: 0.7 };
 const START = 0.6;
 
-/** The words of TALK, timed. */
-export function talkWords(): Word[] {
+/** The words of TALK, timed, said `times` times over. */
+export function talkWords(times = 1): Word[] {
   const words: Word[] = [];
   let t = START;
-  for (const sentence of TALK) {
+  for (const sentence of Array.from({ length: times }, () => TALK).flat()) {
     const tokens = sentence.match(/[A-Za-z]+[，。]?|\p{Script=Han}[，。]?/gu) ?? [];
     for (const text of tokens) {
       const seconds = /[A-Za-z]/.test(text) ? 0.4 : WORD;
@@ -46,13 +46,15 @@ export function talkWords(): Word[] {
 
 const round = (seconds: number) => Math.round(seconds * 1000) / 1000;
 
-/** Writes talk.mp4 and talk.index.json into `dir` and returns the index's path. */
+/** Writes talk.mp4 and talk.index.json into `dir`, the talk said `times` times over, and returns
+ * the index's path. */
 export async function makeTalk(
   dir: string,
   id = "talk",
   size = { width: 160, height: 90 },
+  times = 1,
 ): Promise<string> {
-  const words = talkWords();
+  const words = talkWords(times);
   const seconds = Math.ceil((words.at(-1) as Word).end + 1);
   await makeSource(dir, {
     id,
@@ -65,7 +67,8 @@ export async function makeTalk(
   const path = join(dir, `${id}.index.json`);
   const index = JSON.parse(await readFile(path, "utf8")) as MediaIndex;
   index.speech = [{ start: (words[0] as Word).start, end: (words.at(-1) as Word).end }];
-  index.transcript = { language: "zh", text: TALK.join("\n"), words };
+  const text = Array.from({ length: times }, () => TALK.join("\n")).join("\n");
+  index.transcript = { language: "zh", text, words };
   await writeFile(path, JSON.stringify(index));
   return path;
 }

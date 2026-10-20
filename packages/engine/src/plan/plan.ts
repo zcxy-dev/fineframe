@@ -139,6 +139,19 @@ export interface PlanOptions {
   captions?: CaptionStyle;
   /** What the user asks of this edit, in their words, passed on in every planning request. */
   instructions?: string;
+  /** Plans only from this stretch of the one video given, in seconds: the lines said wholly
+   * inside it. */
+  within?: { start: number; end: number };
+  /** Plans a short edit of the strongest moments whatever the footage's length, as a short of
+   * `pnpm edit --shorts` is. */
+  short?: boolean;
+  /** What the edit is about, in a sentence or two, said to the planner: a short's title and
+   * description. */
+  about?: string;
+  /** The shortest the edit may be, in seconds, when the planner's choice reaches less than
+   * `length` after every request: it is then fitted to the length it reaches, as a short is
+   * within its range. Without it, such an edit fails. */
+  least?: number;
   /** The model that plans, and judges the cut checks a review doubts: best unless given. */
   quality?: Quality;
   /** `rich` (the default) adds Claude's motion graphics and shows B-roll on the edit's points,
@@ -151,6 +164,12 @@ export interface PlanOptions {
 }
 
 type Look = NonNullable<Grade["look"]>;
+
+/** The length a short is fitted to when its plan reaches `seconds`, less than asked: those
+ * seconds, whole, when they are at least `least`, the range's shortest; null under it. */
+export function fittedLength(seconds: number, least: number): number | null {
+  return seconds >= least ? Math.round(seconds) : null;
+}
 
 /** Fails when the footage cannot make the edit asked for; the message says why. */
 export class PlanError extends Error {
@@ -197,6 +216,8 @@ export interface PlanState {
   names: string[];
   /** What the user asks of this edit, in their words; empty when nothing. */
   instructions: string;
+  /** The shortest the edit may be fitted to when the plan reaches less than `length`. */
+  least?: number;
   /** What the plan was asked for besides the edit. */
   extras: PlanExtras;
   fps: FrameRate;
@@ -260,6 +281,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
   const progress = options.onProgress ?? (() => {});
   const out = resolve(options.out);
   const sources = await loadSources(options.inputs);
+  if (options.within) keepWithin(sources, options.within);
   let music = new Map<string, MusicSource>();
   try {
     if (options.music?.length) music = await loadMusic(options.music, new Set(sources.keys()));
@@ -276,7 +298,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
   // Every word played, each pause cut to the longest breath: no edit of this footage runs
   // longer, so a target past it fails here instead of after two paid requests.
   const whole = lengthOf(placeAll(sources, ticksPerFrame(fps))) / TICKS_PER_SECOND;
-  if (whole < options.length * (1 - TOLERANCE)) {
+  if (whole < Math.min(options.length, options.least ?? options.length) * (1 - TOLERANCE)) {
     throw new PlanError(
       `The footage holds too little speech for ${options.length} s: all of it, with every ` +
         `pause cut to a breath, lasts ${whole.toFixed(1)} s, and less once retakes and fillers ` +
@@ -297,7 +319,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
     )
     .join("\n\n");
 
-  const short = options.length < SHORT_SHARE * speech;
+  const short = options.short ?? options.length < SHORT_SHARE * speech;
   const names = (options.names ?? []).map((name) => name.trim()).filter(Boolean);
   const instructions = options.instructions?.trim() ?? "";
   const state: PlanState = {
@@ -311,6 +333,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
     musicListing: music.size > 0 ? describeMusic(music.values()) : "",
     names,
     instructions,
+    ...(options.least === undefined ? {} : { least: options.least }),
     extras: {
       music: music.size > 0,
       title: !short && options.length >= TITLE_SECONDS,
@@ -352,6 +375,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
     chapters: state.extras.chapters,
     names,
     instructions,
+    ...(options.about ? { about: options.about } : {}),
   });
   progress(`Planning ${state.short ? "a short" : "a long"} edit with ${state.planModel}`);
   await decide(state, request);
@@ -510,11 +534,13 @@ export interface Assembly {
 
 /**
  * Fits the chosen segments to the target. When they come out short even with the longest
- * breath, the planner is asked once more for material; when that is not enough, the footage
- * cannot make this edit.
+ * breath, the planner is asked once more for material; when that is not enough, the edit is
+ * fitted to the length it reaches if that is at least `least`, and otherwise the footage cannot
+ * make this edit.
  */
 async function assemble(state: PlanState): Promise<Assembly> {
-  const target = secondsToTicks(state.length);
+  let target = secondsToTicks(state.length);
+  let refitted = false;
   const frame = ticksPerFrame(state.fps);
   let extra = 0;
   for (;;) {
@@ -547,6 +573,17 @@ async function assemble(state: PlanState): Promise<Assembly> {
       );
     }
     if (state.planCalls >= MAX_PLAN_CALLS) {
+      const reached = state.least === undefined ? null : fittedLength(seconds, state.least);
+      if (reached !== null && !refitted) {
+        state.progress(
+          `The edit lasts ${seconds.toFixed(1)} s after ${MAX_PLAN_CALLS} requests; fitting it to ` +
+            `${reached} s, within the range asked`,
+        );
+        state.length = reached;
+        target = secondsToTicks(reached);
+        refitted = true;
+        continue;
+      }
       throw new PlanError(
         `After ${MAX_PLAN_CALLS} requests the edit lasts ${seconds.toFixed(1)} s, short of ` +
           `${state.length} s − ${TOLERANCE * 100} %: the footage holds too little usable ` +
@@ -628,10 +665,30 @@ function shorterAsk(seconds: number): string {
     : `Add footage with more speech: an edit is at least ${shortest} s`;
 }
 
-/** Every word of every source, in file order, as clips at the longest breath. */
-function placeAll(sources: ReadonlyMap<string, PlanSource>, frame: number): PlacedClip[] {
-  const all = [...sources.values()].map((s) => ({ source: s.id, words: s.words.map((_, i) => i) }));
+/** Every word of every line, in file order, as clips at the longest breath. */
+export function placeAll(sources: ReadonlyMap<string, PlanSource>, frame: number): PlacedClip[] {
+  const all = [...sources.values()].map((s) => ({
+    source: s.id,
+    words: s.lines.flatMap((line) =>
+      Array.from({ length: line.last - line.first + 1 }, (_, i) => line.first + i),
+    ),
+  }));
   return placeClips(all, sources, frame, BREATH_RANGE[1]);
+}
+
+/** Leaves each video only the lines said wholly inside `within`, in seconds. */
+function keepWithin(
+  sources: ReadonlyMap<string, PlanSource>,
+  within: { start: number; end: number },
+): void {
+  for (const source of sources.values()) {
+    if (!source.index) continue;
+    source.lines = source.lines.filter(
+      (line) =>
+        (source.words[line.first] as Word).start >= within.start &&
+        (source.words[line.last] as Word).end <= within.end,
+    );
+  }
 }
 
 function stretchesOf(state: PlanState, kept: number[][][], spans: readonly Span[]): Stretch[] {
@@ -1167,7 +1224,7 @@ function dropped(state: PlanState, assembly: Assembly, used: ReadonlySet<string>
  * index given alone), and gives each source an id: its file name, or its folder's name when file
  * names repeat, as corpus clips are all called source.mp4. A name with nothing an id allows, such
  * as 訪談, becomes file-1, file-2…, by order. */
-async function loadSources(inputs: readonly PlanInput[]): Promise<Map<string, PlanSource>> {
+export async function loadSources(inputs: readonly PlanInput[]): Promise<Map<string, PlanSource>> {
   const files: { indexPath: string | null; source?: string }[] = [];
   for (const input of inputs) {
     if (typeof input !== "string") {

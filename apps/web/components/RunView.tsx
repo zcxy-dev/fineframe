@@ -5,7 +5,7 @@ import { formatEstimate } from "../lib/eta.ts";
 import type { Messages } from "../lib/i18n/messages.ts";
 import { downloadName, progressText } from "../lib/i18n/program.ts";
 import type { Job, Stage } from "../lib/jobs.ts";
-import { formatBytes, formatClock, formatLength } from "../lib/settings.ts";
+import { formatBytes, formatClock, formatLength, formatRange } from "../lib/settings.ts";
 import styles from "./editor.module.css";
 import { useT } from "./I18n.tsx";
 import { AlertIcon, CheckIcon } from "./icons.tsx";
@@ -51,14 +51,29 @@ export function RunView({ job }: { job: Job }) {
   const percent = Math.floor(fraction * 100);
   const videos = job.files.filter((file) => file.use === "video").length;
   const photos = job.files.filter((file) => file.use === "image").length;
+  const { shorts } = job.settings;
+  const short = job.progress?.short;
 
   return (
     <section className={`${styles.card} ${styles.run}`} aria-label={words.progress}>
       <div className={styles.runHead}>
         <div>
-          <h2 className={styles.runTitle}>{running ? words.running : words.stopped}</h2>
+          <h2 className={styles.runTitle}>
+            {running ? (shorts ? words.runningShorts : words.running) : words.stopped}
+          </h2>
           <p className={styles.runMeta}>
-            {words.from(formatLength(job.settings.length, t), job.settings.aspect, videos, photos)}
+            {shorts
+              ? words.shortsFrom(
+                  shorts.count,
+                  formatRange(shorts.min, shorts.max, t),
+                  job.settings.aspect,
+                )
+              : words.from(
+                  formatLength(job.settings.length, t),
+                  job.settings.aspect,
+                  videos,
+                  photos,
+                )}
           </p>
         </div>
         <div className={styles.runClock}>
@@ -85,6 +100,7 @@ export function RunView({ job }: { job: Job }) {
       <p className={styles.message} aria-live="polite">
         {current ? words.doing(words.stages[current].doing) : words.starting}
         <span className={styles.messageText}>
+          {short && `${words.short(short.n, short.of)} — `}
           {job.progress?.file && `${job.progress.file} — `}
           {job.progress?.message ? progressText(job.progress.message, t) : words.gettingReady}
         </span>

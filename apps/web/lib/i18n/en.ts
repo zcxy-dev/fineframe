@@ -51,10 +51,13 @@ export const en = {
     cancel: "Cancel",
     make: (length: string) => `Make the ${length} video`,
     makeVideo: "Make the video",
+    makeShorts: (count: number) => `Make ${plural(count, "short", "shorts")}`,
     needAnthropic: "Add your Anthropic API key to start",
     needOpenRouter: "Add your OpenRouter API key to start",
     estimate: (low: string, high: string) =>
       `Claude will cost about ${low} to ${high} for this edit`,
+    estimateShorts: (low: string, high: string) =>
+      `Claude will cost about ${low} to ${high} to find the moments and make each short`,
     privacyCloud:
       "Footage stays on this computer. OpenRouter hears the speech audio; Claude reads the transcripts and stills around each cut. No video file is uploaded.",
     privacyLocal:
@@ -96,6 +99,13 @@ export const en = {
     remove: (path: string) => `Remove ${path}`,
   },
   settings: {
+    what: "What to make",
+    whatChoices: { one: "One video", shorts: "Several shorts" },
+    shortLength: "Length of each short",
+    shortLengthHelp: "Claude picks each short's length within the range, to fit its moment.",
+    count: "How many shorts",
+    countHelp:
+      "Claude finds the moments worth posting, at most about one for each 2 minutes of footage, and makes the best ones, each from one stretch of the video.",
     length: "Length",
     range: (shortest: string, longest: string) => `${shortest} to ${longest}`,
     custom: "Custom",
@@ -246,9 +256,13 @@ export const en = {
   run: {
     progress: "Progress",
     running: "Making your edit",
+    runningShorts: "Making your shorts",
+    short: (n: number, of: number) => `Short ${n} of ${of}`,
     stopped: "Stopped",
     from: (length: string, aspect: string, videos: number, photos: number) =>
       `${length} · ${aspect} · from ${plural(videos, "video", "videos")}${photos > 0 ? ` and ${plural(photos, "photo", "photos")}` : ""}`,
+    shortsFrom: (count: number, range: string, aspect: string) =>
+      `${plural(count, "short", "shorts")} of ${range} · ${aspect}`,
     elapsed: (clock: string) => `${clock} elapsed`,
     estimated: "Estimated from how fast the edit has gone so far",
     approximate: (left: string) => `${left} (approximate)`,
@@ -307,6 +321,33 @@ export const en = {
     downloadCredits: "Download B-roll credits (TXT)",
     another: "Make another edit",
   },
+  shorts: {
+    label: "The shorts",
+    title: (made: number) => `${plural(made, "short", "shorts")}`,
+    making: (made: number, of: number) => `${made} of ${of} made so far`,
+    waiting: "Being made",
+    card: (n: number, title: string) => `Short ${n}: ${title}`,
+    stretch: (from: string, to: string) => `${from}–${to} in the source`,
+    open: "Open",
+    download: "Download",
+    downloadAll: "Download all (ZIP)",
+    allHelp:
+      "Each short's MP4 and SRT, and a text file of their titles, descriptions and hashtags.",
+    fewer: (made: number, asked: number, range: string) =>
+      `Only ${plural(made, "moment", "moments")} in this footage could be made into a short of ${range}, so ${made} ${made === 1 ? "was" : "were"} made instead of ${asked}.`,
+    stoppedCost: (made: number, asked: number) =>
+      `Stopped at the cost limit after ${plural(made, "short", "shorts")}, so ${made} ${made === 1 ? "was" : "were"} made instead of ${asked}.`,
+    unchangeable: (cancelled: boolean): string =>
+      cancelled
+        ? "This run was cancelled and its footage deleted: its shorts can be downloaded, not changed."
+        : "This run stopped before it finished: its shorts can be downloaded, not changed.",
+    back: "All shorts",
+    titleLabel: "Title",
+    description: "Description",
+    hashtags: "Hashtags",
+    copy: "Copy",
+    copied: "Copied",
+  },
   failed: {
     cancelled: "The edit was cancelled",
     title: "The edit could not be finished",
@@ -324,6 +365,7 @@ export const en = {
     length: "Length",
     target: (length: string) => `Target ${length}`,
     actual: (clock: string) => ` · Actual ${clock}`,
+    each: (range: string) => `${range} each`,
     aspect: "Aspect",
     style: "Style",
     captions: "Captions",
@@ -339,6 +381,7 @@ export const en = {
     terms: "Terms",
     planned: "Planned",
     withInstructions: "With instructions",
+    finding: "Claude, finding the moments",
     planning: "Claude, planning",
     graphics: "Claude, motion graphics",
     checking: "Claude, checking cuts",
@@ -361,6 +404,7 @@ export const en = {
     fallback: "The project could not be deleted.",
     untitled: "Untitled",
     footageRemoved: " · footage removed",
+    shorts: (n: number) => plural(n, "short", "shorts"),
     open: "Open",
     sure: "Delete? Click again",
     delete: "Delete",
@@ -461,6 +505,8 @@ export const en = {
     placeholder: "Open with the demo\nPut back the part about pricing\nEnd on the question",
     fallback: "The edit could not be planned again.",
     start: "Re-plan as a new version",
+    stretch: (margin: number) =>
+      `A short is planned again from its own stretch of the video and up to ${margin} s on each side.`,
     cancel: "Cancel",
   },
   versions: {
@@ -516,6 +562,8 @@ export const en = {
       beats: "beat model",
     },
     checkClaude: "Checking that Claude can plan the edit",
+    finding: "Finding the moments that stand alone as shorts",
+    found: (count: string) => `Found ${count} moments`,
     readFile: "Reading the file",
     readFiles: (files: string) => `Reading ${files} files`,
     analysedBefore: "Analysed before",
@@ -539,6 +587,8 @@ export const en = {
     requests: (requests: string, dollars: string) => `${requests} requests, ${dollars}`,
     cached: "all cached",
     tooShort: (seconds: string) => `The edit lasts ${seconds} s; asking for more material`,
+    fittedTo: (seconds: string, requests: string, length: string) =>
+      `The edit lasts ${seconds} s after ${requests} requests; fitting it to ${length} s, within the range asked`,
     leftOutKind: (kind: string, _name: string, line: string, reason: string) =>
       `Left out the ${kind} visual on line ${line}: ${reason}`,
     /** The kinds of visual the plan asks for. */
@@ -657,6 +707,8 @@ export const en = {
     noChanges: "No changes to apply",
     noCredits: "This edit has no B-roll credits",
     noCaptions: "This edit has no captions",
+    noShort: "No such short",
+    tooLarge: "The shorts are too large for one zip; download them one by one",
     emptyFile: "The file is empty",
     noFootage: "Drop some footage first",
     setupFailed: (error: string) => `The analysis could not be set up: ${error}`,

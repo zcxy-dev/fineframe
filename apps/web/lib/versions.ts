@@ -31,14 +31,18 @@ export interface Version {
   video: boolean;
 }
 
-/** A version's files in the job's folder; its project.json is the record that renders it. */
-export function versionFiles(n: number): {
+/** A version's files in the job's folder, or in the folder of one of its shorts (01, 02, …); its
+ * project.json is the record that renders it. */
+export function versionFiles(
+  n: number,
+  short?: string,
+): {
   video: string;
   project: string;
   captions: string;
   broll: string;
 } {
-  const stem = join("out", n === 1 ? "edit" : `edit-v${n}`);
+  const stem = join("out", ...(short ? [short] : []), n === 1 ? "edit" : `edit-v${n}`);
   return {
     video: `${stem}.mp4`,
     project: `${stem}.project.json`,

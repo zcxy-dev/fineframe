@@ -51,9 +51,11 @@ export const zhTW: Messages = {
     cancel: "取消",
     make: (length) => `製作 ${length}影片`,
     makeVideo: "製作影片",
+    makeShorts: (count) => `製作 ${count} 支短影音`,
     needAnthropic: "加入 Anthropic API 金鑰即可開始",
     needOpenRouter: "加入 OpenRouter API 金鑰即可開始",
     estimate: (low, high) => `這次剪輯的 Claude 費用約 ${low} 至 ${high}`,
+    estimateShorts: (low, high) => `找出精華片段並製作每支短影音的 Claude 費用約 ${low} 至 ${high}`,
     privacyCloud:
       "素材留在這台電腦上。OpenRouter 只聽取語音音訊；Claude 只讀取逐字稿與每個剪接點前後的靜態畫面。不會上傳任何影片檔。",
     privacyLocal:
@@ -95,6 +97,13 @@ export const zhTW: Messages = {
     remove: (path) => `移除 ${path}`,
   },
   settings: {
+    what: "要製作什麼",
+    whatChoices: { one: "一支影片", shorts: "多支短影音" },
+    shortLength: "每支短影音的長度",
+    shortLengthHelp: "Claude 會在這個範圍內，依每個片段的內容決定長度。",
+    count: "短影音數量",
+    countHelp:
+      "Claude 會找出值得發布的片段，大約每 2 分鐘素材最多一個，並挑最好的製作，每支都取自影片中連續的一段。",
     length: "長度",
     range: (shortest, longest) => `${shortest} 至 ${longest}`,
     custom: "自訂",
@@ -231,9 +240,12 @@ export const zhTW: Messages = {
   run: {
     progress: "進度",
     running: "剪輯製作中",
+    runningShorts: "短影音製作中",
+    short: (n, of) => `第 ${n}/${of} 支短影音`,
     stopped: "已停止",
     from: (length, aspect, videos, photos) =>
       `${length} · ${aspect} · 來自 ${videos} 支影片${photos > 0 ? `與 ${photos} 張照片` : ""}`,
+    shortsFrom: (count, range, aspect) => `${count} 支 ${range}的短影音 · ${aspect}`,
     elapsed: (clock) => `已經過 ${clock}`,
     estimated: "依目前的剪輯速度估算",
     approximate: (left) => `${left}（估計）`,
@@ -286,6 +298,32 @@ export const zhTW: Messages = {
     downloadCredits: "下載 B-roll 版權資訊（TXT）",
     another: "開始新的剪輯",
   },
+  shorts: {
+    label: "短影音",
+    title: (made) => `${made} 支短影音`,
+    making: (made, of) => `已完成 ${made}/${of} 支`,
+    waiting: "製作中",
+    card: (n, title) => `第 ${n} 支：${title}`,
+    stretch: (from, to) => `取自原片 ${from}–${to}`,
+    open: "開啟",
+    download: "下載",
+    downloadAll: "全部下載（ZIP）",
+    allHelp: "每支短影音的 MP4 與 SRT，以及一個列出標題、說明與主題標籤的文字檔。",
+    fewer: (made, asked, range) =>
+      `這段素材中只有 ${made} 個片段能做成 ${range}的短影音，因此製作了 ${made} 支，而不是 ${asked} 支。`,
+    stoppedCost: (made, asked) =>
+      `達到費用上限，做完 ${made} 支後就停止了，因此製作了 ${made} 支，而不是 ${asked} 支。`,
+    unchangeable: (cancelled) =>
+      cancelled
+        ? "這次製作已取消，素材也已刪除：已完成的短影音可以下載，但無法修改。"
+        : "這次製作在完成前就停止了：已完成的短影音可以下載，但無法修改。",
+    back: "所有短影音",
+    titleLabel: "標題",
+    description: "說明",
+    hashtags: "主題標籤",
+    copy: "複製",
+    copied: "已複製",
+  },
   failed: {
     cancelled: "剪輯已取消",
     title: "剪輯無法完成",
@@ -303,6 +341,7 @@ export const zhTW: Messages = {
     length: "長度",
     target: (length) => `目標 ${length}`,
     actual: (clock) => ` · 實際 ${clock}`,
+    each: (range) => `每支 ${range}`,
     aspect: "畫面比例",
     style: "風格",
     captions: "字幕",
@@ -318,6 +357,7 @@ export const zhTW: Messages = {
     terms: "專有名詞",
     planned: "規劃",
     withInstructions: "依你的需求",
+    finding: "Claude 找出片段",
     planning: "Claude 規劃",
     graphics: "Claude 動態圖卡",
     checking: "Claude 檢查剪接點",
@@ -340,6 +380,7 @@ export const zhTW: Messages = {
     fallback: "無法刪除這個專案。",
     untitled: "未命名",
     footageRemoved: " · 素材已移除",
+    shorts: (n) => `${n} 支短影音`,
     open: "開啟",
     sure: "確定刪除？再按一次",
     delete: "刪除",
@@ -429,6 +470,7 @@ export const zhTW: Messages = {
     placeholder: "用產品示範開場\n放回講價格的段落\n用提問收尾",
     fallback: "無法重新規劃剪輯。",
     start: "重新規劃為新版本",
+    stretch: (margin) => `短影音只會從它在影片中的那一段，以及前後各最多 ${margin} 秒重新規劃。`,
     cancel: "取消",
   },
   versions: {
@@ -479,6 +521,8 @@ export const zhTW: Messages = {
       beats: "節拍模型",
     },
     checkClaude: "確認 Claude 可以規劃剪輯",
+    finding: "正在找出能獨立成短影音的片段",
+    found: (count) => `找到 ${count} 個片段`,
     readFile: "讀取檔案中",
     readFiles: (files) => `讀取 ${files} 個檔案中`,
     analysedBefore: "已分析過",
@@ -497,6 +541,8 @@ export const zhTW: Messages = {
     requests: (requests, dollars) => `${requests} 次請求，${dollars}`,
     cached: "皆已快取",
     tooShort: (seconds) => `剪輯只有 ${seconds} 秒；正在要求更多素材`,
+    fittedTo: (seconds, requests, length) =>
+      `要求 ${requests} 次後剪輯只有 ${seconds} 秒；改剪成 ${length} 秒，仍在所選範圍內`,
     leftOutKind: (_kind, name, line, reason) => `略過第 ${line} 行的${name}：${reason}`,
     visuals: { stock: "圖庫影片", web: "網頁" },
     notJson: "規劃的視覺元素格式有誤；這次剪輯不加視覺元素",
@@ -603,6 +649,8 @@ export const zhTW: Messages = {
     noChanges: "沒有要套用的修改",
     noCredits: "這次剪輯沒有 B-roll 版權資訊",
     noCaptions: "這次剪輯沒有字幕",
+    noShort: "沒有這支短影音",
+    tooLarge: "短影音太大，無法放進一個 ZIP；請逐支下載",
     emptyFile: "檔案是空的",
     noFootage: "請先放入素材",
     setupFailed: (error) => `無法設定分析環境：${error}`,

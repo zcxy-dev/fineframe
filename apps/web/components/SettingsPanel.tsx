@@ -9,6 +9,7 @@ import {
   type Asr,
   CAPTION_STYLES,
   formatLength,
+  formatRange,
   INSTRUCTIONS_MAX,
   instructionsProblem,
   LENGTH_PRESETS,
@@ -18,6 +19,8 @@ import {
   parseLength,
   QUALITIES,
   type Quality,
+  SHORT_RANGES,
+  SHORTS_COUNT,
   STYLES,
   type Style,
   styleName,
@@ -29,6 +32,12 @@ import styles from "./editor.module.css";
 import { useT } from "./I18n.tsx";
 
 export interface Choices {
+  /** One video, or several shorts from one long video. */
+  make: "one" | "shorts";
+  /** With several shorts, the range each one's length lies in, by its place in SHORT_RANGES,
+   * and how many to make. */
+  range: number;
+  count: number;
   /** A preset in seconds, or "custom" for the typed length. */
   preset: number | "custom";
   custom: string;
@@ -116,64 +125,125 @@ export function SettingsPanel({
   const asked = instructionsProblem(choices.instructions, t);
   const tooLong = "seconds" in length && footageSeconds > 0 && length.seconds > footageSeconds;
 
+  const several = choices.make === "shorts";
+  const [fewest, most] = SHORTS_COUNT;
+  const counts = Array.from({ length: most - fewest + 1 }, (_, i) => fewest + i);
+
   return (
     <>
       <fieldset className={styles.field}>
-        <legend className={styles.label}>
-          {words.length}
-          <span className={styles.labelHint}>
-            {words.range(formatLength(shortest, t), formatLength(longest, t))}
-          </span>
-        </legend>
+        <legend className={styles.label}>{words.what}</legend>
         <div className={styles.chips}>
-          {LENGTH_PRESETS.map((seconds) => (
+          {(["one", "shorts"] as const).map((make) => (
             <button
-              key={seconds}
+              key={make}
               type="button"
               className={styles.chip}
-              aria-pressed={choices.preset === seconds}
-              onClick={() => set({ preset: seconds })}
+              aria-pressed={choices.make === make}
+              // Shorts are watched on phones, so they start vertical.
+              onClick={() => set({ make, ...(make === "shorts" ? { aspect: "9:16" } : {}) })}
             >
-              {formatLength(seconds, t)}
+              {words.whatChoices[make]}
             </button>
           ))}
-          <button
-            type="button"
-            className={styles.chip}
-            aria-pressed={choices.preset === "custom"}
-            onClick={() => set({ preset: "custom" })}
-          >
-            {words.custom}
-          </button>
         </div>
-        {choices.preset === "custom" && (
-          <div className={styles.custom}>
-            <input
-              id={`${id}-custom`}
-              className={styles.input}
-              inputMode="text"
-              autoComplete="off"
-              placeholder={words.customPlaceholder}
-              aria-label={words.customLabel}
-              aria-invalid={"problem" in length && choices.custom.trim() !== ""}
-              value={choices.custom}
-              // biome-ignore lint/a11y/noAutofocus: the field appears because it was asked for.
-              autoFocus
-              onChange={(event) => set({ custom: event.target.value })}
-            />
-            <span className={styles.customOut} aria-live="polite">
-              {"seconds" in length
-                ? `= ${formatLength(length.seconds, t)}`
-                : choices.custom.trim()
-                  ? length.problem
-                  : ""}
-            </span>
-          </div>
-        )}
-        {tooLong && (
-          <p className={styles.warning}>{words.tooLong(formatLength(footageSeconds, t))}</p>
-        )}
       </fieldset>
+
+      {several ? (
+        <>
+          <fieldset className={styles.field}>
+            <legend className={styles.label}>{words.shortLength}</legend>
+            <div className={styles.chips}>
+              {SHORT_RANGES.map(([from, to], i) => (
+                <button
+                  key={from}
+                  type="button"
+                  className={styles.chip}
+                  aria-pressed={choices.range === i}
+                  onClick={() => set({ range: i })}
+                >
+                  {formatRange(from, to, t)}
+                </button>
+              ))}
+            </div>
+            <p className={styles.help}>{words.shortLengthHelp}</p>
+          </fieldset>
+          <fieldset className={styles.field}>
+            <legend className={styles.label}>{words.count}</legend>
+            <div className={styles.chips}>
+              {counts.map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  className={styles.chip}
+                  aria-pressed={choices.count === count}
+                  onClick={() => set({ count })}
+                >
+                  {count}
+                </button>
+              ))}
+            </div>
+            <p className={styles.help}>{words.countHelp}</p>
+          </fieldset>
+        </>
+      ) : (
+        <fieldset className={styles.field}>
+          <legend className={styles.label}>
+            {words.length}
+            <span className={styles.labelHint}>
+              {words.range(formatLength(shortest, t), formatLength(longest, t))}
+            </span>
+          </legend>
+          <div className={styles.chips}>
+            {LENGTH_PRESETS.map((seconds) => (
+              <button
+                key={seconds}
+                type="button"
+                className={styles.chip}
+                aria-pressed={choices.preset === seconds}
+                onClick={() => set({ preset: seconds })}
+              >
+                {formatLength(seconds, t)}
+              </button>
+            ))}
+            <button
+              type="button"
+              className={styles.chip}
+              aria-pressed={choices.preset === "custom"}
+              onClick={() => set({ preset: "custom" })}
+            >
+              {words.custom}
+            </button>
+          </div>
+          {choices.preset === "custom" && (
+            <div className={styles.custom}>
+              <input
+                id={`${id}-custom`}
+                className={styles.input}
+                inputMode="text"
+                autoComplete="off"
+                placeholder={words.customPlaceholder}
+                aria-label={words.customLabel}
+                aria-invalid={"problem" in length && choices.custom.trim() !== ""}
+                value={choices.custom}
+                // biome-ignore lint/a11y/noAutofocus: the field appears because it was asked for.
+                autoFocus
+                onChange={(event) => set({ custom: event.target.value })}
+              />
+              <span className={styles.customOut} aria-live="polite">
+                {"seconds" in length
+                  ? `= ${formatLength(length.seconds, t)}`
+                  : choices.custom.trim()
+                    ? length.problem
+                    : ""}
+              </span>
+            </div>
+          )}
+          {tooLong && (
+            <p className={styles.warning}>{words.tooLong(formatLength(footageSeconds, t))}</p>
+          )}
+        </fieldset>
+      )}
 
       <fieldset className={styles.field}>
         <legend className={styles.label}>{words.aspect}</legend>

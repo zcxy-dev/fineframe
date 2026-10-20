@@ -42,6 +42,8 @@ const SAID: [RegExp, (words: Words, said: Groups, t: Messages) => string][] = [
   [/^Reading the file$/, (w) => w.readFile],
   [/^Reading (\d+) files$/, (w, [n]) => w.readFiles(n)],
   [/^Analysed before$/, (w) => w.analysedBefore],
+  [/^Finding the moments that stand alone as shorts$/, (w) => w.finding],
+  [/^Found (\d+) moments$/, (w, [n]) => w.found(n)],
   // The plan (plan/plan.ts, plan/visuals.ts) and its review (plan/review.ts).
   [
     /^Planning (a short|a long) edit with (.+)$/,
@@ -78,6 +80,10 @@ const SAID: [RegExp, (words: Words, said: Groups, t: Messages) => string][] = [
     },
   ],
   [/^The edit lasts ([\d.]+) s; asking for more material$/, (w, [s]) => w.tooShort(s)],
+  [
+    /^The edit lasts ([\d.]+) s after (\d+) requests; fitting it to (\d+) s, within the range asked$/,
+    (w, [s, n, length]) => w.fittedTo(s, n, length),
+  ],
   [
     /^Left out the (\S+) visual on line (\d+): ([\s\S]*)$/,
     (w, [kind, line, reason]) => w.leftOutKind(kind, w.visuals[kind] ?? kind, line, reason),

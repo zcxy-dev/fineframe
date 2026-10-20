@@ -13,6 +13,7 @@ import {
   validateMusicIndex,
   validateProgress,
   validateProject,
+  validateShorts,
 } from "./validate.ts";
 
 const example = (name: string) => fileURLToPath(new URL(`../examples/${name}`, import.meta.url));
@@ -43,6 +44,24 @@ test("the examples validate", async () => {
   assert.equal(index.transcript.words[3]?.text, "Claude");
   const music = await loadJson(example("music-index.example.json"), validateMusicIndex);
   assert.equal(music.downbeats[1], music.beats[4]);
+  const shorts = await loadJson(example("shorts.example.json"), validateShorts);
+  assert.equal(shorts.shorts[1]?.folder, "02");
+});
+
+test("shorts run forward in their own folders, with no score", async () => {
+  const shorts = await loadJson(example("shorts.example.json"), validateShorts);
+  const first = at(shorts.shorts, 0);
+  const rejected = (value: unknown, expected: string) =>
+    assert.throws(
+      () => validateShorts(value),
+      (error: unknown) => error instanceof SchemaError && error.message.includes(expected),
+      expected,
+    );
+  rejected({ ...shorts, range: [60, 30] }, "/range");
+  rejected({ ...shorts, shorts: [{ ...first, end: first.start }] }, "/shorts/0");
+  rejected({ ...shorts, shorts: [first, first] }, "/shorts/1/folder");
+  rejected({ ...shorts, shorts: [{ ...first, score: 9 }] }, "score");
+  rejected({ ...shorts, shorts: [{ ...first, hashtags: ["#one", "#two"] }] }, "hashtags");
 });
 
 test("a project with an unknown field names it", async () => {
@@ -237,7 +256,36 @@ test("progress lines validate, and done carries the outputs", () => {
     message: "Finished",
     outputs: { video: "/out/edit.mp4", project: "/out/edit.project.json" },
   });
+  validateProgress({ stage: "plan", fraction: 0.5, message: "Planning", short: { n: 2, of: 5 } });
+  validateProgress({
+    stage: "short",
+    fraction: 0.6,
+    message: "Short 2 of 5 finished",
+    short: { n: 2, of: 5 },
+    claude: { plan: { dollars: 0.1, requests: 1 }, check: { dollars: 0.01, requests: 4 } },
+  });
+  validateProgress({
+    stage: "done",
+    fraction: 1,
+    message: "Finished",
+    claude: {
+      find: { dollars: 0.2, requests: 1 },
+      plan: { dollars: 0.5, requests: 5 },
+      check: { dollars: 0.05, requests: 20 },
+    },
+    outputs: { shorts: "/out/shorts.json" },
+  });
   assert.throws(() => validateProgress({ stage: "done", fraction: 1, message: "" }), SchemaError);
+  assert.throws(
+    () =>
+      validateProgress({
+        stage: "done",
+        fraction: 1,
+        message: "",
+        outputs: { shorts: "/out/shorts.json", video: "/out/edit.mp4" },
+      }),
+    SchemaError,
+  );
   assert.throws(
     () => validateProgress({ stage: "render", fraction: 1.2, message: "" }),
     SchemaError,

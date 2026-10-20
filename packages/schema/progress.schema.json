@@ -3,7 +3,12 @@
   "$id": "https://github.com/zcxy-dev/fineframe/blob/main/packages/schema/progress.schema.json",
   "title": "Progress",
   "description": "One line of `pnpm edit` progress.",
-  "oneOf": [{ "$ref": "#/$defs/StageProgress" }, { "$ref": "#/$defs/DoneProgress" }],
+  "oneOf": [
+    { "$ref": "#/$defs/StageProgress" },
+    { "$ref": "#/$defs/ShortProgress" },
+    { "$ref": "#/$defs/DoneProgress" },
+    { "$ref": "#/$defs/ShortsDoneProgress" }
+  ],
   "$defs": {
     "Fraction": {
       "description": "How much of the whole run is finished, 0 to 1.",
@@ -58,6 +63,30 @@
             "music"
           ]
         },
+        "claude": { "$ref": "#/$defs/ClaudeCost" },
+        "short": { "$ref": "#/$defs/ShortNumber" }
+      }
+    },
+    "ShortNumber": {
+      "description": "With --shorts, the short the line is about: the nth of those to make.",
+      "type": "object",
+      "required": ["n", "of"],
+      "additionalProperties": false,
+      "properties": {
+        "n": { "type": "integer", "minimum": 1 },
+        "of": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "ShortProgress": {
+      "description": "With --shorts, a short finished: shorts.json already lists it.",
+      "type": "object",
+      "required": ["stage", "fraction", "message", "short"],
+      "additionalProperties": false,
+      "properties": {
+        "stage": { "const": "short" },
+        "fraction": { "$ref": "#/$defs/Fraction" },
+        "message": { "type": "string" },
+        "short": { "$ref": "#/$defs/ShortNumber" },
         "claude": { "$ref": "#/$defs/ClaudeCost" }
       }
     },
@@ -97,12 +126,37 @@
         }
       }
     },
+    "ShortsDoneProgress": {
+      "description": "With --shorts, the last line of a run that made at least one short.",
+      "type": "object",
+      "required": ["stage", "fraction", "message", "outputs"],
+      "additionalProperties": false,
+      "properties": {
+        "stage": { "const": "done" },
+        "fraction": { "const": 1 },
+        "message": { "type": "string" },
+        "claude": { "$ref": "#/$defs/ClaudeCost" },
+        "outputs": {
+          "type": "object",
+          "required": ["shorts"],
+          "additionalProperties": false,
+          "properties": {
+            "shorts": {
+              "description": "The absolute path of shorts.json.",
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
     "ClaudeCost": {
-      "description": "What Claude cost by stage: planning, writing and fixing the motion graphics, and the review after each render with the decisions it escalates. On the done line, and on an error line once a request was made.",
+      "description": "What Claude cost by stage: finding the moments of a --shorts run, planning, writing and fixing the motion graphics, and the review after each render with the decisions it escalates. A --shorts run sums its shorts, those given up on included. On the done line, a short's line, and an error line once a request was made.",
       "type": "object",
       "required": ["plan", "check"],
       "additionalProperties": false,
       "properties": {
+        "find": { "$ref": "#/$defs/Spend" },
         "plan": { "$ref": "#/$defs/Spend" },
         "graphics": { "$ref": "#/$defs/Spend" },
         "check": { "$ref": "#/$defs/Spend" }
