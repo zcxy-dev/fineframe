@@ -65,7 +65,7 @@ function edit(): Project {
           fingerprint: { bytes: 1, sha256: "0".repeat(64) },
         },
       ],
-      captions: { preset: "clean", srt: true, lines: [line(0, 10), line(5, 6)] },
+      captions: { preset: "bold", srt: true, lines: [line(0, 10), line(5, 6)] },
       overlays: [
         { template: "title", params: { text: "T" }, start: 0, duration: s(3) },
         wipe(1.2),

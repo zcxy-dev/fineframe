@@ -330,9 +330,9 @@ export interface Rect1 {
 }
 export interface Captions {
   /**
-   * The caption preset that draws the lines, by id, from the presets in packages/engine.
+   * The caption style, drawn by the preset of that id in packages/engine: bold (word by word, the word being spoken in amber), creator (a few words at a time, big, in a box, with numbers and English words in amber), minimal (small white type), pop (each word pops in as it is said) or none (no captions on the picture; the SubRip file is still written).
    */
-  preset: string;
+  preset: "bold" | "creator" | "minimal" | "pop" | "none";
   /**
    * Also write the lines as SubRip next to the video.
    */

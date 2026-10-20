@@ -117,7 +117,11 @@ test("bad input is refused, saying why", async () => {
     [{ settings: { ...settings, visuals: "loud" } }, video, /Visuals are rich or minimal/],
     [{ settings: { ...settings, quality: "cheap" } }, video, /Quality is best or economy/],
     [{ settings: { ...settings, correct: "yes" } }, video, /correction is on or off/],
-    [{ settings: { ...settings, captions: "comic" } }, video, /caption style is bold, spotlight/],
+    [
+      { settings: { ...settings, captions: "comic" } },
+      video,
+      /caption style is bold, creator, minimal, pop, none/,
+    ],
     [{ settings: { ...settings, terms: "GPU" } }, video, /Terms are a list/],
     [{ settings: { ...settings, terms: ["GPU\nTPU"] } }, video, /A term is one line/],
     [{ settings: { ...settings, instructions: 5 } }, video, /What you tell Claude is text/],
@@ -329,7 +333,7 @@ test("the advanced settings reach the edit, and names or terms left empty are no
       names: [],
       quality: "economy",
       correct: true,
-      captions: "sweep",
+      captions: "pop",
     },
   };
   const { body: job } = await create([{ path: "e.mp4", size: 2 }], advanced);
@@ -342,7 +346,7 @@ test("the advanced settings reach the edit, and names or terms left empty are no
   const after = (option: string) => args[args.indexOf(option) + 1];
   assert.equal(after("--quality"), "economy");
   assert.ok(args.includes("--correct"));
-  assert.equal(after("--captions"), "sweep");
+  assert.equal(after("--captions"), "pop");
   assert.ok(!args.includes("--names"));
   assert.equal(after("--terms"), "terms.txt");
 });
@@ -506,21 +510,38 @@ test("a finished edit changes as versions, the newest three keeping their videos
       }),
       ctx({ id }),
     );
+  // Another caption style only renders again: the edit command, which plans with Claude, does
+  // not run, the record is the one shown with the style changed, and no plan cost is added.
+  const renders = join(root, "renders.log");
+  process.env.FAKE_RENDER_LOG = renders;
+  const planned = await readFile(join(dir, "args.json"), "utf8");
   for (const [n, captions] of [
-    [2, "boxed"],
-    [3, "spotlight"],
-    [4, "sweep"],
+    [2, "creator"],
+    [3, "minimal"],
+    [4, "pop"],
   ] as const) {
+    const shown = JSON.parse(
+      await readFile(
+        join(dir, "out", n === 2 ? "edit.project.json" : `edit-v${n - 1}.project.json`),
+        "utf8",
+      ),
+    );
     const response = await apply(captions);
     assert.equal(response.status, 200);
     assert.equal(((await response.json()) as Job).render?.version, n);
     const job = await until((each) => each.render === undefined);
     assert.equal(job.current, n);
     const record = JSON.parse(await readFile(join(dir, "out", `edit-v${n}.project.json`), "utf8"));
-    assert.equal(record.captions.preset, captions);
+    assert.deepEqual(record, { ...shown, captions: { ...shown.captions, preset: captions } });
     // The version keeps its caption style, which the summary shows.
     assert.equal(job.versions?.at(-1)?.captions, captions);
+    assert.equal(job.versions?.at(-1)?.claude, undefined);
+    const rendered = (await readFile(renders, "utf8")).trim().split("\n");
+    assert.equal(rendered.length, n - 1);
+    assert.ok(rendered.at(-1)?.includes(`edit-v${n}.project.json`), rendered.at(-1));
   }
+  assert.equal(await readFile(join(dir, "args.json"), "utf8"), planned);
+  delete process.env.FAKE_RENDER_LOG;
   // Version 1 keeps its record, not its video; the downloads are the version shown.
   let job = await read();
   assert.deepEqual(

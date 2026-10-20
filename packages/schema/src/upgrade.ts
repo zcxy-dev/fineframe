@@ -1,7 +1,8 @@
 // A project written by an earlier version, as this one reads it. Fineframe 0.4.0 drew its motion
 // graphics as `cards` and popped keywords with a `keyword` overlay; both are gone, so an older
 // project keeps its cuts, framing, captions and the rest, and loses those. Planning it again gives
-// it the motion graphics of this version.
+// it the motion graphics of this version. Its caption presets spotlight, sweep and boxed are gone
+// too, and a project that used one is captioned in bold, the default style.
 
 type Json = Record<string, unknown>;
 type Timed = { start: number; duration: number };
@@ -13,6 +14,9 @@ export interface Upgrade {
   dropped: { cards: number; keywords: number };
 }
 
+/** The caption presets 0.4.0 had and this version does not. */
+const RETIRED_CAPTIONS = new Set(["spotlight", "sweep", "boxed"]);
+
 const isObject = (value: unknown): value is Json =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -21,7 +25,7 @@ const isObject = (value: unknown): value is Json =>
  * - its `cards`, with the speaker clips in `broll` that played below a panel card and the sound
  *   effect that started with each card;
  * - its `keyword` overlays.
- * Anything else, or anything not shaped like a project, is passed on as it is for the schema to
+ * A caption preset it had and this version does not becomes `bold`. Anything else, or anything not shaped like a project, is passed on as it is for the schema to
  * check.
  */
 export function upgradeProject(value: unknown): Upgrade {
@@ -73,6 +77,9 @@ export function upgradeProject(value: unknown): Upgrade {
     dropped.keywords = (project.overlays as Json[]).length - overlays.length;
     if (overlays.length > 0) project.overlays = overlays;
     else delete project.overlays;
+  }
+  if (isObject(project.captions) && RETIRED_CAPTIONS.has(project.captions.preset as string)) {
+    project.captions = { ...project.captions, preset: "bold" };
   }
   return { project, dropped };
 }

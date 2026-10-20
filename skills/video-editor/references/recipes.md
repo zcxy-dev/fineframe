@@ -94,4 +94,4 @@ It also cuts away to web captures or stock footage: `broll` entries whose source
   for (const clip of [...p.main, ...(p.broll ?? []).filter((b) => b.grade)]) clip.grade = { ...clip.grade, look: { id: "warm", intensity: 1 } };
   ```
 
-- **Caption style:** `captions.preset` is `bold`, `spotlight`, `sweep` (karaoke) or `boxed`; `pnpm edit --captions` picks it for a new edit.
+- **Caption style:** `captions.preset` is `bold` (word by word, the word being said in amber), `creator` (a few words at a time, big, in a dark box, numbers and English words in amber), `minimal` (small white type), `pop` (each word pops in as it is said) or `none` (nothing on the picture; `edit-v2.srt` is still written, broken as `bold` breaks it). Only the render changes: no new plan. `pnpm edit --captions` picks it for a new edit.

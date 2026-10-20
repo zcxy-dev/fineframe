@@ -4,7 +4,14 @@ import type { ClaudeCost } from "@video-editor/schema";
 import { en, type Messages } from "./i18n/en.ts";
 import type { Job } from "./jobs.ts";
 import { shownPlan } from "./paths.ts";
-import { formatClock, formatDollars, formatLength, type Style, styleName } from "./settings.ts";
+import {
+  captionStyleName,
+  formatClock,
+  formatDollars,
+  formatLength,
+  type Style,
+  styleName,
+} from "./settings.ts";
 
 /** What Claude cost in all; null when a price is unknown. Edits from before graphics had none. */
 export function dollarsOf(cost: ClaudeCost): number | null {
@@ -36,9 +43,7 @@ export function summaryRows(
     [words.aspect, aspect],
     [words.style, styleName(look, t)],
     // Edits from before the setting had none.
-    ...(captions
-      ? [[words.captions, t.captions[captions]?.name ?? captions] as [string, string]]
-      : []),
+    ...(captions ? [[words.captions, captionStyleName(captions, t)] as [string, string]] : []),
     [words.speech, job.settings.asr === "cloud" ? "OpenRouter" : words.local],
     ...(job.settings.visuals
       ? [[words.visuals, t.settings.visualsChoices[job.settings.visuals].name] as [string, string]]

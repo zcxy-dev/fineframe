@@ -1,8 +1,7 @@
 "use client";
 
-import { rgba } from "@video-editor/effects/layout";
-import { PRESETS, type Preset } from "@video-editor/engine/captions";
-import { type CSSProperties, Fragment, useId } from "react";
+import type { CaptionStyle } from "@video-editor/engine/captions";
+import { useId } from "react";
 import { en, type Messages } from "../lib/i18n/messages.ts";
 import {
   ASPECTS,
@@ -25,6 +24,7 @@ import {
   VISUALS,
   type Visuals,
 } from "../lib/settings.ts";
+import { CaptionPreview } from "./CaptionPreview.tsx";
 import styles from "./editor.module.css";
 import { useT } from "./I18n.tsx";
 
@@ -46,8 +46,8 @@ export interface Choices {
   quality: Quality;
   /** Whether Claude corrects each transcript. */
   correct: boolean;
-  /** The caption preset. */
-  captions: string;
+  /** The caption style. */
+  captions: CaptionStyle;
   /** What the user tells Claude about this edit; never kept for the next. */
   instructions: string;
 }
@@ -242,6 +242,27 @@ export function SettingsPanel({
         </p>
       </fieldset>
 
+      <fieldset className={styles.field}>
+        <legend className={styles.label}>{words.captionStyle}</legend>
+        <div className={styles.captionStyles}>
+          {CAPTION_STYLES.map((captions) => (
+            <label key={captions} className={styles.captionStyle}>
+              <input
+                type="radio"
+                name={`${id}-captions`}
+                className={styles.radio}
+                value={captions}
+                checked={choices.captions === captions}
+                onChange={() => set({ captions })}
+              />
+              <CaptionPreview style={captions} />
+              <span className={styles.aspectName}>{t.captions[captions].name}</span>
+            </label>
+          ))}
+        </div>
+        <p className={styles.help}>{t.captions[choices.captions].description}</p>
+      </fieldset>
+
       <div className={styles.field}>
         <label className={styles.label} htmlFor={`${id}-names`}>
           {words.names}
@@ -380,29 +401,6 @@ export function SettingsPanel({
             </div>
             <p className={styles.help}>{words.correctionHelp}</p>
           </fieldset>
-
-          <fieldset className={styles.field}>
-            <legend className={styles.label}>{words.captionStyle}</legend>
-            <div className={styles.captionStyles}>
-              {CAPTION_STYLES.map((captions) => (
-                <label key={captions} className={styles.captionStyle}>
-                  <input
-                    type="radio"
-                    name={`${id}-captions`}
-                    className={styles.radio}
-                    value={captions}
-                    checked={choices.captions === captions}
-                    onChange={() => set({ captions })}
-                  />
-                  <CaptionPreview preset={PRESETS[captions] as Preset} />
-                  <span className={styles.aspectName}>
-                    {t.captions[captions]?.name ?? captions}
-                  </span>
-                </label>
-              ))}
-            </div>
-            <p className={styles.help}>{t.captions[choices.captions]?.description}</p>
-          </fieldset>
         </div>
       </details>
 
@@ -424,79 +422,5 @@ export function SettingsPanel({
         </div>
       )}
     </>
-  );
-}
-
-/** A caption preset drawn with CSS from its own values, over a dark frame: an approximation of
- * what libass draws, to choose by. */
-function CaptionPreview({ preset }: { preset: Preset }) {
-  const { sample, sampleGap } = useT().settings;
-  const em = (value: number) => `${value}em`;
-  const shadows = [
-    preset.shadow &&
-      `0 ${em(preset.shadow.offset)} ${em(preset.shadow.blur)} ${rgba(preset.shadow.color, preset.shadow.opacity)}`,
-    preset.glow && `0 0 ${em(preset.glow.blur)} ${rgba(preset.glow.color, preset.glow.opacity)}`,
-  ].filter(Boolean);
-  const text: CSSProperties = {
-    color: preset.text,
-    fontWeight: preset.weight,
-    fontSize: em(preset.scale),
-    letterSpacing: em(preset.tracking),
-    ...(shadows.length > 0 ? { textShadow: shadows.join(", ") } : {}),
-    // A stroke drawn under the fill, as libass draws its border outside the glyph.
-    ...(preset.stroke
-      ? {
-          WebkitTextStroke: `${em(preset.stroke.width * 2)} ${preset.stroke.color}`,
-          paintOrder: "stroke fill",
-        }
-      : {}),
-    ...(preset.plate
-      ? {
-          background: rgba(preset.plate.color, preset.plate.opacity),
-          padding: `${em(preset.plate.padY)} ${em(preset.plate.padX)}`,
-          borderRadius: em(preset.plate.radius),
-        }
-      : {}),
-  };
-  const active: CSSProperties = preset.pill
-    ? {
-        color: preset.active,
-        background: preset.pill.color,
-        padding: `${em(preset.pill.padY)} ${em(preset.pill.padX)}`,
-        borderRadius: em(preset.pill.radius),
-        WebkitTextStroke: "0",
-      }
-    : preset.sweep
-      ? { position: "relative", display: "inline-block" }
-      : { color: preset.active };
-  return (
-    <span className={styles.captionFrame} aria-hidden="true">
-      <span className={styles.captionText} style={text}>
-        {sample.map((word, i) => (
-          <Fragment key={word}>
-            {i > 0 && sampleGap}
-            <span
-              style={
-                i === 1
-                  ? active
-                  : i > 1 && preset.upcoming < 1
-                    ? { opacity: preset.upcoming }
-                    : preset.sweep && i === 0
-                      ? { color: preset.active }
-                      : undefined
-              }
-            >
-              {word}
-              {i === 1 && preset.sweep && (
-                // Part of the way through the word, as the colour sweeps.
-                <span className={styles.captionSweep} style={{ color: preset.active }}>
-                  {word}
-                </span>
-              )}
-            </span>
-          </Fragment>
-        ))}
-      </span>
-    </span>
   );
 }

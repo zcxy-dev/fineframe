@@ -13,6 +13,8 @@ interface Segment {
   /** From the row's left edge, in ems. */
   x: number;
   width: number;
+  /** A number, or an English word in a Chinese line, when the layout marks keywords. */
+  keyword?: true;
 }
 
 export interface Row {
@@ -30,9 +32,8 @@ export interface Page {
   rows: Row[];
   /** The frames each of the page's words is the one being spoken: from its first frame until the
    * next word's. The line's last word stays lit until its sound ends and `tail` more, and a
-   * page's last word otherwise until the page ends. Before the first, none is. `said` is the
-   * frame its sound ends, where a karaoke sweep through the page's last word finishes. */
-  words: { start: number; end: number; said: number }[];
+   * page's last word otherwise until the page ends. Before the first, none is. */
+  words: { start: number; end: number }[];
 }
 
 export interface LayoutOptions {
@@ -40,6 +41,10 @@ export interface LayoutOptions {
   maxWidth: number;
   /** The most rows on a page: one or two. */
   maxRows: number;
+  /** The most English words in a row, when fewer than fit. */
+  maxWords?: number;
+  /** Marks numbers, and English words in a Chinese line, as keywords. */
+  keywords?: boolean;
   /** Letter spacing after every character, in ems, as libass adds it. */
   tracking: number;
   /** Ticks per output frame. */
@@ -141,6 +146,17 @@ function wide(code: number): boolean {
   );
 }
 
+/** Digits and the characters Chinese writes numbers with, between two of which a row never
+ * breaks (二十 | 幾歲 but never 二 | 十). */
+const NUMERALS = new Set("0123456789〇零一二兩三四五六七八九十百千萬億幾");
+
+/** Numbers: digits, and Chinese numerals with a 十, 百, 千, 萬 or 億 in them (三十, 二十七, but
+ * not the 一 of 一直). */
+const NUMBER =
+  /\d+(?:[.,:]\d+)*%?|[〇零一二兩三四五六七八九幾]*[十百千萬億][〇零一二兩三四五六七八九十百千萬億幾]*/gu;
+/** English words, with the digits, apostrophes and joiners inside them (4P, don't, e-mail). */
+const ENGLISH = /[A-Za-z][A-Za-z0-9'’+-]*/gu;
+
 interface Char {
   text: string;
   width: number;
@@ -150,6 +166,9 @@ interface Char {
   blank: boolean;
   /** ICU ends a word just before this character. */
   wordStart: boolean;
+  /** Begins an English word: a letter or digit after anything else. */
+  latin: boolean;
+  keyword: boolean;
 }
 
 /** Where a row may end (`end`, exclusive) and the next begin (`next`): the same character
@@ -170,9 +189,25 @@ function normalise(text: string): string {
   return text.replace(/\s+/g, (run) => (run.includes(GAP) ? GAP : " ")).trim();
 }
 
-/** The characters of a line, each with its width and the word it belongs to. */
-function characters(line: CaptionLine, path: string, measure: Metrics, tracking: number): Char[] {
+/** The characters of a line, each with its width and the word it belongs to, and with
+ * `keywords`, whether it is part of a number or of an English word in a Chinese line. */
+function characters(
+  line: CaptionLine,
+  path: string,
+  measure: Metrics,
+  tracking: number,
+  keywords: boolean,
+): Char[] {
   const text = normalise(line.text);
+  const marked = new Set<number>();
+  if (keywords) {
+    const patterns = line.language === "en" ? [NUMBER] : [NUMBER, ENGLISH];
+    for (const pattern of patterns) {
+      for (const match of text.matchAll(pattern)) {
+        for (let i = match.index; i < match.index + match[0].length; i++) marked.add(i);
+      }
+    }
+  }
   const owner: (number | null)[] = Array.from({ length: text.length }, () => null);
   let cursor = 0;
   for (const [i, word] of (line.words ?? []).entries()) {
@@ -201,12 +236,15 @@ function characters(line: CaptionLine, path: string, measure: Metrics, tracking:
       const hex = code.toString(16).toUpperCase().padStart(4, "0");
       throw new Error(`${path}/text: ${char} (U+${hex}) is not in the caption font`);
     }
+    const alnum = /[A-Za-z0-9]/.test(char);
     chars.push({
       text: char,
       width: advance + tracking,
       word: owner[unit] ?? null,
       blank: char === " " || char === GAP,
       wordStart: starts.has(unit),
+      latin: alnum && !/[A-Za-z0-9'’+-]/.test(chars.at(-1)?.text ?? ""),
+      keyword: marked.has(unit),
     });
     unit += char.length;
   }
@@ -246,7 +284,8 @@ function cuts(chars: Char[]): Cut[] {
       !CLOSING.has(here.text) &&
       !OPENING.has(before.text) &&
       !same(before, here) &&
-      !(DOUBLED.has(before.text) && DOUBLED.has(here.text))
+      !(DOUBLED.has(before.text) && DOUBLED.has(here.text)) &&
+      !(NUMERALS.has(before.text) && NUMERALS.has(here.text))
     ) {
       found.push({
         end: i,
@@ -275,16 +314,18 @@ function usable(found: Cut[], chars: Char[], maxWidth: number): Cut[] {
 }
 
 /**
- * Breaks one line into pages of at most `maxRows` rows. The line is first cut at its pauses into
- * phrases, and a page holds as many whole phrases as fit, each row whole phrases, so neither a
- * page nor a row ends inside a phrase that could have started one. A phrase longer than a page
- * is split into the fewest pages, of lengths as even as its word breaks allow, and a phrase
- * longer than a row into the two most even rows.
+ * Breaks one line into pages of at most `maxRows` rows of at most `maxWidth` ems and `maxWords`
+ * English words. The line is first cut at its pauses into phrases, and a page holds as many
+ * whole phrases as fit, each row whole phrases, so neither a page nor a row ends inside a phrase
+ * that could have started one. A phrase longer than a page is split into the fewest pages, of
+ * lengths as even as its word breaks allow, and a phrase longer than a row into the two most even
+ * rows.
  */
 function breakLine(
   chars: Char[],
   maxWidth: number,
   maxRows: number,
+  maxWords = Number.POSITIVE_INFINITY,
 ): { rows: [number, number][] }[] {
   const found = usable(cuts(chars), chars, maxWidth);
   const m = found.length;
@@ -295,12 +336,17 @@ function breakLine(
   for (const char of chars) prefix.push((prefix.at(-1) as number) + char.width);
   const width = (a: number, b: number) =>
     (prefix[endOf(b)] as number) - (prefix[startOf(a)] as number);
+  const latin = [0];
+  for (const char of chars) latin.push((latin.at(-1) as number) + (char.latin ? 1 : 0));
+  const words = (a: number, b: number) =>
+    (latin[endOf(b)] as number) - (latin[startOf(a)] as number);
   const pause = (b: number) => b <= m && (found[b - 1] as Cut).pause;
   const weak = (b: number) => b >= 1 && b <= m && (found[b - 1] as Cut).weak;
   // What ending a row at a weak break costs, against rows that much wider than each other.
   const penalty = maxWidth / 2;
   // A row with no break inside it must stand, however long: an English word is never split.
-  const fits = (a: number, b: number) => b === a + 1 || width(a, b) <= maxWidth + 1e-9;
+  const fits = (a: number, b: number) =>
+    b === a + 1 || (width(a, b) <= maxWidth + 1e-9 && words(a, b) <= maxWords);
 
   const memo = new Map<number, number[] | null>();
   /** The boundaries of the rows from a to b: one row, the best two, or null if two cannot. */
@@ -410,18 +456,28 @@ function breakLine(
 export function layoutCaptions(
   captions: Captions,
   measure: Metrics,
-  { maxWidth, maxRows, tracking, frameTicks, hold, tail, frames }: LayoutOptions,
+  {
+    maxWidth,
+    maxRows,
+    maxWords,
+    keywords,
+    tracking,
+    frameTicks,
+    hold,
+    tail,
+    frames,
+  }: LayoutOptions,
 ): Page[] {
   const frame = (ticks: number) => Math.min(Math.ceil(ticks / frameTicks), frames);
   const pages: Page[] = [];
   for (const [index, line] of captions.lines.entries()) {
     const path = `/captions/lines/${index}`;
-    const chars = characters(line, path, measure, tracking);
+    const chars = characters(line, path, measure, tracking, keywords ?? false);
     if (chars.length === 0) continue;
     const next = captions.lines[index + 1];
     const lineEnd = Math.min(line.end + hold, next ? next.start : Number.POSITIVE_INFINITY);
     const words = line.words ?? [];
-    const laid = breakLine(chars, maxWidth, maxRows);
+    const laid = breakLine(chars, maxWidth, maxRows, maxWords);
     const total = chars.reduce((sum, char) => sum + char.width, 0);
     let before = 0;
     const starts = laid.map(({ rows }, i) => {
@@ -452,11 +508,17 @@ export function layoutCaptions(
             word = local.get(char.word) as number;
           }
           const last = segments.at(-1);
-          if (last && last.word === word) {
+          if (last && last.word === word && (last.keyword ?? false) === char.keyword) {
             last.text += char.text;
             last.width += char.width;
           } else {
-            segments.push({ text: char.text, word, x, width: char.width });
+            segments.push({
+              text: char.text,
+              word,
+              x,
+              width: char.width,
+              ...(char.keyword ? { keyword: true as const } : {}),
+            });
           }
           x += char.width;
         }
@@ -473,7 +535,7 @@ export function layoutCaptions(
           const word = words[w] as { start: number; end: number };
           const following = words[indices[k + 1] ?? w + 1];
           const until = following ? following.start : word.end + tail;
-          return { start: within(word.start), end: within(until), said: within(word.end) };
+          return { start: within(word.start), end: within(until) };
         }),
       });
     }

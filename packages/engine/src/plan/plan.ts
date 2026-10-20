@@ -19,6 +19,7 @@ import {
   validateProject,
   type Word,
 } from "@video-editor/schema";
+import { type CaptionStyle, DEFAULT_CAPTIONS } from "../captions/presets.ts";
 import { LENGTH_RANGE } from "../edit/length.ts";
 import { CAMERA, cropPath } from "../framing.ts";
 import { type AutoGrade, autoGrade } from "../grade.ts";
@@ -111,8 +112,6 @@ const CHAPTER_SECONDS = 120;
 /** The most B-roll shown at once, in seconds, and its fade in and out. */
 const BROLL_MAX = 8;
 const BROLL_FADE = 0.25;
-/** The caption preset an edit starts with unless another is asked for. */
-const CAPTION_PRESET = "bold";
 
 /**
  * What to plan from: a media index file, whose source file is the one it names next to it, or a
@@ -136,8 +135,8 @@ export interface PlanOptions {
   look?: Look | null;
   /** Names of people said in the footage; a lower third shows only a name from these. */
   names?: string[];
-  /** The caption preset (../captions/presets.ts): CAPTION_PRESET unless given. */
-  captions?: string;
+  /** The caption style (../captions/presets.ts): DEFAULT_CAPTIONS unless given. */
+  captions?: CaptionStyle;
   /** What the user asks of this edit, in their words, passed on in every planning request. */
   instructions?: string;
   /** The model that plans, and judges the cut checks a review doubts: best unless given. */
@@ -230,8 +229,8 @@ export interface PlanState {
   /** Whether the graphics were checked and fixed once: later fits leave out what fails. */
   graphicsFixed?: boolean;
   look: Look | null;
-  /** The caption preset. */
-  captions: string;
+  /** The caption style. */
+  captions: CaptionStyle;
   /** The model that answered the last planning request. */
   model: string;
   planCalls: number;
@@ -336,7 +335,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
     stills: new Map(),
     assets: new Map(),
     look: options.look === undefined ? DEFAULT_LOOK : options.look,
-    captions: options.captions ?? CAPTION_PRESET,
+    captions: options.captions ?? DEFAULT_CAPTIONS,
     model: PLAN_MODELS[options.quality ?? "best"],
     planCalls: 0,
     reviews: 0,

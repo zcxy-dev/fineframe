@@ -32,6 +32,8 @@ const project: Project = await loadJson("edit/project.json", validateProject);
 - its motion-graphics `cards`, with the speaker clips that played below a panel card and the sound that started with each card;
 - its `keyword` overlays.
 
+Its caption presets `spotlight`, `sweep` and `boxed` are gone too: a project that used one is captioned in `bold`.
+
 `upgradeProject` returns how many of each it took out, so a caller can say that planning the edit again gives it the new motion graphics.
 
 ## Time

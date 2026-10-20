@@ -2,7 +2,12 @@
 import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { type ClaudeCost, type Progress, validateProgress } from "@video-editor/schema";
-import { PRESETS } from "../captions/presets.ts";
+import {
+  CAPTION_STYLES,
+  type CaptionStyle,
+  DEFAULT_CAPTIONS,
+  isCaptionStyle,
+} from "../captions/presets.ts";
 import { isLookId, type LookId, lookIds } from "../looks.ts";
 import { ClaudeError, QUALITIES, type Quality } from "../plan/claude.ts";
 import { type Aspect, dollars, LENGTH_RANGE, PlanError } from "../plan/plan.ts";
@@ -12,14 +17,13 @@ import { EditError } from "./error.ts";
 import { parseLength } from "./length.ts";
 
 const [shortest, longest] = LENGTH_RANGE;
-const presets = Object.keys(PRESETS);
 /** The longest --instructions: a few sentences, not a script. */
 const INSTRUCTIONS_MAX = 2000;
 const usage = `Usage: pnpm edit <footage folder or file>... --length <length> \\
     --aspect <9:16 | 1:1 | 16:9> -o <out.mp4> [--names <names.txt>] [--terms <terms.txt>] \\
     [--correct] [--instructions <text>] [--asr <local | cloud>] \\
     [--look <${[...lookIds, "none"].join(" | ")}>] \\
-    [--captions <${presets.join(" | ")}>] \\
+    [--captions <${CAPTION_STYLES.join(" | ")}>] \\
     [--quality <best | economy>] [--visuals <rich | minimal>] \\
     [--music <track or folder>]... [--music-license <licence>]
 
@@ -43,7 +47,10 @@ files directly in it: videos to cut, and still images to show as B-roll.
                  OpenRouter with OPENROUTER_API_KEY, for machines without 9 GB of memory to
                  spare; cloud sends the speech audio, never video
       --look     the look over the edit: clean unless another is named, or none
-      --captions the caption style: bold unless another is named
+      --captions the caption style: bold (word by word, the word said in amber) unless
+                 another is named: creator (a few words at a time, big, in a box),
+                 minimal (small white type), pop (each word pops in as it is said) or
+                 none (no captions on the picture; the .srt is still written)
       --quality  best plans with Claude Opus; economy with Claude Sonnet, for about half
                  the cost. best unless given
       --visuals  rich (the default) adds motion graphics Claude writes for the video
@@ -118,8 +125,10 @@ if (look !== "none" && !isLookId(look)) {
   fail(`the look is ${[...lookIds, "none"].join(", ")}, not ${look}`);
 }
 
-const captions = values.captions ?? "bold";
-if (!presets.includes(captions)) fail(`--captions is ${presets.join(", ")}, not ${captions}`);
+const captions = values.captions ?? DEFAULT_CAPTIONS;
+if (!isCaptionStyle(captions)) {
+  fail(`--captions is ${CAPTION_STYLES.join(", ")}, not ${captions}`);
+}
 
 const quality = values.quality ?? "best";
 if (!QUALITIES.includes(quality as Quality)) {
@@ -153,7 +162,7 @@ try {
     out: values.output as string,
     ...(values.names ? { names: values.names } : {}),
     ...(values.terms ? { terms: values.terms } : {}),
-    captions,
+    captions: captions as CaptionStyle,
     ...(instructions ? { instructions } : {}),
     correct: values.correct ?? false,
     asr: asr as "local" | "cloud",

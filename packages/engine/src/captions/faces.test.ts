@@ -164,7 +164,7 @@ test("a caption sits at its place, and above a face that would be under it", asy
   });
   const centre = async (faces: { framing: FaceFraming; aspect: number } | null) => {
     const built = await buildCaptions(edit, buildTimeline(edit, sources(facts("a", { faces }))));
-    const face = built?.ass.split("\n").find((event) => event.startsWith("Dialogue: 4,"));
+    const face = built?.ass?.split("\n").find((event) => event.startsWith("Dialogue: 2,"));
     return Number(/\\pos\([\d.]+,([\d.]+)\)/.exec(face ?? "")?.[1]);
   };
   // 16:9 at 720 lines: the caption's last row ends at 90 % of the height, over the face's
@@ -220,7 +220,7 @@ test("captions keep off what a visual draws: a split screen's panel and a full g
       sources(facts("a", { faces: { framing: LOW_FACE, aspect: WIDE } }), facts("b")),
     ),
   );
-  const event = built?.ass.split("\n").find((e) => e.startsWith("Dialogue: 4,"));
+  const event = built?.ass?.split("\n").find((e) => e.startsWith("Dialogue: 2,"));
   const y = Number(/\\pos\([\d.]+,([\d.]+)\)/.exec(event ?? "")?.[1]);
   assert.ok(y > 360, `caption at ${y}, inside the panel`);
 });

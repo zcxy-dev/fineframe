@@ -1,7 +1,7 @@
 // The page's words in English, the language every other one matches key for key. A function
 // takes what a sentence counts or names; the page's own formatting (lengths, prices, rounding)
 // stays in lib and puts these words around it.
-import { PRESETS } from "@video-editor/engine/captions";
+import type { CaptionStyle } from "@video-editor/engine/captions";
 import { LOOKS, type LookId, lookIds } from "@video-editor/engine/looks";
 
 /** Where a graphic draws, as the engine names its layouts (packages/effects/src/graphics.ts),
@@ -162,8 +162,8 @@ export const en = {
     correctionHelp:
       "Claude reads each transcript with your names and terms and fixes what the speech model misheard, before its words are timed. Adds a Claude cost.",
     captionStyle: "Caption style",
-    /** The words a caption preview shows, the second being spoken, and what goes between them. */
-    sample: ["Every", "word", "on", "time"],
+    /** The four words a caption preview says, a number among them, and what goes between them. */
+    sample: ["Edit", "in", "10", "minutes"],
     sampleGap: " ",
     license: "Music licence",
     licenseHelp:
@@ -182,13 +182,23 @@ export const en = {
       description: "No look: the footage's own colour, balanced and matched between cameras.",
     },
   },
-  /** The caption presets, by the engine's ids. */
-  captions: Object.fromEntries(
-    Object.entries(PRESETS).map(([id, preset]) => [
-      id,
-      { name: `${id[0]?.toUpperCase()}${id.slice(1)}`, description: `${preset.description}.` },
-    ]),
-  ) as Record<string, { name: string; description: string }>,
+  /** The caption styles, by the engine's ids. */
+  captions: {
+    bold: {
+      name: "Highlight",
+      description: "Heavy white type, highlighted word by word: the word being said turns amber.",
+    },
+    creator: {
+      name: "Bold",
+      description: "A few words at a time, big, in a dark box; numbers and English words in amber.",
+    },
+    minimal: { name: "Minimal", description: "Small white type, no highlight." },
+    pop: { name: "Pop", description: "Each word pops in as it is said." },
+    none: {
+      name: "None",
+      description: "No captions on the video; the subtitle file (.srt) is still made.",
+    },
+  } as Record<CaptionStyle, { name: string; description: string }>,
   keys: {
     anthropic: {
       title: "Connect Claude",
@@ -406,8 +416,6 @@ export const en = {
     noMusic: "This edit has no music.",
     look: "Look",
     captionStyle: "Caption style",
-    /** A caption preview: the words before the one spoken, that one, and the words after. */
-    preview: ["Say ", "it", " clearly"],
     overlays: "Overlays",
     keep: "Keep",
     remove: "Remove",
