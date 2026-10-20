@@ -179,7 +179,7 @@ export const zhTW: Messages = {
     },
   },
   captions: {
-    bold: { name: "逐字亮起", description: "粗白字逐字出現；正在說的字變成琥珀色。" },
+    bold: { name: "逐字亮起", description: "整句粗白字逐字標亮：正在說的字變成琥珀色。" },
     creator: {
       name: "粗體重點",
       description: "一次幾個字，大字放在深色框裡；數字和英文用琥珀色標出。",

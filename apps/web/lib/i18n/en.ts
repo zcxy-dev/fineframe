@@ -186,7 +186,7 @@ export const en = {
   captions: {
     bold: {
       name: "Highlight",
-      description: "Word by word in heavy white type; the word being said turns amber.",
+      description: "Heavy white type, highlighted word by word: the word being said turns amber.",
     },
     creator: {
       name: "Bold",
