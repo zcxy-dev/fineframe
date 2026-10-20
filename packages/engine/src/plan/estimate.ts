@@ -4,8 +4,8 @@
 import { mostMoments } from "../edit/length.ts";
 
 /** Finding the moments: the request and its answer, and each minute of footage it reads. */
-const FIND_BASE = 0.05;
-const FIND_PER_MINUTE = 0.006;
+const FIND_BASE = 0.015;
+const FIND_PER_MINUTE = 0.0045;
 
 /**
  * US dollars Claude is likely to cost for an edit of `length` seconds from `footage` seconds of
@@ -34,9 +34,10 @@ export function estimateCost(
 /**
  * US dollars Claude is likely to cost for `count` shorts of `range` seconds from `footage`
  * seconds of video, as a range: one request reads every transcript to find the moments, and each
- * short is then an edit of its middle length from a stretch about twice as long, of which at most
- * one per two minutes of footage are made. Fitted to the run measured in
- * packages/engine/MEASUREMENTS.md.
+ * short costs at most an edit of the range's longest length from a stretch twice as long. At most
+ * one short per two minutes of footage is made. Fitted to the runs measured in
+ * packages/engine/MEASUREMENTS.md: finding the moments cost $0.05 for 7 minutes of footage and
+ * $0.07 for 14, and each short of 26 to 51 s $0.34 to $0.42.
  */
 export function estimateShortsCost(
   footage: number,
@@ -45,7 +46,7 @@ export function estimateShortsCost(
   visuals: "rich" | "minimal" = "rich",
 ): { low: number; high: number } {
   const find = FIND_BASE + FIND_PER_MINUTE * (Math.max(0, footage) / 60);
-  const length = (range[0] + range[1]) / 2;
+  const length = range[1];
   const each = estimateCost(2 * length, length, visuals);
   const made = Math.min(count, mostMoments(footage));
   return { low: find * 0.6 + made * each.low, high: find * 1.5 + made * each.high };

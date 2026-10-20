@@ -36,6 +36,30 @@ uv run vebench render --media synthetic/chat-b1/runs/edit-60s/output.mp4 \
 - **Pictures:** in the 9:16 edits the crop follows whoever is on screen, and cuts to the listener's shot with the source. The interview's cuts join two answers inside one camera's shot, so they show as jump cuts; the talks cut between the host and the speaker at a pause.
 - **Captions:** on the synthetic edit measured before rich visuals, each caption appears within 23 ms of its first word's true start at the median and 118 ms at the 95th percentile, and stays up about 0.4 s past its last word. This was not measured again.
 
+## Shorts measurements
+
+Each row is one `pnpm edit --shorts` run with the real API, with rich visuals without stock footage and `--quality best`, from cached indexes: real-2 with `--asr cloud` on the command line, talk-a from the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0) through the web page. `vebench render` scores each short's video and `vebench edit` its length; no hand-checked transcript exists for these clips, so every main-track clip's edges are checked against the words as the analysis timed them. Times are not given: other jobs ran on the machine.
+
+```bash
+pnpm -s edit bench/corpus/real-2/source.mp4 --shorts 5 --length 30-60s --aspect 9:16 --asr cloud \
+  -o out/shorts > progress.jsonl
+cd bench
+uv run vebench render --media ../out/shorts/01/edit.mp4 --cuts ../out/shorts/01/edit_cuts.json
+uv run vebench edit --project ../out/shorts/01/edit.project.json
+```
+
+<!-- results:engine-shorts -->
+| Footage | Asked | Made | Off the length planned | Clicks, drift | Edges inside a word | Claude: finding, each short, in all |
+|---|---|---|---|---|---|---|
+| real-2: Q&A vlog, Mandarin, 13.8 min | 5 of 30–60 s, 9:16 | 5: 45 to 51 s | -1.0 to +2.8 % | 0 of 6, 0.0 ms | 0 of 22 | $0.07, $0.35–0.41, $2.04 |
+| talk-a: synthetic talk, 3 clips, 7.0 min | 5 of 30–60 s, 9:16 | 3 (3 moments found): 31 to 43 s | -3.4 to +2.4 % | 0 of 4, 0.0 ms | 0 of 14 | $0.05, $0.36–0.42, $1.20 |
+| talk-a: synthetic talk, 3 clips, 7.0 min | 2 of 15–30 s, 9:16 | 2: 26 and 30 s | +0.7 and +4.8 % | 0 of 3, 0.0 ms | 0 of 10 | $0.05, $0.34–0.36, $0.75 |
+<!-- /results -->
+
+- **Moments:** Claude found 6 moments in real-2 and 3 in talk-a, at most one per 2 minutes of footage; the best five and all three were made. Each short plays only its stretch: 66 to 95 s of the source for real-2's shorts of 45 to 51 s. One talk-a short opens on a line from later in its stretch, then plays from its start: the hook first.
+- **Fitting:** in an earlier real-2 run, the code before a short's plan was fitted to the length it reaches, 3 of 6 moments planned 1 to 3 s short of the length Claude picked after both requests and were left out, so 3 shorts were made. With the fit, and with Claude asked for a stretch of about 1.5 times the short's length rather than 1.25, none fell short here.
+- **Cost:** finding the moments reads every transcript once: $0.05 for 7 minutes and $0.07 for 14, at most about $0.30 an hour. Each short costs about what an edit of its length does ([edit measurements](#edit-measurements)), most of it the motion graphics. `estimateShortsCost` is fitted to these runs.
+
 ## Planner measurements
 
 These runs use the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0), each clip analysed at 5dc8da9 with the 0.6B speech model and no transcript correction. Each footage was planned, rendered and reviewed at each length its speech allows, with rich visuals and their motion graphics, without stock footage (no Pexels or Pixabay key), and `--quality best`, one edit at a time: the two groups at 16:9, the single clips at 9:16 except the screen recording. The baseline keeps every clip whole, in file order, cut off at the target. `vebench edit` scores both, and `vebench render` the planner's renders.

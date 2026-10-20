@@ -1,0 +1,41 @@
+{
+  "doc": "packages/engine/MEASUREMENTS.md",
+  "columns": [
+    "Footage",
+    "Asked",
+    "Made",
+    "Off the length planned",
+    "Clicks, drift",
+    "Edges inside a word",
+    "Claude: finding, each short, in all"
+  ],
+  "rows": [
+    [
+      "real-2: Q&A vlog, Mandarin, 13.8 min",
+      "5 of 30–60 s, 9:16",
+      "5: 45 to 51 s",
+      "-1.0 to +2.8 %",
+      "0 of 6, 0.0 ms",
+      "0 of 22",
+      "$0.07, $0.35–0.41, $2.04"
+    ],
+    [
+      "talk-a: synthetic talk, 3 clips, 7.0 min",
+      "5 of 30–60 s, 9:16",
+      "3 (3 moments found): 31 to 43 s",
+      "-3.4 to +2.4 %",
+      "0 of 4, 0.0 ms",
+      "0 of 14",
+      "$0.05, $0.36–0.42, $1.20"
+    ],
+    [
+      "talk-a: synthetic talk, 3 clips, 7.0 min",
+      "2 of 15–30 s, 9:16",
+      "2: 26 and 30 s",
+      "+0.7 and +4.8 %",
+      "0 of 3, 0.0 ms",
+      "0 of 10",
+      "$0.05, $0.34–0.36, $0.75"
+    ]
+  ]
+}
