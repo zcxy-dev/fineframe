@@ -16,8 +16,10 @@ import {
   isOverlayLayout,
   minType,
 } from "./graphics.ts";
+import { guardPage } from "./guard.ts";
 import { layoutFor } from "./layout.ts";
-import { type Box, markupProblem } from "./page.ts";
+import { markupProblem } from "./markup.ts";
+import type { Box } from "./page.ts";
 import { site } from "./render.ts";
 
 /** One graphic to check, and what in the frame it must keep clear of over its time on screen. */
@@ -44,7 +46,15 @@ export interface GraphicCheck {
 /** What the page shows at one moment. */
 interface Snapshot {
   t: number;
-  texts: { text: string; rects: Box[]; size: number; clip: Box | null; owner: number }[];
+  /** Every text drawn, faint ones too: its opacity is `alpha`. */
+  texts: {
+    text: string;
+    rects: Box[];
+    size: number;
+    clip: Box | null;
+    owner: number;
+    alpha: number;
+  }[];
   /** Every drawn element's box, for a label's extent and a full graphic's fill. */
   elements: Box[];
   /** Each icon or logo shown, as drawn. */
@@ -95,6 +105,7 @@ export async function checkGraphics(
       const frame = graphicFrame(job.layout, job.output);
       await writeFile(join(dir, name), graphicPage({ ...job, box: undefined }).page);
       const tab = await browser.newPage();
+      await guardPage(tab);
       try {
         await tab.setViewport(frame);
         await tab.goto(`${server.url}/${name}`, { waitUntil: "load" });
@@ -162,7 +173,8 @@ async function inspect(
       for (let node = walker.nextNode(); node; node = walker.nextNode()) {
         const text = (node.textContent ?? "").trim();
         const parent = node.parentElement as HTMLElement;
-        if (!text || opacity(parent) <= 0.5) continue;
+        const alpha = opacity(parent);
+        if (!text || alpha <= 0.02 || getComputedStyle(parent).visibility === "hidden") continue;
         if (!owners.includes(parent)) owners.push(parent);
         const range = document.createRange();
         range.selectNodeContents(node);
@@ -176,6 +188,7 @@ async function inspect(
           }
         }
         texts.push({
+          alpha,
           text,
           rects: [...range.getClientRects()].filter((r) => r.width > 0 && r.height > 0).map(rect),
           size: Number.parseFloat(getComputedStyle(parent).fontSize),
@@ -220,8 +233,10 @@ async function inspect(
   const settled = drawn.snapshots.find((s) => s.t === drawn.settled) ?? final;
   // Every text as it showed at any of those moments.
   const texts = drawn.snapshots.flatMap((s) => s.texts);
-  const vanished = [...new Set(texts.map((t) => t.text))].filter(
-    (text) => !final.texts.some((t) => t.text === text),
+  // Shown is more than half opaque; every check of where and how big text is reads faint text too.
+  const shown = (list: Snapshot["texts"]) => list.filter((t) => t.alpha > 0.5);
+  const vanished = [...new Set(shown(texts).map((t) => t.text))].filter(
+    (text) => !shown(final.texts).some((t) => t.text === text),
   );
   const problems: string[] = [];
   const u = Math.min(job.output.width, job.output.height) / 100;

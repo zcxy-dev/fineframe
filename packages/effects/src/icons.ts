@@ -822,10 +822,15 @@ export function markFiles(): Map<string, string> {
 export function markOf(
   src: string,
 ): { kind: "icon"; name: IconName } | { kind: "logo"; name: LogoName } | null {
+  // Own entries only: `in` would also find what every object inherits (constructor).
   const icon = src.match(/^icons\/(?:accent\/)?([a-z0-9-]+)\.svg$/);
-  if (icon && (icon[1] as string) in ICONS) return { kind: "icon", name: icon[1] as IconName };
+  if (icon && Object.hasOwn(ICONS, icon[1] as string)) {
+    return { kind: "icon", name: icon[1] as IconName };
+  }
   const logo = src.match(/^logos\/([a-z0-9-]+)\.svg$/);
-  if (logo && (logo[1] as string) in LOGOS) return { kind: "logo", name: logo[1] as LogoName };
+  if (logo && Object.hasOwn(LOGOS, logo[1] as string)) {
+    return { kind: "logo", name: logo[1] as LogoName };
+  }
   return null;
 }
 

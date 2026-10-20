@@ -27,6 +27,7 @@ import { fingerprintOf } from "../sources.ts";
 import type { TimedWord } from "./captions.ts";
 import { findWords } from "./fillers.ts";
 import type { Line } from "./pack.ts";
+import { saysName } from "./wording.ts";
 
 /** How rich an edit is with B-roll: `rich` shows a visual on its points, `minimal` none. */
 export type Visuals = "rich" | "minimal";
@@ -72,10 +73,11 @@ export function parseVisuals(
       query: text("query"),
       url: text("url"),
       focus: text("focus"),
+      name: text("name"),
       sfx: e.sfx === undefined ? "none" : e.sfx,
       reason: text("reason"),
     };
-    const strings = ["source", "text", "query", "url", "focus", "reason"] as const;
+    const strings = ["source", "text", "query", "url", "focus", "name", "reason"] as const;
     const ok =
       strings.every((key) => typeof fields[key] === "string") &&
       Number.isInteger(fields.line) &&
@@ -98,6 +100,8 @@ export interface VisualWish {
   url: string;
   /** web: the words on the page to zoom into. */
   focus: string;
+  /** web: the product or site's name as the speaker says it in the line. */
+  name: string;
   sfx: "none" | (typeof SFX_WISHES)[number];
   reason: string;
 }
@@ -155,10 +159,20 @@ export const visualKey = (wish: VisualWish) =>
 /** Why a wish cannot be shown, or null when it can be sourced: a page a capture may not open, a
  * search page, or one with no words on it to show (a first screen is a home page or an ad, not
  * the part talked about), or a stock search with no key to make it. */
-export function wishProblem(wish: VisualWish, stock: boolean): string | null {
+/** The name a site's address carries: dcard in www.dcard.tw, starbucks in www.starbucks.com.tw. */
+function siteName(hostname: string): string | null {
+  const labels = hostname.toLowerCase().split(".");
+  // A country's second level (com.tw, co.uk) is part of the suffix, not the name.
+  const suffix =
+    labels.length >= 3 && /^(com|net|org|co|gov|edu|ac)$/.test(labels.at(-2) as string) ? 2 : 1;
+  return labels.at(-1 - suffix) ?? null;
+}
+
+export function wishProblem(wish: VisualWish, stock: boolean, said: string): string | null {
   if (wish.kind === "web") {
+    let url: URL;
     try {
-      const url = checkedUrl(wish.url);
+      url = checkedUrl(wish.url);
       if (
         /(^|\.)(google|bing|duckduckgo|yahoo)\./.test(url.hostname) &&
         url.pathname.startsWith("/search")
@@ -169,6 +183,11 @@ export function wishProblem(wish: VisualWish, stock: boolean): string | null {
       return (error as Error).message;
     }
     if (!wish.focus.trim()) return "no words on the page to show";
+    // Only a product or site the speaker names: the name as they say it, or the address's own.
+    const site = siteName(url.hostname);
+    if (!(wish.name.trim() && saysName(wish.name, said)) && !(site && saysName(site, said))) {
+      return `the speaker does not name ${wish.name.trim() || url.hostname} in its line`;
+    }
     return null;
   }
   if (wish.kind === "stock") {
@@ -217,6 +236,8 @@ export async function sourceVisuals(
     output: Pick<Project["output"], "aspect" | "width" | "height">;
     stock: boolean;
     onProblem: (message: string) => void;
+    /** The speech of a source's line, which must name a page's site or product. */
+    said: (source: string, line: number) => string;
     /** Where captures are kept: `<cache>/broll/captures` unless given. */
     dir?: string;
     capture?: typeof capturePage;
@@ -231,7 +252,7 @@ export async function sourceVisuals(
     for (const wish of fresh) {
       const key = visualKey(wish);
       if (assets.has(key)) continue;
-      const problem = wishProblem(wish, options.stock);
+      const problem = wishProblem(wish, options.stock, options.said(wish.source, wish.line));
       if (problem) {
         options.onProblem(`Left out a visual on ${wish.source} line ${wish.line}: ${problem}`);
         assets.set(key, null);

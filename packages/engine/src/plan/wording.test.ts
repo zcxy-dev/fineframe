@@ -58,3 +58,25 @@ test("a unit after a said number counts as said, and a number as the speaker say
   assert.deepEqual(unsaid("歲", "我不知道幾歲"), ["歲"]);
   assert.deepEqual(unsaid("10 倍", height), ["倍"]);
 });
+
+test("numbers and Latin words match whole, not inside a longer one", () => {
+  assert.deepEqual(unsaid("20", "我在 2024 年開始"), ["20"]);
+  assert.deepEqual(unsaid("4%", "成長了 40%"), ["4%"]);
+  assert.deepEqual(unsaid("art", "let's start"), ["art"]);
+  // Still found when said whole, in either script, and in parts.
+  assert.deepEqual(unsaid("2024", "我在 2024 年開始"), []);
+  assert.deepEqual(unsaid("40%", "成長了百分之四十"), []);
+  assert.deepEqual(unsaid("Start", "let's start"), []);
+  assert.deepEqual(unsaid("Pocket 4P", "Pocket 四 P 終於來了"), []);
+  assert.deepEqual(unsaid("1,000", "賣了一千台"), []);
+});
+
+test("a brand is named only by its whole name", () => {
+  const logo = (name: string) => `<img src="logos/${name}.svg">`;
+  assert.deepEqual(unnamed(logo("x"), "the next step"), ["X"]);
+  assert.deepEqual(unnamed(logo("meta"), "read the metadata"), ["Meta"]);
+  assert.deepEqual(unnamed(logo("react"), "what a reaction"), ["React"]);
+  assert.deepEqual(unnamed(logo("linux"), "Linux 上也能跑"), []);
+  assert.deepEqual(unnamed(logo("googledrive"), "存到 Google Drive"), []);
+  assert.deepEqual(unnamed(logo("nodedotjs"), "用 Node.js 寫"), []);
+});

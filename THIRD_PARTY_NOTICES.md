@@ -17,7 +17,7 @@ The project's own code is proprietary, all rights reserved ([LICENSE](LICENSE)).
 | [FFmpeg](https://ffmpeg.org) static builds: from [imageio-binaries](https://github.com/imageio/imageio-binaries), 7.0.2 on Linux, 7.1 on Apple silicon and on Windows ([gyan.dev](https://www.gyan.dev/ffmpeg/builds/)'s essentials build) | GPL-3.0-or-later (Linux, Windows), GPL-2.0-or-later (macOS) | GitHub, pinned commit and SHA-256; renderer, run as a separate program (see [notes](#ffmpeg)) |
 | ffprobe static builds from [@ffprobe-installer](https://github.com/SavageCore/node-ffprobe-installer)'s npm packages: 5.2.0 on Linux, 5.0.1 on Apple silicon, 5.1.0 on Windows | GPL-3.0 (Linux, Windows), LGPL-2.1 (macOS), as each package states | npm registry tarball, SHA-256 checked; renderer, on the first effect render, run as a separate program by HyperFrames (see [notes](#ffmpeg)) |
 | [CPython](https://www.python.org) builds from [python-build-standalone](https://github.com/astral-sh/python-build-standalone) | PSF-2.0, with the licences of the libraries each build includes | Desktop app only: installed by uv into the app's folder on its first start |
-| Chrome Headless Shell ([Chromium](https://www.chromium.org)) | Chromium's BSD-3-Clause licence and the third-party licences it lists; Google's build also refers to the Chrome terms of service | Google's [Chrome for Testing](https://github.com/GoogleChromeLabs/chrome-for-testing), pinned build, through @puppeteer/browsers; renderer, on the first effect render or web capture. There is no build for Linux on arm64 |
+| Chrome Headless Shell ([Chromium](https://www.chromium.org)) | Chromium's BSD-3-Clause licence and the third-party licences it lists; Google's build also refers to the Chrome terms of service | Google's [Chrome for Testing](https://github.com/GoogleChromeLabs/chrome-for-testing), pinned build, its archive SHA-256 checked per platform, through @puppeteer/browsers; renderer, on the first effect render or web capture. There is no build for Linux on arm64 |
 | [Lucide](https://lucide.dev) icons (`lucide-static` 1.50.0) | ISC; the icons drawn from Feather MIT, as its licence file lists them | npm registry tarball, SHA-256 checked; engine, on the first icon lookup |
 | [Tabler Icons](https://tabler.io/icons) (`@tabler/icons` 3.48.0), outline style | MIT | npm registry tarball, SHA-256 checked; engine, on the first icon lookup |
 | [Simple Icons](https://simpleicons.org) (`simple-icons` 16.33.0) | CC0-1.0, except the logos its data gives another licence (see [notes](#icons-and-logos)) | npm registry tarball, SHA-256 checked; engine, on the first logo lookup |
@@ -59,6 +59,8 @@ Models that come inside a package: the TransNetV2 weights in transnetv2-pytorch,
 | [@anthropic-ai/sdk](https://github.com/anthropics/anthropic-sdk-typescript) | MIT | engine, web page |
 | [@hyperframes/producer](https://github.com/heygen-com/hyperframes) | Apache-2.0 | effects, rendering the effects and graphics |
 | [puppeteer-core](https://pptr.dev) | Apache-2.0 | effects, checking the graphics |
+| [htmlparser2](https://github.com/fb55/htmlparser2) | MIT | effects, reading the graphics' markup |
+| [PostCSS](https://postcss.org) | MIT | effects, reading the graphics' styles |
 | [@puppeteer/browsers](https://pptr.dev/browsers-api) | Apache-2.0 | engine, downloading Chrome Headless Shell |
 | [react](https://react.dev), react-dom | MIT | web page |
 | [ajv](https://github.com/ajv-validator/ajv) | MIT | schema, effects |

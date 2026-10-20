@@ -34,13 +34,14 @@ Claude writes each edit's graphics for that video, as markup and its own CSS on 
 | `panel` | The top 880 of every 1920 rows of a 9:16 frame, with the speaker below it | 3–8 s | Opaque, at the panel's size |
 | `full` | The whole frame | 4–12 s | Opaque, at the frame's size |
 
-**What runs.** A graphic's page runs no script but the renderer's own, and loads nothing but the house stylesheet, the fonts and the icons and logos beside it.
-- A Content-Security-Policy in every page enforces that.
-- [`markupProblem`](src/page.ts) refuses, before any render, markup with a script, an event handler, an embedded page, a `url()`, or an image that is not one of the bundled icons and logos.
+**What runs.** A graphic's page runs no script but the renderer's own, and reaches nothing but the house stylesheet, the fonts and the icons and logos beside it. Chrome runs with `--no-sandbox`, so three layers hold that, each without the others:
+- **Parsed markup** ([`src/markup.ts`](src/markup.ts)). `markupProblem` reads the HTML with htmlparser2 against an allowlist: `div`, `span`, `p`, `b`, `strong`, `i`, `em`, `small`, `sub`, `sup`, `br`, lists, headings and `img`. The only attributes are `class` and `style`, plus `src`, `alt`, `width` and `height` on an image, whose `src` must name a bundled icon or logo. Comments, doctypes and CDATA are refused. It reads the CSS and each style attribute with PostCSS: only `@keyframes` and `@property`, no `url()` or anything else that loads, and no `content:` text or counters, whose words no check would read. `cleanMarkup` rebuilds the markup from that parse for the page, so the browser draws exactly what was checked, and a graphic that fails never becomes a page.
+- **The page's policy** ([`src/page.ts`](src/page.ts)). Its Content-Security-Policy allows no script, and styles, fonts and images only from its own folder. As the renderer serves a page, it adds the SHA-256 of each inline script in it, which are HyperFrames' own, so no script added later runs.
+- **Blocked requests** ([`src/guard.ts`](src/guard.ts)). The checking browser's page, and every page HyperFrames opens (its puppeteer's `launch` is wrapped in the render's worker), intercept every request: only those to the loopback address the page came from get through, and every other request and navigation is aborted.
 
 **Icons and logos.** [`src/icons.ts`](src/icons.ts) holds a subset of Lucide's icons and Simple Icons' brand logos ([notices](../../THIRD_PARTY_NOTICES.md#icons-copied-into-the-source)). They are written as SVG files beside the pages, and a graphic shows one as an image: `icons/<name>.svg` in the house white, `icons/accent/<name>.svg` in the accent, `logos/<name>.svg` in the brand's colour, or the accent where that colour would vanish on the dark stage.
 
-**Checks.** [`checkGraphics`](src/check.ts) loads each graphic in the same Chrome, seeks its animations to each part's start and end and to its last frame, and reports each problem as a sentence. It reports text that:
+**Checks.** [`checkGraphics`](src/check.ts) loads each graphic in the same Chrome, seeks its animations to each part's start and end and to its last frame, and reports each problem as a sentence. Every text drawn is checked, faint ones too; it reports text that:
 - has a character none of the fonts has;
 - runs off the frame or out of its box;
 - lies where the captions are drawn;

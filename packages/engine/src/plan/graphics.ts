@@ -329,7 +329,7 @@ export function findQuote(
 
 /** Claude's graphics as wishes on the edit's words; one whose anchor is not in the speech is left
  * out. */
-function wishesOf(
+export function wishesOf(
   answers: readonly Answer[],
   words: readonly TimedWord[],
   progress: (message: string) => void,
@@ -341,17 +341,32 @@ function wishesOf(
       progress(`Left out a graphic on words the edit does not say: "${answer.anchor}"`);
       return [];
     }
-    const quoted = answer.quotes.flatMap((quote) => {
+    // Each phrase it shows must be said: one that is not leaves the graphic nothing to go with
+    // when a cut takes its words, so it is left out.
+    const spans: [number, number][] = [anchor];
+    for (const quote of answer.quotes) {
       const found = findQuote(words, quote, at);
-      if (!found) return [];
-      return words.slice(found[0], found[1] + 1).map((w) => ({ source: w.source, word: w.index }));
-    });
+      if (!found) {
+        progress(`Left out a graphic on words the edit does not say: "${quote}"`);
+        return [];
+      }
+      spans.push(found);
+    }
+    const seen = new Set<number>();
+    const depends = spans
+      .flatMap(([from, to]) => Array.from({ length: to - from + 1 }, (_, k) => from + k))
+      .filter((i) => !seen.has(i) && seen.add(i))
+      .sort((a, b) => a - b)
+      .map((i) => ({
+        source: (words[i] as TimedWord).source,
+        word: (words[i] as TimedWord).index,
+      }));
     const first = words[anchor[0]] as TimedWord;
     return [
       {
         layout: answer.layout,
         anchor: { source: first.source, index: first.index },
-        words: quoted,
+        words: depends,
         seconds: answer.seconds,
         shows: answer.shows,
         html: answer.html,
@@ -550,12 +565,32 @@ function speechDuring(words: readonly TimedWord[], graphic: Graphic): string {
 
 /** Asks Claude once to fix each failing graphic, from its problems and how it was drawn; null
  * for one it did not fix. */
+/** The stretches of an edit `edit` ticks long where nothing new comes into the picture for longer
+ * than `most` seconds: no cut or shot change in `changes`, and no graphic starting or ending. */
+export function stillStretches(
+  changes: readonly number[],
+  graphics: readonly { start: number; end: number }[],
+  edit: number,
+  most: number,
+): { start: number; end: number }[] {
+  const times = [...new Set([0, edit, ...changes, ...graphics.flatMap((g) => [g.start, g.end])])]
+    .filter((t) => t >= 0 && t <= edit)
+    .sort((a, b) => a - b);
+  return times.slice(1).flatMap((end, i) => {
+    const start = times[i] as number;
+    return end - start > secondsToTicks(most) ? [{ start, end }] : [];
+  });
+}
+
+/** One request for the graphics that failed their checks, each to be fixed, and for a graphic in
+ * each still stretch, where one fits. */
 async function fixGraphics(
   failing: { placed: Placed; problems: string[]; shot: Buffer | null }[],
+  still: readonly { start: number; end: number }[],
   project: Project,
   words: readonly TimedWord[],
   options: { claude: Claude; model: string; usage: Usage[] },
-): Promise<(Pick<GraphicWish, "html" | "css"> | null)[]> {
+): Promise<{ fixes: (Pick<GraphicWish, "html" | "css"> | null)[]; added: Answer[] }> {
   const content: Parameters<Claude>[0]["content"] = [];
   for (const [i, { placed, problems, shot }] of failing.entries()) {
     const { graphic, wish } = placed;
@@ -568,9 +603,20 @@ ${problems.map((p) => `- ${p}`).join("\n")}
 Its code: ${JSON.stringify({ html: graphic.html, css: graphic.css })}`,
     });
   }
+  const [, most] = project.output.aspect === "9:16" ? CADENCE.portrait : CADENCE.landscape;
+  if (still.length > 0) {
+    content.push({
+      type: "text",
+      text: `In these stretches nothing new comes into the picture for longer than ${most} s:\n${still
+        .map(
+          (s) => `${seconds(s.start)}–${seconds(s.end)} s:\n${speechText(words, s.start, s.end)}`,
+        )
+        .join("\n\n")}`,
+    });
+  }
   content.push({
     type: "text",
-    text: "Fix each graphic's problems and keep the rest of it. Answer with the whole new html and css of each, in the order given.",
+    text: `${failing.length > 0 ? "Fix each graphic's problems and keep the rest of it: answer with the whole new html and css of each, in the order given, as graphics. " : "Answer with graphics empty. "}${still.length > 0 ? "In each still stretch, write one new graphic on the words that carry its point, as added, or none where nothing there is worth showing." : "Answer with added empty."}`,
   });
   try {
     const reply = await options.claude({
@@ -581,7 +627,7 @@ Its code: ${JSON.stringify({ html: graphic.html, css: graphic.css })}`,
       schema: {
         type: "object",
         additionalProperties: false,
-        required: ["graphics"],
+        required: ["graphics", "added"],
         properties: {
           graphics: {
             type: "array",
@@ -592,16 +638,18 @@ Its code: ${JSON.stringify({ html: graphic.html, css: graphic.css })}`,
               properties: { html: { type: "string" }, css: { type: "string" } },
             },
           },
+          added: (answerSchema(project.output.aspect).properties as { graphics: object }).graphics,
         },
       },
       effort: "medium",
       maxTokens: 64_000,
     });
     options.usage.push(reply.usage);
-    const fixed = (reply.json as { graphics?: Pick<GraphicWish, "html" | "css">[] }).graphics ?? [];
-    return failing.map((_, i) => fixed[i] ?? null);
+    const json = reply.json as { graphics?: Pick<GraphicWish, "html" | "css">[]; added?: Answer[] };
+    const fixed = json.graphics ?? [];
+    return { fixes: failing.map((_, i) => fixed[i] ?? null), added: json.added ?? [] };
   } catch {
-    return failing.map(() => null);
+    return { fixes: failing.map(() => null), added: [] };
   }
 }
 
@@ -687,8 +735,19 @@ export async function withGraphics(
     const r = results[i];
     return r && r.problems.length > 0 ? [{ placed: p, problems: r.problems, shot: r.shot }] : [];
   });
-  if (failing.length > 0 && options.fix) {
-    const fixes = await fixGraphics(failing, project, words, options);
+  // Where the picture would hold still too long for the edit's shape, Claude is asked for more.
+  const [, most] = project.output.aspect === "9:16" ? CADENCE.portrait : CADENCE.landscape;
+  const still = options.fix
+    ? stillStretches(
+        base.changes,
+        placed.map((p) => ({ start: p.graphic.start, end: p.graphic.start + p.graphic.duration })),
+        edit,
+        most,
+      )
+    : [];
+  if ((failing.length > 0 || still.length > 0) && options.fix) {
+    const before = options.usage.length;
+    const { fixes, added } = await fixGraphics(failing, still, project, words, options);
     for (const [i, fix] of fixes.entries()) {
       const { placed: item } = failing[i] as (typeof failing)[number];
       if (!fix) continue;
@@ -697,6 +756,16 @@ export async function withGraphics(
       item.wish.css = fix.css;
       item.graphic.html = fix.html;
       item.graphic.css = fix.css;
+    }
+    if (added.length > 0) {
+      const spent = totalUsage(options.usage.slice(before)).dollars;
+      options.progress(
+        `${options.model} wrote ${added.length} graphics (${spent === null ? "cost unknown" : `$${spent.toFixed(4)}`})`,
+      );
+      // Kept in the wishes, so they stay when the edit is fitted again; checked with the rest,
+      // and left out without another request when they fail.
+      wishes.push(...wishesOf(added, words, options.progress));
+      placed = placeGraphics(wishes, words, edit, frame, base.taken, options.progress);
     }
     results = await check(placed);
   }

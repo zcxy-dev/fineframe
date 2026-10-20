@@ -122,10 +122,11 @@ A rich edit (`visuals: "rich"`, the default; `pnpm edit --visuals`) shows what t
 
 - **What the plan may propose.**
   - `stock`, a search in English for footage of a physical thing or scene. It is offered only when `PEXELS_API_KEY` or `PIXABAY_API_KEY` is set.
-  - `web`, the page of a product, model, project, paper or organisation the speaker names in that line, and the words on it to zoom into. A page for a place or brand only mentioned in passing is not one.
+  - `web`, the page of a product, model, project, paper or organisation the speaker names in that line, the words on it to zoom into, and its name as the speaker says it. A page for a place or brand only mentioned in passing is not one.
   - `sfx`, a sound for a visible action; none for most.
 - **Checks.**
   - A page must be http or https, public, not a search page, and come with words on it to show ([web capture](#b-roll-sourcing)): a first screen is a home page or an ad, not the part talked about.
+  - Its line must name it: the name Claude gives, said whole (a Chinese name as said, a Latin one never inside a longer word), or the name in its address (dcard in www.dcard.tw).
   - A search needs a key.
   - Each is sourced once per plan. Footage is searched and downloaded with the clips the edit already shows excluded. A page is captured in Chrome Headless Shell at twice the pixels of the box it fills, in a viewport of that box's shape, and kept under `~/.cache/video-editor/broll/captures/`.
   - A capture or search that fails says why on stderr and is left out, as is a page without the words it was asked for, or one that turns the capture away.
@@ -161,16 +162,17 @@ It is told the rules:
 
 Code then times and checks each graphic:
 - **Timing.** A graphic starts 0.4 s before the words it lands on are said, for as long as it asked within its layout's range (`GRAPHIC_SECONDS`), until whatever it may not cover starts. Ends fall on the frame grid.
-  - A graphic is left out when the words it lands on, or any it shows, were cut, or when it would come within 0.4 s of the one before or start over B-roll or an effect.
+  - A graphic depends on the words it lands on and each phrase it shows; one whose phrases the edit does not say is left out, and so is one whose words were cut, or that would come within 0.4 s of the one before or start over B-roll or an effect.
   - A label gives way to a panel or a full-frame graphic that wants its time.
   - Full-frame graphics past a quarter of the edit are left out, latest first.
   - A panel splits the screen with the speaker below it, as a capture's split does.
 - **Checks.** Each graphic is drawn in Chrome against the captions as they will be laid out, with its panel's split in place, and the faces under it ([checks](../effects/README.md#graphics)). Its text is also checked against the speech:
-  - each word it shows must be said in the 20 s before it or the 10 s after it, a number in digits or in Chinese numerals (a lone 十 among them), joined at most by small words such as 的 and 不 or by a unit said right after a number, such as 歲 in 二十七歲;
+  - each word it shows must be said in the 20 s before it or the 10 s after it, a Latin word or a number whole (20 is not in 2024, nor art in start), a number in digits or in Chinese numerals (a lone 十 among them), joined at most by small words such as 的 and 不 or by a unit said right after a number, such as 歲 in 二十七歲;
   - no run of eight Chinese characters or four Latin words may be the sentence being said while it shows;
-  - each logo it shows must be of a brand named in the 20 s before it or the 10 s after it.
+  - each logo it shows must be of a brand named whole in the 20 s before it or the 10 s after it (X is not in next, nor Meta in metadata).
+- **Cadence.** After placement, code finds where nothing new comes into the picture (no cut, shot change, B-roll, effect or graphic) for longer than the shape allows: 8 s at 16:9, 4 s at 9:16.
 
-  The graphics that fail go back to Claude once, together, each with its problems and a half-size screenshot. A fix that still fails is left out, and its line keeps the speaker. After a review fits the edit again, the graphics are placed on the words that remain and checked again, and one that fails is left out without another request.
+  The graphics that fail, and those stretches with the words said in them, go to Claude once, together: each failing graphic with its problems and a half-size screenshot, to fix, and each stretch for one new graphic where its words carry a point. A fix that still fails is left out, and its line keeps the speaker; a new graphic is placed and checked with the rest, and left out without another request when it fails. After a review fits the edit again, the graphics are placed on the words that remain and checked again, and one that fails is left out without another request.
 - **Sound.** A graphic that asks for a sound gets one on its first frame, at most one every 6 s with the visuals' sounds, and none when a cut falls from 0.1 s before it to 0.5 s into it, where the sound would ring across the cut.
 - **Credits.** The render adds each icon and logo a graphic draws to `<name>.broll.txt`, a logo with its trademark note.
 

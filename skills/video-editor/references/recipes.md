@@ -78,7 +78,7 @@ It also cuts away to web captures or stock footage: `broll` entries whose source
 - **Change a graphic's words or numbers:** edit the text in its `html`, keeping the markup and classes. Show only words and numbers the speaker says while it shows, as keywords, never the whole sentence the captions already show. Each part enters with a CSS animation of 0.3 to 0.8 s in its `css` and stays; nothing animates out.
 - **Move a graphic:** change `start`, 0.4 s (48000) before the word it shows (its `start` in `captions.lines[].words`), keeping it clear of other graphics and B-roll. Its `words` name the spoken words it shows, so a later cut that takes one out removes it.
 - **Add a graphic:** `{ "layout": "label", "html": "…", "css": "…", "box": { "x": …, "y": …, "w": …, "h": … }, "start": …, "duration": 360000 }`, written as `graphicsGuide` in `packages/effects/src/graphics.ts` says: the house classes, sizes in `var(--u)`, inside the safe area and clear of the captions and the speaker's face; `box` only for a label or a lower third, as fractions of the frame. The render checks only its markup and length, so look at a frame of it in the rendered video before handing it over.
-- **Credits:** the render writes `edit-v2.broll.txt` again from what the new version shows: each source's `credit`.
+- **Credits:** the render writes `edit-v2.broll.txt` again from what the new version shows: each source's `credit`, the sound effects, and each icon and logo a graphic draws (Lucide icons under ISC, Simple Icons logos under CC0 with a note that the logo is its owner's trademark). An icon or logo added by hand is credited the same way.
 
 ## Change the music level, or remove the music
 

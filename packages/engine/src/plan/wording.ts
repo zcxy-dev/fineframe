@@ -47,6 +47,16 @@ export function normalized(text: string): string {
 
 const NUMERALS = "〇零一二兩三四五六七八九十百千萬億";
 
+/** The numbers written in digits in a text, each whole: 1,000 as 1000, 4.5 as itself. */
+function numbersIn(text: string): string[] {
+  return text.replace(/(\d),(?=\d{3})/g, "$1").match(/\d+(?:\.\d+)?/g) ?? [];
+}
+
+/** The Latin words in a text, in lower case: runs of letters that are not Chinese. */
+function latinWords(text: string): string[] {
+  return text.toLowerCase().match(/(?:(?!\p{Script=Han})\p{L})+/gu) ?? [];
+}
+
 /**
  * The words on a graphic that the speech near it does not hold: each run of Chinese characters
  * must be made of pieces of two or more characters found in the speech, joined at most by single
@@ -57,7 +67,8 @@ const NUMERALS = "〇零一二兩三四五六七八九十百千萬億";
 export function unsaid(shown: string, speech: string): string[] {
   const said = normalized(speech);
   const plain = speech.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, "");
-  const numbers = new Set<string>(plain.match(/\d+(?:\.\d+)?/g) ?? []);
+  // Each number said whole, in digits (1,000 and 4.5 among them) or in Chinese numerals.
+  const numbers = new Set<string>(numbersIn(speech));
   for (const run of plain.match(new RegExp(`[${NUMERALS}]+`, "g")) ?? []) {
     const value = chineseNumber(run);
     if (value !== null) numbers.add(String(value));
@@ -69,6 +80,7 @@ export function unsaid(shown: string, speech: string): string[] {
     }
     return false;
   };
+  const words = new Set(latinWords(speech));
   const missing: string[] = [];
   for (const token of shown.match(/[\p{Script=Han}]+|[\p{L}\p{N}][\p{L}\p{N}.,'%-]*/gu) ?? []) {
     if (/\p{Script=Han}/u.test(token)) {
@@ -87,7 +99,7 @@ export function unsaid(shown: string, speech: string): string[] {
         // A number on it must be one the speaker says.
         const digits = run.slice(at).match(/^\d+(?:\.\d+)?/)?.[0];
         if (length >= 2) at += length;
-        else if (digits && (numbers.has(digits) || said.includes(digits))) at += digits.length;
+        else if (digits && numbers.has(digits)) at += digits.length;
         else if (!digits && (JOINERS.has(run[at] as string) || afterNumber(run[at] as string))) {
           at += 1;
         } else {
@@ -97,9 +109,11 @@ export function unsaid(shown: string, speech: string): string[] {
       }
       if (!ok) missing.push(token);
     } else {
-      const word = normalized(token);
-      const number = /^\d+(\.\d+)?$/.test(word) && numbers.has(word);
-      if (word && !JOINERS.has(word) && !number && !said.includes(word)) missing.push(token);
+      // Each number and word in it said whole: 20 is not in 2024, nor art in start.
+      const parts = numbersIn(token).concat(latinWords(token));
+      const heard = (part: string) =>
+        /^\d/.test(part) ? numbers.has(part) : words.has(part) || JOINERS.has(part);
+      if (parts.length > 0 && !parts.every(heard)) missing.push(token);
     }
   }
   return [...new Set(missing)];
@@ -147,10 +161,23 @@ export function repeated(pieces: readonly string[], speech: string): string | nu
   }, "");
 }
 
+/** Whether the speech names `name` whole: a Chinese name as said (星巴克), a Latin one as the
+ * run of words it is (Google Drive, Node.js), never inside a longer word (X is not in next, nor
+ * Meta in metadata). */
+export function saysName(name: string, speech: string): boolean {
+  if (/\p{Script=Han}/u.test(name)) return normalized(speech).includes(normalized(name));
+  const words = (text: string) =>
+    text.toLowerCase().match(/(?:(?!\p{Script=Han})[\p{L}\p{N}])+/gu) ?? [];
+  const said = words(speech);
+  const parts = words(name);
+  if (parts.length === 0) return false;
+  const joined = parts.join("");
+  return said.some((word, i) => word === joined || parts.every((part, k) => said[i + k] === part));
+}
+
 /** The brands whose logos the graphic's markup shows that the speech does not name, by title. */
 export function unnamed(html: string, speech: string): string[] {
-  const said = normalized(speech);
   return marksIn(html)
-    .logos.filter((name) => !said.includes(normalized(LOGOS[name].title)) && !said.includes(name))
+    .logos.filter((name) => !saysName(LOGOS[name].title, speech))
     .map((name) => LOGOS[name].title);
 }

@@ -219,17 +219,18 @@ The effects and motion graphics render with [HyperFrames](../effects/README.md#r
 
 | Edit | Written | Kept | With icons | Left out because | Claude: all, graphics |
 |---|--:|--:|--:|---|---|
-| real-2, 60 s at 9:16 | 10 | 9 | 0 | 1 too little of the frame filled | $0.61, $0.52 |
-| real-10, 60 s at 9:16 (English) | 9 | 7 | 0 | 2 text under the captions | $0.48, $0.41 |
+| real-2, 60 s at 9:16 | 15 | 13 | 3 | 1 too near the end, 1 too close to the one before | $0.51, $0.42 |
+| real-10, 60 s at 9:16 (English) | 9 | 7 | 3 | 2 text under the captions | $0.48, $0.41 |
 | real-8, 60 s at 9:16 | 11 | 9 | 3 | 1 too little of the panel filled, 1 text under the captions | $0.45, $0.35 |
 | real-1, 60 s at 9:16 | 9 | 8 | 3 | 1 too close to the one before | $0.41, $0.30 |
 | real-2, 3 min at 16:9 | 21 | 20 | 10 | 1 too near the end | $0.76, $0.63 |
 | real-6, 3 min at 16:9 | 18 | 15 | 6 | 1 texts overlap, 1 a word not said, 1 too close to the one before | $0.93, $0.74 |
 
-- **Cost:** a 60 s edit cost $0.41 to $0.61 in all, a 3 min one $0.76 and $0.93. The graphics are 75 to 85 % of it; writing them is half to most of that, the fix request the rest.
+- **Cost:** a 60 s edit cost $0.41 to $0.51 in all, a 3 min one $0.76 and $0.93. The graphics are 75 to 85 % of it; writing them is half to most of that, the fix request the rest.
 - **Hard rules:** every edit lands within ±5 % of its length (−3.2 to +4.4 %), with 0 clicks at 18 cuts and 0.0 ms of drift.
-- **Icons and logos:** 22 of the 68 graphics kept mark their words with an icon. None shows a logo: no clip names a brand among the bundled logos.
+- **Icons and logos:** 28 of the 72 graphics kept mark their words with an icon. None shows a logo: no clip names a brand among the bundled logos.
 - **The real-2 and real-8 60 s edits** were made again after two fixes to the checks: a unit said after a number counts as said (a panel showing 27 and 歲 apart had been left out as saying 歲 unsaid), and a graphic's icons count toward how much of its area it fills.
+- **Still stretches:** real-2 at 60 s was made last, once code asks Claude for a graphic where the picture holds still longer than the shape allows: 13 graphics, against 9 before, 2 of them written for such stretches, at $0.51. The planner table and the other edits here were measured before that request, and before a capture had to be named in its line.
 - **What the checks do not see:** text already drawn into the footage. Some of real-6's lower thirds land on its own titles.
 
 ## Colour measurements

@@ -3,6 +3,7 @@
 
 import { createRenderJob, executeRenderJob } from "@hyperframes/producer";
 import type { FrameRate } from "@video-editor/schema";
+import { guardPuppeteer, hyperframesPuppeteer } from "./guard.ts";
 import type { Binaries } from "./render.ts";
 
 export interface WorkerTask {
@@ -23,6 +24,8 @@ function send(message: WorkerMessage): void {
 const quiet = () => {};
 
 async function main(task: WorkerTask): Promise<void> {
+  // Every page HyperFrames opens reaches nothing but its own folder and runs only its scripts.
+  guardPuppeteer(await hyperframesPuppeteer());
   // HyperFrames also logs each step of a render to the console; only its errors are worth a line.
   console.log = console.info = console.debug = console.warn = quiet;
   process.env.PRODUCER_HEADLESS_SHELL_PATH = task.binaries.chrome;

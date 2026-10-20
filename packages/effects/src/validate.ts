@@ -15,7 +15,7 @@ import {
   templateIds,
 } from "./catalog.ts";
 import { GRAPHIC_SECONDS, isOverlayLayout } from "./graphics.ts";
-import { markupProblem } from "./page.ts";
+import { markupProblem } from "./markup.ts";
 
 const ajv = new Ajv2020({ allErrors: true });
 const validators = new Map(templateIds.map((id) => [id, ajv.compile(catalog[id].params)]));

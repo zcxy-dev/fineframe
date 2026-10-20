@@ -58,7 +58,8 @@ ${kinds.map((kind, i) => `${i + 1}. ${kind}`).join("\n")}
 Give the visuals as one JSON array in the visuals string, [] for none, each an object with \
 these keys, every value a string except line: source and line, the line it lands on; text, the \
 words it lands on; kind, ${kinds.length === 2 ? '"stock" or "web"' : '"web"'}; query, the stock \
-search in English; url, the page's address; focus, the words on the page to zoom into; sfx, \
+search in English; url, the page's address; focus, the words on the page to zoom into; name, \
+the product or site's name exactly as the speaker says it in the line, which code checks; sfx, \
 "none" or one of ${SFX_WISHES.map((s) => `"${s}"`).join(", ")}; and reason. Leave the keys of \
 other kinds empty.
 

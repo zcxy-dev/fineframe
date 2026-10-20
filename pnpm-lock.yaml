@@ -90,6 +90,12 @@ importers:
       ajv:
         specifier: 8.20.0
         version: 8.20.0
+      htmlparser2:
+        specifier: 10.1.0
+        version: 10.1.0
+      postcss:
+        specifier: 8.5.30
+        version: 8.5.30
       puppeteer-core:
         specifier: 25.14.0
         version: 25.14.0

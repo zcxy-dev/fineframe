@@ -3,7 +3,13 @@ import { test } from "node:test";
 import { checkGraphics } from "@video-editor/effects";
 import { chrome } from "../chrome.ts";
 import type { TimedWord } from "./captions.ts";
-import { findQuote, type GraphicWish, placeGraphics } from "./graphics.ts";
+import {
+  findQuote,
+  type GraphicWish,
+  placeGraphics,
+  stillStretches,
+  wishesOf,
+} from "./graphics.ts";
 
 const SECOND = 120_000;
 const FRAME = SECOND / 30;
@@ -26,6 +32,57 @@ test("a quote is found among the words nearest where Claude said it lands", () =
   // Punctuation and spaces do not matter; words not said are not found.
   assert.deepEqual(findQuote(words, "所有 心思!", 0), [10, 13]);
   assert.equal(findQuote(words, "三十歲", 0), null);
+});
+
+test("a graphic depends on its anchor and every phrase it shows, and goes when one is not said", () => {
+  const answer = {
+    layout: "label" as const,
+    anchor: "我放",
+    at: 7.5,
+    seconds: 3,
+    quotes: ["所有心思"],
+    shows: "x",
+    sfx: "none" as const,
+    html: "<b>x</b>",
+    css: "",
+  };
+  const left: string[] = [];
+  const [kept, ...rest] = wishesOf(
+    [answer, { ...answer, quotes: ["所有心思", "三十歲"] }],
+    words,
+    (m) => left.push(m),
+  );
+  assert.equal(rest.length, 0);
+  // ，我放 (7 to 9: the comma said with them) and 所有心思 (10 to 13): a cut that takes any of
+  // them takes the graphic.
+  assert.deepEqual(
+    kept?.words.map((w) => w.word),
+    [7, 8, 9, 10, 11, 12, 13],
+  );
+  assert.deepEqual(left, ['Left out a graphic on words the edit does not say: "三十歲"']);
+});
+
+test("the stretches where the picture holds still longer than the edit's shape allows are found", () => {
+  // Cuts at 3 and 20 s, a graphic from 5 to 9 s, in a 30 s edit: still from 9 to 20 s and 20 to
+  // 30 s. At 16:9 (8 s at most) both count; 0-3, 3-5 and 5-9 do not.
+  const spans = stillStretches(
+    [3 * SECOND, 20 * SECOND],
+    [{ start: 5 * SECOND, end: 9 * SECOND }],
+    30 * SECOND,
+    8,
+  );
+  assert.deepEqual(
+    spans.map((s) => [s.start / SECOND, s.end / SECOND]),
+    [
+      [9, 20],
+      [20, 30],
+    ],
+  );
+  // At 9:16, 4 s at most: a cut at 3 s in a 7 s edit leaves none longer.
+  assert.deepEqual(
+    stillStretches([3 * SECOND], [], 7 * SECOND, 4).map((s) => [s.start / SECOND, s.end / SECOND]),
+    [],
+  );
 });
 
 const wish = (overrides: Partial<GraphicWish>): GraphicWish => ({
@@ -120,7 +177,7 @@ test("each graphic is checked as drawn", browser, async () => {
   };
   const chip = (left: number, top: number, size = 6) =>
     `<div class="ff-chip" style="position:absolute;left:${left}px;top:${top}px;animation:ff-from-left .5s var(--enter) .1s both"><span style="font-size:calc(var(--u)*${size})">二十七歲</span></div>`;
-  const [good, onFace, bad, small, empty, marked, emoji, iconic] = await checkGraphics(
+  const [good, onFace, bad, small, empty, marked, emoji, faint, iconic] = await checkGraphics(
     [
       { layout: "label", html: chip(90, 760), css: "", output, frames: 90, ...around },
       { layout: "label", html: chip(350, 400), css: "", output, frames: 90, ...around },
@@ -155,6 +212,15 @@ test("each graphic is checked as drawn", browser, async () => {
       {
         layout: "label",
         html: chip(90, 760).replace("二十七歲", "二十七歲😀"),
+        css: "",
+        output,
+        frames: 90,
+        ...around,
+      },
+      // Faint text is still drawn: it is checked like any other.
+      {
+        layout: "full",
+        html: '<div class="ff-stage"></div><b style="position:absolute;left:10%;right:10%;top:20%;font-size:calc(var(--u)*20);text-align:center;animation:ff-pop .5s both">27</b><span style="position:absolute;left:10%;top:1250px;font-size:calc(var(--u)*5);opacity:.3;animation:ff-fade .5s both">十年前</span>',
         css: "",
         output,
         frames: 90,
@@ -197,6 +263,8 @@ test("each graphic is checked as drawn", browser, async () => {
   assert.deepEqual(emoji?.problems, [
     'The fonts have no "😀": it would show as a box; use words, digits or common punctuation.',
   ]);
+  assert.match(faint?.problems.join("\n") ?? "", /"十年前" lies under the captions/);
+  assert.match(faint?.text ?? "", /十年前/);
   // The icon counts as part of what fills the frame.
   assert.deepEqual(iconic?.problems, []);
   // The chip is in by 0.6 s, its text only at 2 s.

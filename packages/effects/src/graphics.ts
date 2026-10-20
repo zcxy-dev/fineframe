@@ -4,6 +4,7 @@
 import type { Project } from "@video-editor/schema";
 import { iconNames, LOGOS, logoNames } from "./icons.ts";
 import { type Aspect, layoutFor } from "./layout.ts";
+import { cleanMarkup, markupProblem } from "./markup.ts";
 import { type Box, page } from "./page.ts";
 import { HOUSE_CSS } from "./style.ts";
 
@@ -69,13 +70,16 @@ export interface GraphicJob {
   frames: number;
 }
 
-/** A graphic's page and the size it renders at. */
+/** A graphic's page and the size it renders at, its markup rebuilt from its parse. Markup that
+ * markupProblem refuses never reaches a page: the renderer would fetch what it names. */
 export function graphicPage(job: GraphicJob): {
   page: string;
   width: number;
   height: number;
   transparent: boolean;
 } {
+  const unsafe = markupProblem(job.html, job.css);
+  if (unsafe) throw new Error(`A graphic cannot be drawn: ${unsafe}.`);
   const frame = graphicFrame(job.layout, job.output);
   const u = Math.min(job.output.width, job.output.height) / 100;
   const box = isOverlayLayout(job.layout) ? job.box : undefined;
@@ -86,7 +90,7 @@ export function graphicPage(job: GraphicJob): {
       u,
       fps: job.output.fps,
       frames: job.frames,
-      html: job.html,
+      html: cleanMarkup(job.html),
       css: job.css,
     }),
     width: box?.width ?? frame.width,
@@ -130,5 +134,5 @@ ${HOUSE_CSS.trim()}
 - Your HTML goes inside a box the size of the frame (or of the panel), positioned at its top-left corner; place things with \`position: absolute\`, flex or grid inside it.
 - The safe area for labels and lower thirds is x ${Math.round(safe.left)} to ${Math.round(width - safe.right)} and y ${Math.round(safe.top)} to ${Math.round(height - safe.bottom)}${aspect === "9:16" ? " (the app's header is above it and its buttons to the right)" : ""}.
 
-Motion: every part enters with a CSS animation of 0.3 to 0.8 s, \`animation-fill-mode: both\`, at a delay in seconds from the graphic's start; the stylesheet's keyframes ff-rise, ff-fade, ff-from-left, ff-from-right, ff-pop and ff-draw and the timing \`var(--enter)\` are there to use, or write your own @keyframes. Entrances only: nothing animates out, loops or keeps moving; the graphic is cut away at its end. A full or panel graphic is slid in by the renderer over its first ${SLIDE} s, so start its parts at 0.25 s or later and build them in order, each on the word that names it; a box enters with its text, never empty. A number may count up with an @property integer and a counter. No scripts, no url(), and no images but those icons and logos: only HTML and CSS.`;
+Motion: every part enters with a CSS animation of 0.3 to 0.8 s, \`animation-fill-mode: both\`, at a delay in seconds from the graphic's start; the stylesheet's keyframes ff-rise, ff-fade, ff-from-left, ff-from-right, ff-pop and ff-draw and the timing \`var(--enter)\` are there to use, or write your own @keyframes. Entrances only: nothing animates out, loops or keeps moving; the graphic is cut away at its end. A full or panel graphic is slid in by the renderer over its first ${SLIDE} s, so start its parts at 0.25 s or later and build them in order, each on the word that names it; a box enters with its text, never empty. No scripts, no url(), no text written by CSS (content: or counters), and no images but those icons and logos: only HTML and CSS.`;
 }

@@ -192,7 +192,7 @@ export function costByStage(usages: readonly Usage[]): ClaudeCost {
     return { dollars: total.dollars, requests: total.calls };
   };
   return {
-    plan: stage(["plan", "locate", "repair"]),
+    plan: stage(["plan", "locate"]),
     graphics: stage(["graphics"]),
     check: stage(["check", "judge"]),
   };

@@ -34,11 +34,17 @@ const wish = (overrides: Partial<VisualWish>): VisualWish => ({
   query: "",
   url: "",
   focus: "",
+  name: "",
   sfx: "none",
   reason: "",
   ...overrides,
 });
-const surya = wish({ url: "https://huggingface.co/nasa-ibm-ai4science", focus: "Surya" });
+const surya = wish({
+  url: "https://huggingface.co/nasa-ibm-ai4science",
+  focus: "Surya",
+  name: "Hugging Face",
+});
+const said = "Surya 的模型放在 Hugging Face 上";
 const extras = { music: false, title: false, chapters: false, people: false, callouts: false };
 
 test("a rich plan asks for visuals, with stock footage only when a key allows it", () => {
@@ -114,31 +120,58 @@ test("the plan's visuals are read from their JSON, each left out unless whole", 
 });
 
 test("code checks each visual before sourcing it", () => {
-  assert.equal(wishProblem(surya, false), null);
+  assert.equal(wishProblem(surya, false, said), null);
   // A page with no words on it to show would show its first screen: a home page or an ad.
-  assert.match(wishProblem(wish({ url: surya.url }), false) ?? "", /no words on the page/);
-  const web = (url: string) => wishProblem(wish({ kind: "web", url, focus: "x" }), false);
+  assert.match(wishProblem(wish({ url: surya.url }), false, said) ?? "", /no words on the page/);
+  const web = (url: string) =>
+    wishProblem(wish({ kind: "web", url, focus: "x", name: "Hugging Face" }), false, said);
   assert.equal(web("https://huggingface.co/nasa-ibm-ai4science"), null);
   assert.match(web("http://localhost:3000/") ?? "", /local/);
   assert.match(web("http://192.168.1.2/") ?? "", /local/);
   assert.match(web("file:///etc/passwd") ?? "", /http/);
   assert.match(web("not a page") ?? "", /Not a web address/);
   assert.match(web("https://www.google.com/search?q=surya") ?? "", /search page/);
-  assert.match(wishProblem(wish({ kind: "stock", query: "the sun" }), false) ?? "", /key/);
-  assert.equal(wishProblem(wish({ kind: "stock", query: "the sun" }), true), null);
+  assert.match(wishProblem(wish({ kind: "stock", query: "the sun" }), false, said) ?? "", /key/);
+  assert.equal(wishProblem(wish({ kind: "stock", query: "the sun" }), true, said), null);
+});
+
+test("a page is captured only when the speaker names its site or product", () => {
+  const page = (url: string, name: string) => wish({ kind: "web", url, focus: "x", name });
+  const starbucks = page("https://www.starbucks.com.tw/products/cold-foam", "星巴克");
+  assert.equal(wishProblem(starbucks, false, "下班之後去星巴克喝咖啡"), null);
+  assert.match(wishProblem(starbucks, false, "下班之後去喝咖啡") ?? "", /does not name/);
+  // The address's own name, said, is enough: dcard in www.dcard.tw.
+  assert.equal(
+    wishProblem(page("https://www.dcard.tw/f/x", ""), false, "我們在 Dcard 上的故事"),
+    null,
+  );
+  // Not a name heard wrong, nor one inside another word.
+  const claude = page("https://www.anthropic.com/claude", "Claude");
+  assert.match(wishProblem(claude, false, "這一步是交給 Claire 來決定的") ?? "", /does not name/);
+  assert.match(
+    wishProblem(page("https://x.com/home", "X"), false, "the next step") ?? "",
+    /does not name/,
+  );
 });
 
 test("a visual that cannot be sourced is left out and its line keeps the speaker", async (t) => {
   const dir = await scratch(t, "visuals-");
   const assets = new Map<string, Asset | null>();
   const problems: string[] = [];
-  const page = wish({ kind: "web", url: "https://example.com/", focus: "Example Domain", line: 2 });
+  const page = wish({
+    kind: "web",
+    url: "https://example.com/",
+    focus: "Example Domain",
+    name: "Example",
+    line: 2,
+  });
   const broken = wish({ kind: "web", url: "https://example.org/", focus: "x", line: 3 });
   const footage = wish({ kind: "stock", query: "solar flare", line: 4 });
   const captured: { url: string; text?: string; viewport?: object }[] = [];
   await sourceVisuals([page, broken, footage, page], assets, {
     output: { aspect: "9:16", width: 1080, height: 1920 },
     stock: false,
+    said: () => "the Example site",
     dir,
     onProblem: (message) => problems.push(message),
     capture: async (options) => {
@@ -177,6 +210,7 @@ test("a visual that cannot be sourced is left out and its line keeps the speaker
   await sourceVisuals([page], again, {
     output: { aspect: "9:16", width: 1080, height: 1920 },
     stock: false,
+    said: () => "the Example site",
     dir,
     onProblem: () => {},
     capture: async () => assert.fail("captured again"),

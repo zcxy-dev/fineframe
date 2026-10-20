@@ -407,6 +407,16 @@ async function sourceWishes(state: PlanState): Promise<void> {
     output: { aspect: state.aspect, width, height },
     stock: state.extras.stock ?? false,
     onProblem: state.progress,
+    said: (source, n) => {
+      const file = state.sources.get(source);
+      const line = file?.lines.find((l) => l.n === n);
+      return file && line
+        ? file.words
+            .slice(line.first, line.last + 1)
+            .map((w) => w.text)
+            .join(" ")
+        : "";
+    },
   });
   const ready = wishes.filter((wish) => state.assets.get(visualKey(wish))).length;
   state.progress(`Sourced ${ready} of ${wishes.length} visuals`);

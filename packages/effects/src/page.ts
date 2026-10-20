@@ -3,7 +3,6 @@
 // else, sized to what it fills.
 
 import type { FrameRate } from "@video-editor/schema";
-import { markOf } from "./icons.ts";
 
 /** A region of the frame, in output pixels. */
 export interface Box {
@@ -29,10 +28,11 @@ export interface PageSpec {
 }
 
 /** No request leaves the page but for its stylesheets, fonts and the bundled icons and logos, all
- * in its own folder, and no script runs but the renderer's own. */
-const POLICY =
-  "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; " +
-  "script-src 'self' 'unsafe-inline'";
+ * in its own folder, and no script runs: the renderer adds the hashes of its own scripts to this
+ * policy as it serves the page (worker.ts). */
+export const POLICY =
+  "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self'; " +
+  "script-src 'none'";
 
 /** The whole document for one effect. The renderer seeks its CSS animations frame by frame. */
 export function page(spec: PageSpec): string {
@@ -45,6 +45,9 @@ export function page(spec: PageSpec): string {
 <link rel="stylesheet" href="fonts.css"><link rel="stylesheet" href="house.css">
 <style>
 html, body { width: ${box.width}px; height: ${box.height}px; }
+/* Held at their start until the renderer seeks them: HyperFrames measures each animation from the
+   time it has run when first seen, so one left running from load would render a frame or two late. */
+*, *::before, *::after { animation-play-state: paused !important; }
 :root { --u: ${spec.u}px; }
 #frame { position: absolute; left: ${-box.x}px; top: ${-box.y}px; width: ${width}px; height: ${height}px; overflow: hidden; }
 ${spec.css}
@@ -52,28 +55,4 @@ ${spec.css}
 <div id="root" data-composition-id="effect" data-no-timeline data-start="0" data-duration="${seconds}" data-width="${box.width}" data-height="${box.height}"><div id="frame" class="ff">${spec.html}</div></div>
 </body></html>
 `;
-}
-
-/** Why the markup or styles Claude wrote cannot be drawn as they are, or null: scripts, event
- * handlers and anything loaded from elsewhere are not allowed, and the only images are the
- * bundled icons and logos. The page's policy blocks the rest anyway; this says so before a
- * render. */
-export function markupProblem(html: string, css: string): string | null {
-  if (
-    /<\s*(script|iframe|object|embed|link|meta|base|video|audio|style|picture|source)\b/i.test(html)
-  ) {
-    return "it uses an element graphics may not use (script, iframe, link, style and the like)";
-  }
-  for (const [image] of html.matchAll(/<\s*img\b[^>]*>/gi)) {
-    const src = image.match(/\ssrc\s*=\s*["']([^"']*)["']/i)?.[1];
-    if (!src || /\ssrcset\s*=/i.test(image) || !markOf(src)) {
-      return `its image ${src ? `"${src}"` : "without a src"} is not one of the bundled icons or logos`;
-    }
-  }
-  if (/\son\w+\s*=/i.test(html)) return "it has an event handler";
-  if (/javascript:/i.test(html + css)) return "it has a javascript: address";
-  if (/@import|url\(\s*['"]?(?!data:)/i.test(css) || /url\(\s*['"]?(?!data:)/i.test(html)) {
-    return "it loads something by url()";
-  }
-  return null;
 }
