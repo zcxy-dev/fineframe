@@ -140,6 +140,32 @@ function plainest(schema: Schema): unknown {
   return "Fine.";
 }
 
+/** Every progress line about the graphics, as the job's event stream sends each change: what
+ * Claude wrote, what was left out and why, and what was kept. */
+const graphicLines: string[] = [];
+async function follow(id: string, signal: AbortSignal): Promise<void> {
+  try {
+    const response = await fetch(`${origin}/api/jobs/${id}/events`, { signal });
+    const decoder = new TextDecoder();
+    let pending = "";
+    for await (const chunk of response.body ?? []) {
+      pending += decoder.decode(chunk as Uint8Array, { stream: true });
+      const events = pending.split("\n\n");
+      pending = events.pop() ?? "";
+      for (const event of events) {
+        if (!event.startsWith("data: ")) continue;
+        const message = (JSON.parse(event.slice(6)) as { progress?: { message: string } }).progress
+          ?.message;
+        if (message && /graphic/i.test(message) && graphicLines.at(-1) !== message) {
+          graphicLines.push(message);
+        }
+      }
+    }
+  } catch {
+    // Stopped once the edit is done.
+  }
+}
+
 /** The plan for the files the request lists: every line in order, earlier lines first to keep,
  * and the first line's longest word popped on screen. */
 function planFor(packed: string, schema: Schema): unknown {
@@ -171,18 +197,32 @@ function planFor(packed: string, schema: Schema): unknown {
   return { ...decisions, content: "A short spoken test.", segments, emphasis };
 }
 
-/** The edit's graphics: one label on the first word of the speech the request lists, which it
- * gives as `word@seconds`, in the safe area at either aspect. */
+/** The edit's graphics: one label of 2 s on the first word of the speech the request lists, which
+ * it gives as `word@seconds`, whose label keeps clear of what the request lists as taken (a
+ * keyword pop, B-roll), as Claude is told to; in the safe area at either aspect. */
 function graphicsFor(request: string): unknown {
-  const first = request.match(/^\[[\d.]+–[\d.]+\] (\S+)@([\d.]+)/m);
+  const listed = request.split("Taken, no graphic over these:")[1] ?? "";
+  const taken = [...listed.matchAll(/^([\d.]+)–([\d.]+) s: /gm)].map((m) => [
+    Number(m[1]),
+    Number(m[2]),
+  ]);
+  const said = request
+    .split("\n")
+    .filter((line) => line.startsWith("["))
+    .flatMap((line) => [...line.matchAll(/(\S+)@([\d.]+)/g)])
+    .map((m) => ({ word: m[1] as string, at: Number(m[2]) }));
+  // It shows from 0.4 s before the word for 2 s, with 0.4 s clear on either side.
+  const clear = ({ at }: { at: number }) =>
+    taken.every(([start, end]) => at + 2 <= (start as number) || at - 0.8 >= (end as number));
+  const first = said.find(clear);
   if (!first) return { graphics: [] };
-  const [, word, at] = first as unknown as [string, string, string];
+  const { word, at } = first;
   return {
     graphics: [
       {
         layout: "label",
         anchor: word,
-        at: Number(at),
+        at,
         seconds: 2,
         quotes: [word],
         shows: "The first word said.",
@@ -469,6 +509,8 @@ async function makeEdit(): Promise<string[]> {
   await shot(page, "3-ready-to-edit");
   await page.getByRole("button", { name: `Make the ${LENGTH} s video` }).click();
   await page.getByRole("heading", { name: "Making your edit" }).waitFor({ timeout: 120_000 });
+  const following = new AbortController();
+  void follow((await api<{ id: string }>("/api/jobs/latest")).id, following.signal);
   try {
     await page
       .getByText(/^Downloading /)
@@ -482,6 +524,7 @@ async function makeEdit(): Promise<string[]> {
   const failed = page.getByRole("heading", { name: "The edit could not be finished" });
   await done.or(failed).waitFor({ timeout: 2_400_000 });
   clearInterval(watching);
+  following.abort();
   await shot(page, "5-done");
 
   const job = await api<{
@@ -536,6 +579,7 @@ async function makeEdit(): Promise<string[]> {
     say(`overlays in the edit: ${overlays.join(", ") || "none"}`);
     graphics = (project.graphics ?? []).length;
     say(`graphics in the edit: ${graphics}`);
+    for (const line of graphicLines) say(`graphics: ${line}`);
   }
   const playing = await playInPage(page);
   await shot(page, "6-playing");
@@ -550,7 +594,8 @@ async function makeEdit(): Promise<string[]> {
     !job.result?.captions && "no captions",
     !asked.includes("plan") && "Claude was not asked for a plan",
     !asked.includes("graphics") && "Claude was not asked for the graphics",
-    graphics === 0 && "the edit has no graphic: HyperFrames did not draw it",
+    graphics === 0 &&
+      `the edit has no graphic: ${graphicLines.filter((line) => line.startsWith("Left out")).join("; ") || "HyperFrames did not draw it"}`,
     heard === 0 && "OpenRouter heard nothing",
     ![...downloads].some((name) => name.startsWith("the analysis environment")) &&
       "the analysis environment's download was not shown",
