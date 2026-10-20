@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Job, ShortEdit } from "../lib/jobs.ts";
-import { formatClock, formatLength } from "../lib/settings.ts";
+import { formatClock, formatRange } from "../lib/settings.ts";
 import { fewerShorts, jobApi, shortView } from "../lib/shorts.ts";
 import styles from "./editor.module.css";
 import { useT } from "./I18n.tsx";
@@ -12,7 +12,7 @@ import { DownloadIcon } from "./icons.tsx";
 function useRange(job: Job): string {
   const t = useT();
   const { min, max } = job.settings.shorts ?? { min: 0, max: job.settings.length };
-  return t.settings.range(formatLength(min, t), formatLength(max, t));
+  return formatRange(min, max, t);
 }
 
 /** A short's length now: its version shown's, or as it was made. */

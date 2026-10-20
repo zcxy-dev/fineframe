@@ -118,9 +118,11 @@ test("the best moments become shorts, each from its own stretch, listed as each 
     // Shares lines with the one before, so it is not a short of its own.
     { ...saying(5, "Overlapping"), first: 4 + 5 * LINES, last: 3 + 6 * LINES },
     saying(2, "Too thin"),
-    // Every word of one saying lasts under 30 s, so it cannot make a short of 30 s.
-    saying(7, "Too long a length", 30),
-    saying(9, "The ninth time", 16),
+    // One line, under the shortest a short may be with every word kept.
+    { ...saying(11, "One line"), last: 1 + 11 * LINES },
+    // One saying holds well under 30 s of speech: after both requests it is fitted to what it
+    // reaches, within the range.
+    saying(7, "Fitted to what it reaches", 30),
     // Past the most moments 6.5 minutes of footage gives.
     saying(12, "One too many"),
   ]);
@@ -139,16 +141,28 @@ test("the best moments become shorts, each from its own stretch, listed as each 
   };
   const result = await editShorts(options);
 
-  // Two shorts: the overlapping moment, the one too long for its stretch and the one past the most
-  // were never made, and the thin one failed and was left out. Folders count the shorts made, best first.
+  // Two shorts: the overlapping moment, the one line and the one past the most were never made,
+  // and the thin one reached under the range and was left out. Folders count the shorts made,
+  // best first.
   const shorts = await loadJson(join(dir, "shorts", "shorts.json"), validateShorts);
   assert.deepEqual(shorts, result.shorts);
   assert.deepEqual(
-    shorts.shorts.map((short) => [short.folder, short.title, short.length]),
+    shorts.shorts.map((short) => [short.folder, short.title]),
     [
-      ["01", "The fifth time", 15],
-      ["02", "The ninth time", 16],
+      ["01", "The fifth time"],
+      ["02", "Fitted to what it reaches"],
     ],
+  );
+  const [fifth, fitted] = shorts.shorts;
+  assert.equal(fifth?.length, 15);
+  // The length it reached, recorded as its length, and its video within 5 % of it.
+  assert.ok(fitted && fitted.length >= 15 && fitted.length < 30, `${fitted?.length} s`);
+  assert.ok(
+    lines.some((line) =>
+      new RegExp(
+        `after 2 requests; fitting it to ${fitted?.length} s, within the range asked$`,
+      ).test(line.message),
+    ),
   );
   assert.deepEqual(await readdir(join(dir, "shorts")), ["01", "02", "shorts.json"]);
   assert.deepEqual(shorts.shorts[0]?.hashtags, ["#talk", "#editing", "#twowords"]);
@@ -207,7 +221,7 @@ test("the best moments become shorts, each from its own stretch, listed as each 
   const cost = last?.claude;
   assert.deepEqual(cost?.find, { dollars: 0.01, requests: 1 });
   const planned = requests.filter((request) => request.purpose === "plan").length;
-  assert.equal(planned, 4, "two shorts, and the thin one asked twice");
+  assert.equal(planned, 5, "the fifth once, the thin one and the fitted one twice each");
   assert.equal(cost?.plan.requests, planned);
   assert.equal(result.usage.calls, requests.length);
 });

@@ -5,7 +5,7 @@ import { formatEstimate } from "../lib/eta.ts";
 import type { Messages } from "../lib/i18n/messages.ts";
 import { downloadName, progressText } from "../lib/i18n/program.ts";
 import type { Job, Stage } from "../lib/jobs.ts";
-import { formatBytes, formatClock, formatLength } from "../lib/settings.ts";
+import { formatBytes, formatClock, formatLength, formatRange } from "../lib/settings.ts";
 import styles from "./editor.module.css";
 import { useT } from "./I18n.tsx";
 import { AlertIcon, CheckIcon } from "./icons.tsx";
@@ -65,7 +65,7 @@ export function RunView({ job }: { job: Job }) {
             {shorts
               ? words.shortsFrom(
                   shorts.count,
-                  t.settings.range(formatLength(shorts.min, t), formatLength(shorts.max, t)),
+                  formatRange(shorts.min, shorts.max, t),
                   job.settings.aspect,
                 )
               : words.from(

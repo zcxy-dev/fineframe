@@ -148,6 +148,10 @@ export interface PlanOptions {
   /** What the edit is about, in a sentence or two, said to the planner: a short's title and
    * description. */
   about?: string;
+  /** The shortest the edit may be, in seconds, when the planner's choice reaches less than
+   * `length` after every request: it is then fitted to the length it reaches, as a short is
+   * within its range. Without it, such an edit fails. */
+  least?: number;
   /** The model that plans, and judges the cut checks a review doubts: best unless given. */
   quality?: Quality;
   /** `rich` (the default) adds Claude's motion graphics and shows B-roll on the edit's points,
@@ -206,6 +210,8 @@ export interface PlanState {
   names: string[];
   /** What the user asks of this edit, in their words; empty when nothing. */
   instructions: string;
+  /** The shortest the edit may be fitted to when the plan reaches less than `length`. */
+  least?: number;
   /** What the plan was asked for besides the edit. */
   extras: PlanExtras;
   fps: FrameRate;
@@ -286,7 +292,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
   // Every word played, each pause cut to the longest breath: no edit of this footage runs
   // longer, so a target past it fails here instead of after two paid requests.
   const whole = lengthOf(placeAll(sources, ticksPerFrame(fps))) / TICKS_PER_SECOND;
-  if (whole < options.length * (1 - TOLERANCE)) {
+  if (whole < Math.min(options.length, options.least ?? options.length) * (1 - TOLERANCE)) {
     throw new PlanError(
       `The footage holds too little speech for ${options.length} s: all of it, with every ` +
         `pause cut to a breath, lasts ${whole.toFixed(1)} s, and less once retakes and fillers ` +
@@ -321,6 +327,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
     musicListing: music.size > 0 ? describeMusic(music.values()) : "",
     names,
     instructions,
+    ...(options.least === undefined ? {} : { least: options.least }),
     extras: {
       music: music.size > 0,
       title: !short && options.length >= TITLE_SECONDS,
@@ -521,11 +528,13 @@ export interface Assembly {
 
 /**
  * Fits the chosen segments to the target. When they come out short even with the longest
- * breath, the planner is asked once more for material; when that is not enough, the footage
- * cannot make this edit.
+ * breath, the planner is asked once more for material; when that is not enough, the edit is
+ * fitted to the length it reaches if that is at least `least`, and otherwise the footage cannot
+ * make this edit.
  */
 async function assemble(state: PlanState): Promise<Assembly> {
-  const target = secondsToTicks(state.length);
+  let target = secondsToTicks(state.length);
+  let refitted = false;
   const frame = ticksPerFrame(state.fps);
   let extra = 0;
   for (;;) {
@@ -558,6 +567,17 @@ async function assemble(state: PlanState): Promise<Assembly> {
       );
     }
     if (state.planCalls >= MAX_PLAN_CALLS) {
+      const reached = Math.round(seconds);
+      if (state.least !== undefined && reached >= state.least && !refitted) {
+        state.progress(
+          `The edit lasts ${seconds.toFixed(1)} s after ${MAX_PLAN_CALLS} requests; fitting it to ` +
+            `${reached} s, within the range asked`,
+        );
+        state.length = reached;
+        target = secondsToTicks(reached);
+        refitted = true;
+        continue;
+      }
       throw new PlanError(
         `After ${MAX_PLAN_CALLS} requests the edit lasts ${seconds.toFixed(1)} s, short of ` +
           `${state.length} s − ${TOLERANCE * 100} %: the footage holds too little usable ` +

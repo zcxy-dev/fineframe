@@ -581,6 +581,8 @@ export const en = {
     requests: (requests: string, dollars: string) => `${requests} requests, ${dollars}`,
     cached: "all cached",
     tooShort: (seconds: string) => `The edit lasts ${seconds} s; asking for more material`,
+    fittedTo: (seconds: string, requests: string, length: string) =>
+      `The edit lasts ${seconds} s after ${requests} requests; fitting it to ${length} s, within the range asked`,
     leftOutKind: (kind: string, _name: string, line: string, reason: string) =>
       `Left out the ${kind} visual on line ${line}: ${reason}`,
     /** The kinds of visual the plan asks for. */

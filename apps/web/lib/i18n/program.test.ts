@@ -57,6 +57,7 @@ const SAID = [
   "Found 2 of 3 things to point at with claude-sonnet-4-5 (3 requests, $0.01)",
   "Found 2 of 3 things to point at with claude-sonnet-4-5 (all cached)",
   "The edit lasts 12.3 s; asking for more material",
+  "The edit lasts 46.7 s after 2 requests; fitting it to 47 s, within the range asked",
   "Left out the stock visual on line 12: no clip matched",
   "The plan's visuals are not JSON; the edit has none",
   "The plan's visuals are not a list; the edit has none",

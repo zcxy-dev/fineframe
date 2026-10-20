@@ -9,6 +9,7 @@ import {
   formatClock,
   formatDollars,
   formatLength,
+  formatRange,
   type Style,
   styleName,
 } from "./settings.ts";
@@ -44,7 +45,7 @@ export function summaryRows(
       words.length,
       // The run of shorts, rather than one of them: the range each lies in.
       shorts && !job.short
-        ? words.each(t.settings.range(formatLength(shorts.min, t), formatLength(shorts.max, t)))
+        ? words.each(formatRange(shorts.min, shorts.max, t))
         : `${words.target(formatLength(length, t))}${actual ? words.actual(formatClock(actual)) : ""}`,
     ],
     [words.aspect, aspect],

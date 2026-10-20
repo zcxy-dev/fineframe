@@ -535,6 +535,8 @@ export const zhTW: Messages = {
     requests: (requests, dollars) => `${requests} 次請求，${dollars}`,
     cached: "皆已快取",
     tooShort: (seconds) => `剪輯只有 ${seconds} 秒；正在要求更多素材`,
+    fittedTo: (seconds, requests, length) =>
+      `要求 ${requests} 次後剪輯只有 ${seconds} 秒；改剪成 ${length} 秒，仍在所選範圍內`,
     leftOutKind: (_kind, name, line, reason) => `略過第 ${line} 行的${name}：${reason}`,
     visuals: { stock: "圖庫影片", web: "網頁" },
     notJson: "規劃的視覺元素格式有誤；這次剪輯不加視覺元素",

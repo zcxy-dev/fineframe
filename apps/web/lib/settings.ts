@@ -233,6 +233,13 @@ export function formatLength(seconds: number, t: Messages = en): string {
   return parts.filter(Boolean).join(" ");
 }
 
+/** The range a short's length lies in, as the page shows it: 30–60 s, 90 s–3 min. */
+export function formatRange(min: number, max: number, t: Messages = en): string {
+  const { s } = t.units;
+  if (max < 120) return `${min}–${max} ${s}`;
+  return `${min < 120 ? `${min} ${s}` : formatLength(min, t)}–${formatLength(max, t)}`;
+}
+
 /** A running clock: 0:07, 12:30, 1:02:03. */
 export function formatClock(seconds: number): string {
   const whole = Math.max(0, Math.floor(seconds));

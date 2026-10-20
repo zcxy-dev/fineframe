@@ -9,6 +9,7 @@ import {
   type Asr,
   CAPTION_STYLES,
   formatLength,
+  formatRange,
   INSTRUCTIONS_MAX,
   instructionsProblem,
   LENGTH_PRESETS,
@@ -161,7 +162,7 @@ export function SettingsPanel({
                   aria-pressed={choices.range === i}
                   onClick={() => set({ range: i })}
                 >
-                  {words.range(formatLength(from, t), formatLength(to, t))}
+                  {formatRange(from, to, t)}
                 </button>
               ))}
             </div>

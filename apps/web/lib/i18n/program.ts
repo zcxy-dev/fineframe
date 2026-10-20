@@ -81,6 +81,10 @@ const SAID: [RegExp, (words: Words, said: Groups, t: Messages) => string][] = [
   ],
   [/^The edit lasts ([\d.]+) s; asking for more material$/, (w, [s]) => w.tooShort(s)],
   [
+    /^The edit lasts ([\d.]+) s after (\d+) requests; fitting it to (\d+) s, within the range asked$/,
+    (w, [s, n, length]) => w.fittedTo(s, n, length),
+  ],
+  [
     /^Left out the (\S+) visual on line (\d+): ([\s\S]*)$/,
     (w, [kind, line, reason]) => w.leftOutKind(kind, w.visuals[kind] ?? kind, line, reason),
   ],

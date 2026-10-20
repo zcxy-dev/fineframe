@@ -405,10 +405,14 @@ interface Cut {
   within?: { start: number; end: number };
   short?: boolean;
   about?: string;
+  /** The shortest it may be fitted to when its plan reaches less than `length`. */
+  least?: number;
 }
 
 interface Rendered {
   outputs: DoneProgress["outputs"];
+  /** The length it was planned for, and its video's. */
+  length: number;
   seconds: number;
   reviews: number;
 }
@@ -457,6 +461,7 @@ async function cutEdit(
         ...(cut.within ? { within: cut.within } : {}),
         ...(cut.short ? { short: true } : {}),
         ...(cut.about ? { about: cut.about } : {}),
+        ...(cut.least === undefined ? {} : { least: cut.least }),
         claude: prepared.claude,
         ...(options.quality ? { quality: options.quality } : {}),
         ...(options.visuals ? { visuals: options.visuals } : {}),
@@ -507,6 +512,7 @@ async function cutEdit(
         ...(rendered.music ? { music: rendered.music } : {}),
         ...(rendered.broll ? { broll: rendered.broll } : {}),
       },
+      length: edit.state.length,
       seconds: rendered.seconds,
       reviews,
     };
@@ -572,7 +578,7 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
     report,
     spent,
   );
-  const rendered = await cutEdit(
+  const { length: _, ...rendered } = await cutEdit(
     prepared,
     {
       inputs: planInputs(prepared, prepared.files),
@@ -593,7 +599,7 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
 }
 
 /** US dollars Claude may cost: each short, and finding the moments for each hour of footage. */
-export const SHORT_CAP = 1;
+const SHORT_CAP = 1;
 const FIND_CAP_PER_HOUR = 1;
 /** The share of the progress bar after the analysis that finding the moments takes. */
 const FIND_SHARE = 0.05;
@@ -624,8 +630,9 @@ export interface ShortsResult {
  * cache), has Claude find the moments that stand alone as shorts, best first, then edits each
  * from its own stretch of one file, hook first, as `edit` makes a short edit, into `01/edit.mp4`
  * and the files beside it. `shorts.json` lists each short as it is done, with the title,
- * description and hashtags Claude wrote for it. A moment the planner cannot make is left out and
- * the next one made instead.
+ * description and hashtags Claude wrote for it. A short whose plan reaches less than the length
+ * Claude picked is fitted to the length it reaches, within the range; a moment the planner cannot
+ * make is left out and the next one made instead.
  *
  * Progress lines name the short each is about, a `short` line says each one is done, and the last
  * line is `done` or `error`. Claude's cost for finding the moments, and for any short, is held
@@ -763,6 +770,7 @@ async function makeShorts(
           within: { start: moment.start, end: moment.end },
           short: true,
           about: `${moment.title}. ${moment.description}`,
+          least: shortest,
         },
         shortReport(number),
         from,
@@ -770,7 +778,7 @@ async function makeShorts(
       );
     } catch (error) {
       if (!(error instanceof PlanError)) throw error;
-      // A moment the planner cannot cut to its length; the next one is made in its place.
+      // A moment the planner cannot cut to a length in the range; the next one is made instead.
       failure = error.message;
       prepared.log(`The moment "${moment.title}" was left out: ${error.message}`);
       await rm(join(folder, name), { recursive: true, force: true });
@@ -785,7 +793,7 @@ async function makeShorts(
       source: file.given,
       start: moment.start,
       end: moment.end,
-      length: moment.length,
+      length: rendered.length,
       seconds: rendered.seconds,
     });
     await writeFile(list, `${JSON.stringify(validateShorts(shorts), null, 2)}\n`);

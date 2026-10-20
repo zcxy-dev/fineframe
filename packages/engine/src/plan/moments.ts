@@ -43,8 +43,8 @@ export interface FindOptions {
 
 /**
  * Asks Claude for the moments of the footage that stand alone as shorts, best first, and keeps
- * those code can make: on lines that exist, not sharing a line with a better one, with a length
- * in the range that the stretch's speech, every word kept, reaches.
+ * those code can make: on lines that exist, not sharing a line with a better one, with a stretch
+ * whose speech, every word kept, reaches the range.
  */
 export async function findMoments(options: FindOptions): Promise<Moment[]> {
   const sources = await loadSources(options.inputs);
@@ -106,7 +106,7 @@ export async function findMoments(options: FindOptions): Promise<Moment[]> {
     const stretch = new Map([[source.id, { ...source, lines }]]);
     const whole = lengthOf(placeAll(stretch, frame)) / TICKS_PER_SECOND;
     const length = Math.min(longest, Math.max(shortest, Math.round(moment.length)));
-    if (whole < length) continue;
+    if (whole < shortest) continue;
     for (const line of lines) own.add(line.n);
     used.set(source.id, own);
     taken.push({
