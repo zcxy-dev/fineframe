@@ -44,12 +44,13 @@ export async function localWorker(): Promise<Worker> {
 }
 
 /**
- * A hash of the worker's code and locked dependencies in `dir`. The worker's own version number is
- * left out, so a release that only raises it keeps every cached index.
+ * A hash of the worker's code, the dictionaries beside it and its locked dependencies in `dir`.
+ * The worker's own version number is left out, so a release that only raises it keeps every
+ * cached index.
  */
 export async function workerVersion(dir: string): Promise<string> {
   const code = (await readdir(join(dir, "src"), { recursive: true }))
-    .filter((file) => file.endsWith(".py"))
+    .filter((file) => /\.(py|txt)$/.test(file))
     .map((file) => join("src", file))
     .sort();
   const hash = createHash("sha256");

@@ -107,3 +107,69 @@ test("punctuation left on its own after a sentence makes no caption line", () =>
     ["真的嗎？", "好"],
   );
 });
+
+/** Words of source `a` one after another, 0.2 s each, with a pause after the ones in `pauses`. */
+function spoken(texts: string[], pauses: number[] = []): ReturnType<typeof outputWords> {
+  let at = 0;
+  return texts.map((text, index) => {
+    const word = { source: "a", index, text, start: at, end: at + 0.2 * T };
+    at = word.end + (pauses.includes(index) ? 0.6 * T : 0);
+    return word;
+  });
+}
+
+test("a caption line never ends inside a word, even at a full stop the transcript put there", () => {
+  // The transcript heard 衣櫃打。開。 and its lines split at the pause after 打.
+  const words = spoken(["衣", "櫃", "打。", "開。", "其", "實"]);
+  const lines = captionLines(words, (_, i) => (i < 3 ? 1 : 2));
+  assert.deepEqual(
+    lines.map((line) => line.text),
+    ["衣櫃打開", "其實"],
+  );
+  assert.deepEqual(
+    lines[0]?.words?.map((w) => w.text),
+    ["衣", "櫃", "打", "開"],
+  );
+  // Inside a line, the mark makes no pause between the word's characters.
+  assert.equal(subtitled(["衣", "櫃", "打。", "開"]).text, "衣櫃打開");
+});
+
+test("a caption line never ends on a word that leads into the next one", () => {
+  // 要不然會 | 太冷 at a pause of 0.6 s: 會 leads into the words after it.
+  const words = spoken(["套，", "要", "不", "然", "會", "太", "冷。"], [4]);
+  const lines = captionLines(words, (_, i) => (i < 5 ? 1 : 2));
+  assert.deepEqual(
+    lines.map((line) => line.text),
+    ["套　要不然會太冷"],
+  );
+  // A line that ends a sentence, or on a whole word, still ends there.
+  const apart = captionLines(spoken(["好", "冷。", "我", "們"]), (_, i) => (i < 2 ? 1 : 2));
+  assert.deepEqual(
+    apart.map((line) => line.text),
+    ["好冷", "我們"],
+  );
+  // Nor across words the edit cut out between them.
+  const cut = spoken(["要", "不", "然", "會", "太", "冷"]).filter((w) => w.index !== 4);
+  assert.deepEqual(
+    captionLines(cut, (_, i) => (i < 4 ? 1 : 2)).map((line) => line.text),
+    ["要不然會", "冷"],
+  );
+});
+
+test("an English word takes half-width punctuation", () => {
+  // In a Chinese line, a mark on an English word: commas and full stops become pauses, the rest
+  // half-width.
+  assert.equal(
+    subtitled(["到", "底", "值", "得？", "OK，", "Let's", "go"]).text,
+    "到底值得？OK　Let's go",
+  );
+  assert.equal(subtitled(["你", "說", "Really？", "好"]).text, "你說 Really? 好");
+  // An English line sets every mark half-width.
+  const english = captionLines(spoken(["Ian。", "Hello，", "get", "your", "coat."]), () => 1);
+  assert.deepEqual(
+    english.map((line) => line.text),
+    ["Ian.", "Hello, get your coat."],
+  );
+  const mixed = captionLines(spoken(["I", "love", "台", "灣，", "really"]), () => 1);
+  assert.equal(mixed[0]?.text, "I love 台灣, really");
+});

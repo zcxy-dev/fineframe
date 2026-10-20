@@ -38,7 +38,12 @@ test("a release's version bump keeps the cached indexes, a change to the code do
   assert.equal(await workerVersion(dir), before);
 
   await edit(join(dir, "src", "vework", "audio.py"), /$/, "\n# changed\n");
-  assert.notEqual(await workerVersion(dir), before);
+  const code = await workerVersion(dir);
+  assert.notEqual(code, before);
+
+  // Its data, such as the dictionaries the Chinese conversion reads, is part of the code.
+  await edit(join(dir, "src", "vework", "everyday_tw.txt"), /$/, "\u9EB5\t\u9EB5\n");
+  assert.notEqual(await workerVersion(dir), code);
 });
 
 test("a change to a dependency's locked version changes the worker's version", async (t) => {

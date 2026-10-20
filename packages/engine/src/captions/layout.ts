@@ -71,13 +71,57 @@ const DOUBLED = new Set("—…‥");
  * particles that close the one before: a row would rather not end on the first or start with
  * the second, as in 最 | 尖端 or 尖端 | 的. Nor end on a negation, even inside a word such as
  * 都不. It does only when no other break balances. */
-const LEADS = new Set("很太更最都也就還才再又把被將給在從對跟和與向往讓用有是");
+const LEADS = new Set("很太更最都也就還才再又把被將給在從對跟和與向往讓用有是會");
 const NEGATIONS = new Set("不沒別");
 const TRAILS = new Set("的了嗎呢吧啊呀嘛著過地得");
 
 /** Chinese has no spaces between words, so a row breaks where ICU's dictionary ends a word:
  * between 一下 and 怎麼, never inside 剪片. */
 const WORDS = new Intl.Segmenter("zh-Hant-TW", { granularity: "word" });
+
+const HAN = /^\p{Script=Han}$/u;
+
+/** Where ICU's words around the end of `before` meet `after`: whether one word spans the join,
+ * and whether the characters on either side are words of their own. Only between two Chinese
+ * characters; a join next to anything else is between words. */
+function join(before: string, after: string) {
+  const last = before.at(-1) ?? "";
+  const first = after[0] ?? "";
+  if (!HAN.test(last) || !HAN.test(first)) return null;
+  const segments = [...WORDS.segment(before + after)];
+  const at = before.length;
+  const spans = segments.find((s) => s.index < at && s.index + s.segment.length > at);
+  const ending = segments.find((s) => s.index + s.segment.length === at);
+  const starting = segments.find((s) => s.index === at);
+  return {
+    inside: spans !== undefined,
+    lastAlone: ending?.segment.length === 1,
+    firstAlone: starting?.segment.length === 1,
+    last,
+    first,
+  };
+}
+
+/** Whether text `before` and text `after`, run together, put one word of Chinese across the
+ * join (打 | 開). */
+export function insideWord(before: string, after: string): boolean {
+  return join(before, after)?.inside ?? false;
+}
+
+/** Whether a caption should not break between `before` and `after`: inside a word, after a
+ * word that leads into the next (會 | 太冷) or a negation, or before a particle that closes the
+ * word before it (尖端 | 的). */
+export function holdsTogether(before: string, after: string): boolean {
+  const found = join(before, after);
+  if (!found) return false;
+  const { inside, lastAlone, firstAlone, last, first } = found;
+  return (
+    inside ||
+    NEGATIONS.has(last) ||
+    (LEADS.has(last) && lastAlone) ||
+    (TRAILS.has(first) && firstAlone)
+  );
+}
 
 /** Ideographs, kana, hangul and full-width forms, between which a row may break, and the
  * punctuation Chinese sets at full width. Latin text breaks only at spaces. */

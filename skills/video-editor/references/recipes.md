@@ -37,7 +37,7 @@ Find the line in `captions.lines` whose `text` holds the word. Change it in `tex
 { "text": "能比如說　把一句話…", "words": [{ "text": "能", … }, { "text": "比", … }, …] }
 ```
 
-becomes `"text": "嗯　比如說　把一句話…"` with the first entry's `text` `"嗯"`. Each entry keeps at least one character: a fix with more characters than the entries it replaces puts the extra ones in its last entry, and one with fewer deletes the entries left over. Chinese lines show a pause as a full-width space (`　`) where a comma or full stop was, and keep `？`, `！` and quotes; English lines keep their punctuation. The SubRip file is written again from the lines. A character the caption font cannot draw fails the render with the line's path.
+becomes `"text": "嗯　比如說　把一句話…"` with the first entry's `text` `"嗯"`. Each entry keeps at least one character: a fix with more characters than the entries it replaces puts the extra ones in its last entry, and one with fewer deletes the entries left over. Chinese lines show a pause as a full-width space (`　`) where a comma or full stop was, and keep `？`, `！` and quotes; English lines keep their punctuation, set half-width. The SubRip file is written again from the lines. A character the caption font cannot draw fails the render with the line's path.
 
 A word the speech model misheard throughout is better fixed at the source next time: list a person's name in the `--names` file of the next `pnpm edit`, and any other word, such as a brand or a term, in its `--terms` file, which never shows in a lower third.
 
