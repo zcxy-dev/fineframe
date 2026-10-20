@@ -246,6 +246,7 @@ The effects and motion graphics render with [HyperFrames](../effects/README.md#r
 - **Icons and logos:** 28 of the 72 graphics kept mark their words with an icon. None shows a logo: no clip names a brand among the bundled logos.
 - **The real-2 and real-8 60 s edits** were made again after two fixes to the checks: a unit said after a number counts as said (a panel showing 27 and 歲 apart had been left out as saying 歲 unsaid), and a graphic's icons count toward how much of its area it fills.
 - **Still stretches:** real-2 at 60 s was made last, once code asks Claude for a graphic where the picture holds still longer than the shape allows: 13 graphics, against 9 before, 2 of them written for such stretches, at $0.51. The planner table and the other edits here were measured before that request, and before a capture had to be named in its line.
+- **Restating a phrase:** real-2 at 60 s opened on a panel reading 害怕 becoming thirty？ over the line 會害怕 becoming thirty 嗎？, which the check for a run of eight passed. With the check for most of a phrase, the same footage edited again opens on 害怕 and THIRTY: 8 graphics, 60.0 s, 0 clicks, Claude $0.57.
 - **What the checks do not see:** text already drawn into the footage. Some of real-6's lower thirds land on its own titles.
 
 ## Colour measurements

@@ -37,7 +37,7 @@ import type { TimedWord } from "./captions.ts";
 import { type Claude, totalUsage, type Usage } from "./claude.ts";
 import { bare, joinWords } from "./text.ts";
 import { projectCredit, sfxCredit, visualPath } from "./visuals.ts";
-import { repeated, unnamed, unsaid } from "./wording.ts";
+import { repeated, restates, unnamed, unsaid } from "./wording.ts";
 
 /** The sounds a graphic may ask for: one for something landing, a list, a check or an X. */
 const GRAPHIC_SFX = ["none", "tap", "paper", "tone", "stop"] as const;
@@ -558,13 +558,38 @@ function speechNear(words: readonly TimedWord[], graphic: Graphic): string {
 
 /** What is said while a graphic shows, and a second before. */
 function speechDuring(words: readonly TimedWord[], graphic: Graphic): string {
-  const from = graphic.start - secondsToTicks(1);
-  const to = graphic.start + graphic.duration;
-  return joinWords(words.filter((w) => w.start >= from && w.start < to).map((w) => w.text));
+  return joinWords(wordsDuring(words, graphic).map((w) => w.text));
 }
 
-/** Asks Claude once to fix each failing graphic, from its problems and how it was drawn; null
- * for one it did not fix. */
+/** The words said from a second before the graphic to its end. */
+function wordsDuring(words: readonly TimedWord[], graphic: Graphic): TimedWord[] {
+  const from = graphic.start - secondsToTicks(1);
+  const to = graphic.start + graphic.duration;
+  return words.filter((w) => w.start >= from && w.start < to);
+}
+
+/** A pause this long, or a sentence's end, closes a phrase. Seconds. */
+const PHRASE_PAUSE = 0.25;
+
+/** The phrases said while the graphic shows, each as its words read. */
+function phrasesDuring(words: readonly TimedWord[], graphic: Graphic): string[] {
+  const phrases: TimedWord[][] = [];
+  let phrase: TimedWord[] = [];
+  for (const word of wordsDuring(words, graphic)) {
+    const last = phrase.at(-1);
+    if (
+      last &&
+      (word.start - last.end >= secondsToTicks(PHRASE_PAUSE) || /[。？！?!.]$/.test(last.text))
+    ) {
+      phrases.push(phrase);
+      phrase = [];
+    }
+    phrase.push(word);
+  }
+  if (phrase.length > 0) phrases.push(phrase);
+  return phrases.map((p) => joinWords(p.map((w) => w.text)));
+}
+
 /** The stretches of an edit `edit` ticks long where nothing new comes into the picture for longer
  * than `most` seconds: no cut or shot change in `changes`, and no graphic starting or ending. */
 export function stillStretches(
@@ -709,7 +734,9 @@ export async function withGraphics(
     return results.map((result, i) => {
       const { graphic } = list[i] as Placed;
       const missing = unsaid(result.text, speechNear(words, graphic));
-      const echoed = repeated(result.pieces, speechDuring(words, graphic));
+      const echoed =
+        repeated(result.pieces, speechDuring(words, graphic)) ??
+        restates(result.pieces, phrasesDuring(words, graphic));
       const brands = unnamed(graphic.html, speechNear(words, graphic));
       const problems = [
         ...result.problems,

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { normalized, repeated, unnamed, unsaid } from "./wording.ts";
+import { normalized, repeated, restates, unnamed, unsaid } from "./wording.ts";
 
 test("numbers read the same in Chinese numerals and digits", () => {
   assert.equal(normalized("二十七歲"), "27歲");
@@ -79,4 +79,28 @@ test("a brand is named only by its whole name", () => {
   assert.deepEqual(unnamed(logo("linux"), "Linux 上也能跑"), []);
   assert.deepEqual(unnamed(logo("googledrive"), "存到 Google Drive"), []);
   assert.deepEqual(unnamed(logo("nodedotjs"), "用 Node.js 寫"), []);
+});
+
+test("a graphic that shows most of a phrase being said restates it, with a word or two left out", () => {
+  // real-2 at 60 s, 9:16: the panel over its opening line.
+  const line = "會害怕 becoming thirty 嗎？";
+  assert.equal(restates(["害怕", "becoming thirty？"], [line]), line);
+  assert.equal(restates(["會害怕", "Becoming Thirty"], ["其實", line]), line);
+  // Keywords, numbers, comparisons and lists the speaker says are what graphics are for.
+  assert.equal(restates(["thirty"], [line]), null);
+  // Two keywords of a phrase, which leaves its subject out: 朋友 is not on the label.
+  assert.equal(restates(["十幾歲", "二十幾歲"], ["可能十幾歲或二十幾歲的朋友"]), null);
+  assert.equal(restates(["十幾歲", "二十幾歲"], ["十幾歲或二十幾歲的朋友"]), null);
+  assert.equal(restates(["27", "歲"], ["我現在二十七歲"]), null);
+  assert.equal(
+    restates(
+      ["以前", "三十", "很老", "現在", "不會", "羨慕"],
+      ["就我以前會覺得哇", "三十聽起來很老", "但是我現在也不會去特別羨慕"],
+    ),
+    null,
+  );
+  assert.equal(
+    restates(["每一個階段", "不同的難關"], ["其實每一個階段你都有不同的難關要面對嘛"]),
+    null,
+  );
 });
