@@ -7,7 +7,7 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
-import { COLORS, catalog, type renderOverlays, templateIds } from "@video-editor/effects";
+import { COLORS, catalog, type OverlayJob, templateIds } from "@video-editor/effects";
 import {
   type CropPath,
   type FaceBox,
@@ -1523,14 +1523,14 @@ test("overlays land on exact output frames, across cuts and dissolves", async (t
       ],
       { ...tiny, width: 64, height: 36, fps },
     );
-    // At 30 fps: pieces 0-24, the dissolve 24-30, 30-54 and 54-84; the keyword covers frames
-    // 15-60 and the wipe 66-84, cut where the edit ends.
+    // At 30 fps: pieces 0-24, the dissolve 24-30, 30-54 and 54-84; the title covers frames
+    // 15-63 and the wipe 66-84, cut where the edit ends.
     project.overlays = [
-      { template: "keyword", params: { text: "三倍" }, start: SECOND / 2, duration: 1.5 * SECOND },
+      { template: "title", params: { text: "三倍" }, start: SECOND / 2, duration: 1.6 * SECOND },
       { template: "wipe", params: {}, start: 2.2 * SECOND, duration: SECOND },
     ];
     const path = await write(dir, project);
-    const jobs: Parameters<typeof renderOverlays>[0] = [];
+    const jobs: OverlayJob[] = [];
     const result = await render(path, join(dir, "out.mp4"), {
       renderOverlays: async (requested) => {
         jobs.push(...requested);
@@ -1543,14 +1543,14 @@ test("overlays land on exact output frames, across cuts and dissolves", async (t
     const placed = timeline.overlays.map((o) => [o.start, o.end]);
     if (fps.den === 1) {
       assert.deepEqual(placed, [
-        [15, 60],
+        [15, 63],
         [66, 84],
       ]);
     }
     assert.deepEqual(
       jobs.map((job) => [job.template, job.frames, job.width, job.height, job.fps]),
       [
-        ["keyword", (placed[0]?.[1] ?? 0) - (placed[0]?.[0] ?? 0), 64, 36, fps],
+        ["title", (placed[0]?.[1] ?? 0) - (placed[0]?.[0] ?? 0), 64, 36, fps],
         ["wipe", (placed[1]?.[1] ?? 0) - (placed[1]?.[0] ?? 0), 64, 36, fps],
       ],
     );
@@ -1578,14 +1578,14 @@ test("overlays land on exact output frames, across cuts and dissolves", async (t
   );
 });
 
-test("a split screen: a card in the panel, the speaker in step below it, a sound and the credits", async (t) => {
+test("a split screen: a graphic in the panel, the speaker in step below it, a sound and the credits", async (t) => {
   const dir = await scratch(t, "split-");
   // Each source frame one step brighter, so the speaker's frame shows which source frame it is.
   const speaker = await makeSource(dir, {
     id: "a",
     pattern: "color",
-    width: 64,
-    height: 36,
+    width: 36,
+    height: 64,
     fps: 30,
     seconds: 5,
     sound: 220,
@@ -1605,18 +1605,14 @@ test("a split screen: a card in the panel, the speaker in step below it, a sound
   };
   const project = projectOf([speaker, page, tick], [clip("a", 1, 3)], {
     ...tiny,
-    width: 64,
-    height: 36,
+    aspect: "9:16",
+    width: 36,
+    height: 64,
   });
-  // At 30 fps: the card covers frames 15-45 in the upper half, the speaker frames 15-45 below.
-  project.cards = [
-    {
-      card: "logo",
-      params: { name: "GitHub", logo: "github" },
-      start: SECOND / 2,
-      duration: SECOND,
-      placement: "panel",
-    },
+  // At 30 fps: the graphic covers frames 15-45 in the top 30 rows, pushed down from above over
+  // its first 0.35 s; the speaker frames 15-45 below.
+  project.graphics = [
+    { layout: "panel", html: "<b>27</b>", css: "", start: SECOND / 2, duration: SECOND },
   ];
   project.broll = [
     {
@@ -1633,30 +1629,34 @@ test("a split screen: a card in the panel, the speaker in step below it, a sound
   const stems = join(dir, "stems");
   const result = await render(path, join(dir, "out", "edit.mp4"), {
     stems,
-    renderCards: async (jobs) => {
+    renderGraphics: async (jobs) => {
       assert.deepEqual(
-        jobs.map((job) => [job.card, job.placement, job.width, job.height, job.frames]),
-        [["logo", "panel", 64, 18, 30]],
+        jobs.map((job) => [job.layout, job.html, job.box, job.frames]),
+        [["panel", "<b>27</b>", undefined, 30]],
       );
-      return [await numbered(join(dir, "card.webm"), 30, 64, 18)];
+      return [await numbered(join(dir, "panel.webm"), 30, 36, 30)];
     },
   });
-  const picture = await grey(result.video, 64, 36);
+  const picture = await grey(result.video, 36, 64);
   assert.equal(picture.length, 90);
   // Within 3 levels: Apple silicon's FFmpeg build rounds a flat grey up to 2.2 levels away from
   // the Linux build, in one half of a frame where the other half matches.
   const near = (actual: number, expected: number, at: string) =>
     assert.ok(Math.abs(actual - expected) <= 3, `${at}: luma ${actual}, expected ${expected}`);
   for (const [n, frame] of picture.entries()) {
-    const top = frame[4 * 64 + 32] ?? 0;
-    const bottom = frame[30 * 64 + 32] ?? 0;
+    const top = frame[4 * 36 + 18] ?? 0;
+    const bottom = frame[50 * 36 + 18] ?? 0;
     // Frame n of the edit shows source frame 30 + n, in both halves outside the split and in
-    // the lower one inside it.
+    // the lower one inside it. The panel, pushed down from above, reaches row 4 on its second
+    // frame.
     const speakerLuma = (2 * (30 + n) * 255) / 219;
-    if (n >= 15 && n < 45) near(top, ((24 + 4 * (n - 15)) * 255) / 219, `frame ${n}, the card`);
+    if (n >= 16 && n < 45) near(top, ((24 + 4 * (n - 15)) * 255) / 219, `frame ${n}, the panel`);
     else if (n < 75) near(top, speakerLuma, `frame ${n}, above`);
     if (n < 75) near(bottom, speakerLuma, `frame ${n}, the speaker`);
   }
+  // Mid-push, the panel's lower edge has not reached row 25: the speaker still shows there.
+  near(picture[17]?.[25 * 36 + 18] ?? 0, (2 * 47 * 255) / 219, "frame 17, below the push");
+  near(picture[30]?.[25 * 36 + 18] ?? 0, ((24 + 4 * 15) * 255) / 219, "frame 30, the panel");
   // The sound plays from 1.5 s, at most 2 s of its file, and nowhere else.
   const bed = await left(join(stems, "music.wav"));
   assert.ok(level(bed, 1.52, 1.68) > -30, `${level(bed, 1.52, 1.68)} dB`);
@@ -1667,11 +1667,6 @@ test("a split screen: a card in the panel, the speaker in step below it, a sound
     await readFile(result.broll ?? "", "utf8"),
     [
       "B-roll in edit.mp4, with where each piece came from.",
-      "",
-      "GitHub logo, from Simple Icons",
-      "  Source: https://simpleicons.org/?q=github",
-      "  Licence: CC0-1.0 (https://creativecommons.org/publicdomain/zero/1.0/)",
-      "  Note: GitHub is a trademark of its owner: show it only to refer to GitHub.",
       "",
       "Sound effect tick.wav",
       "  Source: https://example.com/tick",
@@ -1684,13 +1679,13 @@ test("a split screen: a card in the panel, the speaker in step below it, a sound
   );
 });
 
-// Remotion downloads Chrome and bundles its page on the first run, which CI's time limit leaves
-// no room for; the graph and the frame placement are tested above.
-const remotion = { skip: process.env.CI ? "renders with Chrome: run it locally" : false };
+// HyperFrames renders in Chrome Headless Shell, which downloads on the first run; CI skips it, and
+// the graph and the frame placement are tested above.
+const chrome = { skip: process.env.CI ? "renders with Chrome: run it locally" : false };
 
 test(
-  "every effect template renders with Remotion and shows only inside its own frames",
-  remotion,
+  "every effect template renders with HyperFrames and shows only inside its own frames",
+  chrome,
   async (t) => {
     const dir = await scratch(t, "templates-");
     for (const [aspect, width, height] of [
@@ -1735,11 +1730,13 @@ test(
       for (const { overlay, start, end } of timeline.overlays) {
         const at = `${aspect} ${overlay.template}`;
         const shown = lit.slice(start, end).filter(Boolean).length;
-        // The first frame is before the entrance and the last after the exit.
+        // The first frame is before the entrance; nothing animates out but the wipe, whose bands
+        // cross the frame and leave it.
         assert.ok(shown > (end - start) / 2, `${at}: ${shown} frames`);
-        assert.ok(!lit[start - 1] && !lit[start] && !lit[end - 1] && !lit[end], at);
+        assert.ok(!lit[start - 1] && !lit[start] && !lit[end], at);
+        assert.equal(lit[end - 1], overlay.template !== "wipe", `${at}: its last frame`);
         // These leave the bottom-right corner clear, so the picture shows through it.
-        if (["lower-third", "keyword", "chapter"].includes(overlay.template)) {
+        if (["lower-third", "chapter"].includes(overlay.template)) {
           for (const frame of picture.slice(start, end)) {
             const value = corner(frame) ?? 0;
             assert.ok(Math.abs(value - ground) <= 2, `${at}: the corner shows ${value}`);
@@ -1747,5 +1744,93 @@ test(
         }
       }
     }
+  },
+);
+
+test(
+  "graphics render with HyperFrames: a label in its box, a panel pushed down, a full frame, an icon",
+  chrome,
+  async (t) => {
+    const dir = await scratch(t, "graphics-");
+    const [width, height] = [180, 320];
+    const source = await makeSource(dir, {
+      id: "grey",
+      pattern: "color",
+      filter: "lutyuv=y=128:u=128:v=128",
+      width,
+      height,
+      fps: 30,
+      seconds: 14,
+      sound: 220,
+    });
+    const project = projectOf([source], [clip("grey", 0, 13)], {
+      aspect: "9:16",
+      width,
+      height,
+      fps: { num: 30, den: 1 },
+    });
+    const box = { x: 0.1, y: 0.3, w: 0.6, h: 0.1 };
+    const chip = `<div class="ff-chip" style="position:absolute;left:${0.1 * width + 4}px;top:${0.3 * height + 4}px;animation:ff-rise .4s var(--enter) both"><span style="font-size:calc(var(--u)*6)">27</span></div>`;
+    const stage =
+      '<div class="ff-stage"></div><b style="position:absolute;inset:0;display:grid;place-items:center;font-size:calc(var(--u)*20);animation:ff-pop .4s var(--enter) .3s both">27</b>';
+    project.graphics = [
+      { layout: "label", html: chip, css: "", box, start: SECOND, duration: 2 * SECOND },
+      { layout: "panel", html: stage, css: "", start: 4 * SECOND, duration: 3 * SECOND },
+      { layout: "full", html: stage, css: "", start: 8 * SECOND, duration: 2 * SECOND },
+      // A bundled icon alone, loaded from the pages' own folder.
+      {
+        layout: "label",
+        html: `<img src="icons/accent/rocket.svg" style="position:absolute;left:${0.1 * width + 4}px;top:${0.3 * height + 4}px;width:calc(var(--u)*20);height:calc(var(--u)*20);animation:ff-fade .4s both">`,
+        css: "",
+        box: { x: 0.1, y: 0.3, w: 0.3, h: 0.2 },
+        start: 10.5 * SECOND,
+        duration: 2 * SECOND,
+      },
+    ];
+    const path = await write(dir, project);
+    const result = await render(path, join(dir, "graphics.mp4"));
+    const picture = await grey(result.video, width, height);
+    const ground = picture[0]?.[0] ?? 0;
+    const changed = (
+      frame: Uint8Array | undefined,
+      x0: number,
+      y0: number,
+      x1: number,
+      y1: number,
+    ) => {
+      let count = 0;
+      for (let y = Math.floor(y0); y < y1; y++) {
+        for (let x = Math.floor(x0); x < x1; x++) {
+          if (Math.abs((frame?.[y * width + x] ?? ground) - ground) > 24) count++;
+        }
+      }
+      return count;
+    };
+    // The label draws inside its box and leaves the rest of the frame as it was.
+    const label = picture[75];
+    assert.ok(
+      changed(
+        label,
+        box.x * width,
+        box.y * height,
+        (box.x + box.w) * width,
+        (box.y + box.h) * height,
+      ) > 20,
+    );
+    assert.equal(changed(label, 0, (box.y + box.h) * height + 2, width, height), 0);
+    assert.equal(changed(picture[29], 0, 0, width, height), 0);
+    // The panel covers the top 880 of every 1920 rows once pushed down; the speaker shows below it.
+    const panelRows = Math.round(((880 / 1920) * height) / 2) * 2;
+    assert.ok(changed(picture[140], 0, 0, width, panelRows) > 0.9 * width * panelRows);
+    assert.equal(changed(picture[140], 0, panelRows + 2, width, height), 0);
+    // The full-frame graphic covers it all, after its push from the right.
+    assert.ok(changed(picture[280], 0, 0, width, height) > 0.9 * width * height);
+    assert.ok(
+      changed(picture[241], 0, 0, width / 2, height) <
+        changed(picture[241], width / 2, 0, width, height),
+    );
+    // The icon draws its strokes in its box.
+    assert.ok(changed(picture[360], 0.1 * width, 0.3 * height, 0.4 * width, 0.5 * height) > 30);
+    assert.equal(changed(picture[360], 0, 0.5 * height + 2, width, height), 0);
   },
 );

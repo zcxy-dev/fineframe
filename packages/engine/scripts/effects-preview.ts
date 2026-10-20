@@ -99,7 +99,6 @@ for (const edit of edits) {
     overlays: [
       overlay("title", 0.3),
       overlay("lower-third", 3.6),
-      overlay("keyword", 8.4),
       overlay("wipe", 12 - 0.3),
       overlay("chapter", 12.4),
       {

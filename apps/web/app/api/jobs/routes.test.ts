@@ -466,11 +466,28 @@ test("a finished edit changes as versions, the newest three keeping their videos
   assert.equal(view.version, 1);
   assert.equal(view.captions, "bold");
   assert.ok(view.lines.length > 0);
-  // Each overlay, card and B-roll clip by what it is and what it shows, never a template's id.
+  // Each overlay, graphic and B-roll clip by what it is and what it shows, never a template's id.
   assert.deepEqual(
     view.removables.map((item) => item.label),
-    ["Lower third: 王小明", "Keyword: Claude", "B-roll: screen.mp4"],
+    ["Lower third: 王小明", "Title: Claude", "B-roll: screen.mp4"],
   );
+  assert.equal(view.older, false);
+  // The same edit as 0.4.0 wrote it, with a card and a keyword pop: it opens without them, and
+  // the panel says that re-planning gives it the new motion graphics.
+  const projectFile = join(dir, "out", "edit.project.json");
+  const current = await readFile(projectFile, "utf8");
+  const old = JSON.parse(current);
+  old.cards = [
+    { card: "stat", params: { value: 3 }, start: 0, duration: 360_000, placement: "full" },
+  ];
+  old.overlays.push({ template: "keyword", params: { text: "三倍" }, start: 0, duration: 180_000 });
+  await writeFile(projectFile, JSON.stringify(old));
+  const older = (await (
+    await editRoute.GET(new Request(`${url}/${id}/edit`), ctx({ id }))
+  ).json()) as EditView;
+  assert.equal(older.older, true);
+  assert.deepEqual(older.removables, view.removables);
+  await writeFile(projectFile, current);
   // The example project names analyses that are not there, which a cut needs: it says so.
   const preview = await previewRoute.POST(
     new Request(`${url}/${id}/preview`, {

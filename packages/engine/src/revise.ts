@@ -22,10 +22,10 @@ export const OVERLAY_TEXT = {
   "lower-third": { name: 16, role: 28 },
 } as const;
 
-/** Something seen over the speaker that can go on its own: an effect overlay, a card, or B-roll
- * that is not the speaker beside a split screen. */
+/** Something seen over the speaker that can go on its own: an effect overlay, a graphic, or
+ * B-roll that is not the speaker beside a split screen. */
 export interface Removal {
-  kind: "overlay" | "card" | "broll";
+  kind: "overlay" | "graphic" | "broll";
   index: number;
 }
 
@@ -148,7 +148,6 @@ export interface Removable extends Removal {
 const TEMPLATE_NAMES: Record<string, [string, string?]> = {
   title: ["Title", "text"],
   "lower-third": ["Lower third", "name"],
-  keyword: ["Keyword", "text"],
   chapter: ["Chapter", "title"],
   callout: ["Callout", "label"],
   wipe: ["Wipe"],
@@ -168,14 +167,14 @@ export function removables(project: Project): Removable[] {
       duration: overlay.duration,
     });
   }
-  for (const [index, card] of (project.cards ?? []).entries()) {
-    const text = Object.values(card.params).find((value) => typeof value === "string");
+  for (const [index, graphic] of (project.graphics ?? []).entries()) {
+    const text = graphicText(graphic.html);
     items.push({
-      kind: "card",
+      kind: "graphic",
       index,
-      label: `Card (${card.card})${typeof text === "string" ? `: ${text}` : ""}`,
-      start: card.start,
-      duration: card.duration,
+      label: `Graphic (${graphic.layout})${text ? `: ${text}` : ""}`,
+      start: graphic.start,
+      duration: graphic.duration,
     });
   }
   for (const [index, clip] of (project.broll ?? []).entries()) {
@@ -204,13 +203,25 @@ export function isVisual(project: Project, index: number): boolean {
   return clip !== undefined && !speakerSources(project).has(clip.source);
 }
 
-/** `project` without what `removals` name, and what goes with each: a panel card's or a split's
+/** The words a graphic's markup shows, without its tags, on one line. */
+function graphicText(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** `project` without what `removals` name, and what goes with each: a panel graphic's or a split's
  * speaker beside it and the sound effect at its start, and a chapter's wipe, the chapters left
  * renumbered. */
 function removeAll(project: Project, removals: readonly Removal[]): Project {
   const frame = ticksPerFrame(project.output.fps);
   const overlays = new Set<number>();
-  const cards = new Set<number>();
+  const graphics = new Set<number>();
   const broll = new Set<number>();
   const sfx = new Set<number>();
   const speakers = speakerSources(project);
@@ -240,11 +251,11 @@ function removeAll(project: Project, removals: readonly Removal[]): Project {
         );
         if (wipe >= 0) overlays.add(wipe);
       }
-    } else if (kind === "card") {
-      const card = project.cards?.[index];
-      if (!card) throw new Error(`No card /cards/${index}`);
-      cards.add(index);
-      withSplit(card.start, card.start + card.duration, card.placement === "panel");
+    } else if (kind === "graphic") {
+      const graphic = project.graphics?.[index];
+      if (!graphic) throw new Error(`No graphic /graphics/${index}`);
+      graphics.add(index);
+      withSplit(graphic.start, graphic.start + graphic.duration, graphic.layout === "panel");
     } else {
       const clip = project.broll?.[index];
       if (!clip || !isVisual(project, index)) throw new Error(`No B-roll /broll/${index}`);
@@ -263,7 +274,7 @@ function removeAll(project: Project, removals: readonly Removal[]): Project {
         : { ...overlay, params: { ...overlay.params, index: at + 1, total: chapters.length } };
     });
   }
-  if (project.cards) out.cards = project.cards.filter((_, i) => !cards.has(i));
+  if (project.graphics) out.graphics = project.graphics.filter((_, i) => !graphics.has(i));
   if (project.broll) out.broll = project.broll.filter((_, i) => !broll.has(i));
   if (project.audio.sfx) {
     out.audio = { ...project.audio, sfx: project.audio.sfx.filter((_, i) => !sfx.has(i)) };

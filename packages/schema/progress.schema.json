@@ -98,12 +98,13 @@
       }
     },
     "ClaudeCost": {
-      "description": "What Claude cost by stage: planning, and the review after each render with the decisions it escalates. On the done line, and on an error line once a request was made.",
+      "description": "What Claude cost by stage: planning, writing and fixing the motion graphics, and the review after each render with the decisions it escalates. On the done line, and on an error line once a request was made.",
       "type": "object",
       "required": ["plan", "check"],
       "additionalProperties": false,
       "properties": {
         "plan": { "$ref": "#/$defs/Spend" },
+        "graphics": { "$ref": "#/$defs/Spend" },
         "check": { "$ref": "#/$defs/Spend" }
       }
     },

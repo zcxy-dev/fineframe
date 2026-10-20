@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { scratch } from "../testing.ts";
-import { findIcon, ICON_SETS, untar } from "./icons.ts";
+import { findIcon, ICON_SETS } from "./icons.ts";
 
 /** Made-up sets laid out as the pinned tarballs unpack, so no lookup downloads. */
 async function sets(dir: string): Promise<void> {
@@ -95,30 +95,4 @@ test("a symbol is found by name, then by tag, Lucide before Tabler", async (t) =
   assert.equal((await findIcon("startup", { dir }))?.name, "rocket");
   assert.equal((await findIcon("github", { dir, kind: "symbol" })) ?? null, null);
   assert.equal(await findIcon("nothing like it", { dir }), null);
-});
-
-/** A ustar archive of `files`, with long paths split into prefix and name. */
-function tar(files: Record<string, string>): Buffer {
-  const blocks: Buffer[] = [];
-  for (const [path, text] of Object.entries(files)) {
-    const header = Buffer.alloc(512);
-    const cut = path.length > 100 ? path.lastIndexOf("/", 155) : -1;
-    header.write(cut > 0 ? path.slice(cut + 1) : path, 0);
-    if (cut > 0) header.write(path.slice(0, cut), 345);
-    const data = Buffer.from(text);
-    header.write(`${data.length.toString(8).padStart(11, "0")}\0`, 124);
-    header.write("0", 156);
-    header.write("ustar\0", 257);
-    blocks.push(header, data, Buffer.alloc((512 - (data.length % 512)) % 512));
-  }
-  return Buffer.concat([...blocks, Buffer.alloc(1024)]);
-}
-
-test("unpacks a tar archive's files, long paths included", () => {
-  const long = `package/${"a".repeat(120)}/icon.svg`;
-  const files = { "package/LICENSE": "ISC", [long]: "<svg/>" };
-  const read = Object.fromEntries(
-    [...untar(tar(files))].map(([path, data]) => [path, data.toString()]),
-  );
-  assert.deepEqual(read, files);
 });

@@ -52,3 +52,11 @@ test("a caption over a face moves to the nearer clear side, and the next keeps i
   const [above] = placeBlocks([block(0, 30)], BOTTOM, BAND, [face(0, 30, 1000, 1350)]);
   assert.equal(above, 1000 - 350 * 0.25 - 12);
 });
+
+test("a caption covers a face before it covers a visual", () => {
+  // A panel over the top 880 rows, and the speaker's face below it filling the band: the caption
+  // goes on the seam under the panel, over the top of the face, rather than over the panel.
+  const panel = { start: 0, end: 30, boxes: [{ x0: 0, y0: 0, x1: 1080, y1: 880 }], hard: true };
+  const [seam] = placeBlocks([block(0, 30)], BOTTOM, BAND, [panel, face(0, 30, 900, 1500)]);
+  assert.equal(seam, 880 + 12 + 200);
+});

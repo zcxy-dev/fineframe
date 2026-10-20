@@ -1,9 +1,10 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Writable } from "node:stream";
-import { cacheDir, type DownloadProgress, pinnedFile } from "./download.ts";
+import { gunzipSync } from "node:zlib";
+import { cacheDir, type DownloadProgress, exists, pinnedFile, untar } from "./download.ts";
 
 /** Flags every FFmpeg run shares: quiet unless something fails, and never reading the terminal. */
 export const QUIET = ["-hide_banner", "-nostdin", "-nostats", "-loglevel", "error"];
@@ -33,6 +34,80 @@ const PINNED: Record<string, { url: string; sha256: string }> = {
     sha256: "2ce797a0f88d7f067180338fb227f7b1928ea727bd9a4d7a1d022f7c52af71a3",
   },
 };
+
+/** Overrides the pinned ffprobe, which the effects renderer runs to check what it wrote. */
+const FFPROBE_ENV = "VIDEO_EDITOR_FFPROBE";
+
+// ffprobe for each system, from the npm packages @ffprobe-installer publishes: the static builds
+// of johnvansickle.com (Linux), gyan.dev (Windows) and Homebrew (macOS, linking only the
+// system's own libraries), each a tarball pinned by SHA-256.
+const NPM = "https://registry.npmjs.org/@ffprobe-installer";
+const PINNED_FFPROBE: Record<string, { url: string; sha256: string }> = {
+  "linux-x64": {
+    url: `${NPM}/linux-x64/-/linux-x64-5.2.0.tgz`,
+    sha256: "8b6b2e34bad5ea7cfbe1914185145f514f620f24203a1a421e8d00a698bf8e61",
+  },
+  "linux-arm64": {
+    url: `${NPM}/linux-arm64/-/linux-arm64-5.2.0.tgz`,
+    sha256: "369ec8159c5a347e460fe5e2cc9a7e3ed9c53acecb8f29e2a6491e756103c060",
+  },
+  "darwin-arm64": {
+    url: `${NPM}/darwin-arm64/-/darwin-arm64-5.0.1.tgz`,
+    sha256: "27069fc32879761968823c3ce5353d3c6573f5df7d83d40b60bc2d878e886d39",
+  },
+  "win32-x64": {
+    url: `${NPM}/win32-x64/-/win32-x64-5.1.0.tgz`,
+    sha256: "97992b5e3b651c7df625831fd369eecc5ec0e9532ac98921138b1c4fbc8de96e",
+  },
+};
+
+let probe: Promise<string> | undefined;
+
+/** The ffprobe binary: `VIDEO_EDITOR_FFPROBE`, or the pinned build, unpacked from its tarball
+ * on first use with `onDownload` hearing the download's progress. */
+export function ffprobe(onDownload?: DownloadProgress): Promise<string> {
+  probe ??= (async () => process.env[FFPROBE_ENV] || (await pinnedProbe(onDownload)))();
+  probe.catch(() => {
+    probe = undefined;
+  });
+  return probe;
+}
+
+async function pinnedProbe(onDownload?: DownloadProgress): Promise<string> {
+  const platform = `${process.platform}-${process.arch}`;
+  const build = PINNED_FFPROBE[platform];
+  if (!build) throw new Error(`No pinned ffprobe build for ${platform}; set ${FFPROBE_ENV}.`);
+  const name = process.platform === "win32" ? "ffprobe.exe" : "ffprobe";
+  const dir = join(cacheDir(), `ffprobe-${build.sha256.slice(0, 12)}`);
+  const path = join(dir, name);
+  if (await exists(path)) return path;
+  const tarball = await pinnedFile(
+    build.url,
+    build.sha256,
+    `${dir}.tgz`,
+    "the pinned ffprobe build",
+    0o644,
+    onDownload,
+  );
+  const entry = [...untar(gunzipSync(await readFile(tarball)))].find(
+    ([file]) => file === `package/${name}`,
+  );
+  if (!entry) throw new Error(`${tarball} holds no package/${name}`);
+  await mkdir(dir, { recursive: true });
+  // Written beside the target and renamed into place, so a concurrent render never runs half of it.
+  const partial = `${path}.${process.pid}.partial`;
+  try {
+    await writeFile(partial, entry[1]);
+    await chmod(partial, 0o755);
+    await rename(partial, path).catch(async (error: unknown) => {
+      if (!(await exists(path))) throw error;
+    });
+  } finally {
+    await rm(partial, { force: true });
+  }
+  await rm(tarball, { force: true });
+  return path;
+}
 
 /** Every filter the render graphs and the colour measurements use, plus libass for captions. */
 export const REQUIRED_FILTERS = [

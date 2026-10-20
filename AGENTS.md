@@ -5,7 +5,7 @@
 - Renders have 0 clicks, A/V drift under 10 ms (never join with `-c copy`), no cut inside a word and a length within ±5 % of the target.
 
 ## Commands
-- Setup, checks and the tests CI skips (the worker's `big` ml tests, the `synth` extra, Chrome for Remotion and web capture, Claude) are in [CONTRIBUTING.md](CONTRIBUTING.md#setup).
+- Setup, checks and the tests CI skips (the worker's `big` ml tests, the `synth` extra, Chrome for HyperFrames and web capture, Claude) are in [CONTRIBUTING.md](CONTRIBUTING.md#setup).
 
 ## Verify
 - Run the change for real on the [synthetic corpus](bench/README.md#synthetic-corpus) and look at the result.

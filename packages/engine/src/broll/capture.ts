@@ -1,14 +1,14 @@
 // Web capture: a page the speaker names, shot headless at 2x as a still cropped to what is
 // talked about, or as a slow scroll down it, ready to zoom into. It runs the Chrome Headless
-// Shell Remotion downloads for the effects, in a fresh profile: no cookies, no saved logins, and
-// it never fills a form or clicks a consent button.
+// Shell the effects render in, in a fresh profile: no cookies, no saved logins, and it never
+// fills a form or clicks a consent button.
 
 import { lookup } from "node:dns/promises";
 import { mkdir, rm } from "node:fs/promises";
 import { isIP } from "node:net";
 import { dirname } from "node:path";
-import { ensureBrowser } from "@remotion/renderer";
 import { type Browser, type BrowserContext, chromium, type Page } from "playwright-core";
+import { chrome } from "../chrome.ts";
 import { ffmpeg, run } from "../ffmpeg.ts";
 import type { Credit } from "./credits.ts";
 
@@ -53,13 +53,9 @@ export interface Capture {
 
 const VIEWPORT = { width: 1280, height: 800 };
 
-/** Opens Chrome Headless Shell, downloading it as Remotion does on first use. */
+/** Opens Chrome Headless Shell, downloading it on first use. */
 export async function openCaptureBrowser(): Promise<Browser> {
-  const status = await ensureBrowser({ logLevel: "error" });
-  if (status.type !== "local-puppeteer-browser" && status.type !== "user-defined-path") {
-    throw new Error(`Chrome Headless Shell is not available (${status.type})`);
-  }
-  return chromium.launch({ executablePath: status.path, headless: true });
+  return chromium.launch({ executablePath: await chrome(), headless: true });
 }
 
 /** Captures `options.url` as a still, cropped when a selector or text is given, or as a scroll. */
@@ -83,8 +79,12 @@ export async function capturePage(options: CaptureOptions): Promise<Capture> {
       await guard(context, allow);
       const page = await context.newPage();
       page.setDefaultTimeout(options.timeout ?? 20_000);
-      await page.goto(url.href, { waitUntil: "load" });
+      const response = await page.goto(url.href, { waitUntil: "load" });
+      if (response && response.status() >= 400) {
+        throw new Error(`${url.href} answered HTTP ${response.status()}`);
+      }
       await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
+      await refused(page, url);
       await clearOverlays(page);
       await mkdir(dirname(options.out), { recursive: true });
       if (options.scroll) return await scrollClip(page, options, viewport, scale, url);
@@ -94,6 +94,23 @@ export async function capturePage(options: CaptureOptions): Promise<Capture> {
     }
   } finally {
     if (!options.browser) await browser.close();
+  }
+}
+
+/** What a page says when it turns a visitor away: a bot check, a block or a challenge. */
+const TURNED_AWAY =
+  /sorry, you have been blocked|access denied|attention required|just a moment\.\.\.|verify (that )?you are (a )?human|are you a robot|checking your browser|enable javascript and cookies|captcha|請稍候|驗證您是真人|您已被封鎖/i;
+
+/** Fails when the page turned the capture away instead of showing itself, so a block page is
+ * never shown as the page. Block pages are short; a long page that only mentions a captcha is
+ * not one. */
+async function refused(page: Page, url: URL): Promise<void> {
+  const { title, text } = await page.evaluate(() => ({
+    title: document.title,
+    text: document.body?.innerText ?? "",
+  }));
+  if (text.length < 2000 && TURNED_AWAY.test(`${title}\n${text}`)) {
+    throw new Error(`${url.href} turned the capture away`);
   }
 }
 

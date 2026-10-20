@@ -3,10 +3,10 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { cardIds, templateIds } from "@video-editor/effects";
+import { GRAPHIC_LAYOUTS, templateIds } from "@video-editor/effects";
 import { removables } from "@video-editor/engine/revise";
 import type { Project } from "@video-editor/schema";
-import { CARD_IDS, SETUP_DOWNLOAD } from "./en.ts";
+import { GRAPHIC_LAYOUTS as LAYOUTS, SETUP_DOWNLOAD } from "./en.ts";
 import { en, MESSAGES } from "./messages.ts";
 import { downloadName, overlayLabel, progressText } from "./program.ts";
 
@@ -44,8 +44,13 @@ const SAID = [
   "Planning a short edit with claude-opus-4-1",
   "Planning a long edit with claude-opus-4-1",
   "claude-opus-4-1 planned the edit ($0.21)",
-  "Rewrote the cards whose text broke their layout with claude-sonnet-4-5 ($0.02)",
   "Sourced 4 of 5 visuals",
+  "claude-opus-4-1 wrote 12 graphics ($0.21)",
+  "Left out the panel graphic at 12.40 s: too close to the graphic before",
+  "Left out a label graphic: the words it lands on were cut",
+  'Left out a graphic on words the edit does not say: "三十歲"',
+  "Kept 9 of 12 graphics",
+  "Wrote no graphics for 0.00–60.00 s: no clip matched",
   "Found 2 of 3 things to point at with claude-sonnet-4-5 (3 requests, $0.01)",
   "Found 2 of 3 things to point at with claude-sonnet-4-5 (all cached)",
   "The edit lasts 12.3 s; asking for more material",
@@ -66,9 +71,8 @@ const SAID = [
   "Mixing music",
   "Rendering 3/10",
   "Finished",
-  "Preparing the effects renderer",
-  "Rendering effect 2/5 (lower-third)",
-  "Rendering effect 3/5 (bar-chart)",
+  "Rendering effect 2/5",
+  "Rendered 5 effects",
   // The page's own server.
   "Preparing the changes",
   "Planning again",
@@ -77,7 +81,7 @@ const SAID = [
 
 /** Text from the programs that the page passes on as it is: names, numbers and reasons. */
 const KEPT =
-  /OpenRouter|Claude|Qwen\/[\w.-]+|claude-[\w.-]+|beat_this|final0|FFmpeg|Message Batch|msgbatch_01|talk-[ab]|US\$[\d.]+|\$[\d.]+|no clip matched|the page did not load|too dark to match|\{"kind":"gif"\}/g;
+  /OpenRouter|Claude|Qwen\/[\w.-]+|claude-[\w.-]+|beat_this|final0|FFmpeg|Message Batch|msgbatch_01|talk-[ab]|US\$[\d.]+|\$[\d.]+|no clip matched|the page did not load|too dark to match|too close to the graphic before|the words it lands on were cut|\{"kind":"gif"\}/g;
 
 test("every progress line is said in Chinese, and as written in English", () => {
   for (const said of SAID) {
@@ -181,6 +185,7 @@ test("every progress line the engine, the effects, vework and the server write i
     "packages/engine/src/plan/plan.ts",
     "packages/engine/src/plan/review.ts",
     "packages/engine/src/plan/visuals.ts",
+    "packages/engine/src/plan/graphics.ts",
     "packages/engine/src/render.ts",
     "packages/effects/src/worker.ts",
     "apps/web/lib/jobs.ts",
@@ -215,7 +220,7 @@ test("what downloads is named by what it is for in Chinese", () => {
     ["mispeech/ced-base", "音訊事件模型（mispeech/ced-base）"],
     ["DeepFilterNet3", "語音降噪模型（DeepFilterNet3）"],
     ["Beat This! final0", "節拍模型（Beat This! final0）"],
-    ["Remotion's compositor", "Remotion 合成器"],
+    ["ffprobe", "ffprobe"],
     [SETUP_DOWNLOAD, "分析環境（Python、PyTorch 與分析程式）"],
     ["FFmpeg", "FFmpeg"],
     ["Chrome Headless Shell", "Chrome Headless Shell"],
@@ -225,10 +230,10 @@ test("what downloads is named by what it is for in Chinese", () => {
   }
 });
 
-test("every overlay, card and B-roll label says its kind in Chinese", () => {
-  assert.deepEqual([...CARD_IDS], [...cardIds]);
+test("every overlay, graphic and B-roll label says its kind in Chinese", () => {
+  assert.deepEqual([...LAYOUTS], [...GRAPHIC_LAYOUTS]);
   for (const id of templateIds) assert.ok(zh.overlays.templates[id], id);
-  for (const id of cardIds) assert.ok(zh.overlays.cards[id], id);
+  for (const id of GRAPHIC_LAYOUTS) assert.ok(zh.overlays.layouts[id], id);
   const at = { start: 0, duration: 120_000 };
   const project = {
     sources: [{ id: "screen", kind: "video", path: "footage/screen.mp4" }],
@@ -236,23 +241,23 @@ test("every overlay, card and B-roll label says its kind in Chinese", () => {
     overlays: [
       ...templateIds.map((template) => ({ ...at, template, params: {} })),
       { ...at, template: "lower-third", params: { name: "王小明" } },
-      { ...at, template: "keyword", params: { text: "Claude" } },
+      { ...at, template: "title", params: { text: "Claude" } },
     ],
-    cards: [
-      ...cardIds.map((card) => ({ ...at, card, params: {} })),
-      { ...at, card: "stat", params: { label: "營收" } },
+    graphics: [
+      ...GRAPHIC_LAYOUTS.map((layout) => ({ ...at, layout, html: "", css: "" })),
+      { ...at, layout: "full", html: '<div class="ff-stage"></div><b>營收</b>', css: "" },
     ],
     broll: [{ source: "screen", in: 0, out: 120_000, start: 0 }],
   } as unknown as Project;
   const labels = removables(project).map((item) => item.label);
-  assert.ok(labels.length === templateIds.length + cardIds.length + 4);
+  assert.ok(labels.length === templateIds.length + GRAPHIC_LAYOUTS.length + 4);
   for (const label of labels) {
     assert.equal(overlayLabel(label, en), label);
     const chinese = overlayLabel(label, zh);
     assert.doesNotMatch(chinese.replace(/B-roll|screen\.mp4|Claude/g, ""), /[A-Za-z]{2,}/, label);
   }
   assert.ok(labels.map((label) => overlayLabel(label, zh)).includes("人名條：王小明"));
-  assert.ok(labels.map((label) => overlayLabel(label, zh)).includes("關鍵字：Claude"));
-  assert.ok(labels.map((label) => overlayLabel(label, zh)).includes("圖卡（數字）：營收"));
+  assert.ok(labels.map((label) => overlayLabel(label, zh)).includes("標題：Claude"));
+  assert.ok(labels.map((label) => overlayLabel(label, zh)).includes("圖卡（滿版）：營收"));
   assert.ok(labels.map((label) => overlayLabel(label, zh)).includes("B-roll：screen.mp4"));
 });

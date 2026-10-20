@@ -9,6 +9,7 @@ import type { MusicIndex } from "./generated/music-index.ts";
 import type { Progress } from "./generated/progress.ts";
 import type { Clip, CropKeyframe, CropRect, Project, Rect, Source } from "./generated/project.ts";
 import { ticksPerFrame } from "./time.ts";
+import { upgradeProject } from "./upgrade.ts";
 
 /** A value that does not match its schema; the message lists every problem, one per line. */
 export class SchemaError extends Error {
@@ -40,8 +41,11 @@ export function describeErrors(errors: ErrorObject[], at = ""): string {
 export const validateMediaIndex = validator<MediaIndex>(mediaIndexSchema);
 export const validateMusicIndex = validator<MusicIndex>(musicIndexSchema);
 export const validateProgress = validator<Progress>(progressSchema);
-/** Also runs the checks a schema cannot express, which packages/schema/README.md lists. */
-export const validateProject = validator<Project>(projectSchema, projectProblems);
+const validateCurrent = validator<Project>(projectSchema, projectProblems);
+/** Also runs the checks a schema cannot express, which packages/schema/README.md lists. A project
+ * an earlier version wrote is read as this version would have written it (`upgradeProject`). */
+export const validateProject = (value: unknown): Project =>
+  validateCurrent(upgradeProject(value).project);
 
 /** Reads a JSON file and validates it, e.g. `await loadJson("edit/project.json", validateProject)`. */
 export async function loadJson<T>(path: string, validate: (value: unknown) => T): Promise<T> {

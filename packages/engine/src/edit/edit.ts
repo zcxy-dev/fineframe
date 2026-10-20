@@ -76,8 +76,8 @@ export interface EditOptions {
   music?: string[];
   /** The licence of every track without its own `<name>.txt`, such as "CC0 1.0". */
   musicLicense?: string;
-  /** `rich` (the default) shows B-roll on the edit's points: cards, web captures and, with
-   * PEXELS_API_KEY or PIXABAY_API_KEY, stock footage; `minimal` none. */
+  /** `rich` (the default) adds motion graphics and shows B-roll on the edit's points: web
+   * captures and, with PEXELS_API_KEY or PIXABAY_API_KEY, stock footage; `minimal` none. */
   visuals?: Visuals;
   /** Each progress line, as `pnpm edit` prints them: the last is `done` or `error`. */
   onProgress?: (line: Progress) => void;
@@ -191,7 +191,11 @@ export function costByStage(usages: readonly Usage[]): ClaudeCost {
     const total = totalUsage(usages.filter((usage) => purposes.includes(usage.purpose)));
     return { dollars: total.dollars, requests: total.calls };
   };
-  return { plan: stage(["plan", "locate", "repair"]), check: stage(["check", "judge"]) };
+  return {
+    plan: stage(["plan", "locate"]),
+    graphics: stage(["graphics"]),
+    check: stage(["check", "judge"]),
+  };
 }
 
 async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Promise<EditResult> {

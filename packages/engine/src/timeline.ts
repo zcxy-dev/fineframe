@@ -1,8 +1,8 @@
-import { catalog, isCardId, isTemplateId } from "@video-editor/effects";
+import { catalog, isTemplateId } from "@video-editor/effects";
 import {
   type BrollClip,
-  type CardClip,
   type Clip,
+  type Graphic,
   type MusicTrack,
   type Overlay,
   type Project,
@@ -71,11 +71,11 @@ export interface TimelineOverlay {
   end: number;
 }
 
-/** A motion-graphics card placed on the output frame grid. */
-export interface TimelineCard {
-  /** Position in `project.cards`. */
+/** A motion graphic placed on the output frame grid. */
+export interface TimelineGraphic {
+  /** Position in `project.graphics`. */
   index: number;
-  card: CardClip;
+  graphic: Graphic;
   /** Output frames [start, end). */
   start: number;
   end: number;
@@ -110,7 +110,7 @@ export interface Timeline {
   main: TimelineClip[];
   broll: TimelineBroll[];
   overlays: TimelineOverlay[];
-  cards: TimelineCard[];
+  graphics: TimelineGraphic[];
   music: TimelineMusic[];
   /** The sound effects, each as a range of its file from its start, mixed in with the music and
    * never ducked. */
@@ -221,13 +221,12 @@ export function buildTimeline(project: Project, sources: Map<string, SourceFacts
     return { index, overlay, start, end };
   });
 
-  // A card is cut to like B-roll, so its ends round to the nearest frame.
-  const cards = (project.cards ?? []).flatMap((card, index): TimelineCard[] => {
-    if (!isCardId(card.card)) throw new Error(`/cards/${index}/card: no card ${card.card}`);
-    const start = frame(card.start);
-    if (start >= frames) throw new Error(`/cards/${index}: starts after the edit ends`);
-    const end = Math.min(frame(card.start + card.duration), frames);
-    return end > start ? [{ index, card, start, end }] : [];
+  // A graphic is cut to like B-roll, so its ends round to the nearest frame.
+  const graphics = (project.graphics ?? []).flatMap((graphic, index): TimelineGraphic[] => {
+    const start = frame(graphic.start);
+    if (start >= frames) throw new Error(`/graphics/${index}: starts after the edit ends`);
+    const end = Math.min(frame(graphic.start + graphic.duration), frames);
+    return end > start ? [{ index, graphic, start, end }] : [];
   });
 
   const samples = ticksToSamples(frames * frameTicks);
@@ -282,7 +281,7 @@ export function buildTimeline(project: Project, sources: Map<string, SourceFacts
     main,
     broll,
     overlays,
-    cards,
+    graphics,
     music,
     sfx,
     speech: speechOf(heard, frameTicks),

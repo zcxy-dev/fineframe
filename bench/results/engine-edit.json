@@ -15,19 +15,19 @@
   "rows": [
     [
       "chat-b: synthetic conversation, 3 clips, 6.7 min",
-      "rich, without stock footage: 5 cards, 29 % of the edit",
+      "rich, without stock footage: 8 motion graphics (2 labels, 1 lower third, 3 panels, 2 full frame), 61 % of the edit",
       "60 s, 9:16",
-      "58.9 s (-1.8 %)",
-      "0 of 12",
+      "60.0 s (0.0 %)",
+      "0 of 10",
       "0",
-      "0 of 5, 0.0 ms",
+      "0 of 4, 0.0 ms",
       "from the cache",
-      "44 s, 57 s, 8 s",
-      "$0.19"
+      "3.2 min, 71 s, 7 s",
+      "$0.57"
     ],
     [
       "chat-b again, with the corpus's three synthetic tracks (`--music`, stated CC0) and a names file naming the guest (`--names`)",
-      "rich, without stock footage: 5 cards, 29 % of the edit",
+      "rich, measured with the cards before motion graphics: 5 cards, 29 % of the edit",
       "60 s, 9:16",
       "59.3 s (-1.2 %)",
       "0 of 12",

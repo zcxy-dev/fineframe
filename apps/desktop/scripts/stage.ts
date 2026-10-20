@@ -5,8 +5,8 @@
 // - build/editor/: the repository's layout as the page's server and `pnpm edit` expect it, with
 //   the page built and only the packages they run (installed without symlinks between
 //   dependencies, as an installer copies files), and the worker's code and lockfile, from which
-//   the app installs the analysis's Python on its first start. No FFmpeg: the renderer's and
-//   Remotion's download on first use.
+//   the app installs the analysis's Python on its first start. No FFmpeg, ffprobe or Chrome: the
+//   renderer downloads them on first use.
 // - build/bin/: uv, pinned by version and SHA-256 for the platform this runs on.
 //
 // It builds for the platform it runs on: each installer is built on its own system.
@@ -107,14 +107,9 @@ run(
   editor,
 );
 
-// Not passed on in the installer: Remotion's compositor, whose FFmpeg is GPL with non-free parts,
-// downloads on the first effect render instead (packages/effects/src/compositor.ts); sharp and
-// its libvips (LGPL) come with Next.js for image optimisation, which the page does not use.
+// Not passed on in the installer: sharp and its libvips (LGPL), which come with Next.js for image
+// optimisation and with HyperFrames' studio server, and neither the page nor a render uses.
 const modules = join(editor, "node_modules");
-for (const name of await readdir(join(modules, "@remotion"))) {
-  if (name.startsWith("compositor-"))
-    await rm(join(modules, "@remotion", name), { recursive: true });
-}
 await rm(join(modules, "sharp"), { recursive: true, force: true });
 await rm(join(modules, "@img"), { recursive: true, force: true });
 

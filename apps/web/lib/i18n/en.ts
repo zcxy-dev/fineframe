@@ -4,37 +4,9 @@
 import { PRESETS } from "@video-editor/engine/captions";
 import { LOOKS, type LookId, lookIds } from "@video-editor/engine/looks";
 
-/** The effects' cards, by their ids (packages/effects/src/cards.ts), which the page cannot import:
- * its renderer is Node's. */
-export const CARD_IDS = [
-  "stat",
-  "kpis",
-  "list",
-  "checklist",
-  "versus",
-  "before-after",
-  "quote",
-  "steps",
-  "timeline",
-  "bar-chart",
-  "line-chart",
-  "ring",
-  "progress",
-  "chat",
-  "terminal",
-  "code",
-  "app",
-  "logo",
-  "icon-grid",
-  "definition",
-  "highlight",
-  "search",
-  "notifications",
-  "pros-cons",
-  "ranking",
-  "section",
-  "table",
-] as const;
+/** Where a graphic draws, as the engine names its layouts (packages/effects/src/graphics.ts),
+ * which the page cannot import: its renderer is Node's. */
+export const GRAPHIC_LAYOUTS = ["label", "lower-third", "panel", "full"] as const;
 
 /** What the desktop app's first start downloads, as lib/setup.ts names it. */
 export const SETUP_DOWNLOAD = "the analysis environment (Python, PyTorch and the worker)";
@@ -168,7 +140,7 @@ export const en = {
     visualsChoices: {
       rich: {
         name: "Rich",
-        help: "Claude adds B-roll to each point: motion-graphics cards, web pages, stock footage and logos, beside the speaker or full frame, with soft sound effects.",
+        help: "Claude adds visuals to the points the speaker makes: motion graphics written for this video, the web pages they name and stock footage, beside the speaker or full frame, with soft sound effects.",
       },
       minimal: { name: "Minimal", help: "Only the footage you dropped in, cut and captioned." },
     },
@@ -237,7 +209,7 @@ export const en = {
     pexels: {
       title: "Connect Pexels",
       about:
-        "Optional: with your free Pexels API key, Claude can show stock footage from Pexels in the edit. Without it, the edit shows cards and web pages instead. Get one at",
+        "Optional: with your free Pexels API key, Claude can show stock footage from Pexels in the edit. Without it, the edit shows motion graphics and web pages instead. Get one at",
       placeholder: "Pexels API key",
       /** What follows the site's link. */
       end: ".",
@@ -245,7 +217,7 @@ export const en = {
     pixabay: {
       title: "Connect Pixabay",
       about:
-        "Optional: with your free Pixabay API key, Claude can show stock footage from Pixabay in the edit. Without it, the edit shows cards and web pages instead. Get one at",
+        "Optional: with your free Pixabay API key, Claude can show stock footage from Pixabay in the edit. Without it, the edit shows motion graphics and web pages instead. Get one at",
       placeholder: "Pixabay API key",
       /** What follows the site's link. */
       end: ".",
@@ -302,7 +274,7 @@ export const en = {
     /** What downloads that the page names itself; any other name is the program's. */
     downloads: {
       [SETUP_DOWNLOAD]: SETUP_DOWNLOAD,
-      "Remotion's compositor": "Remotion's compositor",
+      ffprobe: "ffprobe",
     } as Record<string, string>,
     left: (time: string) => ` · about ${time} left`,
     firstTime: " · only the first time it is used",
@@ -358,6 +330,7 @@ export const en = {
     planned: "Planned",
     withInstructions: "With instructions",
     planning: "Claude, planning",
+    graphics: "Claude, motion graphics",
     checking: "Claude, checking cuts",
     claude: "Claude",
     noPlan: "None: changed without a new plan",
@@ -442,6 +415,8 @@ export const en = {
     replanHelp:
       "Reordering, putting removed parts back, a length more than 5 % off, another aspect or another music track cannot be changed here: Claude plans the edit again from the same footage, whose analysis is kept, so it takes a minute or two and one more plan.",
     replan: "Re-plan…",
+    older:
+      "This edit was made with an earlier version: its motion-graphics cards and keyword pops are left out when it renders again. Re-plan it for the new motion graphics.",
     fallback: "The changes could not be made.",
     renderFallback: "The new version could not be rendered.",
     rendering: (n: number, message: string) => `Rendering version ${n} · ${message}`,
@@ -538,8 +513,17 @@ export const en = {
     planning: (short: boolean, model: string) =>
       `Planning ${short ? "a short" : "a long"} edit with ${model}`,
     planned: (model: string, dollars: string) => `${model} planned the edit (${dollars})`,
-    rewroteCards: (model: string, dollars: string) =>
-      `Rewrote the cards whose text broke their layout with ${model} (${dollars})`,
+    wroteGraphics: (model: string, count: string, dollars: string) =>
+      `${model} wrote ${count} graphics (${dollars})`,
+    leftOutGraphic: (layout: string, _name: string, seconds: string, reason: string) =>
+      `Left out the ${layout} graphic at ${seconds} s: ${reason}`,
+    leftOutCutGraphic: (layout: string, _name: string, reason: string) =>
+      `Left out a ${layout} graphic: ${reason}`,
+    unsaidGraphic: (words: string) =>
+      `Left out a graphic on words the edit does not say: "${words}"`,
+    keptGraphics: (kept: string, written: string) => `Kept ${kept} of ${written} graphics`,
+    noGraphics: (from: string, to: string, problem: string) =>
+      `Wrote no graphics for ${from}–${to} s: ${problem}`,
     sourced: (ready: string, visuals: string) => `Sourced ${ready} of ${visuals} visuals`,
     located: (found: string, wishes: string, model: string, cost: string) =>
       `Found ${found} of ${wishes} things to point at with ${model} (${cost})`,
@@ -549,7 +533,7 @@ export const en = {
     leftOutKind: (kind: string, _name: string, line: string, reason: string) =>
       `Left out the ${kind} visual on line ${line}: ${reason}`,
     /** The kinds of visual the plan asks for. */
-    visuals: { stock: "stock", web: "web", card: "card" } as Record<string, string>,
+    visuals: { stock: "stock", web: "web" } as Record<string, string>,
     notJson: "The plan's visuals are not JSON; the edit has none",
     notList: "The plan's visuals are not a list; the edit has none",
     otherShape: (json: string) => `Left out a visual the plan gave in another shape: ${json}`,
@@ -570,9 +554,8 @@ export const en = {
     mixingMusic: "Mixing music",
     rendering: (count: string) => `Rendering ${count}`,
     finished: "Finished",
-    preparingEffects: "Preparing the effects renderer",
-    renderingEffect: (count: string, id: string, _name: string) =>
-      `Rendering effect ${count} (${id})`,
+    renderingEffect: (count: string) => `Rendering effect ${count}`,
+    renderedEffects: (count: string) => `Rendered ${count} effects`,
     preparingChanges: "Preparing the changes",
     planningAgain: "Planning again",
     startingRender: "Starting the render",
@@ -582,15 +565,15 @@ export const en = {
     templates: {
       title: "Title",
       "lower-third": "Lower third",
-      keyword: "Keyword",
       chapter: "Chapter",
       callout: "Callout",
       wipe: "Wipe",
     } as Record<string, string>,
-    /** The cards, by their ids, which English names them by. */
-    cards: Object.fromEntries(CARD_IDS.map((id) => [id, id])) as Record<string, string>,
+    /** Where a graphic draws, which English names by the engine's own words. */
+    layouts: Object.fromEntries(GRAPHIC_LAYOUTS.map((id) => [id, id])) as Record<string, string>,
     labelled: (name: string, text: string) => `${name}: ${text}`,
-    card: (kind: string, text?: string) => `Card (${kind})${text === undefined ? "" : `: ${text}`}`,
+    graphic: (layout: string, text?: string) =>
+      `Graphic (${layout})${text === undefined ? "" : `: ${text}`}`,
     broll: (name: string) => `B-roll: ${name}`,
   },
   errors: {

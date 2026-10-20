@@ -32,9 +32,9 @@ export interface Project {
    */
   broll?: BrollClip[];
   /**
-   * Motion-graphics cards from packages/effects, cut to as B-roll: opaque, over the main track and B-roll and under the overlays, drawn in array order.
+   * Motion graphics written for this edit, as HTML and CSS that packages/effects renders: labels and lower thirds over the picture, panels and full-frame graphics cut to as B-roll. Over the main track and B-roll and under the overlays, drawn in array order.
    */
-  cards?: CardClip[];
+  graphics?: Graphic[];
   captions?: Captions;
   /**
    * Animated effects over the picture and B-roll and under the captions, drawn in array order.
@@ -292,26 +292,41 @@ export interface Rect {
   w: number;
   h: number;
 }
-export interface CardClip {
+export interface Graphic {
   /**
-   * The card's id, from the cards in packages/effects.
+   * label: a chip over the picture; lower-third: a pill low on one side over the picture; panel: the upper panel of a split screen, the top 880 of every 1920 rows at 9:16; full: the whole frame.
    */
-  card: string;
+  layout: "label" | "lower-third" | "panel" | "full";
   /**
-   * The card's parameters, as its JSON Schema in packages/effects defines them.
+   * Its markup, laid out in a box the size of the frame (the panel's for a panel), with --u 1 % of the frame's short side. No scripts, images or url().
    */
-  params: {
-    [k: string]: unknown;
-  };
+  html: string;
+  /**
+   * Its own styles beside the house stylesheet in packages/effects, its parts' CSS entrance animations among them.
+   */
+  css: string;
+  box?: Rect1;
+  /**
+   * The spoken words it shows, by source and word index in that source's media index: it goes when a cut takes any of them out.
+   */
+  words?: {
+    source: SourceId;
+    word: number;
+  }[];
   /**
    * A time or length in ticks: 120 000 per second, so every common frame rate has a whole number of ticks per frame.
    */
   start: number;
   duration: PositiveTicks;
-  /**
-   * full fills the frame; panel fills the upper panel of a split screen, the top 880 of every 1920 rows at 9:16 and the upper half otherwise.
-   */
-  placement: "full" | "panel";
+}
+/**
+ * A B-roll clip's place in the output frame, in fractions of its width and height, from its top-left corner.
+ */
+export interface Rect1 {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 export interface Captions {
   /**

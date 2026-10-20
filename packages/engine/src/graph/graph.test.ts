@@ -457,20 +457,20 @@ test("overlays go over the B-roll, each frame counted onto the piece's own frame
   const edit = timeline([clip("a", 0, 2), clip("a", 5, 2)], {
     broll: [{ source: "b", in: 0, out: SECOND, start: 1.5 * SECOND }],
     overlays: [
-      { template: "keyword", params: { text: "x" }, start: SECOND, duration: 2 * SECOND },
+      { template: "title", params: { text: "x" }, start: SECOND, duration: 2 * SECOND },
       { template: "wipe", params: {}, start: 1.75 * SECOND, duration: SECOND / 2 },
     ],
   });
-  const files = ["/cache/keyword.webm", "/cache/wipe.webm"];
+  const files = ["/cache/title.webm", "/cache/wipe.webm"];
   const [first, second] = cutPieces(edit).map((p) => pieceVideo(p, edit, files));
   assert.ok(first && second);
-  // Frames 30-90 of the keyword and 53-68 of the wipe: in the second piece, the keyword's
+  // Frames 30-90 of the title and 53-68 of the wipe: in the second piece, the title's
   // frames 30-59 start at its frame 0, and the wipe's frames 7-14.
-  assert.deepEqual(second.slice(second.indexOf("/cache/keyword.webm") - 3).slice(0, 8), [
+  assert.deepEqual(second.slice(second.indexOf("/cache/title.webm") - 3).slice(0, 8), [
     "-c:v",
     "libvpx-vp9",
     "-i",
-    "/cache/keyword.webm",
+    "/cache/title.webm",
     "-c:v",
     "libvpx-vp9",
     "-i",

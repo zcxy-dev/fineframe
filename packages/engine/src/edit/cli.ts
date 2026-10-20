@@ -46,11 +46,12 @@ files directly in it: videos to cut, and still images to show as B-roll.
       --captions the caption style: bold unless another is named
       --quality  best plans with Claude Opus; economy with Claude Sonnet, for about half
                  the cost. best unless given
-      --visuals  rich (the default) cuts to B-roll on the edit's points: motion-graphics
-                 cards, captures of the web pages named and, with PEXELS_API_KEY or
-                 PIXABAY_API_KEY (free), stock footage, in full frame or a split screen,
-                 with a soft sound on a visible action; their credits go to
-                 <name>.broll.txt beside the video. minimal shows none
+      --visuals  rich (the default) adds motion graphics Claude writes for the video
+                 and cuts to B-roll on the edit's points: captures of the web pages
+                 named and, with PEXELS_API_KEY or PIXABAY_API_KEY (free), stock
+                 footage, in full frame or a split screen, with a soft sound on a
+                 visible action; their credits go to <name>.broll.txt beside the
+                 video. minimal shows none
   -m, --music    background music Claude may choose from: an audio file, or a folder of them.
                  Use only music you have the right to use. Each track's licence is the first
                  line of <name>.txt beside it (a web address and a credit line may follow);
@@ -175,7 +176,8 @@ try {
     `edit: analyze ${seconds(t.analyze)} (analysed ${result.analyzed}, from the cache ` +
       `${result.cached}), plan ${seconds(t.plan)}, render ${seconds(t.render)}, check ` +
       `${seconds(t.check)} (reviews: ${result.reviews}); Claude ${dollars(u.dollars)}: plan ` +
-      `${dollars(cost?.plan.dollars ?? null)}, check ${dollars(cost?.check.dollars ?? null)} ` +
+      `${dollars(cost?.plan.dollars ?? null)}, graphics ${dollars(cost?.graphics?.dollars ?? 0)}, ` +
+      `check ${dollars(cost?.check.dollars ?? null)} ` +
       `(requests: ${u.calls})`,
   );
 } catch (error) {

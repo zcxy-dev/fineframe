@@ -18,7 +18,7 @@ export const CHECK_MODEL = "claude-haiku-5-5";
  * replies through the same code. */
 export interface ClaudeRequest {
   /** Which step asks; recorded replies are keyed by it. */
-  purpose: "plan" | "check" | "judge" | "locate" | "repair";
+  purpose: "plan" | "check" | "judge" | "locate" | "graphics";
   model: string;
   system: string;
   /** In order. A text block marked `cache` ends a prefix that later requests reuse. */

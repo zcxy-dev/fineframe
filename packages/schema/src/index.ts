@@ -5,4 +5,5 @@ export type { MusicIndex, Section as MusicSection } from "./generated/music-inde
 export type * from "./generated/progress.ts";
 export type * from "./generated/project.ts";
 export * from "./time.ts";
+export * from "./upgrade.ts";
 export * from "./validate.ts";

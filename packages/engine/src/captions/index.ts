@@ -19,6 +19,9 @@ export interface CaptionFiles {
   /** The same pages as SubRip: the same text, broken into the same rows, on the same frames. */
   srt: string;
   pages: Page[];
+  /** Where each page is drawn, in output pixels, over output frames [start, end): what a graphic
+   * keeps its text off. */
+  boxes: { start: number; end: number; x: number; y: number; width: number; height: number }[];
   /** The face file the script is drawn in, for stageFonts. */
   font: string;
 }
@@ -33,7 +36,7 @@ const CLEARANCE = 0.3;
 export async function buildCaptions(
   project: Project,
   timeline: Pick<Timeline, "main" | "broll" | "frames" | "frameTicks"> &
-    Partial<Pick<Timeline, "cards">>,
+    Partial<Pick<Timeline, "graphics">>,
 ): Promise<CaptionFiles | null> {
   const { captions, output } = project;
   if (!captions) return null;
@@ -74,10 +77,22 @@ export async function buildCaptions(
     [...faceZones(timeline, output), ...visualZones(timeline, output)],
   ).map((bottom) => bottom - CLEARANCE * em);
   const geometry = { width: output.width, height: output.height, em, frameTicks };
+  const boxes = blocks.map((block, i) => {
+    const bottom = (bottoms[i] as number) + CLEARANCE * em;
+    return {
+      start: block.start,
+      end: block.end,
+      x: block.left,
+      y: bottom - block.height,
+      width: block.right - block.left,
+      height: block.height,
+    };
+  });
   return {
     ass: writeAss(pages, bottoms, chosen, face, geometry),
     srt: toSrt(pages, frameTicks),
     pages,
+    boxes,
     font,
   };
 }

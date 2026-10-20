@@ -109,8 +109,8 @@ test("B-roll that starts after the edit ends fails", () => {
 
 test("an overlay covers the frames whose start falls within its time, cut where the edit ends", () => {
   const overlay = (start: number, seconds: number) => ({
-    template: "keyword",
-    params: { text: "x" },
+    template: "wipe",
+    params: {},
     start: Math.round(start * SECOND),
     duration: Math.round(seconds * SECOND),
   });
@@ -129,7 +129,7 @@ test("an overlay covers the frames whose start falls within its time, cut where 
   );
   const late = project([clip("a", 0, 2)], { overlays: [overlay(2, 1)] });
   assert.throws(() => buildTimeline(late, both), /overlays\/0: starts after the edit ends/);
-  // Cut to 0.8 s of its 1.5 s, the keyword still has room for its motion; cut to 0.1 s, it has not.
+  // Cut to 0.8 s of its 1.5 s, the wipe still has room for its motion; cut to 0.1 s, it has not.
   const cut = project([clip("a", 0, 2)], { overlays: [overlay(1.2, 1.5)] });
   assert.deepEqual(
     buildTimeline(cut, both).overlays.map((o) => [o.start, o.end]),
@@ -138,7 +138,7 @@ test("an overlay covers the frames whose start falls within its time, cut where 
   const stub = project([clip("a", 0, 2)], { overlays: [overlay(1.9, 1.5)] });
   assert.throws(
     () => buildTimeline(stub, both),
-    /overlays\/0: the edit ends 0\.1 s into it, under keyword's minimum of 0\.8 s/,
+    /overlays\/0: the edit ends 0\.1 s into it, under wipe's minimum of 0\.4 s/,
   );
 });
 

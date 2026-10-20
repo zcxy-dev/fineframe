@@ -650,6 +650,7 @@ export function ReEdit({
       <div className={styles.section}>
         <h3 className={styles.sectionTitle}>{words.replanTitle}</h3>
         <p className={styles.help}>{words.replanHelp}</p>
+        {view.older && <p className={styles.help}>{words.older}</p>}
         {replanning ? (
           <Replan job={job} onJob={onJob} onClose={() => setReplanning(false)} />
         ) : (
@@ -852,7 +853,7 @@ function toRevision(draft: Draft, words: readonly Word[]): Revision {
   if (titles.length > 0) revision.overlays = titles;
   if (draft.remove.length > 0) {
     revision.remove = draft.remove.map((id) => {
-      const [kind, index] = id.split(":") as ["overlay" | "card" | "broll", string];
+      const [kind, index] = id.split(":") as ["overlay" | "graphic" | "broll", string];
       return { kind, index: Number(index) };
     });
   }

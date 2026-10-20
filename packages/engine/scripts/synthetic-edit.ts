@@ -147,12 +147,10 @@ async function withEffects(name: string, project: Project) {
   });
   const overlays = [
     at("title", 0.2),
-    at("keyword", 3),
     at("lower-third", 4.8),
     at("wipe", cut - catalog.wipe.seconds.typical / 2),
     at("chapter", 8.8),
     at("callout", 10.6),
-    at("keyword", 12.9),
   ];
   const path = join(dir, "project.with-effects.json");
   await writeFile(path, JSON.stringify({ ...project, overlays }, null, 2));

@@ -55,10 +55,11 @@ export interface StageProgress {
   claude?: ClaudeCost;
 }
 /**
- * What Claude cost by stage: planning, and the review after each render with the decisions it escalates. On the done line, and on an error line once a request was made.
+ * What Claude cost by stage: planning, writing and fixing the motion graphics, and the review after each render with the decisions it escalates. On the done line, and on an error line once a request was made.
  */
 export interface ClaudeCost {
   plan: Spend;
+  graphics?: Spend;
   check: Spend;
 }
 export interface Spend {

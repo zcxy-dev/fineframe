@@ -137,8 +137,8 @@ test("Claude's effects become overlays timed on the speech, one at a time and on
   });
   const base = await recorded();
   const moved = ids.map((id) => movedTo(base, id));
-  const emphasis = (line: number, text: string, keyword: string) =>
-    ({ source: "a", line, text, keyword, reason: "A beat." }) as const;
+  const emphasis = (line: number, text: string) =>
+    ({ source: "a", line, text, reason: "A beat." }) as const;
   const decisions: Decisions = {
     ...base,
     segments: moved.flatMap((d) => d.segments.map((s) => ({ ...s, priority: 1 }))),
@@ -154,13 +154,7 @@ test("Claude's effects become overlays timed on the speech, one at a time and on
       // Waits for the B-roll to leave, and shows without a role too long for the template.
       { name: "王大同", role: "很".repeat(30), source: "b", line: 1 },
     ],
-    emphasis: [
-      // Said while the lower third is up: left out.
-      emphasis(2, "今天要講三件事", "三件事"),
-      // Longer than a keyword may be: left out by the template's own limits.
-      emphasis(3, "自動剪輯", "自動剪輯自動剪輯自動剪輯自動剪輯"),
-      emphasis(5, "繁體中文", "繁體中文"),
-    ],
+    emphasis: [emphasis(2, "今天要講三件事"), emphasis(5, "繁體中文")],
   };
   const { claude, requests } = recordedClaude({ plan: [decisions] });
   const out = join(dir, "edit", "project.json");
@@ -196,17 +190,16 @@ test("Claude's effects become overlays timed on the speech, one at a time and on
     [
       ["title", { text: "三件事", subtitle: "自動剪輯入門" }],
       ["lower-third", { name: "林語安", role: "主講人" }],
-      ["keyword", { text: "繁體中文", position: "upper" }],
       ["lower-third", { name: "王大同" }],
     ],
   );
-  const [title, name, keyword, second] = overlays as [Overlay, Overlay, Overlay, Overlay];
+  const [title, name, second] = overlays as [Overlay, Overlay, Overlay];
   // The title opens on the first word; nothing overlaps; all within the edit, on the frame grid.
   const words = (edit.project.captions?.lines ?? []).flatMap((line) => line.words ?? []);
   assert.ok(Math.abs(title.start - (words[0]?.start ?? -1)) <= T / 25, `${title.start / T} s`);
   for (const [a, b] of [
     [title, name],
-    [name, keyword],
+    [name, second],
   ] as const) {
     assert.ok(a.start + a.duration <= b.start, `${a.template} overlaps ${b.template}`);
   }
@@ -214,9 +207,6 @@ test("Claude's effects become overlays timed on the speech, one at a time and on
   for (const o of overlays) {
     assert.ok(o.start % (T / 25) === 0 && o.start + o.duration <= length, JSON.stringify(o));
   }
-  // The keyword lands 0.15 s before 繁 is said.
-  const said = words.find((w) => w.text.startsWith("繁"));
-  assert.ok(said && Math.abs(keyword.start - (said.start - 0.15 * T)) <= T / 25);
   // The second name shows once the B-roll over its speaker has gone.
   const [cutaway] = edit.project.broll ?? [];
   assert.ok(cutaway, "B-roll placed");

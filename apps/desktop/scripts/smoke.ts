@@ -6,9 +6,10 @@
 // cloud speech and its key, adds a synthetic spoken clip, makes a 15 s edit and checks the video,
 // then quits the app and checks nothing it started is left running. Claude and OpenRouter are
 // local stand-ins that answer as they would, so it costs nothing: the plan keeps the lines in
-// order and pops one keyword, every cut passes its check, and each speech chunk is heard as one
-// of the clip's sentences. Everything else is real: the analysis's models, FFmpeg and Chrome
-// Headless Shell download on first use, and the clip is analysed, planned, rendered and checked.
+// order, the graphics are one label on the first word said, every cut passes
+// its check, and each speech chunk is heard as one of the clip's sentences. Everything else is
+// real: the analysis's models, FFmpeg, ffprobe and Chrome Headless Shell download on first use,
+// and the clip is analysed, planned, rendered with its graphic and checked.
 // `--shots` saves the window at each step.
 //
 // On Linux, run it under a display, such as `xvfb-run -a`. The clip's speech comes from the
@@ -139,8 +140,34 @@ function plainest(schema: Schema): unknown {
   return "Fine.";
 }
 
+/** Every progress line about the graphics, as the job's event stream sends each change: what
+ * Claude wrote, what was left out and why, and what was kept. */
+const graphicLines: string[] = [];
+async function follow(id: string, signal: AbortSignal): Promise<void> {
+  try {
+    const response = await fetch(`${origin}/api/jobs/${id}/events`, { signal });
+    const decoder = new TextDecoder();
+    let pending = "";
+    for await (const chunk of response.body ?? []) {
+      pending += decoder.decode(chunk as Uint8Array, { stream: true });
+      const events = pending.split("\n\n");
+      pending = events.pop() ?? "";
+      for (const event of events) {
+        if (!event.startsWith("data: ")) continue;
+        const message = (JSON.parse(event.slice(6)) as { progress?: { message: string } }).progress
+          ?.message;
+        if (message && /graphic/i.test(message) && graphicLines.at(-1) !== message) {
+          graphicLines.push(message);
+        }
+      }
+    }
+  } catch {
+    // Stopped once the edit is done.
+  }
+}
+
 /** The plan for the files the request lists: every line in order, earlier lines first to keep,
- * and the first line's longest word popped on screen. */
+ * and the first line its emphasis. */
 function planFor(packed: string, schema: Schema): unknown {
   const decisions = plainest(schema) as Record<string, unknown>;
   const segments: object[] = [];
@@ -156,18 +183,47 @@ function planFor(packed: string, schema: Schema): unknown {
     segments.push({ source, first: n, last: n, priority: Math.min(5, Math.ceil(n / 2)), reason });
     if (emphasis.length === 0) {
       const words = (numbered[2] as string).replace(/[⟨⟩]/g, "").split(/\s+/);
-      // The longest word a keyword pop can show (the catalog's 12 characters at most): chunks
-      // are heard in the order they arrive, not said, so line 1 may be any of the sentences.
-      const keyword =
-        words
-          .map((word) => word.replace(/\W/g, ""))
-          .filter((word) => word.length <= 12)
-          .sort((a, b) => b.length - a.length)[0] ?? "";
-      emphasis.push({ source, line: n, text: words.slice(0, 3).join(" "), keyword, reason });
-      say(`asked to pop "${keyword}" on line ${n}: ${numbered[2]}`);
+      emphasis.push({ source, line: n, text: words.slice(0, 3).join(" "), reason });
     }
   }
   return { ...decisions, content: "A short spoken test.", segments, emphasis };
+}
+
+/** The edit's graphics: one label of 2 s, with a bundled icon, on the first word of the speech
+ * the request lists, which it gives as `word@seconds`, whose label keeps clear of what the request
+ * lists as taken (an effect, B-roll), as Claude is told to; in the safe area at either aspect. */
+function graphicsFor(request: string): unknown {
+  const listed = request.split("Taken, no graphic over these:")[1] ?? "";
+  const taken = [...listed.matchAll(/^([\d.]+)–([\d.]+) s: /gm)].map((m) => [
+    Number(m[1]),
+    Number(m[2]),
+  ]);
+  const said = request
+    .split("\n")
+    .filter((line) => line.startsWith("["))
+    .flatMap((line) => [...line.matchAll(/(\S+)@([\d.]+)/g)])
+    .map((m) => ({ word: m[1] as string, at: Number(m[2]) }));
+  // It shows from 0.4 s before the word for 2 s, with 0.4 s clear on either side.
+  const clear = ({ at }: { at: number }) =>
+    taken.every(([start, end]) => at + 2 <= (start as number) || at - 0.8 >= (end as number));
+  const first = said.find(clear);
+  if (!first) return { graphics: [] };
+  const { word, at } = first;
+  return {
+    graphics: [
+      {
+        layout: "label",
+        anchor: word,
+        at,
+        seconds: 2,
+        quotes: [word],
+        shows: "The first word said.",
+        sfx: "none",
+        html: `<div class="ff-chip" style="position:absolute;left:calc(var(--u)*12);top:calc(var(--u)*24);animation:ff-rise .5s var(--enter) both"><img src="icons/accent/sparkles.svg" style="width:calc(var(--u)*5);height:calc(var(--u)*5)"><span style="font-size:calc(var(--u)*6)">${word}</span></div>`,
+        css: "",
+      },
+    ],
+  };
 }
 
 async function body(request: IncomingMessage): Promise<string> {
@@ -182,6 +238,8 @@ function json(response: ServerResponse, status: number, value: unknown): void {
 }
 
 const asked: string[] = [];
+/** How many graphics the edit's project has once it is made. */
+let graphics = 0;
 const anthropic = createServer(async (request, response) => {
   const path = request.url ?? "";
   if (request.method === "GET" && path.startsWith("/v1/models/")) {
@@ -206,9 +264,12 @@ const anthropic = createServer(async (request, response) => {
   };
   const schema = params.output_config.format.schema;
   const planning = "segments" in (schema.properties ?? {});
-  asked.push(planning ? "plan" : "check");
+  const writing = "graphics" in (schema.properties ?? {}) && !asked.includes("graphics");
+  asked.push(planning ? "plan" : writing ? "graphics" : "check");
   const packed = params.messages[0]?.content[0]?.text ?? "";
-  const text = JSON.stringify(planning ? planFor(packed, schema) : plainest(schema));
+  const text = JSON.stringify(
+    planning ? planFor(packed, schema) : writing ? graphicsFor(packed) : plainest(schema),
+  );
   const usage = { input_tokens: 10, output_tokens: 10, cache_creation_input_tokens: 0 };
   const message = {
     id: `msg_${asked.length}`,
@@ -440,6 +501,8 @@ async function makeEdit(): Promise<string[]> {
   await shot(page, "3-ready-to-edit");
   await page.getByRole("button", { name: `Make the ${LENGTH} s video` }).click();
   await page.getByRole("heading", { name: "Making your edit" }).waitFor({ timeout: 120_000 });
+  const following = new AbortController();
+  void follow((await api<{ id: string }>("/api/jobs/latest")).id, following.signal);
   try {
     await page
       .getByText(/^Downloading /)
@@ -453,6 +516,7 @@ async function makeEdit(): Promise<string[]> {
   const failed = page.getByRole("heading", { name: "The edit could not be finished" });
   await done.or(failed).waitFor({ timeout: 2_400_000 });
   clearInterval(watching);
+  following.abort();
   await shot(page, "5-done");
 
   const job = await api<{
@@ -499,11 +563,15 @@ async function makeEdit(): Promise<string[]> {
   if (existsSync(projectPath)) {
     const project = JSON.parse(await readFile(projectPath, "utf8")) as {
       overlays?: { template: string; start: number; params: { text?: string } }[];
+      graphics?: { layout: string; start: number }[];
     };
     const overlays = (project.overlays ?? []).map(
       (o) => `${o.template} "${o.params.text ?? ""}" at ${o.start}`,
     );
     say(`overlays in the edit: ${overlays.join(", ") || "none"}`);
+    graphics = (project.graphics ?? []).length;
+    say(`graphics in the edit: ${graphics}`);
+    for (const line of graphicLines) say(`graphics: ${line}`);
   }
   const playing = await playInPage(page);
   await shot(page, "6-playing");
@@ -517,6 +585,9 @@ async function makeEdit(): Promise<string[]> {
     Math.abs(seconds - LENGTH) > LENGTH * 0.05 && `the edit is ${seconds} s, not ${LENGTH} s ± 5 %`,
     !job.result?.captions && "no captions",
     !asked.includes("plan") && "Claude was not asked for a plan",
+    !asked.includes("graphics") && "Claude was not asked for the graphics",
+    graphics === 0 &&
+      `the edit has no graphic: ${graphicLines.filter((line) => line.startsWith("Left out")).join("; ") || "HyperFrames did not draw it"}`,
     heard === 0 && "OpenRouter heard nothing",
     ![...downloads].some((name) => name.startsWith("the analysis environment")) &&
       "the analysis environment's download was not shown",
@@ -526,7 +597,11 @@ async function makeEdit(): Promise<string[]> {
       !fetched("ffmpeg-") &&
       "FFmpeg was neither shown downloading nor downloaded",
     !downloads.has("Chrome Headless Shell") &&
-      `Chrome Headless Shell's download was not shown; the effects cache holds: ${contents(join(home.XDG_CACHE_HOME, "video-editor", "effects"))}`,
+      !fetched("chrome") &&
+      `Chrome Headless Shell was neither shown downloading nor downloaded; the cache holds: ${contents(join(home.XDG_CACHE_HOME, "video-editor"))}`,
+    !downloads.has("ffprobe") &&
+      !fetched("ffprobe-") &&
+      "ffprobe was neither shown downloading nor downloaded",
     (playing.error || playing.width === 0 || playing.brightest < 32) &&
       "the window's player does not show the video",
   ].filter((problem): problem is string => typeof problem === "string");

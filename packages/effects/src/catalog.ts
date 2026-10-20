@@ -17,11 +17,6 @@ export type LowerThirdParams = {
   role?: string;
   accent?: Color;
 };
-export type KeywordParams = {
-  text: string;
-  position?: "upper" | "lower";
-  accent?: Color;
-};
 export type ChapterParams = {
   title: string;
   index: number;
@@ -43,7 +38,6 @@ export type WipeParams = {
 export interface TemplateParams {
   title: TitleParams;
   "lower-third": LowerThirdParams;
-  keyword: KeywordParams;
   chapter: ChapterParams;
   callout: CalloutParams;
   wipe: WipeParams;
@@ -66,17 +60,17 @@ export interface Template<P> {
   example: P;
 }
 
-export const accent = {
+const accent = {
   description: "The accent colour, `#rrggbb`; leave it out for the house amber.",
   type: "string",
   pattern: "^#[0-9a-fA-F]{6}$",
 } as const;
 
 /** Text the templates draw on one or two lines, so its length is capped. */
-export const text = (description: string, maxLength: number) =>
+const text = (description: string, maxLength: number) =>
   ({ description, type: "string", minLength: 1, maxLength, pattern: "\\S" }) as const;
 
-export const object = (properties: Record<string, object>, required: string[]) => ({
+const object = (properties: Record<string, object>, required: string[]) => ({
   type: "object",
   additionalProperties: false,
   required,
@@ -117,31 +111,6 @@ export const catalog: { [Id in TemplateId]: Template<TemplateParams[Id]> } = {
       ["name"],
     ),
     example: { name: "林語安", role: "前端工程師 · Frontend Engineer" },
-  },
-  keyword: {
-    purpose: "Pops the one word or number a sentence turns on, as a highlighter swipe.",
-    whenToUse:
-      "The one to three claims per minute that carry the argument: a result, a number, a " +
-      "term the viewer must remember.",
-    avoid: "Every sentence, filler words, or words the captions already make obvious.",
-    timing: "Starts 0.15 s before the spoken word, so the swipe lands as it is said.",
-    seconds: { min: 0.8, typical: 1.5, max: 3 },
-    params: object(
-      {
-        text: text("The word or short phrase exactly as spoken, or the number.", 12),
-        position: {
-          description:
-            "upper: the top of the frame, clear of a speaker's chest; lower: just above the " +
-            "captions, which at 9:16 is a talking head's chin, so only for shots with no one on camera.",
-          type: "string",
-          enum: ["upper", "lower"],
-          default: "upper",
-        },
-        accent,
-      },
-      ["text"],
-    ),
-    example: { text: "效能提升 3 倍" },
   },
   chapter: {
     purpose: "Marks where a new chapter starts and how far through the video it is.",
@@ -230,8 +199,8 @@ export const guidance = [
   "Effects mark what the viewer must notice or remember; most cuts get no effect.",
   "Place an effect only where its template's whenToUse fits the content at that moment.",
   "At most two overlays on screen at once, and never two of the same template.",
-  "At 9:16 the lower third, the chapter marker and an upper keyword all sit at the top of the " +
-    "frame, so none of them overlaps another in time there.",
+  "At 9:16 the lower third and the chapter marker both sit at the top of the frame, so they " +
+    "never overlap in time there.",
   "Write every text param in the language the speaker uses at that point; Traditional Chinese " +
     "for Mandarin.",
 ];

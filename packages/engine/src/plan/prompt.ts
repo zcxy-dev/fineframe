@@ -1,13 +1,6 @@
 // The planner's instructions and the shape of its answer.
 
-import {
-  cardIds,
-  cards,
-  catalog,
-  iconNames,
-  logoNames,
-  type TemplateId,
-} from "@video-editor/effects";
+import { catalog, type TemplateId } from "@video-editor/effects";
 import type { CalloutWish } from "./locate.ts";
 import { SFX_WISHES, type VisualWish } from "./visuals.ts";
 
@@ -30,42 +23,8 @@ export function planSystem(
   );
 }
 
-/** How the planner proposes B-roll for each point: stock footage when a key allows it, a web
- * capture of a page named, or a motion-graphics card. */
-/** A card's text limits from its params' schema, " At most: …." or "": a param past one is left
- * out with its card. */
-function limits(schema: object): string {
-  type Node = {
-    type?: string;
-    maxLength?: number;
-    minItems?: number;
-    maxItems?: number;
-    items?: Node;
-    properties?: Record<string, Node>;
-  };
-  // The text limits under a node, nested objects named by their path.
-  const texts = (node: Node, path = ""): string[] =>
-    Object.entries(node.properties ?? {}).flatMap(([key, value]) =>
-      value.type === "string" && value.maxLength !== undefined
-        ? [`${path}${key} ${value.maxLength}`]
-        : value.type === "object"
-          ? texts(value, `${path}${key}.`)
-          : [],
-    );
-  const parts: string[] = [];
-  const own = texts(schema as Node);
-  if (own.length > 0) parts.push(`${own.join(", ")} characters`);
-  for (const [key, value] of Object.entries((schema as Node).properties ?? {})) {
-    const each = value.type === "array" && value.items ? texts(value.items) : [];
-    if (each.length > 0) {
-      parts.push(
-        `${key} ${value.minItems} to ${value.maxItems}, each ${each.join(", ")} characters`,
-      );
-    }
-  }
-  return parts.length > 0 ? ` At most: ${parts.join("; ")}.` : "";
-}
-
+/** How the planner proposes B-roll for each point: stock footage when a key allows it, or a web
+ * capture of a page the speaker names. Motion graphics are written once the cut is known. */
 function visualsSection(stock: boolean): string {
   const kinds = [
     ...(stock
@@ -76,53 +35,36 @@ to four plain words for a stock footage library; the footage must show the thing
 a person at a computer.",
         ]
       : []),
-    "web: the real page of a product, model, project, paper or organisation the speaker names, \
-captured and zoomed into. Give its own address (https://…), one you are sure exists, such as a \
-product's home page or a model's page on Hugging Face, never a search page or a guessed deep \
-link, and the words on that page to zoom into exactly as the page writes them (its name, a \
-heading, a number), or empty for its first screen.",
-    "card: an animated motion-graphics card, for what has no footage: a number, a list, a \
-comparison, a process, a definition, a quote. Give the card and its params as a JSON object, \
-text in the speaker's language. Never invent a number, a result or a quote: a card shows only \
-what the speaker says or what is common knowledge about a thing they name.",
+    "web: the real page of a product, model, project, paper or organisation the speaker names in \
+that line, captured and zoomed into the part talked about. Give its own address (https://…), one \
+you are sure exists, such as a product's page or a model's page on Hugging Face, never a search \
+page, a home page that only advertises, or a guessed deep link, and the words on that page to \
+zoom into exactly as the page writes them (its name, a heading, a price, a number). Never a page \
+for a place or brand mentioned in passing (meeting at a café is not about the café).",
   ];
-  const list = cardIds
-    .map(
-      (id) => `- ${id}: ${cards[id].purpose} ${cards[id].whenToUse} Example params: \
-${JSON.stringify(cards[id].example)}${limits(cards[id].params)}`,
-    )
-    .join("\n");
   return `
 
 ## Visuals
 
-The edit cuts away from the speaker to show what they talk about, at a creator's pace. Offer \
-about one visual every 4 to 6 seconds of the edit: code keeps those on lines the length keeps, \
-at most one every 5 seconds. Put them on the points that carry it (a tool, product or \
-organisation named, a number, a list, a comparison, a process), never on every sentence, and \
-never two in a row on one point. Give each on the line and the words it lands on, exactly as \
-they appear in the line: code cuts to it as the first of those words is said and back to the \
-speaker a few seconds later, picks a full-frame or split-screen layout and leaves out what \
+The edit cuts away from the speaker to show the real thing they talk about. Offer a visual \
+only where they name it: code keeps those on lines the length keeps, at most one every 5 seconds, \
+and motion graphics for numbers, lists and comparisons are added once the cut is known, so leave \
+those to them. Give each on the line and the words it lands on, exactly as they appear in the \
+line, words that name the thing: code cuts to it as the first of those words is said and back to \
+the speaker a few seconds later, picks a full-frame or split-screen layout and leaves out what \
 does not fit. Prefer, in this order:
 ${kinds.map((kind, i) => `${i + 1}. ${kind}`).join("\n")}
-An opening that names a tool, a product or an organisation can show it from its first word.
 
 Give the visuals as one JSON array in the visuals string, [] for none, each an object with \
 these keys, every value a string except line: source and line, the line it lands on; text, the \
-words it lands on; kind, ${kinds.length === 3 ? '"stock", "web" or "card"' : '"web" or "card"'}; \
-query, the stock search in English; url, the page's address; focus, the words on the page to \
-zoom into; card, which card; params, the card's params as a JSON object written as a string; \
-sfx, "none" or one of ${SFX_WISHES.map((s) => `"${s}"`).join(", ")}; and reason. Leave the \
-keys of other kinds empty.
+words it lands on; kind, ${kinds.length === 2 ? '"stock" or "web"' : '"web"'}; query, the stock \
+search in English; url, the page's address; focus, the words on the page to zoom into; name, \
+the product or site's name exactly as the speaker says it in the line, which code checks; sfx, \
+"none" or one of ${SFX_WISHES.map((s) => `"${s}"`).join(", ")}; and reason. Leave the keys of \
+other kinds empty.
 
-Cards, with their params as JSON objects like the examples:
-${list}
-Icons are Lucide names, only these: ${iconNames.join(", ")}. Logos only these brands, and \
-only for the brand named: ${logoNames.join(", ")}. Leave out a param you have nothing for.
-
-sfx: a sound only on a visible action, and none for most visuals: tap when a logo or a number \
-lands, click for a small piece of UI (a search, a chat, a terminal), paper for a document or a \
-list, tone for a check, stop for an X or a wrong way. Never whoosh on a cut.`;
+sfx: a sound only on a visible action, and none for most visuals: click for a small piece of UI \
+(a search, a chat, a terminal), paper for a document. Never whoosh on a cut.`;
 }
 
 const CHAPTERS_EFFECT = `
@@ -189,8 +131,7 @@ segment; empty when there is no B-roll. Give the B-roll file, the seconds of it 
 8 s), and the file and line it covers.
 - emphasis: the strongest beats of the edit, about one every 15 to 30 seconds: a key number, a \
 punchline, the promise of the video. Give the file, the line and the words exactly as they \
-appear in it. Code pushes the picture in there. Give a keyword (see Effects) for the few that \
-carry the argument, and an empty one for the rest.
+appear in it. Code pushes the picture in there.
 - content: in two or three sentences, what the footage is and the story the edit tells.
 
 ## Length
@@ -220,9 +161,6 @@ the length by priority.
 Animated text over the picture marks what the viewer must notice or remember, so most of the \
 edit has none. Code times each effect on the speech, shows one at a time and drops what does \
 not fit.
-- keyword, on an emphasis moment: ${catalog.keyword.purpose} ${catalog.keyword.whenToUse} \
-Avoid: ${catalog.keyword.avoid} Give the word or number as said, in the speaker's language, at \
-most ${most("keyword", "text")} characters.
 - title, when the request asks for one: ${catalog.title.purpose} It shows over the edit's \
 opening. A short phrase of at most ${most("title", "text")} characters in the video's language, \
 and optionally a subtitle of at most ${most("title", "subtitle")} that says what the viewer gets; \
@@ -317,12 +255,11 @@ const PLAN_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["source", "line", "text", "keyword", "reason"],
+        required: ["source", "line", "text", "reason"],
         properties: {
           source: { type: "string" },
           line: { type: "integer" },
           text: { type: "string" },
-          keyword: { type: "string", description: "The word to pop on screen, or empty." },
           reason: { type: "string" },
         },
       },
@@ -468,8 +405,7 @@ export interface Decisions {
     line: number;
     reason: string;
   }[];
-  /** `keyword` is empty for a moment that gets no keyword pop. */
-  emphasis: { source: string; line: number; text: string; keyword?: string; reason: string }[];
+  emphasis: { source: string; line: number; text: string; reason: string }[];
   /** Present when music was offered. */
   music?: { track: string; section: number; reason: string };
   /** Present for a long edit; an empty text is no title. */

@@ -30,7 +30,6 @@ import { loudnessFor, planVoice } from "../voice.ts";
 import { captionLines, outputWords, type TimedWord } from "./captions.ts";
 import {
   anthropicClaude,
-  CHECK_MODEL,
   type Claude,
   PLAN_MODELS,
   type Quality,
@@ -40,6 +39,7 @@ import {
 import { calloutSpan, plannedOverlays } from "./effects.ts";
 import { type FillerCandidate, fillerCandidates, findWords } from "./fillers.ts";
 import { BREATH_RANGE, fitLength, type Span } from "./fit.ts";
+import { type GraphicWish, withGraphics, writeGraphics } from "./graphics.ts";
 import { calloutRect, LOCATE_MODEL, type Located, locate, wishKey } from "./locate.ts";
 import {
   describeMusic,
@@ -83,7 +83,6 @@ import {
   type PlacedVisual,
   parseVisuals,
   placeVisuals,
-  repairCards,
   sourceVisuals,
   speakerClips,
   stockAvailable,
@@ -143,8 +142,9 @@ export interface PlanOptions {
   instructions?: string;
   /** The model that plans, and judges the cut checks a review doubts: best unless given. */
   quality?: Quality;
-  /** `rich` (the default) shows B-roll on the edit's points, sourced from free web captures,
-   * motion-graphics cards and, with a Pexels or Pixabay key, stock footage; `minimal` none. */
+  /** `rich` (the default) adds Claude's motion graphics and shows B-roll on the edit's points,
+   * sourced from free web captures and, with a Pexels or Pixabay key, stock footage; `minimal`
+   * none. */
   visuals?: Visuals;
   /** Defaults to the Anthropic API. */
   claude?: Claude;
@@ -225,6 +225,10 @@ export interface PlanState {
   stills: Map<string, boolean>;
   /** Each visual the planner proposed, sourced, by visualKey; null for one that could not be. */
   assets: Map<string, Asset | null>;
+  /** The graphics Claude wrote for the edit, once its cut was known; placed again on each fit. */
+  graphics?: GraphicWish[];
+  /** Whether the graphics were checked and fixed once: later fits leave out what fails. */
+  graphicsFixed?: boolean;
   look: Look | null;
   /** The caption preset. */
   captions: string;
@@ -394,27 +398,25 @@ async function sourceWishes(state: PlanState): Promise<void> {
   const playing = new Set(
     state.segments.flatMap((s) => s.lines.map((line) => `${s.source}:${line.n}`)),
   );
-  const before = state.usage.length;
-  const visuals = await repairCards(
-    (state.decisions.visuals ?? []).filter((wish) => playing.has(`${wish.source}:${wish.line}`)),
-    state.claude,
-    state.usage,
+  const wishes = (state.decisions.visuals ?? []).filter((wish) =>
+    playing.has(`${wish.source}:${wish.line}`),
   );
-  if (state.usage.length > before) {
-    const spent = totalUsage(state.usage.slice(before)).dollars;
-    state.progress(
-      `Rewrote the cards whose text broke their layout with ${CHECK_MODEL} (${dollars(spent)})`,
-    );
-  }
-  // Placed from these, whose params the assets are keyed by.
-  state.decisions = { ...state.decisions, visuals };
-  const wishes = visuals;
   if (wishes.length === 0) return;
   const [width, height] = outputSize(state.aspect, state.sources);
   await sourceVisuals(wishes, state.assets, {
     output: { aspect: state.aspect, width, height },
     stock: state.extras.stock ?? false,
     onProblem: state.progress,
+    said: (source, n) => {
+      const file = state.sources.get(source);
+      const line = file?.lines.find((l) => l.n === n);
+      return file && line
+        ? file.words
+            .slice(line.first, line.last + 1)
+            .map((w) => w.text)
+            .join(" ")
+        : "";
+    },
   });
   const ready = wishes.filter((wish) => state.assets.get(visualKey(wish))).length;
   state.progress(`Sourced ${ready} of ${wishes.length} visuals`);
@@ -772,9 +774,8 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
     if (rect) placed.set(wishKey(wish), rect);
   }
   const edit = lengthOf(clips);
-  const first = plannedOverlays(state, words, edit, covered, cuts, placed, changes, speaking);
-  // Visuals keep clear of the B-roll placed and of every effect but a keyword, which they then
-  // keep off themselves.
+  const overlays = plannedOverlays(state, words, edit, covered, cuts, placed, changes, speaking);
+  // Visuals keep clear of the B-roll placed and of every effect.
   const visuals = state.extras.visuals
     ? placeVisuals(state.decisions.visuals ?? [], state.assets, {
         words,
@@ -783,7 +784,7 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
         edit,
         frame: ticksPerFrame(state.fps),
         aspect: state.aspect,
-        blocked: [...covered, ...first.filter((o) => o.template !== "keyword")].map((o) => ({
+        blocked: [...covered, ...overlays].map((o) => ({
           start: o.start,
           end: o.start + o.duration,
         })),
@@ -791,21 +792,6 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
           state.progress(`Left out the ${wish.kind} visual on line ${wish.line}: ${reason}`),
       })
     : [];
-  const shown = visuals.map((v) => ({ start: v.start, duration: v.end - v.start }));
-  const overlays =
-    visuals.length > 0
-      ? plannedOverlays(
-          state,
-          words,
-          edit,
-          [...covered, ...shown],
-          cuts,
-          placed,
-          changes,
-          speaking,
-          shown,
-        )
-      : first;
   const output = { aspect: state.aspect, width, height };
   const parts = await visualParts(visuals, output, (file) => visualPath(folder, file));
   sources.push(...parts.sources);
@@ -843,6 +829,23 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
   await writeFile(state.out, `${JSON.stringify(project, null, 2)}\n`);
   project = await planVoice(punchIns(await graded(state, project), shots(state)), state.out);
   project = withVisuals(state, project, visuals, parts, windows);
+  if (state.extras.visuals) {
+    const options = {
+      claude: state.claude,
+      model: state.planModel,
+      usage: state.usage,
+      progress: state.progress,
+      speakers: (spans: readonly { start: number; end: number; layout: string }[]) =>
+        splitSpeakers(state, project, spans, windows),
+    };
+    // Written once the cut is known, and placed again on the words each later fit keeps.
+    state.graphics ??= await writeGraphics(project, state.out, words, options);
+    project = await withGraphics(project, state.out, state.graphics, words, {
+      ...options,
+      fix: !state.graphicsFixed,
+    });
+    state.graphicsFixed = true;
+  }
   await writeFile(state.out, `${JSON.stringify(validateProject(project), null, 2)}\n`);
   return { path: state.out, project, assembly, state };
 }
@@ -850,7 +853,7 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
 /**
  * The project with its visuals, added once its own clips are graded and punched in: captures and
  * footage as B-roll, as sourced; the speaker beside each split screen, framed for that shape and
- * graded as the main clip it plays in step with; cards; and the sound effects.
+ * graded as the main clip it plays in step with; and the sound effects.
  */
 function withVisuals(
   state: PlanState,
@@ -860,8 +863,25 @@ function withVisuals(
   windows: ReadonlyMap<string, ReadonlyMap<number, Rect>>,
 ): Project {
   if (visuals.length === 0) return project;
-  const speakers = speakerClips(
-    visuals,
+  const speakers = splitSpeakers(state, project, visuals, windows);
+  const broll = [...(project.broll ?? []), ...parts.broll, ...speakers];
+  return {
+    ...project,
+    ...(broll.length > 0 ? { broll } : {}),
+    audio: { ...project.audio, ...(parts.sfx.length > 0 ? { sfx: parts.sfx } : {}) },
+  };
+}
+
+/** The speaker beside each split screen of `spans`, framed for its half and graded as the main
+ * clip it plays in step with. */
+function splitSpeakers(
+  state: PlanState,
+  project: Project,
+  spans: readonly { start: number; end: number; layout: string }[],
+  windows: ReadonlyMap<string, ReadonlyMap<number, Rect>>,
+): BrollClip[] {
+  return speakerClips(
+    spans,
     project.main,
     (source) => state.sources.get(source)?.index ?? null,
     project.output,
@@ -875,13 +895,6 @@ function withVisuals(
     });
     return under?.grade ? { ...clip, grade: under.grade } : clip;
   });
-  const broll = [...(project.broll ?? []), ...parts.broll, ...speakers];
-  return {
-    ...project,
-    ...(broll.length > 0 ? { broll } : {}),
-    ...(parts.cards.length > 0 ? { cards: parts.cards } : {}),
-    audio: { ...project.audio, ...(parts.sfx.length > 0 ? { sfx: parts.sfx } : {}) },
-  };
 }
 
 /**

@@ -2,7 +2,7 @@
 // music's licences go to `<name>.music.txt`: ready to paste under the video.
 import { writeFile } from "node:fs/promises";
 import { basename } from "node:path";
-import { LOGOS, type LogoName } from "@video-editor/effects";
+import { LOGOS, marksIn } from "@video-editor/effects";
 
 /** Where one piece of B-roll came from and what its source asks to be credited. */
 export interface Credit {
@@ -42,36 +42,25 @@ export async function writeCredits(video: string, credits: readonly Credit[]): P
   return path;
 }
 
-/** The credits of the logos and icons a card draws, from the sets the cards bundle. */
-export function cardCredits(params: unknown): Credit[] {
-  const credits: Credit[] = [];
-  const visit = (value: unknown) => {
-    if (Array.isArray(value)) value.forEach(visit);
-    else if (value && typeof value === "object") {
-      for (const [key, item] of Object.entries(value)) {
-        if (key === "logo" && typeof item === "string") {
-          const title = LOGOS[item as LogoName]?.title ?? item;
-          credits.push({
-            what: `${title} logo, from Simple Icons`,
-            source: `https://simpleicons.org/?q=${encodeURIComponent(item)}`,
-            license: { name: "CC0-1.0", url: "https://creativecommons.org/publicdomain/zero/1.0/" },
-            by: null,
-            note: `${title} is a trademark of its owner: show it only to refer to ${title}.`,
-          });
-        } else if (key === "icon" && typeof item === "string") {
-          credits.push({
-            what: `Lucide icon "${item}"`,
-            source: `https://lucide.dev/icons/${item}`,
-            license: {
-              name: "ISC",
-              url: "https://github.com/lucide-icons/lucide/blob/main/LICENSE",
-            },
-            by: null,
-          });
-        } else visit(item);
-      }
-    }
-  };
-  visit(params);
-  return credits;
+/** The credits of the icons and logos a graphic's markup shows, from the sets bundled with it. */
+export function markCredits(html: string): Credit[] {
+  const { icons, logos } = marksIn(html);
+  return [
+    ...logos.map((name) => {
+      const { title } = LOGOS[name];
+      return {
+        what: `${title} logo, from Simple Icons`,
+        source: `https://simpleicons.org/?q=${encodeURIComponent(name)}`,
+        license: { name: "CC0-1.0", url: "https://creativecommons.org/publicdomain/zero/1.0/" },
+        by: null,
+        note: `${title} is a trademark of its owner: show it only to refer to ${title}.`,
+      };
+    }),
+    ...icons.map((name) => ({
+      what: `Lucide icon "${name}"`,
+      source: `https://lucide.dev/icons/${name}`,
+      license: { name: "ISC", url: "https://github.com/lucide-icons/lucide/blob/main/LICENSE" },
+      by: null,
+    })),
+  ];
 }

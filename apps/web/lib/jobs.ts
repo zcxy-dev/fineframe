@@ -23,6 +23,7 @@ import {
   type Project,
   type StageProgress,
   TICKS_PER_SECOND,
+  upgradeProject,
   validateProject,
 } from "@video-editor/schema";
 import { Finish } from "./eta.ts";
@@ -188,6 +189,9 @@ export interface EditView {
   music: { gainDb: number } | null;
   look: string;
   captions: string | null;
+  /** Made by an earlier version, whose motion-graphics cards and keyword pops this one leaves out
+   * when it renders the edit again. */
+  older: boolean;
 }
 
 /** A request the job cannot take in its state; the message is for the page, said in the words of
@@ -706,9 +710,15 @@ export class Jobs {
     return job.versions;
   }
 
-  async #project(job: Job, n: number): Promise<{ project: Project; path: string }> {
+  async #project(job: Job, n: number): Promise<{ project: Project; path: string; older: boolean }> {
     const path = join(this.#dir(job), versionFiles(n).project);
-    return { project: await loadJson(path, validateProject), path };
+    let older = false;
+    const project = await loadJson(path, (value) => {
+      const { cards, keywords } = upgradeProject(value).dropped;
+      older = cards + keywords > 0;
+      return validateProject(value);
+    });
+    return { project, path, older };
   }
 
   /** A finished edit's version `n` (the one shown unless given), with what can change in it. */
@@ -718,7 +728,7 @@ export class Jobs {
     if (!this.#versions(job).some((each) => each.n === version)) {
       throw new JobError((t) => t.server.noVersion, 404);
     }
-    const { project } = await this.#project(job, version);
+    const { project, older } = await this.#project(job, version);
     return {
       version,
       length: editLength(project),
@@ -744,6 +754,7 @@ export class Jobs {
       music: project.audio.music?.[0] ? { gainDb: project.audio.music[0].gainDb ?? 0 } : null,
       look: lookOf(project),
       captions: project.captions?.preset ?? null,
+      older,
     };
   }
 
