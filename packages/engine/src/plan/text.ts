@@ -26,8 +26,25 @@ export function wordLanguage(text: string): "zh-TW" | "en" | null {
   return null;
 }
 
+const HALF_WIDTH: Record<string, string> = {
+  "，": ",",
+  "。": ".",
+  "！": "!",
+  "？": "?",
+  "：": ":",
+  "；": ";",
+  "、": ",",
+};
+
+/** A full-width comma, full stop, colon, semicolon, question or exclamation mark as English
+ * writes it. */
+export function halfWidth(mark: string): string {
+  return HALF_WIDTH[mark] ?? mark;
+}
+
 /** Words joined as a subtitle writes them: Chinese characters run together, and a space sets
- * off each English word or number, except next to full-width punctuation or before punctuation. */
+ * off each English word or number, except next to full-width punctuation or before punctuation,
+ * and so does an English mark that ends a clause before a Chinese character. */
 export function joinWords(words: readonly string[]): string {
   let text = "";
   for (const word of words) {
@@ -36,6 +53,7 @@ export function joinWords(words: readonly string[]): string {
     const spaced =
       (LATIN.test(before) && (LATIN.test(first) || HAN.test(first))) ||
       (CLOSES.test(before) && LATIN.test(first)) ||
+      (/[!?,;:]/.test(before) && HAN.test(first)) ||
       (HAN.test(before) && LATIN.test(first));
     text += (spaced ? " " : "") + word;
   }

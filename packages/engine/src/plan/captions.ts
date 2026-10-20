@@ -4,9 +4,9 @@ import {
   secondsToTicks,
   type Word,
 } from "@video-editor/schema";
-import { GAP } from "../captions/layout.ts";
+import { GAP, holdsTogether, insideWord } from "../captions/layout.ts";
 import type { PlacedClip, PlaceSource } from "./place.ts";
-import { endsSentence, joinWords, wordLanguage } from "./text.ts";
+import { bare, endsSentence, halfWidth, joinWords, wordLanguage } from "./text.ts";
 
 /** A kept word on the output timeline. */
 export interface TimedWord {
@@ -49,27 +49,41 @@ const PAUSE_MARK = /(?:[，、。；：,;:]|(?<!\..*)\.)+$/u;
 /** The same marks at the start of a word, where a transcript sometimes puts the pause before it. */
 const LEADING_MARK = /^[，、。；：,;:]+/u;
 
+/** The words' bare texts run together: the `count` before `at`, and from `at` on. */
+function around(texts: readonly string[], at: number, count = 4): [string, string] {
+  const run = (from: number, to: number) => texts.slice(from, to).map(bare).join("");
+  return [run(Math.max(0, at - count), at), run(at, at + count)];
+}
+
+/** A full-width mark right after an English word or a number, set half-width as English sets it
+ * (Really？ -> Really?). */
+function englishMarks(text: string): string {
+  return text.replace(/(?<=[A-Za-z0-9])[，。！？：；、]/gu, halfWidth);
+}
+
 /**
  * A Chinese caption line as Taiwanese subtitles set it: no commas or full stops, a full-width
  * space where one fell inside the line and nothing where one ended it. Question and exclamation
- * marks, quotes and ellipses stay. Each word's text loses its mark too; a word that was only
- * punctuation has nothing left to show, so it gets an empty text.
+ * marks, quotes and ellipses stay, half-width after an English word. A mark the transcript put
+ * inside a word (打。開) makes no pause. Each word's text loses its mark too; a word that was
+ * only punctuation has nothing left to show, so it gets an empty text.
  */
 export function subtitled(words: readonly string[]): { text: string; words: string[] } {
   const shown: string[] = [];
   let text = "";
   let pause = false;
-  for (const word of words) {
-    const bare = word.replace(LEADING_MARK, "");
-    const kept = bare.replace(PAUSE_MARK, "");
+  for (const [i, word] of words.entries()) {
+    const bareWord = word.replace(LEADING_MARK, "");
+    const kept = englishMarks(bareWord.replace(PAUSE_MARK, ""));
     shown.push(kept);
-    if (bare !== word) pause = true;
+    if (bareWord !== word) pause = true;
     if (kept) {
+      if (pause && insideWord(...around(words, i))) pause = false;
       if (pause && text) text += GAP;
       text = pause ? text + kept : joinWords([text, kept].filter(Boolean));
       pause = false;
     }
-    if (kept !== bare) pause = true;
+    if (PAUSE_MARK.test(bareWord)) pause = true;
   }
   return { text, words: shown };
 }
@@ -79,7 +93,7 @@ export function subtitled(words: readonly string[]): { text: string; words: stri
  * on the output timeline. Splitting them to fit the screen is the caption renderer's job. A line
  * is tagged with the language most of its words are in, and a word in the other language with
  * its own. A Chinese line drops its commas and full stops as Taiwanese subtitles do; an English
- * line keeps its punctuation as written.
+ * line keeps its punctuation, half-width.
  */
 export function captionLines(
   words: readonly TimedWord[],
@@ -93,9 +107,18 @@ export function captionLines(
       group &&
       previous &&
       previous.source === word.source &&
-      lineOf(previous.source, previous.index) === lineOf(word.source, word.index) &&
       word.index > previous.index &&
-      !endsSentence(previous.text);
+      ((lineOf(previous.source, previous.index) === lineOf(word.source, word.index) &&
+        !endsSentence(previous.text)) ||
+        // A line never ends inside a word or on one that leads into the next, wherever the
+        // transcript put a pause or a full stop.
+        (word.index === previous.index + 1 &&
+          holdsTogether(
+            ...around(
+              [...group.map((w) => w.text), ...words.slice(i).map((w) => w.text)],
+              group.length,
+            ),
+          )));
     if (continues) group.push(word);
     else groups.push([word]);
   }
@@ -107,8 +130,9 @@ export function captionLines(
     }
     const language = counts.en > counts["zh-TW"] ? "en" : "zh-TW";
     const texts = group.map((word) => word.text);
+    const english = texts.map((text) => text.replace(/[，。！？：；、]/gu, halfWidth));
     const shown =
-      language === "zh-TW" ? subtitled(texts) : { text: joinWords(texts), words: texts };
+      language === "zh-TW" ? subtitled(texts) : { text: joinWords(english), words: english };
     const captionWords = group.flatMap((word, i): CaptionWord[] => {
       const own = wordLanguage(word.text);
       const text = shown.words[i] as string;
