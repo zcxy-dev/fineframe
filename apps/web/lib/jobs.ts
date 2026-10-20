@@ -210,6 +210,13 @@ export function checkReplan(value: unknown): ReplanChoice | string {
   };
 }
 
+/** What the project list calls a job: its first link's title, else its first video's path, or
+ * the link of one not fetched yet. */
+function nameOf(job: Job): string {
+  const first = job.files.find((file) => file.use === "video");
+  return job.files.find((file) => file.title)?.title ?? (first?.path || first?.url || "");
+}
+
 /** A footage path's name without its folder and extension. */
 function stemOf(path: string): string {
   return basename(path, extname(path));
@@ -342,7 +349,7 @@ export interface ProjectSummary {
   status: Status;
   length: number;
   aspect: Settings["aspect"];
-  /** Its first video's path, to tell projects apart. */
+  /** Its first link's title, else its first video's path or link, to tell projects apart. */
   name: string;
   /** Bytes its folder takes on disk. */
   bytes: number;
@@ -546,10 +553,7 @@ export class Jobs {
         status: job.status,
         length: job.settings.length,
         aspect: job.settings.aspect,
-        name:
-          job.files.find((file) => file.title)?.title ??
-          job.files.find((file) => file.use === "video")?.path ??
-          "",
+        name: nameOf(job),
         bytes: await diskUsage(this.#dir(job)),
         footage: existsSync(join(this.#dir(job), "footage")),
         ...(job.settings.shorts ? { shorts: job.shorts?.length ?? 0 } : {}),
