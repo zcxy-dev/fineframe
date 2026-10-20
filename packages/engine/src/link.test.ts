@@ -51,18 +51,26 @@ test("yt-dlp is downloaded from the latest release once its hash matches, and ke
   if (!asset) return t.skip("no yt-dlp for this computer");
   const dir = await scratch(t, "yt-dlp-");
   let release = { tag: "2026.01.01", body: Buffer.from("yt-dlp one"), listed: "" };
+  // As GitHub does: the latest release's files redirect to the tagged ones, which redirect to a
+  // storage host whose URLs name no file.
   const server = await serve((path) => {
-    if (path === "/latest/download/SHA2-256SUMS")
+    if (path === "/latest/download/SHA2-256SUMS") {
       return { to: `/download/${release.tag}/SHA2-256SUMS` };
-    if (path === `/download/${release.tag}/SHA2-256SUMS`) {
+    }
+    if (path === `/download/${release.tag}/SHA2-256SUMS`)
+      return { to: `/storage/1?${release.tag}` };
+    if (path === `/download/${release.tag}/${asset}`) return { to: `/storage/2?${release.tag}` };
+    if (path === `/storage/1?${release.tag}`) {
       return { body: `${release.listed || sha256(release.body)}  ${asset}\n0000  other\n` };
     }
-    if (path === `/download/${release.tag}/${asset}`) return { body: release.body };
+    if (path === `/storage/2?${release.tag}`) return { body: release.body };
   });
   t.after(server.close);
   const options = { release: `${server.base}/latest/download/`, dir };
 
-  const first = await ytDlp(options);
+  // Links pasted together check it once.
+  const [first, again] = await Promise.all([ytDlp(options), ytDlp(options)]);
+  assert.equal(again, first);
   assert.deepEqual(await readFile(first), release.body);
   // The same release again: only its sums are read.
   server.asked.length = 0;
@@ -70,6 +78,7 @@ test("yt-dlp is downloaded from the latest release once its hash matches, and ke
   assert.deepEqual(server.asked, [
     "/latest/download/SHA2-256SUMS",
     "/download/2026.01.01/SHA2-256SUMS",
+    "/storage/1?2026.01.01",
   ]);
 
   // A newer release replaces it.

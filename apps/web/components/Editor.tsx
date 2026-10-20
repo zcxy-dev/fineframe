@@ -242,7 +242,7 @@ export function Editor() {
           })
           .catch((error: Error) => {
             setLinks((current) => current.filter((link) => link.url !== url));
-            setLinkError(`${url}: ${error.message}`);
+            setLinkError(t.footage.linkFailed(url, error.message));
           });
       }
     },

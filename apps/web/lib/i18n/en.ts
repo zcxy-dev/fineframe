@@ -105,6 +105,7 @@ export const en = {
     rights: "Only import videos you have the right to use.",
     reading: "Reading the link…",
     fromLink: "Fetched when the edit starts",
+    linkFailed: (url: string, why: string) => `${url}: ${why}`,
   },
   settings: {
     what: "What to make",

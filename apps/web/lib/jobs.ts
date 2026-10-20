@@ -661,6 +661,8 @@ export class Jobs {
       await this.#finish(job, null, [(error as Error).message]);
       return;
     }
+    // Cancelled while its arguments were written.
+    if ((job.status as Status) === "cancelled") return;
     const log: string[] = [];
     const run = runEdit({
       command: this.#command,

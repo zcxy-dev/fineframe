@@ -103,6 +103,7 @@ export const zhTW: Messages = {
     rights: "只匯入你有權使用的影片。",
     reading: "正在讀取連結…",
     fromLink: "開始剪輯時下載",
+    linkFailed: (url, why) => `${url}：${why}`,
   },
   settings: {
     what: "要製作什麼",

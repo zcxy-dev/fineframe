@@ -85,29 +85,54 @@ export interface YtDlpOptions {
  * reading them. Each call reads the latest release's SHA2-256SUMS; the binary it lists for this
  * computer is downloaded the first time and checked against it before it is kept, and an older
  * one is removed. When GitHub cannot be reached, the one kept from before is used, if there is
- * one. A binary is kept only once its hash matched, so none is run that did not.
+ * one. A binary is kept only once its hash matched, so none is run that did not. Calls while one
+ * is under way, such as for several links pasted at once, share it.
  */
-export async function ytDlp(options: YtDlpOptions = {}): Promise<string> {
+export function ytDlp(options: YtDlpOptions = {}): Promise<string> {
+  const key = `${options.release ?? YT_DLP_RELEASE}\0${options.dir ?? cacheDir()}`;
+  let checking = checks.get(key);
+  if (!checking) {
+    checking = latestYtDlp(options).finally(() => checks.delete(key));
+    checks.set(key, checking);
+  }
+  return checking;
+}
+
+/** Each check of yt-dlp under way, by its release and folder. */
+const checks = new Map<string, Promise<string>>();
+
+async function latestYtDlp(options: YtDlpOptions): Promise<string> {
   const asset = ytDlpAsset();
   if (!asset) {
     throw new LinkError("unsupported", `No yt-dlp for ${process.platform} on ${process.arch}`);
   }
   const dir = options.dir ?? cacheDir();
   const suffix = process.platform === "win32" ? ".exe" : "";
-  const sums = await fetch(new URL("SHA2-256SUMS", options.release ?? YT_DLP_RELEASE), {
-    signal: AbortSignal.timeout(30_000),
-  }).catch(() => null);
-  if (!sums?.ok) {
+  // The latest release's sums redirect to its tagged ones, the folder its assets are in, so an
+  // asset fetched from there is of the release whose sums were read, whatever is released
+  // meanwhile. The tagged URL redirects again, to a storage host whose URL names no asset.
+  const read = async (): Promise<{ sums: string; tagged: URL } | number | null> => {
+    const signal = AbortSignal.timeout(30_000);
+    const latest = new URL("SHA2-256SUMS", options.release ?? YT_DLP_RELEASE);
+    const hop = await fetch(latest, { redirect: "manual", signal });
+    const location = hop.headers.get("location");
+    if (!location) return hop.status;
+    const tagged = new URL(location, latest);
+    const response = await fetch(tagged, { signal });
+    return response.ok ? { sums: await response.text(), tagged } : response.status;
+  };
+  const release = await read().catch(() => null);
+  if (release === null || typeof release === "number") {
     const kept = (await readdir(dir).catch(() => [])).find((name) =>
       /^yt-dlp-[0-9a-f]{12}(\.exe)?$/.test(name),
     );
     if (kept) return join(dir, kept);
     throw new LinkError(
       "offline",
-      `Could not reach GitHub to download yt-dlp, which imports links${sums ? ` (HTTP ${sums.status})` : ""}`,
+      `Could not reach GitHub to download yt-dlp, which imports links${release ? ` (HTTP ${release})` : ""}`,
     );
   }
-  const listed = (await sums.text())
+  const listed = release.sums
     .split("\n")
     .map((line) => line.trim().split(/\s+/))
     .find(([, name]) => name === asset)?.[0];
@@ -116,9 +141,7 @@ export async function ytDlp(options: YtDlpOptions = {}): Promise<string> {
   }
   const path = join(dir, `yt-dlp-${listed.slice(0, 12)}${suffix}`);
   if (await exists(path)) return path;
-  // The asset from the release whose sums were read, which a newer release cannot replace
-  // between the two requests.
-  const url = new URL(asset, sums.url).href;
+  const url = new URL(asset, release.tagged).href;
   await pinnedFile(url, listed, path, "yt-dlp", 0o755, options.onDownload);
   await removeOtherPins(path, "yt-dlp-");
   return path;
