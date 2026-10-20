@@ -9,6 +9,11 @@ test("a title becomes a file name every system keeps", () => {
   assert.equal(fileTitle("Ends with dots..."), "Ends with dots");
   assert.equal(fileTitle("tab\there\nnewline"), "tab here newline");
   assert.equal(fileTitle("???"), "short");
+  // Names Windows keeps for devices, with or without an extension after them.
+  assert.equal(fileTitle("CON"), "CON_");
+  assert.equal(fileTitle("nul.final"), "nul_.final");
+  assert.equal(fileTitle("Com1"), "Com1_");
+  assert.equal(fileTitle("Console"), "Console");
   // At most 60 characters, counted as people read them, not as UTF-16 halves.
   assert.equal([...fileTitle("影".repeat(80))].length, 60);
   assert.equal([...fileTitle("😀".repeat(80))].length, 60);

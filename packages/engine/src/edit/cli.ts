@@ -32,8 +32,8 @@ const usage = `Usage: pnpm edit <footage folder, file or link>... --length <leng
 Edits footage into a finished video within 5 % of the length asked. A folder stands for the
 files directly in it: videos to cut, and still images to show as B-roll. A link (http or
 https) is a public video's page, such as a YouTube video's; other sites yt-dlp reads may
-work. Its video is fetched at up to 1080p beside the output, as <title> [<id>].mp4, and
-edited like a file. Use only videos you have the right to use. A playlist, a channel, and a
+work. Its video is fetched at up to 1080p beside the output, as <title> [<id>].mp4 (or .mkv),
+and edited like a file. Use only videos you have the right to use. A playlist, a channel, and a
 private, members-only, age-restricted or live video cannot be fetched; browser cookies are
 never read. The latest yt-dlp is downloaded from GitHub, checked against its release's
 SHA2-256SUMS, and updated before each link is fetched.

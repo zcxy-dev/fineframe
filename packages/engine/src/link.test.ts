@@ -1,17 +1,41 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, utimes, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { cacheDir } from "./download.ts";
+import { ffmpeg, run } from "./ffmpeg.ts";
 import { fetchLink, fromYtDlp, isLink, LinkError, readLink, ytDlp, ytDlpAsset } from "./link.ts";
 import { scratch } from "./testing.ts";
 
 const FAKE = [process.execPath, fileURLToPath(new URL("edit/fixtures/yt-dlp.ts", import.meta.url))];
 const sha256 = (data: Buffer | string) => createHash("sha256").update(data).digest("hex");
+
+/** Whether process `pid` still runs. */
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Waits up to two seconds for each of `pids` to end, and says whether they all did. */
+async function ended(pids: number[]): Promise<boolean> {
+  for (let i = 0; i < 40 && pids.some(alive); i++) await new Promise((r) => setTimeout(r, 50));
+  return !pids.some(alive);
+}
+
+/** The ids the stand-in wrote to `file`: its own and its writer's. */
+async function pidsIn(file: string): Promise<number[]> {
+  return (await readFile(file, "utf8")).trim().split("\n").map(Number);
+}
 
 /** A local server answering each path with what `routes` gives, and 404 otherwise. */
 async function serve(
@@ -72,6 +96,8 @@ test("yt-dlp is downloaded from the latest release once its hash matches, and ke
   const [first, again] = await Promise.all([ytDlp(options), ytDlp(options)]);
   assert.equal(again, first);
   assert.deepEqual(await readFile(first), release.body);
+  // Downloaded earlier than the next, as releases are days apart.
+  await utimes(first, new Date(2026, 0, 1), new Date(2026, 0, 1));
   // The same release again: only its sums are read.
   server.asked.length = 0;
   assert.equal(await ytDlp(options), first);
@@ -81,21 +107,29 @@ test("yt-dlp is downloaded from the latest release once its hash matches, and ke
     "/storage/1?2026.01.01",
   ]);
 
-  // A newer release replaces it.
+  // A newer release is used from then on; the one before stays for an import that started with
+  // it, and goes at the release after.
+  const name = (path: string) => path.slice(dir.length + 1);
   release = { tag: "2026.02.01", body: Buffer.from("yt-dlp two"), listed: "" };
   const second = await ytDlp(options);
   assert.notEqual(second, first);
   assert.deepEqual(await readFile(second), release.body);
-  assert.deepEqual(await readdir(dir), [second.slice(dir.length + 1)]);
+  assert.deepEqual((await readdir(dir)).sort(), [name(first), name(second)].sort());
+  await utimes(second, new Date(2026, 1, 1), new Date(2026, 1, 1));
+  release = { tag: "2026.03.01", body: Buffer.from("yt-dlp three"), listed: "" };
+  const third = await ytDlp(options);
+  assert.deepEqual((await readdir(dir)).sort(), [name(second), name(third)].sort());
 
   // One that does not match its listed hash is never kept.
-  release = { tag: "2026.03.01", body: Buffer.from("tampered"), listed: sha256("yt-dlp three") };
+  release = { tag: "2026.04.01", body: Buffer.from("tampered"), listed: sha256("yt-dlp four") };
   await assert.rejects(ytDlp(options), /SHA-256/);
-  assert.deepEqual(await readdir(dir), [second.slice(dir.length + 1)]);
+  assert.deepEqual((await readdir(dir)).sort(), [name(second), name(third)].sort());
 
-  // GitHub out of reach: the one kept is used, and without one it says so.
+  // GitHub out of reach: the newest kept is used, whatever order the folder lists them in, and
+  // without one it says so.
   server.close();
-  assert.equal(await ytDlp(options), second);
+  await utimes(second, new Date(2026, 0, 1), new Date(2026, 0, 1));
+  assert.equal(await ytDlp(options), third);
   await assert.rejects(ytDlp({ ...options, dir: await scratch(t, "yt-dlp-") }), (error) => {
     assert.ok(error instanceof LinkError);
     assert.equal(error.problem, "offline");
@@ -137,6 +171,14 @@ test("a link's video is read, then fetched into the folder with its progress", a
   const named = await fetchLink(url, dir, { program: FAKE });
   assert.equal(named.path, join(dir, "On air [v1].mp4"));
 
+  // A file already there is never written over, even one whose name differs only in case, as
+  // macOS and Windows do not tell those apart.
+  await writeFile(join(dir, "on AIR.mp4"), "a file of the user's");
+  const beside = await fetchLink(url, dir, { program: FAKE, stem: () => "On air" });
+  assert.equal(beside.path, join(dir, "On air (2).mp4"));
+  assert.equal(await readFile(join(dir, "on AIR.mp4"), "utf8"), "a file of the user's");
+  assert.deepEqual(await readFile(join(dir, "On air.mp4")), body);
+
   // Never a configuration file or cookies, and the link only after "--".
   const runs = (await readFile(log, "utf8"))
     .trim()
@@ -174,10 +216,13 @@ test("a playlist, a private video and a live stream are refused with what to do"
   }
 });
 
-test("a stopped fetch leaves nothing in the folder", async (t) => {
+test("a stopped fetch stops yt-dlp and what it runs, and leaves nothing in the folder", async (t) => {
   const server = await serve(() => ({ body: Buffer.alloc(200_000) }));
   t.after(server.close);
   const dir = await scratch(t, "link-");
+  const pids = join(await scratch(t, "pids-"), "pids");
+  process.env.FAKE_YT_DLP_PIDS = pids;
+  t.after(() => delete process.env.FAKE_YT_DLP_PIDS);
   const stop = new AbortController();
   const fetching = fetchLink(`${server.base}/slow`, dir, {
     program: FAKE,
@@ -186,6 +231,90 @@ test("a stopped fetch leaves nothing in the folder", async (t) => {
   });
   await assert.rejects(fetching, { name: "AbortError" });
   assert.deepEqual(await readdir(dir), []);
+  assert.ok(await ended(await pidsIn(pids)), "yt-dlp and its writer still run");
+});
+
+for (const [how, signal] of [
+  ["ends", null],
+  ["is interrupted (Ctrl+C)", "SIGINT"],
+  ["is stopped", "SIGTERM"],
+] as const) {
+  test(`a program that ${how} while fetching leaves nothing running or behind`, async (t) => {
+    const server = await serve(() => ({ body: Buffer.alloc(200_000) }));
+    t.after(server.close);
+    const dir = await scratch(t, "link-");
+    const pids = join(await scratch(t, "pids-"), "pids");
+    // Fetches a link and, once it is under way, says so, then exits by itself unless a signal
+    // is to end it.
+    const script = `
+      import { fetchLink } from ${JSON.stringify(new URL("link.ts", import.meta.url).href)};
+      let said = false;
+      await fetchLink(process.argv[1], process.argv[2], {
+        program: JSON.parse(process.argv[3]),
+        onProgress: () => {
+          if (said) return;
+          said = true;
+          process.stdout.write("fetching\\n");
+          if (process.argv[4] === "exit") process.exit(0);
+        },
+      });`;
+    const child = spawn(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        script,
+        `${server.base}/slow`,
+        dir,
+        JSON.stringify(FAKE),
+        signal ? "wait" : "exit",
+      ],
+      { env: { ...process.env, FAKE_YT_DLP_PIDS: pids }, stdio: ["ignore", "pipe", "inherit"] },
+    );
+    const exited = once(child, "exit");
+    await once(child.stdout, "data");
+    if (signal) child.kill(signal);
+    await exited;
+    assert.ok(await ended(await pidsIn(pids)), "yt-dlp and its writer still run");
+    assert.deepEqual(await readdir(dir), []);
+  });
+}
+
+// yt-dlp itself, as kept in the cache by an earlier import: CI has none, and tests download
+// nothing, so it is skipped there.
+const kept = (await readdir(cacheDir()).catch(() => [])).find((name) =>
+  /^yt-dlp-[0-9a-f]{12}(\.exe)?$/.test(name),
+);
+test("streams MP4 cannot hold are kept as Matroska, and MP4 stays MP4", {
+  skip: kept ? false : "no yt-dlp kept in the cache: import a link once to run it",
+}, async (t) => {
+  const dir = await scratch(t, "link-");
+  const sources = await scratch(t, "sources-");
+  const encode = async (name: string, codecs: string[]) => {
+    const lavfi = [
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc=size=320x240:rate=25",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=f=440",
+    ];
+    await run(await ffmpeg(), ["-v", "error", ...lavfi, "-t", "2", ...codecs, join(sources, name)]);
+    return readFile(join(sources, name));
+  };
+  const files: Record<string, Buffer> = {
+    "/vp8.webm": await encode("vp8.webm", ["-c:v", "libvpx", "-c:a", "libvorbis"]),
+    "/h264.mp4": await encode("h264.mp4", ["-c:v", "libx264", "-c:a", "aac"]),
+  };
+  const server = await serve((path) => (files[path] ? { body: files[path] } : undefined));
+  t.after(server.close);
+  const program = [join(cacheDir(), kept as string)];
+  const webm = await fetchLink(`${server.base}/vp8.webm`, dir, { program, stem: () => "vp8" });
+  assert.equal(webm.path, join(dir, "vp8.mkv"));
+  const mp4 = await fetchLink(`${server.base}/h264.mp4`, dir, { program, stem: () => "h264" });
+  assert.equal(mp4.path, join(dir, "h264.mp4"));
 });
 
 test("yt-dlp's errors become the problem a person can act on", () => {
@@ -205,6 +334,9 @@ test("yt-dlp's errors become the problem a person can act on", () => {
       "unavailable",
     ],
     ["Unsupported URL: https://example.com/", "unsupported"],
+    // What the link says is not what yt-dlp said.
+    ["Unsupported URL: https://example.com/premium-members/live", "unsupported"],
+    ["[generic] premium: Unable to download webpage: HTTP Error 404: Not Found", "unavailable"],
     [
       "[generic] x: Unable to download webpage: <urlopen error [Errno -2] Name or service not known>",
       "offline",
