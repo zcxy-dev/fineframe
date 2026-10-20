@@ -222,7 +222,7 @@ function AnalysisSteps({ job }: { job: Job }) {
 export function DownloadView({ download }: { download: NonNullable<Job["download"]> }) {
   const t = useT();
   const words = t.run;
-  const { bytes, total, secondsLeft } = download;
+  const { bytes, total, secondsLeft, bytesPerSecond } = download;
   const name = downloadName(download.name, t);
   const percent = Math.floor((bytes / total) * 100);
   return (
@@ -243,8 +243,9 @@ export function DownloadView({ download }: { download: NonNullable<Job["download
       </div>
       <p className={styles.help}>
         {t.compose.of(formatBytes(bytes), formatBytes(total))}
+        {bytesPerSecond !== undefined && words.speed(formatBytes(bytesPerSecond))}
         {secondsLeft !== undefined && words.left(formatLeft(secondsLeft, t))}
-        {words.firstTime}
+        {!download.video && words.firstTime}
       </p>
     </div>
   );

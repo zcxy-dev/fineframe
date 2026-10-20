@@ -10,7 +10,9 @@
     "./claude": "./src/plan/claude.ts",
     "./download": "./src/download.ts",
     "./estimate": "./src/plan/estimate.ts",
+    "./ffmpeg": "./src/ffmpeg.ts",
     "./length": "./src/edit/length.ts",
+    "./link": "./src/link.ts",
     "./looks": "./src/looks.ts",
     "./media": "./src/edit/media.ts",
     "./revise": "./src/revise.ts"

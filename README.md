@@ -29,7 +29,7 @@ Macs with an Intel processor are not supported: PyTorch and ONNX Runtime, which 
 
 **Linux.** Make the AppImage executable (`chmod +x Fineframe-*.AppImage`) and run it. AppImages need FUSE 2: on Ubuntu 24.04, `sudo apt install libfuse2t64`.
 
-**The first time it opens,** the app asks for your [Anthropic API key](https://console.anthropic.com/settings/keys) and checks it; Claude plans each edit, writes its motion graphics and checks its cuts, about US$0.20 to 0.60 for an edit of a minute or less and US$1 to 1.20 for one of five minutes ([measured](packages/engine/MEASUREMENTS.md#planner-measurements)). Meanwhile it installs the analysis once, about 2 GB of Python and PyTorch, with its progress in the window. The first edit then downloads what it needs on first use, each with its own bar: the speech model ([sizes](#which-speech-model-runs)), FFmpeg and the effects renderer. On a computer with less than 12 GB of memory, too little for the speech model, speech is heard on OpenRouter instead, with your [OpenRouter API key](https://openrouter.ai/settings/keys), for about US$0.03 an hour of footage; the app says so, and either can be chosen.
+**The first time it opens,** the app asks for your [Anthropic API key](https://console.anthropic.com/settings/keys) and checks it; Claude plans each edit, writes its motion graphics and checks its cuts, about US$0.20 to 0.60 for an edit of a minute or less and US$1 to 1.20 for one of five minutes ([measured](packages/engine/MEASUREMENTS.md#planner-measurements)). Meanwhile it installs the analysis once, about 2 GB of Python and PyTorch, with its progress in the window. The first edit then downloads what it needs on first use, each with its own bar: the speech model ([sizes](#which-speech-model-runs)), FFmpeg and the effects renderer, and yt-dlp for the first link imported. On a computer with less than 12 GB of memory, too little for the speech model, speech is heard on OpenRouter instead, with your [OpenRouter API key](https://openrouter.ai/settings/keys), for about US$0.03 an hour of footage; the app says so, and either can be chosen.
 
 The keys stay on your computer, in a file only your user can read, in the app's folder (`~/Library/Application Support/Fineframe` on macOS, `%APPDATA%\Fineframe` on Windows, `~/.config/Fineframe` on Linux), with the Python it installed. The models and edits are in `.cache\video-editor` and `.cache\huggingface` in your user folder (`~/.cache/…` on macOS and Linux). To remove the app entirely, uninstall or delete it and delete those folders. The app does not update itself yet: install a newer version over it, and the keys and downloads stay. Releases up to 0.3.0 were called Video Editor: Fineframe does not replace it and asks for the key again, since that app's folder is `Video Editor`; uninstall it and delete that folder. How the app is built: [`apps/desktop`](apps/desktop/README.md).
 
@@ -48,7 +48,7 @@ check       review every cut, fix what is wrong, at most three passes
 finished.mp4  +  captions.srt
 ```
 
-A single web page drives it: drop the files, pick the length and aspect ratio, press start, and download the result.
+A single web page drives it: drop the files or paste a video's link, pick the length and aspect ratio, press start, and download the result.
 
 ## What works today
 
@@ -64,6 +64,7 @@ A single web page drives it: drop the files, pick the length and aspect ratio, p
 - **Framing:** a [virtual camera](packages/engine/README.md#framing) frames every clip in the edit's shape and follows whoever speaks.
 - **Render:** [`project.json` to MP4](packages/engine/README.md#how-it-renders) with frame- and sample-exact cuts, transitions, B-roll, grading and loudness ([measurements](packages/engine/MEASUREMENTS.md#render-measurements)).
 - **Music:** tracks you supply, fitted to the edit and ducked under speech ([details](packages/engine/README.md#planning), [measurements](packages/engine/MEASUREMENTS.md#music-measurements)).
+- **Links:** a public video's link, from YouTube or another site [yt-dlp](https://github.com/yt-dlp/yt-dlp) reads, imported as footage at up to 1080p, in the page and in `pnpm edit` ([details](packages/engine/README.md#editing-footage)).
 - **One command:** [`pnpm edit`](packages/engine/README.md#editing-footage) turns a folder of footage into the finished video at the length and aspect asked ([measurements](packages/engine/MEASUREMENTS.md#edit-measurements)).
 - **Several shorts:** [`pnpm edit --shorts`](packages/engine/README.md#editing-footage) and the page make up to 10 shorts from one long video, each from one stretch of it, with a title, a description and hashtags.
 - **Desktop app:** [installers](#install) for Apple silicon Macs, Windows and Linux run the web page with nothing else to install ([details](apps/desktop/README.md)).
@@ -81,7 +82,7 @@ A single web page drives it: drop the files, pick the length and aspect ratio, p
 - **Platforms:** macOS on Apple silicon, Windows x64 and Linux x64, tested by CI on every change. Intel Macs are not supported.
 - **Synthetic corpus:** [`vebench synth`](bench/README.md#synthetic-corpus) generates talks, conversations, a phone walk, screen recordings and music with exact truth.
 
-Analysis and rendering run locally; [SECURITY.md](SECURITY.md#scope) says what planning, the cut review, transcript correction, cloud speech and a rich edit's B-roll send or fetch.
+Analysis and rendering run locally; [SECURITY.md](SECURITY.md#scope) says what planning, the cut review, transcript correction, cloud speech, a rich edit's B-roll and link import send or fetch.
 
 ## Quick start
 

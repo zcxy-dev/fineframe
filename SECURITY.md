@@ -23,6 +23,10 @@ B-roll sourcing ([`packages/engine/src/broll`](packages/engine/README.md#b-roll-
 - **Icons** download three npm tarballs from the npm registry, each checked against its SHA-256.
 - **Chrome Headless Shell** downloads Google's Chrome for Testing archive of a pinned build, checked against its SHA-256 for each platform before it is unpacked.
 
+Link import ([`packages/engine/src/link.ts`](packages/engine/README.md#editing-footage)), in the page and in `pnpm edit`, fetches a public video from the link the user gives, and sends nothing of the user's own:
+- **yt-dlp** is downloaded from its GitHub releases and kept current: before each link, it reads the latest release's `SHA2-256SUMS`, and a new release's standalone binary is checked against its SHA-256 before it is kept or run; a partial or mismatched download is deleted. When GitHub cannot be reached, the binary kept from before runs.
+- **The video** is fetched by that yt-dlp from the site the link names, and from whatever hosts the site sends it to. yt-dlp runs with no configuration file, never reads cookies from a file or a browser, and gets the link as an argument after `--`, never through a shell. For YouTube it runs the site's JavaScript challenge in the Node that runs the editor, with yt-dlp's own solver scripts. Reading a link (its title and length, as the page lists it) also contacts the site. A link is refused unless it is `http` or `https`; yt-dlp may follow it to any address, the local network's included.
+
 Especially welcome:
 - **Media parsing:** malformed media files that lead to code execution, path traversal or runaway resource use.
 - **Dependencies:** issues in pinned dependencies or downloaded model weights that affect this project.

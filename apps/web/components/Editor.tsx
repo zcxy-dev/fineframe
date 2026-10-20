@@ -30,7 +30,7 @@ import { jobApi, shortView } from "../lib/shorts.ts";
 import { dollarsOf, summaryRows } from "../lib/summary.ts";
 import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
-import { Footage, type Item } from "./Footage.tsx";
+import { Footage, type Item, type LinkItem } from "./Footage.tsx";
 import { useLocale, useT } from "./I18n.tsx";
 import { CaptionsIcon, CheckIcon, DownloadIcon, LockIcon } from "./icons.tsx";
 import { KeyDialog } from "./KeyDialog.tsx";
@@ -71,6 +71,8 @@ export function Editor() {
   const t = useT();
   const { locale, choose } = useLocale();
   const [items, setItems] = useState<Item[]>([]);
+  const [links, setLinks] = useState<LinkItem[]>([]);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const [skipped, setSkipped] = useState(0);
   const [choices, setChoices] = useState<Choices>({
     make: "one",
@@ -215,6 +217,38 @@ export function Editor() {
     setSkipped((count) => count + left);
   }, []);
 
+  // Each link pasted, read by the server for its title and length; one it cannot import is
+  // left out, saying why.
+  const addLinks = useCallback(
+    (text: string) => {
+      const urls = [...new Set(text.split(/\s+/).filter(Boolean))];
+      setLinkError(null);
+      setLinks((current) => [
+        ...current,
+        ...urls.filter((url) => !current.some((link) => link.url === url)).map((url) => ({ url })),
+      ]);
+      for (const url of urls) {
+        void fetch("/api/links", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        })
+          .then(async (response) => {
+            const read = (await response.json()) as LinkItem["video"] & { error?: string };
+            if (!response.ok) throw new Error(read.error ?? t.compose.refused);
+            setLinks((current) =>
+              current.map((link) => (link.url === url ? { url, video: read } : link)),
+            );
+          })
+          .catch((error: Error) => {
+            setLinks((current) => current.filter((link) => link.url !== url));
+            setLinkError(`${url}: ${error.message}`);
+          });
+      }
+    },
+    [t],
+  );
+
   // Each video's and track's length, read from its header one at a time, for the totals and the
   // warning.
   useEffect(() => {
@@ -233,11 +267,13 @@ export function Editor() {
   }, [items]);
 
   const used = items.filter((item) => !item.off);
-  const hasVideo = used.some((item) => item.use === "video");
+  const hasVideo = used.some((item) => item.use === "video") || links.length > 0;
   const music = used.filter((item) => item.use === "music").length;
   const footageSeconds = useMemo(
-    () => items.reduce((sum, item) => sum + (item.use === "video" ? (item.duration ?? 0) : 0), 0),
-    [items],
+    () =>
+      items.reduce((sum, item) => sum + (item.use === "video" ? (item.duration ?? 0) : 0), 0) +
+      links.reduce((sum, link) => sum + (link.video?.seconds ?? 0), 0),
+    [items, links],
   );
   const range = SHORT_RANGES[choices.range] ?? DEFAULT_SHORT_RANGE;
   const several = choices.make === "shorts";
@@ -254,14 +290,16 @@ export function Editor() {
       ? t.compose.installing
       : setup?.state === "failed"
         ? t.compose.setupFailed
-        : !hasVideo
-          ? items.length === 0
-            ? t.compose.addFootage
-            : t.compose.addVideo
-          : "problem" in length
-            ? length.problem
-            : (instructionsProblem(choices.instructions, t) ??
-              (music > 0 && !choices.musicLicense.trim() ? t.compose.musicLicense : null));
+        : links.some((link) => !link.video)
+          ? t.footage.reading
+          : !hasVideo
+            ? items.length === 0
+              ? t.compose.addFootage
+              : t.compose.addVideo
+            : "problem" in length
+              ? length.problem
+              : (instructionsProblem(choices.instructions, t) ??
+                (music > 0 && !choices.musicLicense.trim() ? t.compose.musicLicense : null));
 
   /** Sends the footage and starts the edit; `instructions` are what the box holds unless a
    * retry gives the failed edit's own. */
@@ -297,6 +335,7 @@ export function Editor() {
             ...(several ? { shorts: { count: choices.count, min: range[0], max: range[1] } } : {}),
           },
           files: used.map((item) => ({ path: item.path, size: item.file.size })),
+          links: links.map((link) => link.url),
         }),
       });
       const created = (await response.json()) as Job & { error?: string; code?: string };
@@ -440,8 +479,14 @@ export function Editor() {
             )}
             <Footage
               items={items}
+              links={links}
+              linkError={linkError}
               skipped={skipped}
               onAdd={add}
+              onAddLinks={addLinks}
+              onRemoveLink={(url) =>
+                setLinks((current) => current.filter((link) => link.url !== url))
+              }
               onRemove={(key) => setItems((current) => current.filter((item) => item.key !== key))}
               onToggle={(key) =>
                 setItems((current) =>
@@ -450,6 +495,8 @@ export function Editor() {
               }
               onClear={() => {
                 setItems([]);
+                setLinks([]);
+                setLinkError(null);
                 setSkipped(0);
               }}
             />

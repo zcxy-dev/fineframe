@@ -26,7 +26,13 @@ export interface SetupState {
   /** "ready" once the analysis can run; "failed" says why in `error`. */
   state: "ready" | "installing" | "failed";
   /** What is downloading while it installs, as a model's download is shown. */
-  download?: { name: string; bytes: number; total: number; secondsLeft?: number };
+  download?: {
+    name: string;
+    bytes: number;
+    total: number;
+    secondsLeft?: number;
+    bytesPerSecond?: number;
+  };
   error?: string;
 }
 
@@ -137,14 +143,14 @@ export class Setup {
         if (total === 0) return;
         const now = { at: Date.now(), bytes };
         started ??= now;
-        const left = secondsLeft(started, now, total);
+        const rate = secondsLeft(started, now, total);
         this.#state = {
           state: "installing",
           download: {
             name: SETUP_DOWNLOAD,
             bytes,
             total,
-            ...(left === undefined ? {} : { secondsLeft: left }),
+            ...(rate ? { secondsLeft: rate.seconds, bytesPerSecond: rate.bytesPerSecond } : {}),
           },
         };
       });

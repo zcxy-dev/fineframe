@@ -2,8 +2,11 @@
 // so they run without the models, FFmpeg or a real key.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -19,6 +22,9 @@ process.env.VIDEO_EDITOR_EDIT_CLI = fileURLToPath(
 process.env.FAKE_EDIT_HOLD = hold;
 process.env.VIDEO_EDITOR_RENDER_CLI = fileURLToPath(
   new URL("../../../lib/fixtures/render.ts", import.meta.url),
+);
+process.env.VIDEO_EDITOR_YT_DLP = fileURLToPath(
+  new URL("../../../../../packages/engine/src/edit/fixtures/yt-dlp.ts", import.meta.url),
 );
 // The key the page saved, which the edit gets over the server's own.
 const env = join(root, ".env");
@@ -47,6 +53,7 @@ const versionsRoute = await import("./[id]/versions/route.ts");
 const versionRoute = await import("./[id]/versions/[n]/route.ts");
 const replanRoute = await import("./[id]/replan/route.ts");
 const shortsRoute = await import("./[id]/shorts/route.ts");
+const linksRoute = await import("../links/route.ts");
 
 test.after(() => rm(root, { recursive: true, force: true }));
 
@@ -932,4 +939,84 @@ test("a run of shorts stopped at its cost limit ends done with the shorts made, 
   } finally {
     delete process.env.FAKE_SHORTS_STOP;
   }
+});
+
+test("a link: read when pasted, refused saying why, fetched into the footage as the edit starts", async (t) => {
+  const video = Buffer.alloc(30_000, 5);
+  const server = createServer((_, response) => response.end(video));
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const read = (link: string, language = "en") =>
+    linksRoute.POST(
+      new Request("http://127.0.0.1/api/links", {
+        method: "POST",
+        headers: { "accept-language": language },
+        body: JSON.stringify({ url: link }),
+      }),
+    );
+
+  const link = `${base}/v?title=Street%20photos%3A%20Taipei`;
+  const listed = await read(link);
+  assert.equal(listed.status, 200);
+  assert.deepEqual(await listed.json(), {
+    url: link,
+    id: "v1",
+    title: "Street photos: Taipei",
+    seconds: 37,
+    site: "Generic",
+  });
+  for (const [path, pattern] of [
+    ["/channel/playlist", /playlist or a channel: paste the link of one video/],
+    ["/private", /private: only public videos/],
+    ["/live", /live video/],
+  ] as const) {
+    const refused = await read(`${base}${path}`);
+    assert.equal(refused.status, 400, path);
+    assert.match(((await refused.json()) as { error: string }).error, pattern);
+  }
+  const zh = await read(`${base}/private`, "zh-TW");
+  assert.match(((await zh.json()) as { error: string }).error, /不公開/);
+  const notLink = await read("file:///etc/passwd");
+  assert.equal(notLink.status, 400);
+
+  const { response, body: job } = await create([{ path: "a.mp4", size: 4 }], {
+    settings,
+    links: [link],
+  });
+  assert.equal(response.status, 201);
+  assert.equal((await put(job.id, 0, new Uint8Array(4))).status, 200);
+  // The link's video is fetched by the server, not sent: there is no such file to send.
+  assert.equal((await put(job.id, 1, new Uint8Array(4))).status, 404);
+  assert.equal((await start(job.id)).status, 200);
+  let done = job;
+  while (done.status === "running" || done.status === "uploading") {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    done = (await (
+      await jobRoute.GET(new Request(`${url}/${job.id}`), ctx({ id: job.id }))
+    ).json()) as Job;
+  }
+  assert.equal(done.status, "done", done.error);
+  const fetched = done.files[1];
+  assert.deepEqual(fetched, {
+    path: "Street photos Taipei.mp4",
+    size: video.length,
+    use: "video",
+    received: video.length,
+    url: link,
+    title: "Street photos: Taipei",
+  });
+  assert.deepEqual(
+    await readFile(join(root, job.id, "footage", "Street photos Taipei.mp4")),
+    video,
+  );
+  const args = JSON.parse(await readFile(join(root, job.id, "args.json"), "utf8")) as string[];
+  assert.deepEqual(args.slice(0, 2), [
+    join("footage", "a.mp4"),
+    join("footage", "Street photos Taipei.mp4"),
+  ]);
+  // The project is named after the video.
+  const projects = (await (await jobsRoute.GET()).json()) as ProjectSummary[];
+  assert.equal(projects.find((project) => project.id === job.id)?.name, "Street photos: Taipei");
 });

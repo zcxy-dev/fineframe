@@ -1,6 +1,6 @@
 "use client";
 
-import { type DragEvent, useRef, useState } from "react";
+import { type DragEvent, useId, useRef, useState } from "react";
 import { fromDrop, fromInput, type Picked } from "../lib/collect.ts";
 import { formatBytes, formatClock, type Role } from "../lib/settings.ts";
 import styles from "./editor.module.css";
@@ -11,6 +11,7 @@ import {
   FilmIcon,
   FolderIcon,
   ImageIcon,
+  LinkIcon,
   PlusIcon,
   UploadIcon,
 } from "./icons.tsx";
@@ -26,21 +27,47 @@ export interface Item {
   duration?: number | null;
 }
 
+/** A pasted link's video, which the server fetches when the edit starts. */
+export interface LinkItem {
+  url: string;
+  /** Undefined while the server reads the link. */
+  video?: { title: string; seconds: number | null; site: string };
+}
+
 interface Props {
   items: readonly Item[];
+  links: readonly LinkItem[];
+  /** Why the last link pasted cannot be imported. */
+  linkError: string | null;
   skipped: number;
   onAdd: (picked: Picked[]) => void;
+  /** Adds each link in what was pasted. */
+  onAddLinks: (text: string) => void;
+  onRemoveLink: (url: string) => void;
   onRemove: (key: string) => void;
   /** Offers a music file to the edit, or stops offering it. */
   onToggle: (key: string) => void;
   onClear: () => void;
 }
 
-/** The drop zone, then the list of what was dropped. */
-export function Footage({ items, skipped, onAdd, onRemove, onToggle, onClear }: Props) {
+/** The drop zone and the link field, then the list of what was dropped and pasted. */
+export function Footage({
+  items,
+  links,
+  linkError,
+  skipped,
+  onAdd,
+  onAddLinks,
+  onRemoveLink,
+  onRemove,
+  onToggle,
+  onClear,
+}: Props) {
   const t = useT();
   const words = t.footage;
+  const id = useId();
   const [over, setOver] = useState(false);
+  const [pasted, setPasted] = useState("");
   const files = useRef<HTMLInputElement>(null);
   const folder = useRef<HTMLInputElement>(null);
   const depth = useRef(0);
@@ -51,11 +78,18 @@ export function Footage({ items, skipped, onAdd, onRemove, onToggle, onClear }: 
     setOver(false);
     onAdd(await fromDrop(event.dataTransfer.items));
   };
+  const addLinks = () => {
+    if (!pasted.trim()) return;
+    onAddLinks(pasted);
+    setPasted("");
+  };
   const videos = items.filter((item) => item.use === "video");
   const photos = items.filter((item) => item.use === "image").length;
   const music = items.filter((item) => item.use === "music" && !item.off).length;
-  const seconds = videos.reduce((sum, item) => sum + (item.duration ?? 0), 0);
-  const compact = items.length > 0;
+  const seconds =
+    videos.reduce((sum, item) => sum + (item.duration ?? 0), 0) +
+    links.reduce((sum, link) => sum + (link.video?.seconds ?? 0), 0);
+  const compact = items.length + links.length > 0;
 
   return (
     <div className={styles.footage}>
@@ -115,13 +149,49 @@ export function Footage({ items, skipped, onAdd, onRemove, onToggle, onClear }: 
         />
       </section>
 
+      <div className={styles.linkField}>
+        <label className={styles.label} htmlFor={`${id}-link`}>
+          {words.link}
+        </label>
+        <div className={styles.linkRow}>
+          <input
+            id={`${id}-link`}
+            className={styles.input}
+            type="url"
+            inputMode="url"
+            autoComplete="off"
+            placeholder={words.linkPlaceholder}
+            aria-invalid={linkError !== null}
+            aria-describedby={`${id}-link-hint`}
+            value={pasted}
+            onChange={(event) => setPasted(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") addLinks();
+            }}
+          />
+          <button type="button" className={styles.button} onClick={addLinks}>
+            <LinkIcon width={16} height={16} />
+            {words.addLink}
+          </button>
+        </div>
+        {linkError && (
+          <p className={styles.linkError} role="alert">
+            {linkError}
+          </p>
+        )}
+        <p className={styles.help} id={`${id}-link-hint`}>
+          {words.linkHint}
+        </p>
+        <p className={styles.rights}>{words.rights}</p>
+      </div>
+
       {compact && (
         <div className={`${styles.card} ${styles.files}`}>
           <div className={styles.filesHead}>
             <div>
               <h2 className={styles.filesTitle}>{words.title}</h2>
               <p className={styles.filesMeta}>
-                {words.videos(videos.length)}
+                {words.videos(videos.length + links.length)}
                 {photos > 0 && ` · ${words.photos(photos)}`}
                 {music > 0 && ` · ${words.tracks(music)}`}
                 {seconds > 0 && ` · ${words.inAll(formatClock(seconds))}`}
@@ -192,6 +262,39 @@ export function Footage({ items, skipped, onAdd, onRemove, onToggle, onClear }: 
                   className={styles.iconButton}
                   aria-label={words.remove(item.path)}
                   onClick={() => onRemove(item.key)}
+                >
+                  <CloseIcon width={16} height={16} />
+                </button>
+              </li>
+            ))}
+            {links.map((link) => (
+              <li key={link.url} className={styles.file}>
+                <span className={styles.fileIcon}>
+                  <LinkIcon />
+                </span>
+                <span className={styles.fileText}>
+                  <span className={styles.fileName} title={link.url}>
+                    {link.video?.title ?? link.url}
+                  </span>
+                  <span className={styles.fileMeta}>
+                    {link.video
+                      ? [
+                          link.video.site,
+                          link.video.seconds === null
+                            ? words.lengthUnknown
+                            : formatClock(link.video.seconds),
+                          words.fromLink,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")
+                      : words.reading}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  className={styles.iconButton}
+                  aria-label={words.remove(link.video?.title ?? link.url)}
+                  onClick={() => onRemoveLink(link.url)}
                 >
                   <CloseIcon width={16} height={16} />
                 </button>
