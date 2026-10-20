@@ -1,5 +1,3 @@
-import queue
-import threading
 from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 
@@ -76,44 +74,6 @@ def windows(frames: Iterable[np.ndarray]) -> Iterator[tuple[np.ndarray, int]]:
         scored += STEP
 
 
-def ahead(frames: Iterable[np.ndarray], size: int = 2 * WINDOW) -> Iterator[np.ndarray]:
-    """`frames`, decoded in a thread of their own up to `size` ahead, so decoding overlaps the
-    model. An error decoding is raised here."""
-    held: queue.Queue = queue.Queue(size)
-    stop = threading.Event()
-    end = object()
-
-    def put(item: object) -> bool:
-        """Waits for room, unless the reader has stopped."""
-        while not stop.is_set():
-            try:
-                held.put(item, timeout=0.1)
-                return True
-            except queue.Full:
-                pass
-        return False
-
-    def decode() -> None:
-        try:
-            for frame in frames:
-                if not put(frame):
-                    return
-            put(end)
-        except Exception as exc:  # handed to the reading thread
-            put(exc)
-
-    thread = threading.Thread(target=decode, daemon=True)
-    thread.start()
-    try:
-        while (item := held.get()) is not end:
-            if isinstance(item, Exception):
-                raise item
-            yield item
-    finally:
-        stop.set()
-        thread.join()
-
-
 def predict(frames: Iterable[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
     """Per-frame probabilities: a transition's center, and any frame inside a transition."""
     ml.require()
@@ -122,17 +82,11 @@ def predict(frames: Iterable[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
 
     model = TransNetV2(device="cpu" if not torch.cuda.is_available() else "cuda")
     center, inside = [], []
-    # Real footage drives the network's activations into subnormal floats, which a CPU handles
-    # several times slower; flushing them to zero leaves the scores the same (MEASUREMENTS.md).
-    torch.set_flush_denormal(True)
-    try:
-        with torch.no_grad():
-            for window, scored in windows(ahead(frames)):
-                one, many = model.predict_raw(torch.from_numpy(window)[None].to(model.device))
-                center.append(one[0, CONTEXT : CONTEXT + scored, 0].cpu().numpy())
-                inside.append(many[0, CONTEXT : CONTEXT + scored, 0].cpu().numpy())
-    finally:
-        torch.set_flush_denormal(False)
+    with torch.no_grad():
+        for window, scored in windows(frames):
+            one, many = model.predict_raw(torch.from_numpy(window)[None].to(model.device))
+            center.append(one[0, CONTEXT : CONTEXT + scored, 0].cpu().numpy())
+            inside.append(many[0, CONTEXT : CONTEXT + scored, 0].cpu().numpy())
     return np.concatenate(center), np.concatenate(inside)
 
 

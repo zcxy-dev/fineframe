@@ -1,5 +1,3 @@
-import itertools
-
 import numpy as np
 import pytest
 from conftest import ffmpeg
@@ -119,24 +117,3 @@ def test_detects_hard_cuts_and_a_dissolve(shots_video):
     assert found[2]["start"] == pytest.approx(8.0, abs=0.1)
     assert found[2]["end"] == pytest.approx(9.0, abs=0.1)
     assert len(found) == 3
-
-
-def test_frames_decoded_ahead_arrive_in_order_and_a_decoding_error_reaches_the_reader():
-    frames = [np.full((27, 48, 3), i % 256, np.uint8) for i in range(500)]
-    assert [int(f[0, 0, 0]) for f in shots.ahead(iter(frames), size=8)] == [
-        i % 256 for i in range(500)
-    ]
-
-    def broken():
-        yield frames[0]
-        raise ValueError("damaged frame")
-
-    with pytest.raises(ValueError, match="damaged frame"):
-        list(shots.ahead(broken()))
-
-
-def test_a_reader_that_stops_early_stops_the_decoding():
-    endless = itertools.repeat(np.zeros((27, 48, 3), np.uint8))
-    taken = shots.ahead(endless, size=4)
-    next(taken)
-    taken.close()  # joins the decoding thread, which would hang on a full queue
