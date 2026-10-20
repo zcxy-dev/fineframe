@@ -574,7 +574,19 @@ export function Editor() {
               />
             )}
             {status === "done" && job && !one && job.settings.shorts && (
-              <ShortsDone job={job} onNew={() => setPhase({ kind: "compose" })} />
+              <>
+                <ShortsDone job={job} />
+                <Summary job={job} />
+                <div className={styles.block}>
+                  <button
+                    type="button"
+                    className={styles.linkButton}
+                    onClick={() => setPhase({ kind: "compose" })}
+                  >
+                    {t.done.another}
+                  </button>
+                </div>
+              </>
             )}
             {status === "done" && job && !one && !job.settings.shorts && (
               <Done job={job} onJob={update} onNew={() => setPhase({ kind: "compose" })} />

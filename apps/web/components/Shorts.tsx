@@ -113,7 +113,7 @@ export function ShortsGrid({ job, onOpen }: { job: Job; onOpen: (folder: string)
 }
 
 /** The run of shorts once finished: how many were made and why fewer, and "Download all". */
-export function ShortsDone({ job, onNew }: { job: Job; onNew: () => void }) {
+export function ShortsDone({ job }: { job: Job }) {
   const t = useT();
   const words = t.shorts;
   const range = useRange(job);
@@ -134,9 +134,6 @@ export function ShortsDone({ job, onNew }: { job: Job; onNew: () => void }) {
         </a>
         <p className={styles.help}>{words.allHelp}</p>
       </div>
-      <button type="button" className={styles.linkButton} onClick={onNew}>
-        {t.done.another}
-      </button>
     </div>
   );
 }

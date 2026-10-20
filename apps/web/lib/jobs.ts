@@ -664,7 +664,8 @@ export class Jobs {
 
   #progress(job: Job, line: Progress): void {
     const now = Date.now();
-    if (line.claude) job.claude = line.claude;
+    // A short's line says what that short cost, not the run.
+    if (line.claude && line.stage !== "short") job.claude = line.claude;
     if ("download" in line && line.download) {
       const { name, bytes, total } = line.download;
       let start = this.#downloads.get(job.id);
