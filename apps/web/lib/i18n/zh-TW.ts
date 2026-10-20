@@ -311,6 +311,12 @@ export const zhTW: Messages = {
     allHelp: "每支短影音的 MP4 與 SRT，以及一個列出標題、說明與主題標籤的文字檔。",
     fewer: (made, asked, range) =>
       `這段素材中只有 ${made} 個片段能做成 ${range}的短影音，因此製作了 ${made} 支，而不是 ${asked} 支。`,
+    stoppedCost: (made, asked) =>
+      `達到費用上限，做完 ${made} 支後就停止了，因此製作了 ${made} 支，而不是 ${asked} 支。`,
+    unchangeable: (cancelled) =>
+      cancelled
+        ? "這次製作已取消，素材也已刪除：已完成的短影音可以下載，但無法修改。"
+        : "這次製作在完成前就停止了：已完成的短影音可以下載，但無法修改。",
     back: "所有短影音",
     titleLabel: "標題",
     description: "說明",

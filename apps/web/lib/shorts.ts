@@ -8,8 +8,9 @@ export const REPLAN_MARGIN = 30;
 
 /**
  * One short of `job` as the page shows an edit: its versions, the one shown, its result, what it
- * cost and its length, and a render only while one of its own versions renders. `short` names it
- * in every request the page makes about it.
+ * cost and its length, and a render only while one of its own versions renders, with the run's
+ * status, as a short of a run that did not end can be downloaded but not changed. `short` names
+ * it in every request the page makes about it.
  */
 export function shortView(job: Job, folder: string): Job | null {
   const short = job.shorts?.find((each) => each.folder === folder);
@@ -17,7 +18,6 @@ export function shortView(job: Job, folder: string): Job | null {
   const { versions, current, result, claude, render, ...rest } = job;
   return {
     ...rest,
-    status: "done",
     settings: { ...job.settings, length: short.length },
     short: folder,
     ...(short.versions ? { versions: short.versions } : {}),
@@ -40,9 +40,11 @@ export function jobApi(job: Job, path = "", query: Record<string, string | numbe
   return `/api/jobs/${job.id}${path ? `/${path}` : ""}${search}`;
 }
 
-/** How many shorts were made and asked for, when the run finished with fewer than asked. */
-export function fewerShorts(job: Job): { made: number; asked: number } | null {
+/** How many shorts were made and asked for, and whether the run stopped at its cost limit, when
+ * it finished with fewer than asked. */
+export function fewerShorts(job: Job): { made: number; asked: number; cost: boolean } | null {
   const asked = job.settings.shorts?.count;
   const made = job.shorts?.length ?? 0;
-  return job.status === "done" && asked !== undefined && made < asked ? { made, asked } : null;
+  if (job.status !== "done" || asked === undefined || made >= asked) return null;
+  return { made, asked, cost: job.stopped === "cost" };
 }

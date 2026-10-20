@@ -39,7 +39,7 @@ import { ReEdit, Versions } from "./ReEdit.tsx";
 import { Player, ResultSummary, useVideoLength } from "./ResultView.tsx";
 import { DownloadView, RunView } from "./RunView.tsx";
 import { type Choices, chosenLength, type Machine, SettingsPanel } from "./SettingsPanel.tsx";
-import { ShortsDone, ShortsGrid, ShortText } from "./Shorts.tsx";
+import { ShortsDone, ShortsGrid, ShortsKept, ShortText } from "./Shorts.tsx";
 
 /** What /api/key says: which keys the server has, never the keys. */
 type Keys = { set: boolean; openrouter: boolean; pexels: boolean; pixabay: boolean };
@@ -545,7 +545,8 @@ export function Editor() {
             {one ? (
               <>
                 <Player job={one} video={video} />
-                <ReEdit job={one} onJob={update} video={video} />
+                {/* A short of a run stopped or cancelled before it ended does not change. */}
+                {status === "done" && <ReEdit job={one} onJob={update} video={video} />}
               </>
             ) : status === "done" && job && !job.settings.shorts ? (
               <>
@@ -571,6 +572,7 @@ export function Editor() {
                 onJob={update}
                 onNew={() => setPhase({ kind: "compose" })}
                 onBack={() => setOpened(null)}
+                fixed={status !== "done"}
               />
             )}
             {status === "done" && job && !one && job.settings.shorts && (
@@ -591,7 +593,7 @@ export function Editor() {
             {status === "done" && job && !one && !job.settings.shorts && (
               <Done job={job} onJob={update} onNew={() => setPhase({ kind: "compose" })} />
             )}
-            {(status === "error" || status === "cancelled") && job && (
+            {(status === "error" || status === "cancelled") && job && !one && (
               <Failed
                 job={job}
                 onBack={() => setPhase({ kind: "compose" })}
@@ -609,6 +611,9 @@ export function Editor() {
                 onReplaceKey={(service) => setAsking(service)}
               />
             )}
+            {(status === "error" || status === "cancelled") && job && !one && job.shorts?.length ? (
+              <ShortsKept job={job} />
+            ) : null}
           </aside>
         </main>
       )}
@@ -648,11 +653,14 @@ function Done({
   onJob,
   onNew,
   onBack,
+  fixed = false,
 }: {
   job: Job;
   onJob: (job: Job) => void;
   onNew: () => void;
   onBack?: () => void;
+  /** A short of a run stopped or cancelled before it ended: downloads only, no versions. */
+  fixed?: boolean;
 }) {
   const t = useT();
   const seconds = useVideoLength(job);
@@ -690,7 +698,11 @@ function Done({
         </div>
       </div>
       {short && <ShortText short={short} />}
-      <Versions job={job} onJob={onJob} />
+      {fixed ? (
+        <p className={styles.help}>{t.shorts.unchangeable(job.status === "cancelled")}</p>
+      ) : (
+        <Versions job={job} onJob={onJob} />
+      )}
       <Summary job={job} actual={seconds} />
       <div className={styles.block}>
         <button type="button" className={styles.linkButton} onClick={onBack ?? onNew}>

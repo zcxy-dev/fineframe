@@ -64,6 +64,9 @@ export interface EditOptions {
   length: number;
   /** Cuts only from this stretch of the one video given, in seconds into it. */
   within?: { start: number; end: number };
+  /** Plans the edit as one short of a longer video, about this, in a sentence or two: hook
+   * first, with no opening title, as `--shorts` made it. */
+  short?: string;
   aspect: Aspect;
   /** The video to write. `<name>.project.json`, `<name>.srt` and `edit_cuts.json` go beside it. */
   out: string;
@@ -128,6 +131,8 @@ const ANALYZE_SHARE = 0.9;
 const SHARES = { plan: 0.3, render: 0.3, check: 0.4 };
 /** The share of each review pass before its render of the fixes. */
 const CHECK_SHARE = 0.3;
+/** How finely FFmpeg's header states a file's length, in seconds. */
+const FFMPEG_TICK = 0.01;
 
 /**
  * Edits footage to a finished video: analyses each file (or takes its index from the cache),
@@ -235,13 +240,13 @@ interface Prepared {
   music: MusicInput[];
   names: string[];
   claude: Claude;
+  /** Called before each request to Claude, which it stops by throwing. */
+  limit: { check: () => void };
   log: (line: string) => void;
   timings: Record<Stage, number>;
   timed: <T>(stage: Stage, work: () => Promise<T>) => Promise<T>;
   /** The share of the progress bar the analysis took. */
   analyzed: number;
-  /** The videos' length in all, in seconds, as their containers state it. */
-  footage: number;
 }
 
 /**
@@ -302,7 +307,9 @@ async function prepare(
     asked = anthropicClaude();
   }
   const ask = asked;
+  const limit = { check: () => {} };
   const claude: Claude = async (request) => {
+    limit.check();
     const reply = await ask(request);
     spent.push(reply.usage);
     return reply;
@@ -379,11 +386,11 @@ async function prepare(
       .map((line) => line.trim())
       .filter((line) => line && !line.startsWith("#")),
     claude,
+    limit,
     log,
     timings,
     timed,
     analyzed,
-    footage,
   };
 }
 
@@ -559,7 +566,9 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
         if (videos.length !== 1 || !file) {
           throw new EditError(`--within cuts from one video, not ${videos.length}`);
         }
-        if (!(within.start >= 0 && within.start < within.end && within.end <= seconds)) {
+        // FFmpeg's header gives the length to the centisecond; the media index, to the microsecond.
+        const end = seconds + FFMPEG_TICK;
+        if (!(within.start >= 0 && within.start < within.end && within.end <= end)) {
           throw new EditError(
             `${file.given} lasts ${seconds.toFixed(1)} s: the stretch ${within.start}-` +
               `${within.end} s is not inside it`,
@@ -585,6 +594,7 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
       video,
       length: options.length,
       ...(within ? { within } : {}),
+      ...(options.short ? { short: true, about: options.short } : {}),
     },
     report,
     prepared.analyzed,
@@ -604,7 +614,7 @@ const FIND_CAP_PER_HOUR = 1;
 /** The share of the progress bar after the analysis that finding the moments takes. */
 const FIND_SHARE = 0.05;
 
-export interface ShortsOptions extends Omit<EditOptions, "length" | "within" | "out"> {
+export interface ShortsOptions extends Omit<EditOptions, "length" | "within" | "short" | "out"> {
   /** How many shorts to make, SHORTS_COUNT inclusive: the best moments, fewer when the footage
    * holds fewer. */
   count: number;
@@ -623,6 +633,13 @@ export interface ShortsResult {
   cached: number;
   /** Review passes, of every short. */
   reviews: number;
+  /** Why the run stopped at its cost limit, when it did. */
+  stopped?: string;
+}
+
+/** Stops a run of shorts at its cost limit; the message says which limit and the spend. */
+class CostLimit extends Error {
+  override name = "CostLimit";
 }
 
 /**
@@ -645,8 +662,9 @@ export async function editShorts(options: ShortsOptions): Promise<ShortsResult> 
   try {
     const result = await makeShorts(options, lines, emit, spent);
     const made = result.shorts.shorts.length;
-    const message =
-      made < options.count
+    const message = result.stopped
+      ? `Made ${made} shorts, not ${options.count}: stopped at the cost limit, as ${result.stopped}`
+      : made < options.count
         ? `Made ${made} shorts, not ${options.count}: only ${made} moments of the footage ` +
           `could be made into shorts of ${options.range[0]}-${options.range[1]} s`
         : `Made ${made} shorts in ${basename(dirname(result.outputs.shorts))}`;
@@ -714,7 +732,7 @@ async function makeShorts(
   const shortsAt = findAt + (1 - findAt) * FIND_SHARE;
   report("plan", findAt, "Finding the moments that stand alone as shorts");
   const videos = planInputs(prepared, prepared.videos);
-  const moments = await prepared.timed("plan", () =>
+  const { moments, seconds: footage } = await prepared.timed("plan", () =>
     findMoments({
       inputs: videos,
       range: options.range,
@@ -725,7 +743,7 @@ async function makeShorts(
     }),
   );
   const found = totalUsage(spent.filter((usage) => usage.purpose === "find")).dollars ?? 0;
-  const findCap = FIND_CAP_PER_HOUR * Math.max(1, prepared.footage / 3600);
+  const findCap = FIND_CAP_PER_HOUR * Math.max(1, footage / 3600);
   if (found > findCap) {
     throw new EditError(
       `Finding the moments cost $${found.toFixed(2)}, over the $${findCap.toFixed(2)} it may ` +
@@ -747,18 +765,37 @@ async function makeShorts(
   };
   const list = join(folder, "shorts.json");
   const images = prepared.files.filter((file) => file.kind === "image");
+  // Each moment tried, made or not, costs; the run may spend what finding them may, and a short's
+  // cap for each short asked, on at most twice as many moments as shorts asked for.
+  const runCap = findCap + SHORT_CAP * options.count;
+  const tries = Math.min(moments.length, 2 * options.count);
   let reviews = 0;
   let next = 0;
   let failure: string | null = null;
-  for (let n = 1; n <= options.count && next < moments.length; ) {
+  let stopped: string | null = null;
+  for (let n = 1; n <= options.count && next < tries; ) {
     const moment = moments[next++] as Moment;
-    const of = Math.min(options.count, n - 1 + moments.length - next + 1);
+    const of = Math.min(options.count, n - 1 + tries - next + 1);
     const number = { n, of };
     const span = (1 - shortsAt) / of;
     const from = Math.max(last(), shortsAt + (n - 1) * span);
     const file = prepared.videos.find((video) => video.path === moment.path) as MediaFile;
     const name = String(n).padStart(2, "0");
     const before = spent.length;
+    prepared.limit.check = () => {
+      const own = totalUsage(spent.slice(before)).dollars ?? 0;
+      const all = totalUsage(spent).dollars ?? 0;
+      if (own > SHORT_CAP) {
+        throw new CostLimit(
+          `a short reached $${own.toFixed(2)}, over the $${SHORT_CAP} a short may`,
+        );
+      }
+      if (all > runCap) {
+        throw new CostLimit(
+          `the run reached $${all.toFixed(2)}, over the $${runCap.toFixed(2)} it may`,
+        );
+      }
+    };
     let rendered: Rendered;
     try {
       rendered = await cutEdit(
@@ -777,12 +814,18 @@ async function makeShorts(
         shortsAt + n * span,
       );
     } catch (error) {
+      await rm(join(folder, name), { recursive: true, force: true });
+      if (error instanceof CostLimit) {
+        stopped = error.message;
+        break;
+      }
       if (!(error instanceof PlanError)) throw error;
       // A moment the planner cannot cut to a length in the range; the next one is made instead.
       failure = error.message;
       prepared.log(`The moment "${moment.title}" was left out: ${error.message}`);
-      await rm(join(folder, name), { recursive: true, force: true });
       continue;
+    } finally {
+      prepared.limit.check = () => {};
     }
     reviews += rendered.reviews;
     shorts.shorts.push({
@@ -797,33 +840,31 @@ async function makeShorts(
       seconds: rendered.seconds,
     });
     await writeFile(list, `${JSON.stringify(validateShorts(shorts), null, 2)}\n`);
-    const own = spent.slice(before);
     emit(
       validateProgress({
         stage: "short",
         fraction: last(),
         message: `Short ${n} of ${of}: ${rendered.seconds.toFixed(1)} s, "${moment.title}"`,
         short: number,
-        claude: costByStage(own),
+        claude: costByStage(spent.slice(before)),
       }),
     );
-    const dollars = totalUsage(own).dollars ?? 0;
-    if (dollars > SHORT_CAP) {
-      throw new EditError(
-        `Short ${n} cost $${dollars.toFixed(2)}, over the $${SHORT_CAP} a short may, so the run ` +
-          `stopped; the ${n} made are in ${options.out}`,
-      );
-    }
     n++;
   }
-  if (shorts.shorts.length === 0) {
+  const made = shorts.shorts.length;
+  if (stopped !== null) {
+    if (made === 0) throw new EditError(`Stopped at the cost limit after 0 shorts: ${stopped}`);
+    shorts.stopped = "cost";
+    await writeFile(list, `${JSON.stringify(validateShorts(shorts), null, 2)}\n`);
+  } else if (made === 0) {
     throw new EditError(
-      `None of the ${moments.length} moments found could be cut to its length${failure ? `: ${failure}` : ""}`,
+      `None of the ${tries} moments tried could be cut to a length in the range${failure ? `: ${failure}` : ""}`,
     );
   }
   return {
     outputs: { shorts: list },
     shorts,
+    ...(stopped === null ? {} : { stopped }),
     reviews,
     timings: prepared.timings,
     usage: totalUsage(spent),

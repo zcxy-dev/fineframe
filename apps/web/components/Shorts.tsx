@@ -75,6 +75,7 @@ export function ShortsGrid({ job, onOpen }: { job: Job; onOpen: (folder: string)
                 <button
                   type="button"
                   className={styles.button}
+                  // Each made short plays and downloads at once; it opens once the run ends.
                   disabled={running}
                   aria-label={words.card(i + 1, short.title)}
                   onClick={() => onOpen(short.folder)}
@@ -126,13 +127,37 @@ export function ShortsDone({ job }: { job: Job }) {
           {range} · {job.settings.aspect}
         </p>
       </div>
-      {fewer && <p className={styles.warning}>{words.fewer(fewer.made, fewer.asked, range)}</p>}
+      {fewer && (
+        <p className={styles.warning}>
+          {fewer.cost
+            ? words.stoppedCost(fewer.made, fewer.asked)
+            : words.fewer(fewer.made, fewer.asked, range)}
+        </p>
+      )}
       <div className={styles.downloads}>
         <a className={styles.primary} href={jobApi(job, "shorts")} download>
           <DownloadIcon width={18} height={18} />
           {words.downloadAll}
         </a>
         <p className={styles.help}>{words.allHelp}</p>
+      </div>
+    </div>
+  );
+}
+
+/** The shorts a run made before it was cancelled or stopped: all of them to download, and why
+ * they cannot change. */
+export function ShortsKept({ job }: { job: Job }) {
+  const t = useT();
+  const words = t.shorts;
+  return (
+    <div className={styles.block}>
+      <p className={styles.help}>{words.unchangeable(job.status === "cancelled")}</p>
+      <div className={styles.downloads}>
+        <a className={styles.button} href={jobApi(job, "shorts")} download>
+          <DownloadIcon width={18} height={18} />
+          {words.downloadAll}
+        </a>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { fileTitle } from "./paths.ts";
-import { ArchiveTooLarge, zipStream } from "./zip.ts";
+import { ArchiveTooLarge, fitsZip, zipStream } from "./zip.ts";
 
 test("a title becomes a file name every system keeps", () => {
   assert.equal(fileTitle('a/b\\c:d*e?f"g<h>i|j'), "a b c d e f g h i j");
@@ -16,5 +16,12 @@ test("a title becomes a file name every system keeps", () => {
 
 test("more files than a zip without its 64-bit extension holds are refused before any byte", async () => {
   const entries = Array.from({ length: 65_536 }, (_, i) => ({ name: `${i}.txt`, text: "" }));
+  await assert.rejects(zipStream(entries), ArchiveTooLarge);
+});
+
+test("a size ZIP64 marks, or an entry count it marks, is refused, not written", async () => {
+  assert.equal(fitsZip(0xffff_fffe), true);
+  assert.equal(fitsZip(0xffff_ffff), false);
+  const entries = Array.from({ length: 0xffff }, (_, i) => ({ name: `${i}.txt`, text: "" }));
   await assert.rejects(zipStream(entries), ArchiveTooLarge);
 });

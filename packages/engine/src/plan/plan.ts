@@ -165,6 +165,12 @@ export interface PlanOptions {
 
 type Look = NonNullable<Grade["look"]>;
 
+/** The length a short is fitted to when its plan reaches `seconds`, less than asked: those
+ * seconds, whole, when they are at least `least`, the range's shortest; null under it. */
+export function fittedLength(seconds: number, least: number): number | null {
+  return seconds >= least ? Math.round(seconds) : null;
+}
+
 /** Fails when the footage cannot make the edit asked for; the message says why. */
 export class PlanError extends Error {
   override name = "PlanError";
@@ -567,8 +573,8 @@ async function assemble(state: PlanState): Promise<Assembly> {
       );
     }
     if (state.planCalls >= MAX_PLAN_CALLS) {
-      const reached = Math.round(seconds);
-      if (state.least !== undefined && reached >= state.least && !refitted) {
+      const reached = state.least === undefined ? null : fittedLength(seconds, state.least);
+      if (reached !== null && !refitted) {
         state.progress(
           `The edit lasts ${seconds.toFixed(1)} s after ${MAX_PLAN_CALLS} requests; fitting it to ` +
             `${reached} s, within the range asked`,

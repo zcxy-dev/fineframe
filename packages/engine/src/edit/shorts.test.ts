@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -14,7 +14,9 @@ import {
   validateProject,
   validateShorts,
 } from "@video-editor/schema";
+import { ffmpeg, run } from "../ffmpeg.ts";
 import type { Claude, ClaudeRequest } from "../plan/claude.ts";
+import { findMoments } from "../plan/moments.ts";
 import type { CutVerdict, Decisions } from "../plan/prompt.ts";
 import { makeTalk } from "../plan/talk.ts";
 import { scratch } from "../testing.ts";
@@ -52,19 +54,23 @@ const text = (request: ClaudeRequest) =>
 /**
  * Claude finding `moments`, then planning each short as recorded for the talk, moved to the lines
  * of the saying it is given; a short titled "Too thin" is planned from one line, too little for
- * its length. Every request costs `dollars` by its purpose.
+ * its length. Every request costs `dollars` by its purpose, and the plans of a short titled
+ * "Expensive" $1.20 each.
  */
 function claudeFor(moments: unknown[], dollars: Partial<Record<string, number>> = {}) {
   const requests: ClaudeRequest[] = [];
   let thin = false;
+  let expensive = false;
   const claude: Claude = async (request) => {
     requests.push(request);
     let json: unknown;
     if (request.purpose === "find") json = { moments };
     else if (request.purpose === "plan") {
       const all = text(request);
-      if (all.includes("This short is about:"))
+      if (all.includes("This short is about:")) {
         thin = all.includes("This short is about: Too thin");
+        expensive = all.includes("This short is about: Expensive");
+      }
       const first = Number(all.match(/^Lines:\n(\d+) /m)?.[1] ?? 1) - 1;
       const filler = Number(all.match(/⟨f(\d+) /)?.[1] ?? 1) - 1;
       const plan = await recorded();
@@ -92,7 +98,7 @@ function claudeFor(moments: unknown[], dollars: Partial<Record<string, number>> 
         purpose: request.purpose,
         model: request.model,
         ...usage,
-        dollars: dollars[request.purpose] ?? 0.01,
+        dollars: request.purpose === "plan" && expensive ? 1.2 : (dollars[request.purpose] ?? 0.01),
       },
     };
   };
@@ -242,7 +248,15 @@ test("a short's stretch can be edited again on its own, and a stretch the file l
     visuals: "minimal" as const,
     onProgress: (line: Progress) => lines.push(line),
   };
-  const index = JSON.parse(await readFile(join(folder, "talk.index.json"), "utf8"));
+  // The index times the file to the microsecond, FFmpeg's header to the centisecond: a stretch
+  // to the index's end lies inside the file.
+  const path = join(folder, "talk.index.json");
+  const index = JSON.parse(await readFile(path, "utf8"));
+  const header = ["-hide_banner", "-i", join(folder, "talk.mp4"), "-t", "0", "-f", "null", "-"];
+  const said = await run(await ffmpeg(), header);
+  const [, minutes, seconds] = said.stderr.match(/Duration: \d+:(\d+):([\d.]+)/) ?? [];
+  index.source.duration = Number(minutes) * 60 + Number(seconds) + 0.004;
+  await writeFile(path, JSON.stringify(index));
   const words = index.transcript.words as { start: number; end: number }[];
   const start = words.find((word) => word.start > 60)?.start ?? 0;
   const result = await edit({ ...options, within: { start: start - 0.1, end: start + 30 } });
@@ -250,13 +264,31 @@ test("a short's stretch can be edited again on its own, and a stretch the file l
   for (const clip of project.main) {
     assert.ok(clip.in >= secondsToTicks(start - 0.6) && clip.out <= secondsToTicks(start + 30.5));
   }
+  // That stretch holds more than twice 15 s of speech, so on its own it is a long edit; as one
+  // short planned again, it stays a short edit about its moment.
+  const asked: string[] = [];
+  const listening: Claude = async (request) => {
+    if (request.purpose === "plan") asked.push(text(request));
+    return claude(request);
+  };
+  await edit({
+    ...options,
+    claude: listening,
+    out: join(dir, "out", "edit-v2.mp4"),
+    within: { start: start - 0.1, end: start + 30 },
+    short: "The fifth time. Said once more.",
+  });
+  assert.match(asked[0] ?? "", /^Make a short edit: the strongest self-contained moments\./m);
+  assert.match(asked[0] ?? "", /^This short is about: The fifth time\. Said once more\.$/m);
+  const end = index.source.duration as number;
+  await edit({ ...options, out: join(dir, "end", "edit.mp4"), within: { start: end - 40, end } });
 
   const refused = async (within: { start: number; end: number }, message: string) =>
     assert.rejects(
       edit({ ...options, within }),
       (error: Error) => error instanceof EditError && error.message === message,
     );
-  const duration = index.source.duration as number;
+  const duration = Number(minutes) * 60 + Number(seconds);
   await refused(
     { start: duration - 10, end: duration + 20 },
     `${join(folder, "talk.mp4")} lasts ${duration.toFixed(1)} s: the stretch ${duration - 10}-${duration + 20} s is not inside it`,
@@ -317,15 +349,70 @@ test("shorts that cannot be made, or cost past their cap, stop with the reason",
     { find: 1.5 },
   );
   assert.deepEqual(found.at(-1)?.claude?.find, { dollars: 1.5, requests: 1 });
+  // A short whose plan passes $1 stops the run before its next request: nothing made.
   await fails(
-    { out: join(dir, "e") },
-    [saying(1, "First"), saying(3, "Second")],
-    /^Short 1 cost \$1\.\d\d, over the \$1 a short may, so the run stopped; the 1 made are in /,
-    { plan: 1 },
+    { out: join(dir, "e"), count: 1 },
+    [saying(1, "Expensive")],
+    /^Stopped at the cost limit after 0 shorts: a short reached \$1\.20, over the \$1 a short may$/,
   );
-  const kept = await loadJson(join(dir, "e", "shorts.json"), validateShorts);
+  // Tries at most twice as many moments as shorts asked for.
+  const thin = [saying(1, "Too thin 1"), saying(5, "Too thin 2"), saying(9, "Too thin 3")];
+  const tries = claudeFor(thin);
+  await assert.rejects(
+    editShorts({ ...base, claude: tries.claude, out: join(dir, "f"), count: 1 }),
+    (error: Error) =>
+      /^None of the 2 moments tried could be cut to a length in the range: /.test(error.message),
+  );
+  assert.equal(tries.requests.filter((request) => request.purpose === "plan").length, 4);
+  // What failed moments cost counts: past finding's $1 and $1 for each short asked, the run stops.
+  const costly = claudeFor(thin, { plan: 0.6 });
+  await assert.rejects(
+    editShorts({ ...base, claude: costly.claude, out: join(dir, "g") }),
+    (error: Error) =>
+      /^Stopped at the cost limit after 0 shorts: the run reached \$3\.01, over the \$3\.00 it may$/.test(
+        error.message,
+      ),
+  );
+  assert.equal(costly.requests.filter((request) => request.purpose === "plan").length, 5);
+
+  // Stopped at the limit with shorts made: the run ends as one that made fewer, saying why.
+  const lines: Progress[] = [];
+  const { claude } = claudeFor([saying(1, "First"), saying(3, "Expensive")]);
+  const result = await editShorts({
+    ...base,
+    claude,
+    out: join(dir, "h"),
+    onProgress: (line) => lines.push(line),
+  });
   assert.deepEqual(
-    kept.shorts.map((short) => short.title),
+    result.shorts.shorts.map((short) => short.title),
     ["First"],
+  );
+  assert.equal(result.shorts.stopped, "cost");
+  const kept = await loadJson(join(dir, "h", "shorts.json"), validateShorts);
+  assert.deepEqual(kept, result.shorts);
+  assert.deepEqual(await readdir(join(dir, "h")), ["01", "shorts.json"]);
+  assert.equal(lines.at(-1)?.stage, "done");
+  assert.equal(
+    lines.at(-1)?.message,
+    "Made 1 shorts, not 2: stopped at the cost limit, as a short reached $1.20, over the $1 a short may",
+  );
+});
+
+test("finding the moments says how much footage it read, from the analysis", async (t) => {
+  const dir = await scratch(t, "moments-");
+  const folder = await longTalk(dir);
+  const index = JSON.parse(await readFile(join(folder, "talk.index.json"), "utf8"));
+  const { claude } = claudeFor([saying(1, "One")]);
+  const found = await findMoments({
+    inputs: [{ index: join(folder, "talk.index.json"), source: join(folder, "talk.mp4") }],
+    range: [15, 30],
+    claude,
+    usage: [],
+  });
+  assert.equal(found.seconds, index.source.duration);
+  assert.deepEqual(
+    found.moments.map((moment) => moment.title),
+    ["One"],
   );
 });

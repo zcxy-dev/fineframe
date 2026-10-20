@@ -7,7 +7,9 @@
 // openrouter.txt and the Pexels and Pixabay ones in stock.txt.
 // $FAKE_EDIT_NO_CAPTIONS leaves the captions file empty, as the engine does when no speech is kept.
 // With --shorts it makes two shorts, fewer than asked, from the first file in out/01 and out/02,
-// each playing a stretch of that file, whose media index says it lasts 100 s.
+// each playing a stretch of that file, whose media index says it lasts 100 s. After the first it
+// waits while $FAKE_SHORTS_HOLD names a file that exists, and with $FAKE_SHORTS_STOP it stops
+// there at the cost limit.
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
@@ -83,6 +85,12 @@ if (args.includes("--shorts")) {
       short: number,
       claude: cost,
     });
+    const held = process.env.FAKE_SHORTS_HOLD;
+    while (held && existsSync(held)) await new Promise((done) => setTimeout(done, 20));
+    if (process.env.FAKE_SHORTS_STOP) {
+      await writeFile(join(out, "shorts.json"), JSON.stringify({ ...shorts, stopped: "cost" }));
+      break;
+    }
   }
   say({
     stage: "done",

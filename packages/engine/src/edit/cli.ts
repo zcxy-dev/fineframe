@@ -20,7 +20,7 @@ const [shortest, longest] = LENGTH_RANGE;
 /** The longest --instructions: a few sentences, not a script. */
 const INSTRUCTIONS_MAX = 2000;
 const usage = `Usage: pnpm edit <footage folder or file>... --length <length> \\
-    --aspect <9:16 | 1:1 | 16:9> -o <out.mp4> [--within <start>-<end>] \\
+    --aspect <9:16 | 1:1 | 16:9> -o <out.mp4> [--within <start>-<end>] [--short <about>] \\
     [--shorts <count>] [--names <names.txt>] [--terms <terms.txt>] \\
     [--correct] [--instructions <text>] [--asr <local | cloud>] \\
     [--look <${[...lookIds, "none"].join(" | ")}>] \\
@@ -39,6 +39,9 @@ files directly in it: videos to cut, and still images to show as B-roll.
                  --shorts, a new folder: shorts.json and each short's folder go in it
       --within   cut only from this stretch of the one video given, such as 612-671 or
                  10:12-11:11, in seconds into it
+      --short    plan the edit as one short of a longer video, about this ("<title>.
+                 <description>" from shorts.json): hook first, with no opening title, as
+                 --shorts makes each one; with --within, to plan a short again
       --shorts   make this many shorts, ${SHORTS_COUNT[0]} to ${SHORTS_COUNT[1]}, from one long video instead of one edit:
                  Claude finds the moments that stand alone, at most about one for each 2 min
                  of footage, and the best are made, fewer when the footage holds fewer. Each is
@@ -99,6 +102,7 @@ const parsed = (() => {
       options: {
         length: { type: "string", short: "l" },
         within: { type: "string" },
+        short: { type: "string" },
         shorts: { type: "string" },
         aspect: { type: "string", short: "a" },
         output: { type: "string", short: "o" },
@@ -141,8 +145,9 @@ const within = values.within === undefined ? null : parseSpan(values.within);
 if (values.within !== undefined && within === null) {
   fail(`--within is a stretch such as 612-671 or 10:12-11:11, not ${values.within}`);
 }
-if (within && count !== null)
-  fail("--within and --shorts go apart: each short has its own stretch");
+if ((within || values.short) && count !== null) {
+  fail("--within and --short go without --shorts: each short has its own stretch");
+}
 const aspect = values.aspect as Aspect;
 if (!["9:16", "1:1", "16:9"].includes(aspect))
   fail(`the aspect is 9:16, 1:1 or 16:9, not ${aspect}`);
@@ -214,6 +219,7 @@ try {
           ...options,
           length: length as number,
           ...(within ? { within: { start: within[0], end: within[1] } } : {}),
+          ...(values.short?.trim() ? { short: values.short.trim() } : {}),
         });
   const { timings: t, usage: u } = result;
   const seconds = (value: number) => `${value.toFixed(1)} s`;

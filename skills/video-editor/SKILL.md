@@ -59,4 +59,4 @@ These change what the planner chose, so say so to the user and run `pnpm edit` a
 - Putting back something the plan left out, reordering the story, or other footage.
 - A different music track than the one chosen (its level and removal are recipes).
 
-A short is planned again from its own file and stretch, with up to 30 s on each side inside the file, into its folder: `pnpm -s edit <its file> --within <start − 30>-<end + 30> --length 45s --aspect 9:16 -o out/shorts/01/edit-45s.mp4`, the stretch from `shorts.json`.
+A short is planned again from its own file and stretch, with up to 30 s on each side inside the file, into its folder, as a short about its moment: `pnpm -s edit <its file> --within <start − 30>-<end + 30> --short "<title>. <description>" --length 45s --aspect 9:16 -o out/shorts/01/edit-45s.mp4`, the stretch, title and description from `shorts.json`.

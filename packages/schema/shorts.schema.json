@@ -25,6 +25,10 @@
       "description": "The shorts made so far, best first.",
       "type": "array",
       "items": { "$ref": "#/$defs/Short" }
+    },
+    "stopped": {
+      "description": "Why the run made fewer than it could: \"cost\" when Claude's cost reached the run's limit. Absent otherwise.",
+      "enum": ["cost"]
     }
   },
   "$defs": {

@@ -20,6 +20,10 @@ export interface Shorts {
    * The shorts made so far, best first.
    */
   shorts: Short[];
+  /**
+   * Why the run made fewer than it could: "cost" when Claude's cost reached the run's limit. Absent otherwise.
+   */
+  stopped?: "cost";
 }
 export interface Short {
   /**

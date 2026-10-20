@@ -20,7 +20,7 @@ import { render } from "../render.ts";
 import { scratch } from "../testing.ts";
 import { anthropicClaude, type ClaudeRequest, recordedClaude } from "./claude.ts";
 import { MARGIN } from "./place.ts";
-import { MAX_PLAN_CALLS, PlanError, plan } from "./plan.ts";
+import { fittedLength, MAX_PLAN_CALLS, PlanError, plan } from "./plan.ts";
 import type { Decisions } from "./prompt.ts";
 import { makeSong, makeTalk, talkWords } from "./talk.ts";
 
@@ -865,4 +865,14 @@ test("plans the synthetic talk with the real API", {
   assert.doesNotMatch(said, /剪輯，不對/, "the false start is cut");
   assert.match(said, /第一件事是自動剪輯/, "the retake is kept");
   assertNoCutInWords(edit.project, talkWords());
+});
+
+test("a short is fitted to what its plan reaches only when that is inside its range", () => {
+  // The length it reached, to the second, when it is at least the range's shortest.
+  assert.equal(fittedLength(46.7, 30), 47);
+  assert.equal(fittedLength(30.2, 30), 30);
+  assert.equal(fittedLength(30, 30), 30);
+  // Rounding never lets one under the range in: 29.5 s is short of a 30 s floor.
+  assert.equal(fittedLength(29.5, 30), null);
+  assert.equal(fittedLength(29.99, 30), null);
 });

@@ -788,6 +788,8 @@ test("several shorts: each made in its own folder, opened and changed on its own
     "the short's file alone",
   );
   assert.equal(again[again.indexOf("--within") + 1], "0-91.25");
+  // Planned again as a short about its moment, hook first, with no opening title.
+  assert.ok(again.includes("--short=剪輯的一天：從 0 到 1?. Description 1."));
   assert.ok(!again.includes("--shorts"));
   assert.equal(again[again.indexOf("-o") + 1], join("out", "01", "edit-v2.mp4"));
   assert.equal(planned.shorts?.[0]?.current, 2);
@@ -852,4 +854,82 @@ test("a project from before several shorts opens as it was", async () => {
   assert.deepEqual(await store.get(id), old);
   const summary = (await store.list()).find((project) => project.id === id);
   assert.equal(summary?.shorts, undefined);
+});
+
+test("a run of shorts keeps each as it is done; cancelled, they stay listed and downloadable", async () => {
+  const held = join(root, "shorts-hold");
+  await writeFile(held, "");
+  process.env.FAKE_SHORTS_HOLD = held;
+  const shorts = { count: 3, min: 30, max: 60 };
+  const { body: created } = await create([{ path: "cancel.mp4", size: 2 }], {
+    settings: { ...settings, shorts },
+  });
+  const id = created.id;
+  assert.equal((await put(id, 0, new Uint8Array(2))).status, 200);
+  assert.equal((await start(id)).status, 200);
+  const read = async () =>
+    (await (await jobRoute.GET(new Request(url), ctx({ id }))).json()) as Job;
+  for (;;) {
+    if ((await read()).shorts?.length === 1) break;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  // Saved as soon as it is done: a server that stops now still lists it.
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const saved = JSON.parse(await readFile(join(root, id, "job.json"), "utf8")) as Job;
+  assert.deepEqual(
+    saved.shorts?.map((short) => short.folder),
+    ["01"],
+  );
+
+  const cancelled = await jobRoute.DELETE(
+    new Request(`${url}/${id}`, { method: "DELETE" }),
+    ctx({ id }),
+  );
+  assert.equal(((await cancelled.json()) as Job).status, "cancelled");
+  delete process.env.FAKE_SHORTS_HOLD;
+  await rm(held);
+  const job = await read();
+  assert.deepEqual(
+    job.shorts?.map((short) => short.folder),
+    ["01"],
+  );
+  // Downloadable one by one and all together; never changed, as the footage is gone.
+  const short = (path: string) => `${url}/${id}/${path}?short=01`;
+  assert.equal((await videoRoute.GET(new Request(short("video")), ctx({ id }))).status, 200);
+  const zipped = await shortsRoute.GET(new Request(`${url}/${id}/shorts`), ctx({ id }));
+  assert.equal(zipped.status, 200);
+  assert.ok((await zipped.arrayBuffer()).byteLength > 1000);
+  assert.equal((await editRoute.GET(new Request(short("edit")), ctx({ id }))).status, 409);
+  const replanned = await replanRoute.POST(
+    new Request(short("replan"), {
+      method: "POST",
+      body: JSON.stringify({ length: 30, aspect: "9:16", music: "auto" }),
+    }),
+    ctx({ id }),
+  );
+  assert.equal(replanned.status, 409);
+});
+
+test("a run of shorts stopped at its cost limit ends done with the shorts made, saying so", async () => {
+  process.env.FAKE_SHORTS_STOP = "1";
+  try {
+    const shorts = { count: 3, min: 30, max: 60 };
+    const { body: created } = await create([{ path: "costly.mp4", size: 2 }], {
+      settings: { ...settings, shorts },
+    });
+    const id = created.id;
+    assert.equal((await put(id, 0, new Uint8Array(2))).status, 200);
+    assert.equal((await start(id)).status, 200);
+    let job: Job;
+    for (;;) {
+      job = (await (await jobRoute.GET(new Request(url), ctx({ id }))).json()) as Job;
+      if (job.status !== "running") break;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.equal(job.status, "done");
+    assert.equal(job.stopped, "cost");
+    assert.equal(job.shorts?.length, 1);
+  } finally {
+    delete process.env.FAKE_SHORTS_STOP;
+  }
 });

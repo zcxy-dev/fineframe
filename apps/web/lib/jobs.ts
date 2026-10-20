@@ -129,8 +129,11 @@ export interface Job {
   versions?: Version[];
   /** The version the page shows; 1 unless another was chosen. */
   current?: number;
-  /** With several shorts, each one made so far, best first. */
+  /** With several shorts, each one made so far, best first; they stay, to download, when the run
+   * stops or is cancelled before it ends. */
   shorts?: ShortEdit[];
+  /** With several shorts, "cost" when the run stopped at its cost limit, having made fewer. */
+  stopped?: "cost";
   /** On the page only, never in job.json: the short a view of one short shows, by its folder. */
   short?: string;
   /** A version rendering, while it renders, or why it failed. */
@@ -203,6 +206,8 @@ interface EditPlan {
   footage?: JobFile[];
   /** The stretch of that file to cut from, in seconds. */
   within?: [number, number];
+  /** What a short planned again is about: its title and description. */
+  short?: string;
   /** The look and caption style, when not the edit's settings', as a version changed them. */
   look?: string;
   captions?: string;
@@ -604,6 +609,8 @@ export class Jobs {
       plan.shorts ? `${plan.shorts.min}-${plan.shorts.max}` : String(plan.length),
       ...(plan.shorts ? ["--shorts", String(plan.shorts.count)] : []),
       ...(plan.within ? ["--within", `${plan.within[0]}-${plan.within[1]}`] : []),
+      // Joined, so a title starting with "-" is not read as an option.
+      ...(plan.short ? [`--short=${plan.short}`] : []),
       "--aspect",
       plan.aspect,
       "--look",
@@ -723,9 +730,11 @@ export class Jobs {
     this.#emit(job);
   }
 
-  /** Takes the shorts shorts.json lists into the job, the newest with what it cost. */
+  /** Takes the shorts shorts.json lists into the job, the newest with what it cost, and whether
+   * the run stopped at its cost limit, and saves it, so a server that stops keeps them. */
   async #readShorts(job: Job, claude?: ClaudeCost): Promise<void> {
     const listed = await loadJson(join(this.#dir(job), OUT, "shorts.json"), validateShorts);
+    if (listed.stopped) job.stopped = listed.stopped;
     const shorts = job.shorts ?? [];
     for (const short of listed.shorts) {
       if (shorts.some((each) => each.folder === short.folder)) continue;
@@ -735,6 +744,7 @@ export class Jobs {
       shorts.push(made);
     }
     job.shorts = shorts;
+    await this.#save(job);
     this.#emit(job);
   }
 
@@ -753,6 +763,8 @@ export class Jobs {
     if (job.status === "cancelled") {
       // Nothing of a cancelled edit is worth keeping.
     } else if (code === 0 && job.result && job.settings.shorts && job.shorts?.length) {
+      // The run's last word: why it made fewer, written after its last short.
+      await this.#readShorts(job).catch(() => {});
       job.status = "done";
     } else if (code === 0 && job.result && existsSync(join(dir, VIDEO))) {
       // The result is settled before the job reads as done, so the page never offers what is
@@ -1028,14 +1040,15 @@ export class Jobs {
     return job;
   }
 
-  /** What a re-plan of `short` cuts from: its file, and its stretch with REPLAN_MARGIN on each
-   * side, inside the file as its media index, which `project` names, measures it. */
+  /** How a re-plan of `short` is planned: from its file, and its stretch with REPLAN_MARGIN on
+   * each side, inside the file as its media index, which `project` names, measures it; as a short
+   * about its moment. */
   async #stretch(
     job: Job,
     short: ShortEdit,
     project: Project,
     path: string,
-  ): Promise<Pick<EditPlan, "footage" | "within">> {
+  ): Promise<Pick<EditPlan, "footage" | "within" | "short">> {
     const file = job.files.find((each) => join("footage", each.path) === join(short.source));
     if (!file) throw new JobError((t) => t.server.noShort, 404);
     const played = project.sources.find(
@@ -1048,7 +1061,11 @@ export class Jobs {
     const start = Math.max(0, short.start - REPLAN_MARGIN);
     const end = Math.min(duration, short.end + REPLAN_MARGIN);
     const round = (seconds: number) => Math.round(seconds * 1000) / 1000;
-    return { footage: [file], within: [round(start), Math.floor(end * 1000) / 1000] };
+    return {
+      footage: [file],
+      within: [round(start), Math.floor(end * 1000) / 1000],
+      short: `${short.title}. ${short.description}`,
+    };
   }
 
   /** Shows version `n`, rendering it again from its record when its video was not kept. */
@@ -1221,7 +1238,8 @@ export class Jobs {
   /** What "Download all" puts in its zip: each short's video and captions, named by its place
    * and title, and a text file of each one's title, description and hashtags. */
   async shortsArchive(id: string): Promise<{ name: string; entries: ArchiveEntry[] }> {
-    const job = await this.#finished(id);
+    // The shorts made so far, even of a run stopped or cancelled before it ended.
+    const job = await this.get(id);
     const shorts = job.shorts ?? [];
     if (shorts.length === 0) throw new JobError((t) => t.server.noShort, 404);
     const entries: ArchiveEntry[] = [];

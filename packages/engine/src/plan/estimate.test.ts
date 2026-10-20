@@ -47,6 +47,11 @@ test("the shorts estimate's range holds what the measured runs of shorts cost", 
   }
   // Finding the moments in an hour of footage stays under its $1 cap.
   assert.ok(estimateShortsCost(3600, 1, [15, 30], "minimal").high < 1);
+  // The upper bound counts the moments a run may try and leave out: from 4 minutes, one short may
+  // be tried twice, each try planned twice; from 2 minutes, it is tried once.
+  const twice = estimateShortsCost(240, 1, [30, 60]).high;
+  const once = estimateShortsCost(120, 1, [30, 60]).high;
+  assert.ok(twice - once > 0.15, `${twice} − ${once}`);
   // No more shorts than the footage gives: one per 2 minutes.
   assert.equal(
     estimateShortsCost(240, 10, [30, 60]).high,

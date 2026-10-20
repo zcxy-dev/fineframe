@@ -335,6 +335,12 @@ export const en = {
       "Each short's MP4 and SRT, and a text file of their titles, descriptions and hashtags.",
     fewer: (made: number, asked: number, range: string) =>
       `Only ${plural(made, "moment", "moments")} in this footage could be made into a short of ${range}, so ${made} ${made === 1 ? "was" : "were"} made instead of ${asked}.`,
+    stoppedCost: (made: number, asked: number) =>
+      `Stopped at the cost limit after ${plural(made, "short", "shorts")}, so ${made} ${made === 1 ? "was" : "were"} made instead of ${asked}.`,
+    unchangeable: (cancelled: boolean): string =>
+      cancelled
+        ? "This run was cancelled and its footage deleted: its shorts can be downloaded, not changed."
+        : "This run stopped before it finished: its shorts can be downloaded, not changed.",
     back: "All shorts",
     titleLabel: "Title",
     description: "Description",

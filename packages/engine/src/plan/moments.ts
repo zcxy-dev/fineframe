@@ -42,11 +42,14 @@ export interface FindOptions {
 }
 
 /**
- * Asks Claude for the moments of the footage that stand alone as shorts, best first, and keeps
+ * Asks Claude for the moments of the footage that stand alone as shorts, best first, with the
+ * footage's length as its analysis measured it, in seconds; keeps
  * those code can make: on lines that exist, not sharing a line with a better one, with a stretch
  * whose speech, every word kept, reaches the range.
  */
-export async function findMoments(options: FindOptions): Promise<Moment[]> {
+export async function findMoments(
+  options: FindOptions,
+): Promise<{ moments: Moment[]; seconds: number }> {
   const sources = await loadSources(options.inputs);
   const videos = [...sources.values()].filter((s) => s.index && s.lines.length > 0);
   const footage = videos.reduce((sum, s) => sum + (s.index?.source.duration ?? 0), 0);
@@ -121,7 +124,7 @@ export async function findMoments(options: FindOptions): Promise<Moment[]> {
       hashtags: hashtags.slice(0, HASHTAGS[1]),
     });
   }
-  return taken;
+  return { moments: taken, seconds: footage };
 }
 
 interface Answer {

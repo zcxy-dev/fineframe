@@ -12,10 +12,15 @@ export interface ArchiveEntry {
   text?: string;
 }
 
-/** The most a zip without its 64-bit extension holds: bytes in a file or before the directory,
- * and entries. Shorts come nowhere near either. */
-const MAX_BYTES = 0xffff_ffff;
-const MAX_ENTRIES = 0xffff;
+/** Where a zip without its 64-bit extension ends: a size, offset or entry count of all ones marks
+ * the extension's, so the largest it holds is one less. Shorts come nowhere near either. */
+const ZIP64_BYTES = 0xffff_ffff;
+const ZIP64_ENTRIES = 0xffff;
+
+/** Whether `bytes`, a file's size or an offset, fits a zip without its 64-bit extension. */
+export function fitsZip(bytes: number): boolean {
+  return bytes < ZIP64_BYTES;
+}
 /** Bit 11 of the flags: the names are UTF-8, so 01-剪輯.mp4 opens as written everywhere. */
 const UTF8 = 0x0800;
 /** Version 2.0, the one that defines folders and stored files, on MS-DOS, as most zips say. */
@@ -29,14 +34,14 @@ export class ArchiveTooLarge extends Error {
 /** The zip of `entries`, as it streams. Fails before any byte with ArchiveTooLarge when the
  * files would need the 64-bit extension. */
 export async function zipStream(entries: readonly ArchiveEntry[]): Promise<ReadableStream> {
-  if (entries.length > MAX_ENTRIES) throw new ArchiveTooLarge(`${entries.length} files`);
+  if (entries.length >= ZIP64_ENTRIES) throw new ArchiveTooLarge(`${entries.length} files`);
   const sized: (ArchiveEntry & { size: number; data?: Buffer })[] = [];
   let total = 0;
   for (const entry of entries) {
     const data = entry.text === undefined ? undefined : Buffer.from(entry.text, "utf8");
     const size = data ? data.length : (await stat(entry.path as string)).size;
     total += size + 30 + Buffer.byteLength(entry.name);
-    if (size > MAX_BYTES || total > MAX_BYTES) throw new ArchiveTooLarge(`${total} bytes`);
+    if (!fitsZip(size) || !fitsZip(total)) throw new ArchiveTooLarge(`${total} bytes`);
     sized.push({ ...entry, size, ...(data ? { data } : {}) });
   }
   return Readable.toWeb(Readable.from(write(sized))) as ReadableStream;
