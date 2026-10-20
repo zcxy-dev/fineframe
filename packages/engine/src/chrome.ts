@@ -2,7 +2,14 @@
 // Testing build, pinned by version and by its archive's SHA-256, and downloaded on first use.
 
 import { join } from "node:path";
-import { Browser, BrowserPlatform, detectBrowserPlatform, install } from "@puppeteer/browsers";
+import {
+  Browser,
+  BrowserPlatform,
+  detectBrowserPlatform,
+  getInstalledBrowsers,
+  install,
+  uninstall,
+} from "@puppeteer/browsers";
 import { cacheDir, type DownloadProgress } from "./download.ts";
 
 /** Overrides the pinned build, e.g. with a Chromium for a system Chrome for Testing lacks. */
@@ -40,7 +47,17 @@ export async function installChrome(options: {
     ...(options.baseUrl ? { baseUrl: options.baseUrl } : {}),
     ...(options.onDownload ? { downloadProgressCallback: options.onDownload } : {}),
   });
+  await removeOtherBuilds(options.cacheDir);
   return installed.executablePath;
+}
+
+/** Deletes every Chrome Headless Shell in `cacheDir` but the pinned build: what earlier pins left.
+ * One that cannot be deleted, such as a build still running on Windows, stays. */
+export async function removeOtherBuilds(cacheDir: string): Promise<void> {
+  for (const { browser, buildId, platform } of await getInstalledBrowsers({ cacheDir })) {
+    if (browser !== Browser.CHROMEHEADLESSSHELL || buildId === CHROME_BUILD) continue;
+    await uninstall({ browser, buildId, platform, cacheDir }).catch(() => {});
+  }
 }
 
 let resolved: Promise<string> | undefined;

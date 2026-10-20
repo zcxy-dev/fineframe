@@ -1,10 +1,17 @@
 import { spawn } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { Writable } from "node:stream";
 import { gunzipSync } from "node:zlib";
-import { cacheDir, type DownloadProgress, exists, pinnedFile, untar } from "./download.ts";
+import {
+  cacheDir,
+  type DownloadProgress,
+  exists,
+  pinnedFile,
+  removeOtherPins,
+  untar,
+} from "./download.ts";
 
 /** Flags every FFmpeg run shares: quiet unless something fails, and never reading the terminal. */
 export const QUIET = ["-hide_banner", "-nostdin", "-nostats", "-loglevel", "error"];
@@ -106,6 +113,7 @@ async function pinnedProbe(onDownload?: DownloadProgress): Promise<string> {
     await rm(partial, { force: true });
   }
   await rm(tarball, { force: true });
+  await removeOtherPins(dir, "ffprobe-");
   return path;
 }
 
@@ -191,7 +199,10 @@ async function pinned(onDownload?: DownloadProgress): Promise<string> {
   }
   const name = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
   const path = join(cacheDir(), `ffmpeg-${build.sha256.slice(0, 12)}`, name);
-  return pinnedFile(build.url, build.sha256, path, "the pinned FFmpeg build", 0o755, onDownload);
+  if (await exists(path)) return path;
+  await pinnedFile(build.url, build.sha256, path, "the pinned FFmpeg build", 0o755, onDownload);
+  await removeOtherPins(dirname(path), "ffmpeg-");
+  return path;
 }
 
 /** Names in `ffmpeg -filters` output. */

@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
-import { access, chmod, mkdir, rename, rm } from "node:fs/promises";
+import { access, chmod, mkdir, readdir, rename, rm } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
@@ -63,6 +63,20 @@ export async function pinnedFile(
     await rm(partial, { force: true });
   }
   return path;
+}
+
+/**
+ * Deletes what earlier pins left beside `kept`, a pinned download's file or folder: everything in
+ * its folder whose name starts with `prefix`, such as `ffmpeg-` for `ffmpeg-e7e7fb30477f`, and
+ * not with `kept`'s own name. Called after a new pin is downloaded, so each pin's old download
+ * goes once; one that cannot be deleted, such as a program still running on Windows, stays.
+ */
+export async function removeOtherPins(kept: string, prefix: string): Promise<void> {
+  const dir = dirname(kept);
+  for (const name of await readdir(dir).catch(() => [])) {
+    if (!name.startsWith(prefix) || name.startsWith(basename(kept))) continue;
+    await rm(join(dir, name), { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 export async function exists(path: string): Promise<boolean> {

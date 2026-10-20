@@ -4,8 +4,8 @@
 // them), and a caption must never fall back to whatever the machine has or draw a box.
 
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-import { cacheDir, pinnedFile } from "../download.ts";
+import { dirname, join } from "node:path";
+import { cacheDir, exists, pinnedFile, removeOtherPins } from "../download.ts";
 
 const COMMIT = "f8d157532fbfaeda587e826d4cd5b21a49186f7c";
 const SOURCE = `https://raw.githubusercontent.com/notofonts/noto-cjk/${COMMIT}/Sans/OTF/TraditionalChinese`;
@@ -25,10 +25,13 @@ export function family(weight: Weight): string {
 }
 
 /** The face of `weight`, downloaded and verified on first use. */
-export function fontFile(weight: Weight): Promise<string> {
+export async function fontFile(weight: Weight): Promise<string> {
   const { family, file, sha256 } = FACES[weight];
   const path = join(cacheDir(), `fonts-${COMMIT.slice(0, 12)}`, file);
-  return pinnedFile(`${SOURCE}/${file}`, sha256, path, family);
+  if (await exists(path)) return path;
+  await pinnedFile(`${SOURCE}/${file}`, sha256, path, family);
+  await removeOtherPins(dirname(path), "fonts-");
+  return path;
 }
 
 /** What layout needs from a face, in ems: the advance of each character and where libass puts
