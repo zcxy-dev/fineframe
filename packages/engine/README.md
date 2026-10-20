@@ -168,7 +168,7 @@ Code then times and checks each graphic:
   - A panel splits the screen with the speaker below it, as a capture's split does.
 - **Checks.** Each graphic is drawn in Chrome against the captions as they will be laid out, with its panel's split in place, and the faces under it ([checks](../effects/README.md#graphics)). Its text is also checked against the speech:
   - each word it shows must be said in the 20 s before it or the 10 s after it, a Latin word or a number whole (20 is not in 2024, nor art in start), a number in digits or in Chinese numerals (a lone 十 among them), joined at most by small words such as 的 and 不 or by a unit said right after a number, such as 歲 in 二十七歲;
-  - no run of eight Chinese characters or four Latin words may be the sentence being said while it shows;
+  - it may not restate what is said while it shows: no run of eight Chinese characters or four Latin words of it, and not most of one phrase with a small word or two left out (害怕 becoming thirty for 會害怕 becoming thirty 嗎), while two keywords of a phrase that leave its subject out still pass;
   - each logo it shows must be of a brand named whole in the 20 s before it or the 10 s after it (X is not in next, nor Meta in metadata).
 - **Cadence.** After placement, code finds where nothing new comes into the picture (no cut, shot change, B-roll, effect or graphic) for longer than the shape allows: 8 s at 16:9, 4 s at 9:16.
 

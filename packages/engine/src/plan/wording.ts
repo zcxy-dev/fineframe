@@ -161,6 +161,52 @@ export function repeated(pieces: readonly string[], speech: string): string | nu
   }, "");
 }
 
+/** How much of a phrase a graphic may show, by its words' weight (repeated's units). A graphic
+ * restates a phrase said while it shows when the words both hold in order weigh at least `least`,
+ * make up `ofGraphic` of the graphic, and make up `ofPhrase` of the phrase or leave out at most
+ * `leftOut` of its words that are not small words: 害怕 becoming thirty for 會害怕 becoming thirty
+ * 嗎. A keyword, a number or one side of a comparison is a small part of one or the other, and two
+ * keywords that leave a phrase's subject out (十幾歲, 二十幾歲 for 十幾歲或二十幾歲的朋友) do not
+ * restate it. */
+const RESTATED = { least: 5, ofGraphic: 0.8, ofPhrase: 0.7, leftOut: 1 };
+
+/** The heaviest run of units both lists hold in the same order, gaps allowed, by `weigh`. */
+function common(a: readonly string[], b: readonly string[], weigh: (unit: string) => number) {
+  let previous = new Array<number>(b.length + 1).fill(0);
+  for (const unit of a) {
+    const row = [0];
+    for (const [k, other] of b.entries()) {
+      const along = unit === other ? (previous[k] as number) + weigh(unit) : 0;
+      row.push(Math.max(along, previous[k + 1] as number, row[k] as number));
+    }
+    previous = row;
+  }
+  return previous[b.length] as number;
+}
+
+/** The phrase said while the graphic shows that its words restate, or null (RESTATED). */
+export function restates(pieces: readonly string[], phrases: readonly string[]): string | null {
+  const shown = pieces.flatMap(units);
+  const total = (list: readonly string[], weigh: (unit: string) => number) =>
+    list.reduce((sum, unit) => sum + weigh(unit), 0);
+  // Words that carry meaning: small words such as 的, 或 and 嗎 weigh nothing.
+  const content = (unit: string) => (JOINERS.has(unit) ? 0 : weight(unit));
+  const graphic = total(shown, weight);
+  for (const phrase of phrases) {
+    const said = units(phrase);
+    const both = common(shown, said, weight);
+    const leftOut = total(said, content) - common(shown, said, content);
+    if (
+      both >= RESTATED.least &&
+      both >= RESTATED.ofGraphic * graphic &&
+      (both >= RESTATED.ofPhrase * total(said, weight) || leftOut <= RESTATED.leftOut)
+    ) {
+      return phrase;
+    }
+  }
+  return null;
+}
+
 /** Whether the speech names `name` whole: a Chinese name as said (星巴克), a Latin one as the
  * run of words it is (Google Drive, Node.js), never inside a longer word (X is not in next, nor
  * Meta in metadata). */
