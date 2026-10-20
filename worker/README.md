@@ -118,6 +118,12 @@ uv run --env-file ../.env vework analyze talk.mp4 -o talk.index.json --correct -
 - **Declined chunks:** when Claude declines a chunk, it stays as transcribed and its record says so. No other model is asked, so every correction comes from the same model.
 - **Glossary:** a UTF-8 text file with one name or term per line; blank lines and lines starting with `#` are skipped. `--asr-context` also gives it to Qwen3-ASR as its context prompt, which biases recognition towards those words. It is a separate option so its effect can be measured apart from Claude's.
 
+## Taiwan Traditional Chinese
+
+Chinese text is converted to Taiwan Traditional Chinese with OpenCC's `s2twp`, which also swaps mainland words for Taiwan's (视频 to 影片, 软件 to 軟體), and two dictionaries of ours that take precedence over its matches of the same length. [`everyday_s2t.txt`](src/vework/everyday_s2t.txt) fixes characters it picks wrong in everyday speech (很赞 to 很讚, 系安全带 to 繫安全帶, 嘴巴里面 to 嘴巴裡面, 面 to 麵 in some phrases about noodles). [`everyday_tw.txt`](src/vework/everyday_tw.txt) keeps everyday words that its Taiwan phrases turn into computing terms, such as 類型 (not 型別), 項目 (not 專案), 對象 (not 物件) and 支持 (not 支援); longer computing terms such as 資料庫 still convert. A 面 on its own stays 面: only the meaning tells a face from noodles.
+
+Before alignment, a full-width mark that runs into a Latin letter or digit gets a space after it (？OK，Let's to ？ OK， Let's), as the aligner splits words only at spaces and Han characters. After it, Chinese numerals next to a Latin word are written in digits, as a product name or a measure is written: Pocket 三 to Pocket 3, and joined to a unit or a one-letter suffix after them, 四 P to 4P and 六十 mm to 60mm. Numerals elsewhere stay as said.
+
 ## Word timings
 
 Qwen3-ForcedAligner times words on an 80 ms grid and gives some characters no duration. A zero-length character first gets the free time beside it or, with none, an even share of a neighboring Han character's time; an English neighbor keeps its own. [`timing.py`](src/vework/timing.py) then reads each edge from the audio level in the grid cell that starts at the reported time (its constants set the level's window and thresholds):
