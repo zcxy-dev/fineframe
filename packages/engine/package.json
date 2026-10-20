@@ -8,6 +8,7 @@
     "./broll": "./src/broll/index.ts",
     "./captions": "./src/captions/presets.ts",
     "./claude": "./src/plan/claude.ts",
+    "./download": "./src/download.ts",
     "./estimate": "./src/plan/estimate.ts",
     "./length": "./src/edit/length.ts",
     "./looks": "./src/looks.ts",

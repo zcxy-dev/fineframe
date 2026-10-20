@@ -32,6 +32,10 @@ test("an edit that failed for a reason its owner can fix says what to do", () =>
     ],
     ["The plan request to claude-opus-5-5 failed: Connection error.", "network"],
     [
+      "The footage lasts 37.0 s in all, too short for a 60 s edit: ask for a shorter edit or add footage",
+      "length",
+    ],
+    [
       "ENOENT: no such file or directory, open '/tmp/jobs/0c3e/out/analysis/talk-a.json'",
       "missing",
     ],

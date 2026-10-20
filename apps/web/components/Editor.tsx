@@ -652,7 +652,10 @@ function Failed({
       label: t.failed.addCredit,
       href: "https://console.anthropic.com/settings/billing",
     },
-    onRetry && fix?.kind !== "file" && { label: t.failed.retry, run: onRetry },
+    // The same files and length would fail the same way.
+    onRetry &&
+      fix?.kind !== "file" &&
+      fix?.kind !== "length" && { label: t.failed.retry, run: onRetry },
     {
       label: fix?.kind === "file" ? t.failed.changeFootage : t.failed.back,
       run: onBack,

@@ -97,7 +97,7 @@ export type Aspect = Project["output"]["aspect"];
 
 export { LENGTH_RANGE };
 
-const TOLERANCE = 0.05;
+export const TOLERANCE = 0.05;
 /** Planning requests per edit: the plan, and one more if code's fit comes out short. */
 export const MAX_PLAN_CALLS = 2;
 /** A target below this share of the footage's speech is a short edit of its strongest moments;

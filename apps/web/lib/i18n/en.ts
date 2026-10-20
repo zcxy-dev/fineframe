@@ -608,6 +608,10 @@ export const en = {
         summary: "Fineframe could not reach the internet.",
         next: "Check the connection and start the edit again: what was analysed or downloaded is kept.",
       },
+      length: {
+        summary: "The footage is shorter than the edit.",
+        next: "Choose a shorter length, or add footage, and start again.",
+      },
     },
   },
   /** What the server says to the page when it refuses a request. */

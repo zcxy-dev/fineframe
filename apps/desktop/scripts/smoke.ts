@@ -16,10 +16,10 @@
 // system's voice: `say` on macOS, the speech synthesizer .NET ships on Windows, espeak-ng on Linux.
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { _electron as electron, type Page } from "playwright-core";
@@ -550,10 +550,9 @@ async function makeEdit(): Promise<string[]> {
   say(
     `the edit is ${seconds.toFixed(2)} s, captions ${job.result?.captions ? "written" : "missing"}`,
   );
-  // Where the page keeps the job's edit (apps/web/lib/jobs.ts).
+  // Where the page keeps the job's edit (apps/web/lib/jobs.ts): in the app's own cache.
   const projectPath = join(
-    homedir(),
-    ".cache",
+    home.XDG_CACHE_HOME,
     "video-editor",
     "jobs",
     job.id,
@@ -648,6 +647,8 @@ if (
 )
   problems.push("the server still answers");
 say(`the app quit, and the ${started.size} processes it started with it`);
+// The app's folders and caches, models among them, go too.
+await rm(work, { recursive: true, force: true, maxRetries: 5 });
 
 if (problems.length > 0) {
   console.error(`smoke: failed:\n- ${problems.join("\n- ")}`);
