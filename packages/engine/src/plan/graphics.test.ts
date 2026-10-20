@@ -120,7 +120,7 @@ test("each graphic is checked as drawn", browser, async () => {
   };
   const chip = (left: number, top: number, size = 6) =>
     `<div class="ff-chip" style="position:absolute;left:${left}px;top:${top}px;animation:ff-from-left .5s var(--enter) .1s both"><span style="font-size:calc(var(--u)*${size})">二十七歲</span></div>`;
-  const [good, onFace, bad, small, empty, marked, emoji] = await checkGraphics(
+  const [good, onFace, bad, small, empty, marked, emoji, iconic] = await checkGraphics(
     [
       { layout: "label", html: chip(90, 760), css: "", output, frames: 90, ...around },
       { layout: "label", html: chip(350, 400), css: "", output, frames: 90, ...around },
@@ -160,6 +160,15 @@ test("each graphic is checked as drawn", browser, async () => {
         frames: 90,
         ...around,
       },
+      // A full frame whose icon and number together span most of it.
+      {
+        layout: "full",
+        html: '<div class="ff-stage"></div><div style="position:absolute;left:10%;right:10%;top:20%;height:40%;display:flex;align-items:center;justify-content:space-between;animation:ff-pop .5s both"><img src="icons/accent/rocket.svg" style="width:40%;height:100%"><b style="font-size:calc(var(--u)*20)">27</b></div>',
+        css: "",
+        output,
+        frames: 90,
+        ...around,
+      },
     ],
     await chrome(),
   );
@@ -188,6 +197,8 @@ test("each graphic is checked as drawn", browser, async () => {
   assert.deepEqual(emoji?.problems, [
     'The fonts have no "😀": it would show as a box; use words, digits or common punctuation.',
   ]);
+  // The icon counts as part of what fills the frame.
+  assert.deepEqual(iconic?.problems, []);
   // The chip is in by 0.6 s, its text only at 2 s.
   assert.deepEqual(empty?.problems, [
     "A box shows empty for 1.4 s before its text enters: bring the text in with its box, within 0.8 s.",

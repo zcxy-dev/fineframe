@@ -45,14 +45,30 @@ export function normalized(text: string): string {
     .replace(/[\s\p{P}\p{S}]/gu, "");
 }
 
+const NUMERALS = "〇零一二兩三四五六七八九十百千萬億";
+
 /**
  * The words on a graphic that the speech near it does not hold: each run of Chinese characters
  * must be made of pieces of two or more characters found in the speech, joined at most by single
- * small words (的, 和, 不 and the like); each Latin word and number must be said, a number in
- * digits or in Chinese numerals.
+ * small words (的, 和, 不 and the like) or by a unit the speaker says right after a number (歲 in
+ * 二十七歲); each Latin word and number must be said, a number in digits or in Chinese numerals,
+ * a lone 十 among them.
  */
 export function unsaid(shown: string, speech: string): string[] {
   const said = normalized(speech);
+  const plain = speech.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, "");
+  const numbers = new Set<string>(plain.match(/\d+(?:\.\d+)?/g) ?? []);
+  for (const run of plain.match(new RegExp(`[${NUMERALS}]+`, "g")) ?? []) {
+    const value = chineseNumber(run);
+    if (value !== null) numbers.add(String(value));
+  }
+  const afterNumber = (char: string) => {
+    for (let i = plain.indexOf(char); i > 0; i = plain.indexOf(char, i + 1)) {
+      if (/\d/.test(plain[i - 1] as string) || NUMERALS.includes(plain[i - 1] as string))
+        return true;
+    }
+    return false;
+  };
   const missing: string[] = [];
   for (const token of shown.match(/[\p{Script=Han}]+|[\p{L}\p{N}][\p{L}\p{N}.,'%-]*/gu) ?? []) {
     if (/\p{Script=Han}/u.test(token)) {
@@ -68,9 +84,13 @@ export function unsaid(shown: string, speech: string): string[] {
             break;
           }
         }
+        // A number on it must be one the speaker says.
+        const digits = run.slice(at).match(/^\d+(?:\.\d+)?/)?.[0];
         if (length >= 2) at += length;
-        else if (JOINERS.has(run[at] as string) || /\d/.test(run[at] as string)) at += 1;
-        else {
+        else if (digits && (numbers.has(digits) || said.includes(digits))) at += digits.length;
+        else if (!digits && (JOINERS.has(run[at] as string) || afterNumber(run[at] as string))) {
+          at += 1;
+        } else {
           ok = false;
           break;
         }
@@ -78,7 +98,8 @@ export function unsaid(shown: string, speech: string): string[] {
       if (!ok) missing.push(token);
     } else {
       const word = normalized(token);
-      if (word && !JOINERS.has(word) && !said.includes(word)) missing.push(token);
+      const number = /^\d+(\.\d+)?$/.test(word) && numbers.has(word);
+      if (word && !JOINERS.has(word) && !number && !said.includes(word)) missing.push(token);
     }
   }
   return [...new Set(missing)];

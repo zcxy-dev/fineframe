@@ -166,12 +166,12 @@ Code then times and checks each graphic:
   - Full-frame graphics past a quarter of the edit are left out, latest first.
   - A panel splits the screen with the speaker below it, as a capture's split does.
 - **Checks.** Each graphic is drawn in Chrome against the captions as they will be laid out, with its panel's split in place, and the faces under it ([checks](../effects/README.md#graphics)). Its text is also checked against the speech:
-  - each word it shows must be said in the 20 s before it or the 10 s after it, a number in digits or in Chinese numerals, joined at most by small words such as 的 and 不;
+  - each word it shows must be said in the 20 s before it or the 10 s after it, a number in digits or in Chinese numerals (a lone 十 among them), joined at most by small words such as 的 and 不 or by a unit said right after a number, such as 歲 in 二十七歲;
   - no run of eight Chinese characters or four Latin words may be the sentence being said while it shows;
   - each logo it shows must be of a brand named in the 20 s before it or the 10 s after it.
 
   The graphics that fail go back to Claude once, together, each with its problems and a half-size screenshot. A fix that still fails is left out, and its line keeps the speaker. After a review fits the edit again, the graphics are placed on the words that remain and checked again, and one that fails is left out without another request.
-- **Sound.** A graphic that asks for a sound gets one on its first frame, at most one every 6 s with the visuals' sounds.
+- **Sound.** A graphic that asks for a sound gets one on its first frame, at most one every 6 s with the visuals' sounds, and none when a cut falls from 0.1 s before it to 0.5 s into it, where the sound would ring across the cut.
 - **Credits.** The render adds each icon and logo a graphic draws to `<name>.broll.txt`, a logo with its trademark note.
 
 A request that fails leaves the edit without graphics there.

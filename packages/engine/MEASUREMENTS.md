@@ -188,7 +188,7 @@ cd ../../bench && uv run vebench report /tmp/synthetic-edit
 |---|---|---|---|
 | This renderer: 14 hard cuts, then dissolves, a dip, B-roll and framing | 18 | 0 | 0.0 ms |
 | The same 14 cuts with each clip encoded alone with 30 ms fades and joined with `-c copy` | 13 | 0 | 57.6 ms |
-| The same 14 cuts with seven effect overlays across them | 13 | 0 | 0.0 ms |
+| The same 14 cuts with five effect overlays across them | 13 | 0 | 0.0 ms |
 
 Peak memory of the whole render without overlays, every FFmpeg process included, on 0.4–0.5 s clips. Each overlay a piece spans adds one VP9 decoder ([its memory](../effects/README.md#rendering)).
 
@@ -217,18 +217,19 @@ The effects and motion graphics render with [HyperFrames](../effects/README.md#r
 
 **Graphics on real footage.** Six edits of CC BY clips from the [step 3 check](#planner-measurements) (#103) were made again with `pnpm edit --asr cloud --quality best`. Claude wrote each edit's graphics in one request and fixed the ones the checks failed in one more; what still failed was left out.
 
-| Edit | Written | Kept | Left out because | Claude: all, graphics |
-|---|--:|--:|---|---|
-| real-2, 60 s at 9:16 | 8 | 8 | – | $0.40, $0.31 |
-| real-10, 60 s at 9:16 (English) | 8 | 6 | 1 over the speaker's face, 1 too close to the one before | $0.34, $0.27 |
-| real-8, 60 s at 9:16 | 9 | 8 | 1 text under the captions | $0.47, $0.37 |
-| real-1, 60 s at 9:16 | 9 | 7 | 1 too little of the panel filled, 1 too near the end | $0.40, $0.31 |
-| real-2, 3 min at 16:9 | 12 | 9 | 1 text under the captions, 1 repeats the captions, 1 too little of the frame filled | $0.62, $0.42 |
-| real-6, 3 min at 16:9 | 14 | 13 | 1 too little of the frame filled and words not said | $0.64, $0.46 |
+| Edit | Written | Kept | With icons | Left out because | Claude: all, graphics |
+|---|--:|--:|--:|---|---|
+| real-2, 60 s at 9:16 | 12 | 8 | 3 | 3 too little of the panel or frame filled, 1 too near the end | $0.51, $0.42 |
+| real-10, 60 s at 9:16 (English) | 9 | 7 | 0 | 2 text under the captions | $0.48, $0.41 |
+| real-8, 60 s at 9:16 | 11 | 8 | 0 | 2 too little of the panel filled, 1 text off the frame and under the captions | $0.53, $0.45 |
+| real-1, 60 s at 9:16 | 9 | 8 | 3 | 1 too close to the one before | $0.41, $0.30 |
+| real-2, 3 min at 16:9 | 21 | 20 | 10 | 1 too near the end | $0.76, $0.63 |
+| real-6, 3 min at 16:9 | 18 | 15 | 6 | 1 texts overlap, 1 a word not said, 1 too close to the one before | $0.93, $0.74 |
 
-- **Cost:** a 60 s edit cost $0.34 to $0.47 in all, a 3 min one $0.62 and $0.64. The graphics are 68 to 80 % of it; writing them is half to most of that, the fix request the rest.
-- **Hard rules:** every edit lands within ±5 % of its length (−0.5 to +3.3 %), with 0 clicks at 26 cuts and 0.0 ms of drift.
-- **Captions and panels:** the 9:16 edits were made last, once captions kept off panels; the 3 min edits at 16:9, which have no panels, before.
+- **Cost:** a 60 s edit cost $0.41 to $0.53 in all, a 3 min one $0.76 and $0.93. The graphics are 75 to 85 % of it; writing them is half to most of that, the fix request the rest.
+- **Hard rules:** every edit lands within ±5 % of its length (−2.5 to +4.4 %), with 0 clicks at 18 cuts and 0.0 ms of drift.
+- **Icons and logos:** 22 of the 66 graphics kept mark their words with an icon. None shows a logo: no clip names a brand among the bundled logos.
+- **The real-2 60 s edit** was made again after the wording check learned that a unit said after a number counts as said: before it, a panel showing 27 and 歲 apart was left out as saying 歲 unsaid.
 - **What the checks do not see:** text already drawn into the footage. Some of real-6's lower thirds land on its own titles.
 
 ## Colour measurements

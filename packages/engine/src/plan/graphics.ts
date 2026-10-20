@@ -737,7 +737,13 @@ export async function withGraphics(
   };
 }
 
-/** The sounds the graphics ask for, at most one every SFX_EVERY s with the project's own. */
+/** A sound's attack rings on this long; with a cut in it, or just before it, the splice no longer
+ * shows as clean in the mix (vebench render counts it as a click). Seconds. */
+const SOUND_RING = 0.5;
+const SOUND_BEFORE = 0.1;
+
+/** The sounds the graphics ask for, at most one every SFX_EVERY s with the project's own, and
+ * none with a cut within its first SOUND_RING s. */
 async function graphicSounds(
   placed: readonly Placed[],
   project: Project,
@@ -749,10 +755,22 @@ async function graphicSounds(
   const effects: SoundEffect[] = [];
   const ids = new Map<string, string>();
   const every = secondsToTicks(SFX_EVERY);
+  // Where the main track's clips join, on the output timeline.
+  const cuts: number[] = [];
+  let at = 0;
+  for (const clip of project.main) {
+    if (at > 0) cuts.push(at);
+    at += clip.out - clip.in;
+  }
+  const near = (start: number) =>
+    cuts.some(
+      (cut) =>
+        cut >= start - secondsToTicks(SOUND_BEFORE) && cut <= start + secondsToTicks(SOUND_RING),
+    );
   let nth = 0;
   for (const { wish, graphic } of placed) {
     if (wish.sfx === "none") continue;
-    if (taken.some((t) => Math.abs(t - graphic.start) < every)) continue;
+    if (taken.some((t) => Math.abs(t - graphic.start) < every) || near(graphic.start)) continue;
     const sound = pickSfx(wish.sfx, nth++);
     let id = ids.get(sound.path);
     if (!id) {

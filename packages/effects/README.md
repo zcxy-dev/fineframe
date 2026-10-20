@@ -50,7 +50,7 @@ Claude writes each edit's graphics for that video, as markup and its own CSS on 
 
 It also reports:
 - a label that covers a face or leaves the safe area;
-- a panel or full-frame graphic whose text spans too little of it, or whose largest text is under 12 units;
+- a panel or full-frame graphic whose text and icons span too little of it, or whose largest text is under 12 units;
 - a part that does not enter, enters for longer than 0.8 s or keeps moving;
 - a box that shows empty for more than 0.8 s before its text;
 - an icon or logo that does not load.

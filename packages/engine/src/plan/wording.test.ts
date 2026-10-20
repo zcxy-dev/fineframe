@@ -44,3 +44,17 @@ test("a logo shows only a brand the speaker names", () => {
   assert.deepEqual(unnamed(html, "我把程式碼放在 GitHub 上"), ["Notion"]);
   assert.deepEqual(unnamed(html, "github 跟 Notion 都用"), []);
 });
+
+test("a unit after a said number counts as said, and a number as the speaker says it", () => {
+  const age = "我放所有心思在解決我二十七歲的問題";
+  const height = "他比我高十公分";
+  // The number and its unit set apart, as a graphic draws a big number and a small unit.
+  assert.deepEqual(unsaid("27 歲", age), []);
+  assert.deepEqual(unsaid("27歲", age), []);
+  // 十 alone is a number when the speaker says it before a unit.
+  assert.deepEqual(unsaid("10 公分", height), []);
+  // Neither lets through what was not said: another number, or a unit not said after one.
+  assert.deepEqual(unsaid("30 歲", age), ["30"]);
+  assert.deepEqual(unsaid("歲", "我不知道幾歲"), ["歲"]);
+  assert.deepEqual(unsaid("10 倍", height), ["倍"]);
+});

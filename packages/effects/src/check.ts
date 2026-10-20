@@ -47,6 +47,8 @@ interface Snapshot {
   texts: { text: string; rects: Box[]; size: number; clip: Box | null; owner: number }[];
   /** Every drawn element's box, for a label's extent and a full graphic's fill. */
   elements: Box[];
+  /** Each icon or logo shown, as drawn. */
+  images: Box[];
   /** Each framed box that holds text, by its index: whether it shows, and whether its text does. */
   frames: { shows: boolean; filled: boolean }[];
 }
@@ -196,7 +198,11 @@ async function inspect(
         }
         return { shows, filled };
       });
-      return { t, texts, elements, frames };
+      const images = [...root.querySelectorAll("img")]
+        .filter((e) => opacity(e) > 0.5)
+        .map((e) => rect(e.getBoundingClientRect()))
+        .filter((r) => r.width > 0 && r.height > 0);
+      return { t, texts, elements, images, frames };
     };
     // As each part starts and finishes moving, and on the last frame.
     const last = Math.max(0, seconds - 1 / 30);
@@ -347,14 +353,14 @@ async function inspect(
   }
   const largest = Math.max(0, ...settled.texts.map((t) => t.size)) / u;
   if (!isOverlayLayout(job.layout) && all.length > 0) {
-    // Measured on the text alone: a box that only frames it fills nothing.
-    const text = union(settled.texts.flatMap((t) => t.rects));
+    // Measured on the text and the icons beside it: a box that only frames them fills nothing.
+    const text = union([...settled.texts.flatMap((t) => t.rects), ...settled.images]);
     const wide = text.width / frame.width;
     const tall = text.height / frame.height;
     const area = job.layout === "panel" ? "panel" : "frame";
     if (wide < 0.65 || tall < 0.35) {
       problems.push(
-        `It leaves too much of the ${area} empty: its text spans ${Math.round(100 * wide)} % of the width and ${Math.round(100 * tall)} % of the height; spread it over 75 to 90 % of the width and most of the height, with larger type.`,
+        `It leaves too much of the ${area} empty: its text and icons span ${Math.round(100 * wide)} % of the width and ${Math.round(100 * tall)} % of the height; spread it over 75 to 90 % of the width and most of the height, with larger type.`,
       );
     }
     if (largest < HERO - 0.25) {
