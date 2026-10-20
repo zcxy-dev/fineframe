@@ -58,9 +58,15 @@ export async function fileResponse(
   });
 }
 
-function attachment(name: string): string {
+/** A Content-Disposition that downloads as `name`, written as is where the browser reads UTF-8. */
+export function attachment(name: string): string {
   const ascii = name.replace(/[^\x20-\x7e]|["\\]/g, "_");
   return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`;
+}
+
+/** The short a request is about, by its folder (`?short=01`); undefined for the edit itself. */
+export function shortParam(request: Request): string | undefined {
+  return new URL(request.url).searchParams.get("short") ?? undefined;
 }
 
 /**

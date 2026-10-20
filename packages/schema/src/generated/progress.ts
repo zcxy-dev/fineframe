@@ -3,7 +3,7 @@
 /**
  * One line of `pnpm edit` progress.
  */
-export type Progress = StageProgress | DoneProgress;
+export type Progress = StageProgress | ShortProgress | DoneProgress | ShortsDoneProgress;
 /**
  * How much of the whole run is finished, 0 to 1.
  */
@@ -53,11 +53,13 @@ export interface StageProgress {
     | "align"
     | "music";
   claude?: ClaudeCost;
+  short?: ShortNumber;
 }
 /**
- * What Claude cost by stage: planning, writing and fixing the motion graphics, and the review after each render with the decisions it escalates. On the done line, and on an error line once a request was made.
+ * What Claude cost by stage: finding the moments of a --shorts run, planning, writing and fixing the motion graphics, and the review after each render with the decisions it escalates. A --shorts run sums its shorts, those given up on included. On the done line, a short's line, and an error line once a request was made.
  */
 export interface ClaudeCost {
+  find?: Spend;
   plan: Spend;
   graphics?: Spend;
   check: Spend;
@@ -68,6 +70,23 @@ export interface Spend {
    */
   dollars: number | null;
   requests: number;
+}
+/**
+ * With --shorts, the short the line is about: the nth of those to make.
+ */
+export interface ShortNumber {
+  n: number;
+  of: number;
+}
+/**
+ * With --shorts, a short finished: shorts.json already lists it.
+ */
+export interface ShortProgress {
+  stage: "short";
+  fraction: Fraction;
+  message: string;
+  short: ShortNumber;
+  claude?: ClaudeCost;
 }
 export interface DoneProgress {
   stage: "done";
@@ -92,5 +111,20 @@ export interface DoneProgress {
      * Where each piece of B-roll and each sound effect the video plays came from, when it plays any with a credit.
      */
     broll?: string;
+  };
+}
+/**
+ * With --shorts, the last line of a run that made at least one short.
+ */
+export interface ShortsDoneProgress {
+  stage: "done";
+  fraction: 1;
+  message: string;
+  claude?: ClaudeCost;
+  outputs: {
+    /**
+     * The absolute path of shorts.json.
+     */
+    shorts: string;
   };
 }

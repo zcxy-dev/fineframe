@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Job, ReplanChoice } from "../lib/jobs.ts";
 import { formatLength } from "../lib/settings.ts";
+import { jobApi, REPLAN_MARGIN } from "../lib/shorts.ts";
 import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
 import { useT } from "./I18n.tsx";
@@ -38,7 +39,7 @@ export function Replan({
   const start = async () => {
     setError(null);
     setSending(true);
-    const response = await fetch(`/api/jobs/${job.id}/replan`, {
+    const response = await fetch(jobApi(job, "replan"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(choice),
@@ -53,7 +54,10 @@ export function Replan({
   };
   return (
     <div className={styles.replan}>
-      <p className={styles.help}>{words.help}</p>
+      <p className={styles.help}>
+        {words.help}
+        {job.short && ` ${words.stretch(REPLAN_MARGIN)}`}
+      </p>
       <div className={styles.field}>
         <span className={styles.label}>{words.length}</span>
         <div className={styles.chips}>

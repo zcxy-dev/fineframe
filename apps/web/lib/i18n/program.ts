@@ -42,6 +42,8 @@ const SAID: [RegExp, (words: Words, said: Groups, t: Messages) => string][] = [
   [/^Reading the file$/, (w) => w.readFile],
   [/^Reading (\d+) files$/, (w, [n]) => w.readFiles(n)],
   [/^Analysed before$/, (w) => w.analysedBefore],
+  [/^Finding the moments that stand alone as shorts$/, (w) => w.finding],
+  [/^Found (\d+) moments$/, (w, [n]) => w.found(n)],
   // The plan (plan/plan.ts, plan/visuals.ts) and its review (plan/review.ts).
   [
     /^Planning (a short|a long) edit with (.+)$/,

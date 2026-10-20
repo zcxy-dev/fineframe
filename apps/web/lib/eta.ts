@@ -39,9 +39,10 @@ export class Finish {
   #analysed: number | undefined;
   #finish: number | undefined;
 
-  /** For an edit of `length` seconds. */
-  constructor(length: number) {
-    this.#after = afterAnalysis(length) * 1000;
+  /** For `edits` edits of `length` seconds each, one after another, as a run of shorts makes
+   * them. */
+  constructor(length: number, edits = 1) {
+    this.#after = afterAnalysis(length) * edits * 1000;
   }
 
   /** The bar at `at` (epoch milliseconds) in `stage`; returns the estimated finish, or undefined

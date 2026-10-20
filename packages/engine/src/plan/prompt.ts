@@ -435,6 +435,8 @@ export function planRequest(options: {
   names?: readonly string[];
   /** What the user asks of this edit, in their words. */
   instructions?: string;
+  /** What the edit is about: a short's title and description. */
+  about?: string;
 }): string {
   const { target, aspect, short, speech, music, title, chapters, names, instructions } = options;
   const kind = short
@@ -444,6 +446,7 @@ export function planRequest(options: {
     `Make ${kind}.`,
     `Target length: ${target.toFixed(0)} s (±5 %), aspect ${aspect}.`,
     `The files hold ${speech.toFixed(0)} s of speech before fillers and pauses are removed.`,
+    ...(options.about ? [`This short is about: ${options.about}`] : []),
     ...asks(title, chapters, names, instructions),
     ...(music ? ["", music] : []),
   ].join("\n");

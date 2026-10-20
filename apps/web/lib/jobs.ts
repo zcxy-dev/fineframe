@@ -19,19 +19,22 @@ import {
 import {
   type ClaudeCost,
   loadJson,
+  type MediaIndex,
   type Progress,
   type Project,
+  type ShortNumber,
   type StageProgress,
   TICKS_PER_SECOND,
   upgradeProject,
   validateProject,
+  validateShorts,
 } from "@video-editor/schema";
 import { Finish } from "./eta.ts";
 import type { FixKind } from "./fixes.ts";
 import { LOCALES } from "./i18n/locale.ts";
 import { en, MESSAGES, type Messages } from "./i18n/messages.ts";
 import { readKey, type Service, VARIABLES } from "./key.ts";
-import { safeRelativePath } from "./paths.ts";
+import { fileTitle, safeRelativePath } from "./paths.ts";
 import { FOOTAGE_KEPT } from "./retention.ts";
 import { type Run, runEdit } from "./runner.ts";
 import {
@@ -45,8 +48,10 @@ import {
   roleOf,
   type Settings,
 } from "./settings.ts";
+import { REPLAN_MARGIN } from "./shorts.ts";
 import { dollarsOf } from "./summary.ts";
 import { type Version, versionFiles, videosToPrune } from "./versions.ts";
+import type { ArchiveEntry } from "./zip.ts";
 
 export type Stage = "analyze" | "plan" | "render" | "check";
 
@@ -56,6 +61,29 @@ interface JobFile extends FileEntry {
   use: Role;
   /** Bytes the server has of it. */
   received: number;
+}
+
+/** One short of a run of several, as shorts.json lists it, with its own versions. */
+export interface ShortEdit {
+  /** Its folder in out/: 01, 02, … in the order Claude ranked them, best first. */
+  folder: string;
+  title: string;
+  description: string;
+  hashtags: string[];
+  /** The footage file it is cut from, as the edit was given it (footage/…), and its stretch of
+   * that file in seconds, which a re-plan takes its material from. */
+  source: string;
+  start: number;
+  end: number;
+  /** The length Claude chose for it, and its video's as made, in seconds. */
+  length: number;
+  seconds: number;
+  /** Epoch milliseconds. */
+  finished: number;
+  claude?: ClaudeCost;
+  result?: Job["result"];
+  versions?: Version[];
+  current?: number;
 }
 
 /** What the page shows of an edit; it is also what job.json keeps. */
@@ -77,6 +105,8 @@ export interface Job {
     message: string;
     file?: string;
     step?: StageProgress["step"];
+    /** With several shorts, the one being made. */
+    short?: ShortNumber;
   };
   /** When the edit will likely finish, in epoch milliseconds, at the rate it has gone so far;
    * once there is enough to go on. */
@@ -99,9 +129,15 @@ export interface Job {
   versions?: Version[];
   /** The version the page shows; 1 unless another was chosen. */
   current?: number;
+  /** With several shorts, each one made so far, best first. */
+  shorts?: ShortEdit[];
+  /** On the page only, never in job.json: the short a view of one short shows, by its folder. */
+  short?: string;
   /** A version rendering, while it renders, or why it failed. */
   render?: {
     version: number;
+    /** The short it is a version of, by its folder; absent for the edit itself. */
+    short?: string;
     /** A version being made, rather than an older one rendering again. */
     fresh: boolean;
     fraction: number;
@@ -161,6 +197,12 @@ interface EditPlan {
   aspect: Settings["aspect"];
   music: JobFile[];
   instructions?: string;
+  /** Several shorts instead of one edit. */
+  shorts?: NonNullable<Settings["shorts"]>;
+  /** The footage to cut from, when not all of it: the one file of a short. */
+  footage?: JobFile[];
+  /** The stretch of that file to cut from, in seconds. */
+  within?: [number, number];
   /** The look and caption style, when not the edit's settings', as a version changed them. */
   look?: string;
   captions?: string;
@@ -239,6 +281,8 @@ export function secondsLeft(
 }
 
 const VIDEO = versionFiles(1).video;
+/** Where a run of several shorts writes shorts.json and a folder for each short. */
+const OUT = "out";
 /** stderr lines kept with a failed edit, for a person to read in edit.log. */
 const LOG = "edit.log";
 
@@ -255,6 +299,8 @@ export interface ProjectSummary {
   bytes: number;
   /** Whether its footage is still kept, which editing it again needs. */
   footage: boolean;
+  /** With several shorts, how many were made so far. */
+  shorts?: number;
 }
 
 /** The ids of the jobs whose footage goes so that only the newest `keep` finished edits keep
@@ -302,6 +348,8 @@ export class Jobs {
   /** Jobs whose render was stopped, until it exits. */
   readonly #stopped = new Set<string>();
   readonly #listeners = new Map<string, Set<(job: Job) => void>>();
+  /** Each running job's latest reading of shorts.json, which its end waits for. */
+  readonly #reading = new Map<string, Promise<void>>();
   /** Each job's latest write of job.json, which the next one waits for. */
   readonly #saving = new Map<string, Promise<void>>();
   readonly #loaded: Promise<void>;
@@ -327,8 +375,9 @@ export class Jobs {
         await this.#save(job);
       }
       if (job.render && !job.render.error) {
-        if (job.render.fresh)
-          job.versions = job.versions?.filter((v) => v.n !== job.render?.version);
+        const slot = slotOf(job, job.render.short);
+        if (job.render.fresh && slot)
+          slot.versions = slot.versions?.filter((v) => v.n !== job.render?.version);
         job.render.error = "The server stopped before this version finished rendering";
         await this.#save(job);
       }
@@ -434,6 +483,7 @@ export class Jobs {
         name: job.files.find((file) => file.use === "video")?.path ?? "",
         bytes: await diskUsage(this.#dir(job)),
         footage: existsSync(join(this.#dir(job), "footage")),
+        ...(job.settings.shorts ? { shorts: job.shorts?.length ?? 0 } : {}),
       })),
     );
   }
@@ -503,14 +553,20 @@ export class Jobs {
     job.status = "running";
     job.started = Date.now();
     const dir = this.#dir(job);
-    const { length, aspect, instructions } = job.settings;
+    const { length, aspect, instructions, shorts } = job.settings;
     const music = job.files.filter((file) => file.use === "music");
     let args: string[];
     try {
       args = await this.#editArgs(
         job,
-        { length, aspect, music, ...(instructions ? { instructions } : {}) },
-        VIDEO,
+        {
+          length,
+          aspect,
+          music,
+          ...(instructions ? { instructions } : {}),
+          ...(shorts ? { shorts } : {}),
+        },
+        shorts ? OUT : VIDEO,
       );
       await this.#save(job);
     } catch (error) {
@@ -541,10 +597,13 @@ export class Jobs {
   async #editArgs(job: Job, plan: EditPlan, output: string): Promise<string[]> {
     const { style, names, terms = [], musicLicense, visuals } = job.settings;
     const footage = (file: JobFile) => join("footage", file.path);
+    const cut = plan.footage ?? job.files.filter((file) => file.use === "video");
     const args = [
-      ...job.files.filter((file) => file.use !== "music").map(footage),
+      ...job.files.filter((file) => cut.includes(file) || file.use === "image").map(footage),
       "--length",
-      String(plan.length),
+      plan.shorts ? `${plan.shorts.min}-${plan.shorts.max}` : String(plan.length),
+      ...(plan.shorts ? ["--shorts", String(plan.shorts.count)] : []),
+      ...(plan.within ? ["--within", `${plan.within[0]}-${plan.within[1]}`] : []),
       "--aspect",
       plan.aspect,
       "--look",
@@ -620,11 +679,18 @@ export class Jobs {
       this.#downloads.delete(job.id);
     }
     if (line.stage === "done") {
+      const { outputs } = line;
       job.result = {
         message: line.message,
-        captions: line.outputs.captions !== undefined,
-        broll: line.outputs.broll !== undefined,
+        captions: "captions" in outputs && outputs.captions !== undefined,
+        broll: "broll" in outputs && outputs.broll !== undefined,
       };
+    } else if (line.stage === "short") {
+      // Read from shorts.json, which lists it by now; the run's end waits for it.
+      const read = (this.#reading.get(job.id) ?? Promise.resolve())
+        .then(() => this.#readShorts(job, line.claude))
+        .catch(() => {});
+      this.#reading.set(job.id, read);
     } else if (line.stage === "error") {
       job.error = line.message;
     } else {
@@ -640,10 +706,14 @@ export class Jobs {
         message: line.message,
         ...(line.file ? { file: line.file } : {}),
         ...(line.step ? { step: line.step } : {}),
+        ...(line.short ? { short: line.short } : {}),
       };
       let finish = this.#finishes.get(job.id);
       if (!finish) {
-        finish = new Finish(job.settings.length);
+        const { shorts } = job.settings;
+        finish = shorts
+          ? new Finish((shorts.min + shorts.max) / 2, shorts.count)
+          : new Finish(job.settings.length);
         this.#finishes.set(job.id, finish);
       }
       const estimate = finish.update(now, job.progress.fraction, stage, job.download !== undefined);
@@ -652,7 +722,24 @@ export class Jobs {
     this.#emit(job);
   }
 
+  /** Takes the shorts shorts.json lists into the job, the newest with what it cost. */
+  async #readShorts(job: Job, claude?: ClaudeCost): Promise<void> {
+    const listed = await loadJson(join(this.#dir(job), OUT, "shorts.json"), validateShorts);
+    const shorts = job.shorts ?? [];
+    for (const short of listed.shorts) {
+      if (shorts.some((each) => each.folder === short.folder)) continue;
+      const made: ShortEdit = { ...short, finished: Date.now(), ...(claude ? { claude } : {}) };
+      made.result = { message: "", captions: false };
+      await this.#settle(job, 1, made);
+      shorts.push(made);
+    }
+    job.shorts = shorts;
+    this.#emit(job);
+  }
+
   async #finish(job: Job, code: number | null, log: readonly string[]): Promise<void> {
+    await this.#reading.get(job.id);
+    this.#reading.delete(job.id);
     this.#runs.delete(job.id);
     this.#downloads.delete(job.id);
     this.#finishes.delete(job.id);
@@ -664,11 +751,13 @@ export class Jobs {
     const dir = this.#dir(job);
     if (job.status === "cancelled") {
       // Nothing of a cancelled edit is worth keeping.
+    } else if (code === 0 && job.result && job.settings.shorts && job.shorts?.length) {
+      job.status = "done";
     } else if (code === 0 && job.result && existsSync(join(dir, VIDEO))) {
       // The result is settled before the job reads as done, so the page never offers what is
       // not there.
       // Captions with no lines, when no speech is kept, are not worth a download.
-      await this.#settle(job, 1);
+      await this.#settle(job, 1, job);
       job.status = "done";
     } else {
       job.status = "error";
@@ -679,39 +768,51 @@ export class Jobs {
     this.#emit(job);
   }
 
-  /** What the page offers of version `n`, from its files: the captions, the B-roll credits and
-   * the music it plays. */
-  async #settle(job: Job, n: number): Promise<void> {
-    if (!job.result) return;
+  /** What the page offers of version `n` of `slot`, the edit or one of its shorts, from its
+   * files: the captions, the B-roll credits and the music it plays. */
+  async #settle(job: Job, n: number, slot: Slot): Promise<void> {
+    const { result } = slot;
+    if (!result) return;
     const dir = this.#dir(job);
-    const files = versionFiles(n);
+    const files = versionFiles(n, folderOf(slot));
     // Captions with no lines, when no speech is kept, are not worth a download.
     const captions = await stat(join(dir, files.captions)).catch(() => null);
-    job.result.captions = (captions?.size ?? 0) > 0;
-    job.result.broll = existsSync(join(dir, files.broll));
+    result.captions = (captions?.size ?? 0) > 0;
+    result.broll = existsSync(join(dir, files.broll));
     if (job.files.some((file) => file.use === "music")) {
       // Unknown, rather than none, when the project cannot be read.
       const played = await playedMusic(dir, files.project).catch(() => null);
-      if (played) job.result.music = played;
-      else delete job.result.music;
+      if (played) result.music = played;
+      else delete result.music;
     }
   }
 
-  /** The versions of a finished edit, oldest first. */
-  #versions(job: Job): Version[] {
-    job.versions ??= [
+  /** The versions of a finished edit or short, oldest first. */
+  #versions(job: Job, slot: Slot): Version[] {
+    slot.versions ??= [
       {
         n: 1,
-        created: job.finished ?? job.created,
+        created: ("folder" in slot ? slot.finished : job.finished) ?? job.created,
         summary: job.settings.instructions ? "The edit, with instructions" : "The edit",
         video: true,
       },
     ];
-    return job.versions;
+    return slot.versions;
   }
 
-  async #project(job: Job, n: number): Promise<{ project: Project; path: string; older: boolean }> {
-    const path = join(this.#dir(job), versionFiles(n).project);
+  /** The edit, or the short in `folder`; a short the job does not have is not found. */
+  #slot(job: Job, folder: string | undefined): Slot {
+    const slot = slotOf(job, folder);
+    if (!slot) throw new JobError((t) => t.server.noShort, 404);
+    return slot;
+  }
+
+  async #project(
+    job: Job,
+    n: number,
+    slot: Slot,
+  ): Promise<{ project: Project; path: string; older: boolean }> {
+    const path = join(this.#dir(job), versionFiles(n, folderOf(slot)).project);
     let older = false;
     const project = await loadJson(path, (value) => {
       const { cards, keywords } = upgradeProject(value).dropped;
@@ -722,13 +823,14 @@ export class Jobs {
   }
 
   /** A finished edit's version `n` (the one shown unless given), with what can change in it. */
-  async view(id: string, n?: number): Promise<EditView> {
+  async view(id: string, n?: number, short?: string): Promise<EditView> {
     const job = await this.#finished(id);
-    const version = n ?? job.current ?? 1;
-    if (!this.#versions(job).some((each) => each.n === version)) {
+    const slot = this.#slot(job, short);
+    const version = n ?? slot.current ?? 1;
+    if (!this.#versions(job, slot).some((each) => each.n === version)) {
       throw new JobError((t) => t.server.noVersion, 404);
     }
-    const { project, older } = await this.#project(job, version);
+    const { project, older } = await this.#project(job, version, slot);
     return {
       version,
       length: editLength(project),
@@ -760,9 +862,10 @@ export class Jobs {
 
   /** What `revision` would do to the version shown, without rendering it: where its cuts land
    * and the length it leaves. */
-  async preview(id: string, revision: Revision) {
+  async preview(id: string, revision: Revision, short?: string) {
     const job = await this.#finished(id);
-    const { project, path } = await this.#project(job, job.current ?? 1);
+    const slot = this.#slot(job, short);
+    const { project, path } = await this.#project(job, slot.current ?? 1, slot);
     try {
       const { length, removed, notes, outside } = revise(
         project,
@@ -782,25 +885,33 @@ export class Jobs {
     revision: Revision,
     summary: string,
     summaries?: Version["summaries"],
+    short?: string,
   ): Promise<Job> {
     const job = await this.#finished(id);
+    const slot = this.#slot(job, short);
     this.#refuseWhileRunning();
     this.#requireFootage(job);
-    const from = job.current ?? 1;
-    const versions = this.#versions(job);
+    const from = slot.current ?? 1;
+    const versions = this.#versions(job, slot);
     const n = Math.max(...versions.map((version) => version.n)) + 1;
     // Busy from here, before the next await, so a second Apply at the same moment is refused.
-    job.render = { version: n, fresh: true, fraction: 0, message: "Preparing the changes" };
+    job.render = {
+      version: n,
+      ...(short ? { short } : {}),
+      fresh: true,
+      fraction: 0,
+      message: "Preparing the changes",
+    };
     let revised: Project;
     try {
-      const { project, path } = await this.#project(job, from);
+      const { project, path } = await this.#project(job, from, slot);
       try {
         revised = revise(project, revision, await wordsFor(revision, project, path)).project;
       } catch (error) {
         throw new JobError((error as Error).message, 400);
       }
       // Beside the version it came from, so its relative paths still resolve.
-      const record = join(this.#dir(job), versionFiles(n).project);
+      const record = join(this.#dir(job), versionFiles(n, short).project);
       await writeFile(record, `${JSON.stringify(revised, null, 2)}\n`);
     } catch (error) {
       delete job.render;
@@ -816,15 +927,16 @@ export class Jobs {
       look: lookOf(revised),
       ...(revised.captions ? { captions: revised.captions.preset } : {}),
     });
-    this.#render(job, n, true);
+    this.#render(job, n, true, slot);
     return job;
   }
 
   /** Plans the edit again from the same footage, its analysis cached, as the next version: at
    * another length or aspect, with other music, or with what the user asks of it. The version
    * shown stays until the new one is done. */
-  async replan(id: string, choice: ReplanChoice): Promise<Job> {
+  async replan(id: string, choice: ReplanChoice, short?: string): Promise<Job> {
     const job = await this.#finished(id);
+    const slot = this.#slot(job, short);
     const keys = await this.#requireKeys(job.settings);
     this.#refuseWhileRunning();
     this.#requireFootage(job);
@@ -838,17 +950,23 @@ export class Jobs {
     if (choice.music !== "auto" && choice.music !== "none" && music.length === 0) {
       throw new JobError((t) => t.server.notOffered, 400);
     }
-    const versions = this.#versions(job);
+    const versions = this.#versions(job, slot);
     const n = Math.max(...versions.map((version) => version.n)) + 1;
-    const from = job.current ?? 1;
+    const from = slot.current ?? 1;
     // Busy from here, before the next await, so a second request at the same moment is refused.
-    job.render = { version: n, fresh: true, fraction: 0, message: "Planning again" };
-    const files = versionFiles(n);
+    job.render = {
+      version: n,
+      ...(short ? { short } : {}),
+      fresh: true,
+      fraction: 0,
+      message: "Planning again",
+    };
+    const files = versionFiles(n, short);
     let args: string[];
     let kept: { look: string; captions?: string };
     try {
       // The look and caption style the version shown has, which the panel may have changed.
-      const { project } = await this.#project(job, from);
+      const { project, path } = await this.#project(job, from, slot);
       kept = {
         look: lookOf(project),
         ...(project.captions ? { captions: project.captions.preset } : {}),
@@ -861,6 +979,7 @@ export class Jobs {
           music,
           ...(choice.instructions ? { instructions: choice.instructions } : {}),
           ...kept,
+          ...("folder" in slot ? await this.#stretch(job, slot, project, path) : {}),
         },
         files.video,
       );
@@ -903,27 +1022,51 @@ export class Jobs {
     await this.#save(job);
     this.#emit(job);
     void run.exited
-      .then(({ code }) => this.#rendered(job, n, code, log, failed))
-      .catch((error: Error) => this.#rendered(job, n, null, [...log, error.message], failed));
+      .then(({ code }) => this.#rendered(job, n, code, log, slot, failed))
+      .catch((error: Error) => this.#rendered(job, n, null, [...log, error.message], slot, failed));
     return job;
   }
 
+  /** What a re-plan of `short` cuts from: its file, and its stretch with REPLAN_MARGIN on each
+   * side, inside the file as its media index, which `project` names, measures it. */
+  async #stretch(
+    job: Job,
+    short: ShortEdit,
+    project: Project,
+    path: string,
+  ): Promise<Pick<EditPlan, "footage" | "within">> {
+    const file = job.files.find((each) => join("footage", each.path) === join(short.source));
+    if (!file) throw new JobError((t) => t.server.noShort, 404);
+    const played = project.sources.find(
+      (source) => resolve(dirname(path), source.path) === join(this.#dir(job), short.source),
+    );
+    const index = played?.index
+      ? await loadJson(resolve(dirname(path), played.index), (value) => value as MediaIndex)
+      : null;
+    const duration = index?.source.duration ?? short.end;
+    const start = Math.max(0, short.start - REPLAN_MARGIN);
+    const end = Math.min(duration, short.end + REPLAN_MARGIN);
+    const round = (seconds: number) => Math.round(seconds * 1000) / 1000;
+    return { footage: [file], within: [round(start), Math.floor(end * 1000) / 1000] };
+  }
+
   /** Shows version `n`, rendering it again from its record when its video was not kept. */
-  async show(id: string, n: number): Promise<Job> {
+  async show(id: string, n: number, short?: string): Promise<Job> {
     const job = await this.#finished(id);
-    const version = this.#versions(job).find((each) => each.n === n);
+    const slot = this.#slot(job, short);
+    const version = this.#versions(job, slot).find((each) => each.n === n);
     if (!version) throw new JobError((t) => t.server.noVersion, 404);
-    if (version.video && existsSync(join(this.#dir(job), versionFiles(n).video))) {
-      job.current = n;
-      await this.#settle(job, n);
-      await this.#keepVideos(job);
+    if (version.video && existsSync(join(this.#dir(job), versionFiles(n, short).video))) {
+      slot.current = n;
+      await this.#settle(job, n, slot);
+      await this.#keepVideos(job, slot);
       await this.#save(job);
       this.#emit(job);
       return job;
     }
     this.#refuseWhileRunning();
     this.#requireFootage(job);
-    this.#render(job, n, false);
+    this.#render(job, n, false, slot);
     return job;
   }
 
@@ -942,9 +1085,16 @@ export class Jobs {
 
   /** Renders version `n` from its record with \`pnpm render\`, in a process of its own as an
    * edit runs, and shows it once done. */
-  #render(job: Job, n: number, fresh: boolean): void {
-    const files = versionFiles(n);
-    job.render = { version: n, fresh, fraction: 0, message: "Starting the render" };
+  #render(job: Job, n: number, fresh: boolean, slot: Slot): void {
+    const short = folderOf(slot);
+    const files = versionFiles(n, short);
+    job.render = {
+      version: n,
+      ...(short ? { short } : {}),
+      fresh,
+      fraction: 0,
+      message: "Starting the render",
+    };
     const log: string[] = [];
     const run = runEdit({
       command: this.#renderCommand,
@@ -964,8 +1114,8 @@ export class Jobs {
     void this.#save(job);
     this.#emit(job);
     void run.exited
-      .then(({ code }) => this.#rendered(job, n, code, log))
-      .catch((error: Error) => this.#rendered(job, n, null, [...log, error.message]));
+      .then(({ code }) => this.#rendered(job, n, code, log, slot))
+      .catch((error: Error) => this.#rendered(job, n, null, [...log, error.message], slot));
   }
 
   async #rendered(
@@ -973,24 +1123,26 @@ export class Jobs {
     n: number,
     code: number | null,
     log: readonly string[],
+    slot: Slot,
     /** Why it failed, when the command said so on its own terms. */
     failed?: string,
   ) {
     this.#runs.delete(job.id);
     const stopped = this.#stopped.delete(job.id);
     const render = job.render;
-    const versions = this.#versions(job);
+    const versions = this.#versions(job, slot);
     const version = versions.find((each) => each.n === n);
     const dir = this.#dir(job);
+    const files = versionFiles(n, folderOf(slot));
     // The render reads as finished only once everything it changes is settled and saved, so
     // no one sees it done with the version it made not yet shown.
-    if (code === 0 && version && existsSync(join(dir, versionFiles(n).video))) {
-      const { project } = await this.#project(job, n);
+    if (code === 0 && version && existsSync(join(dir, files.video))) {
+      const { project } = await this.#project(job, n, slot);
       version.video = true;
       version.seconds = editLength(project) / TICKS_PER_SECOND;
-      job.current = n;
-      await this.#settle(job, n);
-      await this.#keepVideos(job);
+      slot.current = n;
+      await this.#settle(job, n, slot);
+      await this.#keepVideos(job, slot);
       const { render: _, ...done } = job;
       await this.#save(done);
       delete job.render;
@@ -1004,8 +1156,8 @@ export class Jobs {
             ? "The render was stopped"
             : `The render stopped unexpectedly${code === null ? "" : ` (exit code ${code})`}`;
       if (render.fresh) {
-        job.versions = versions.filter((each) => each.n !== n);
-        await rm(join(dir, versionFiles(n).project), { force: true });
+        slot.versions = versions.filter((each) => each.n !== n);
+        await rm(join(dir, files.project), { force: true });
       }
       await writeFile(join(dir, LOG), `${log.join("\n")}\n`);
       // What a plan cost before it failed, which its version, dropped, no longer shows.
@@ -1020,11 +1172,11 @@ export class Jobs {
     this.#emit(job);
   }
 
-  /** Deletes the videos of versions no longer kept; their records stay. */
-  async #keepVideos(job: Job): Promise<void> {
-    const versions = this.#versions(job);
-    for (const n of videosToPrune(versions, job.current ?? 1)) {
-      await rm(join(this.#dir(job), versionFiles(n).video), { force: true });
+  /** Deletes the videos of versions of `slot` no longer kept; their records stay. */
+  async #keepVideos(job: Job, slot: Slot): Promise<void> {
+    const versions = this.#versions(job, slot);
+    for (const n of videosToPrune(versions, slot.current ?? 1)) {
+      await rm(join(this.#dir(job), versionFiles(n, folderOf(slot)).video), { force: true });
       const version = versions.find((each) => each.n === n);
       if (version) version.video = false;
     }
@@ -1049,13 +1201,48 @@ export class Jobs {
     return job;
   }
 
-  /** The finished video, its captions as SubRip, or the credits of its B-roll; null until the
-   * edit is done. */
-  async output(id: string, kind: "video" | "captions" | "broll"): Promise<string | null> {
+  /** The finished video, its captions as SubRip, or the credits of its B-roll, of the edit or
+   * of the short in `short`; null until it is made. A short plays as soon as it is made, while
+   * the others are still being made. */
+  async output(
+    id: string,
+    kind: "video" | "captions" | "broll",
+    short?: string,
+  ): Promise<string | null> {
     const job = await this.get(id);
-    if (job.status !== "done") return null;
-    const path = join(this.#dir(job), versionFiles(job.current ?? 1)[kind]);
+    if (job.status !== "done" && !short) return null;
+    const slot = slotOf(job, short);
+    if (!slot) return null;
+    const path = join(this.#dir(job), versionFiles(slot.current ?? 1, short)[kind]);
     return existsSync(path) ? path : null;
+  }
+
+  /** What "Download all" puts in its zip: each short's video and captions, named by its place
+   * and title, and a text file of each one's title, description and hashtags. */
+  async shortsArchive(id: string): Promise<{ name: string; entries: ArchiveEntry[] }> {
+    const job = await this.#finished(id);
+    const shorts = job.shorts ?? [];
+    if (shorts.length === 0) throw new JobError((t) => t.server.noShort, 404);
+    const entries: ArchiveEntry[] = [];
+    const listing: string[] = [];
+    for (const short of shorts) {
+      const stem = `${short.folder}-${fileTitle(short.title)}`;
+      const files = versionFiles(short.current ?? 1, short.folder);
+      for (const [kind, extension] of [
+        ["video", "mp4"],
+        ["captions", "srt"],
+      ] as const) {
+        const path = join(this.#dir(job), files[kind]);
+        if (existsSync(path)) entries.push({ name: `${stem}.${extension}`, path });
+      }
+      listing.push(
+        [`${short.folder}. ${short.title}`, short.description, short.hashtags.join(" ")].join("\n"),
+      );
+    }
+    entries.push({ name: "shorts.txt", text: `${listing.join("\n\n")}\n` });
+    const { min, max } = job.settings.shorts ?? { min: 0, max: job.settings.length };
+    const name = `shorts-${min}-${max}s-${job.settings.aspect.replace(":", "x")}.zip`;
+    return { name, entries };
   }
 
   /** Calls `listener` with the job after every change; returns the call that stops it. */
@@ -1094,6 +1281,19 @@ export class Jobs {
     this.#saving.set(job.id, write);
     return write;
   }
+}
+
+/** The edit itself, or one of its shorts: what has versions, of which one is shown. */
+type Slot = Job | ShortEdit;
+
+/** A short's folder; undefined for the edit itself. */
+function folderOf(slot: Slot): string | undefined {
+  return "folder" in slot ? slot.folder : undefined;
+}
+
+/** The edit, or its short in `folder`; undefined for a short it does not have. */
+function slotOf(job: Job, folder: string | undefined): Slot | undefined {
+  return folder === undefined ? job : job.shorts?.find((short) => short.folder === folder);
 }
 
 /** The music files the project `file` in `dir` plays, in the order they first play, by their paths

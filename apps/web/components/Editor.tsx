@@ -1,6 +1,6 @@
 "use client";
 
-import { estimateCost } from "@video-editor/engine/estimate";
+import { estimateCost, estimateShortsCost } from "@video-editor/engine/estimate";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Picked } from "../lib/collect.ts";
@@ -13,6 +13,8 @@ import type { Service } from "../lib/key.ts";
 import type { Remembered } from "../lib/remembered.ts";
 import {
   DEFAULT_CAPTIONS,
+  DEFAULT_SHORT_RANGE,
+  DEFAULT_SHORTS,
   DEFAULT_STYLE,
   DEFAULT_VISUALS,
   formatBytes,
@@ -21,8 +23,10 @@ import {
   instructionsProblem,
   namesFrom,
   roleOf,
+  SHORT_RANGES,
 } from "../lib/settings.ts";
 import type { SetupState } from "../lib/setup.ts";
+import { jobApi, shortView } from "../lib/shorts.ts";
 import { dollarsOf, summaryRows } from "../lib/summary.ts";
 import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
@@ -35,6 +39,7 @@ import { ReEdit, Versions } from "./ReEdit.tsx";
 import { Player, ResultSummary, useVideoLength } from "./ResultView.tsx";
 import { DownloadView, RunView } from "./RunView.tsx";
 import { type Choices, chosenLength, type Machine, SettingsPanel } from "./SettingsPanel.tsx";
+import { ShortsDone, ShortsGrid, ShortText } from "./Shorts.tsx";
 
 /** What /api/key says: which keys the server has, never the keys. */
 type Keys = { set: boolean; openrouter: boolean; pexels: boolean; pixabay: boolean };
@@ -68,6 +73,9 @@ export function Editor() {
   const [items, setItems] = useState<Item[]>([]);
   const [skipped, setSkipped] = useState(0);
   const [choices, setChoices] = useState<Choices>({
+    make: "one",
+    range: SHORT_RANGES.indexOf(DEFAULT_SHORT_RANGE),
+    count: DEFAULT_SHORTS,
     preset: 60,
     custom: "",
     aspect: "9:16",
@@ -231,10 +239,15 @@ export function Editor() {
     () => items.reduce((sum, item) => sum + (item.use === "video" ? (item.duration ?? 0) : 0), 0),
     [items],
   );
-  const length = chosenLength(choices, t);
+  const range = SHORT_RANGES[choices.range] ?? DEFAULT_SHORT_RANGE;
+  const several = choices.make === "shorts";
+  // Several shorts are each within the range, the edit's length its longest.
+  const length = several ? { seconds: range[1] } : chosenLength(choices, t);
   const estimate =
     "seconds" in length && footageSeconds > 0
-      ? estimateCost(footageSeconds, length.seconds, choices.visuals)
+      ? several
+        ? estimateShortsCost(footageSeconds, choices.count, range, choices.visuals)
+        : estimateCost(footageSeconds, length.seconds, choices.visuals)
       : null;
   const blocked =
     setup?.state === "installing"
@@ -281,6 +294,7 @@ export function Editor() {
             captions: choices.captions,
             // Nothing asked, nothing sent: the request is the same as without the box.
             ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
+            ...(several ? { shorts: { count: choices.count, min: range[0], max: range[1] } } : {}),
           },
           files: used.map((item) => ({ path: item.path, size: item.file.size })),
         }),
@@ -351,6 +365,12 @@ export function Editor() {
 
   const job = phase.kind === "compose" ? null : phase.job;
   const status = phase.kind === "job" ? phase.job.status : null;
+  // The short opened from the grid, shown as an edit of its own.
+  const [opened, setOpened] = useState<string | null>(null);
+  const one = job && opened ? shortView(job, opened) : null;
+  useEffect(() => {
+    if (!job?.shorts?.some((short) => short.folder === opened)) setOpened(null);
+  }, [job, opened]);
 
   return (
     <div className={styles.shell}>
@@ -487,9 +507,11 @@ export function Editor() {
                   disabled={blocked !== null}
                   onClick={() => void start()}
                 >
-                  {"seconds" in length
-                    ? t.compose.make(formatLength(length.seconds, t))
-                    : t.compose.makeVideo}
+                  {several
+                    ? t.compose.makeShorts(choices.count)
+                    : "seconds" in length
+                      ? t.compose.make(formatLength(length.seconds, t))
+                      : t.compose.makeVideo}
                 </button>
                 {blocked ? (
                   <p className={styles.help}>{blocked}</p>
@@ -500,7 +522,7 @@ export function Editor() {
                 ) : (
                   estimate && (
                     <p className={styles.help}>
-                      {t.compose.estimate(
+                      {(several ? t.compose.estimateShorts : t.compose.estimate)(
                         formatDollars(estimate.low, t),
                         formatDollars(estimate.high, t),
                       )}
@@ -520,18 +542,41 @@ export function Editor() {
       ) : (
         <main className={styles.layout} data-status={status ?? undefined}>
           <div className={styles.main}>
-            {status === "done" && job ? (
+            {one ? (
+              <>
+                <Player job={one} video={video} />
+                <ReEdit job={one} onJob={update} video={video} />
+              </>
+            ) : status === "done" && job && !job.settings.shorts ? (
               <>
                 <Player job={job} video={video} />
                 <ReEdit job={job} onJob={update} video={video} />
               </>
             ) : (
-              job && <RunView job={job} />
+              job && (
+                <>
+                  {status !== "done" && <RunView job={job} />}
+                  {job.settings.shorts && (job.shorts?.length || status === "running") && (
+                    <ShortsGrid job={job} onOpen={setOpened} />
+                  )}
+                </>
+              )
             )}
           </div>
           <aside className={`${styles.card} ${styles.panel}`} aria-label={t.done.label}>
             {status === "running" && job && <Running job={job} onCancel={() => cancel(job)} />}
-            {status === "done" && job && (
+            {one && (
+              <Done
+                job={one}
+                onJob={update}
+                onNew={() => setPhase({ kind: "compose" })}
+                onBack={() => setOpened(null)}
+              />
+            )}
+            {status === "done" && job && !one && job.settings.shorts && (
+              <ShortsDone job={job} onNew={() => setPhase({ kind: "compose" })} />
+            )}
+            {status === "done" && job && !one && !job.settings.shorts && (
               <Done job={job} onJob={update} onNew={() => setPhase({ kind: "compose" })} />
             )}
             {(status === "error" || status === "cancelled") && job && (
@@ -584,41 +629,60 @@ function Running({ job, onCancel }: { job: Job; onCancel: () => void }) {
   );
 }
 
-function Done({ job, onJob, onNew }: { job: Job; onJob: (job: Job) => void; onNew: () => void }) {
+/** A finished edit, or one short of several with its title, description and hashtags and a way
+ * back to the others. */
+function Done({
+  job,
+  onJob,
+  onNew,
+  onBack,
+}: {
+  job: Job;
+  onJob: (job: Job) => void;
+  onNew: () => void;
+  onBack?: () => void;
+}) {
   const t = useT();
-  const base = `/api/jobs/${job.id}`;
   const seconds = useVideoLength(job);
+  const short = job.shorts?.find((each) => each.folder === job.short);
+  const download = { download: "" };
   return (
     <>
       <div className={styles.block}>
+        {onBack && (
+          <button type="button" className={styles.linkButton} onClick={onBack}>
+            ← {t.shorts.back}
+          </button>
+        )}
         <div>
-          <h2 className={styles.panelTitle}>{t.done.ready}</h2>
+          <h2 className={styles.panelTitle}>{short ? short.title : t.done.ready}</h2>
           <ResultSummary job={job} seconds={seconds} />
         </div>
         <div className={styles.downloads}>
-          <a className={styles.primary} href={`${base}/video?download`} download>
+          <a className={styles.primary} href={jobApi(job, "video", download)} download>
             <DownloadIcon width={18} height={18} />
             {t.done.download}
           </a>
           {job.result?.captions && (
-            <a className={styles.button} href={`${base}/captions?download`} download>
+            <a className={styles.button} href={jobApi(job, "captions", download)} download>
               <CaptionsIcon width={18} height={18} />
               {t.done.downloadCaptions}
             </a>
           )}
           {job.result?.broll && (
-            <a className={styles.button} href={`${base}/broll?download`} download>
+            <a className={styles.button} href={jobApi(job, "broll", download)} download>
               <DownloadIcon width={18} height={18} />
               {t.done.downloadCredits}
             </a>
           )}
         </div>
       </div>
+      {short && <ShortText short={short} />}
       <Versions job={job} onJob={onJob} />
       <Summary job={job} actual={seconds} />
       <div className={styles.block}>
-        <button type="button" className={styles.linkButton} onClick={onNew}>
-          {t.done.another}
+        <button type="button" className={styles.linkButton} onClick={onBack ?? onNew}>
+          {onBack ? t.shorts.back : t.done.another}
         </button>
       </div>
     </>

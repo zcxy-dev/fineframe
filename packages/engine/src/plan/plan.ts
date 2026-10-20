@@ -139,6 +139,15 @@ export interface PlanOptions {
   captions?: CaptionStyle;
   /** What the user asks of this edit, in their words, passed on in every planning request. */
   instructions?: string;
+  /** Plans only from this stretch of the one video given, in seconds: the lines said wholly
+   * inside it. */
+  within?: { start: number; end: number };
+  /** Plans a short edit of the strongest moments whatever the footage's length, as a short of
+   * `pnpm edit --shorts` is. */
+  short?: boolean;
+  /** What the edit is about, in a sentence or two, said to the planner: a short's title and
+   * description. */
+  about?: string;
   /** The model that plans, and judges the cut checks a review doubts: best unless given. */
   quality?: Quality;
   /** `rich` (the default) adds Claude's motion graphics and shows B-roll on the edit's points,
@@ -260,6 +269,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
   const progress = options.onProgress ?? (() => {});
   const out = resolve(options.out);
   const sources = await loadSources(options.inputs);
+  if (options.within) keepWithin(sources, options.within);
   let music = new Map<string, MusicSource>();
   try {
     if (options.music?.length) music = await loadMusic(options.music, new Set(sources.keys()));
@@ -297,7 +307,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
     )
     .join("\n\n");
 
-  const short = options.length < SHORT_SHARE * speech;
+  const short = options.short ?? options.length < SHORT_SHARE * speech;
   const names = (options.names ?? []).map((name) => name.trim()).filter(Boolean);
   const instructions = options.instructions?.trim() ?? "";
   const state: PlanState = {
@@ -352,6 +362,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
     chapters: state.extras.chapters,
     names,
     instructions,
+    ...(options.about ? { about: options.about } : {}),
   });
   progress(`Planning ${state.short ? "a short" : "a long"} edit with ${state.planModel}`);
   await decide(state, request);
@@ -628,10 +639,30 @@ function shorterAsk(seconds: number): string {
     : `Add footage with more speech: an edit is at least ${shortest} s`;
 }
 
-/** Every word of every source, in file order, as clips at the longest breath. */
-function placeAll(sources: ReadonlyMap<string, PlanSource>, frame: number): PlacedClip[] {
-  const all = [...sources.values()].map((s) => ({ source: s.id, words: s.words.map((_, i) => i) }));
+/** Every word of every line, in file order, as clips at the longest breath. */
+export function placeAll(sources: ReadonlyMap<string, PlanSource>, frame: number): PlacedClip[] {
+  const all = [...sources.values()].map((s) => ({
+    source: s.id,
+    words: s.lines.flatMap((line) =>
+      Array.from({ length: line.last - line.first + 1 }, (_, i) => line.first + i),
+    ),
+  }));
   return placeClips(all, sources, frame, BREATH_RANGE[1]);
+}
+
+/** Leaves each video only the lines said wholly inside `within`, in seconds. */
+function keepWithin(
+  sources: ReadonlyMap<string, PlanSource>,
+  within: { start: number; end: number },
+): void {
+  for (const source of sources.values()) {
+    if (!source.index) continue;
+    source.lines = source.lines.filter(
+      (line) =>
+        (source.words[line.first] as Word).start >= within.start &&
+        (source.words[line.last] as Word).end <= within.end,
+    );
+  }
 }
 
 function stretchesOf(state: PlanState, kept: number[][][], spans: readonly Span[]): Stretch[] {
@@ -1167,7 +1198,7 @@ function dropped(state: PlanState, assembly: Assembly, used: ReadonlySet<string>
  * index given alone), and gives each source an id: its file name, or its folder's name when file
  * names repeat, as corpus clips are all called source.mp4. A name with nothing an id allows, such
  * as 訪談, becomes file-1, file-2…, by order. */
-async function loadSources(inputs: readonly PlanInput[]): Promise<Map<string, PlanSource>> {
+export async function loadSources(inputs: readonly PlanInput[]): Promise<Map<string, PlanSource>> {
   const files: { indexPath: string | null; source?: string }[] = [];
   for (const input of inputs) {
     if (typeof input !== "string") {

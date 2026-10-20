@@ -1,4 +1,4 @@
-import { checkOrigin, errorResponse } from "../../../../../../lib/http.ts";
+import { checkOrigin, errorResponse, shortParam } from "../../../../../../lib/http.ts";
 import { jobs } from "../../../../../../lib/jobs.ts";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +8,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
   try {
     checkOrigin(request);
     const { id, n } = await ctx.params;
-    return Response.json(await jobs().show(id, Number(n)));
+    return Response.json(await jobs().show(id, Number(n), shortParam(request)));
   } catch (error) {
     return errorResponse(error, request);
   }

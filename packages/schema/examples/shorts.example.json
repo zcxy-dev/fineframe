@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "asked": 3,
+  "range": [30, 60],
+  "shorts": [
+    {
+      "folder": "01",
+      "title": "Why the editor never cuts inside a word",
+      "description": "Code places every cut in a pause, so no word is ever clipped.",
+      "hashtags": ["#videoediting", "#automation", "#creators"],
+      "source": "footage/talk.mp4",
+      "start": 412.6,
+      "end": 489.3,
+      "length": 45,
+      "seconds": 44.7
+    },
+    {
+      "folder": "02",
+      "title": "One file in, five shorts out",
+      "description": "Each short comes from one stretch of the talk, with its fillers and pauses cut.",
+      "hashtags": ["#shorts", "#workflow", "#editing", "#ai"],
+      "source": "footage/talk.mp4",
+      "start": 95.2,
+      "end": 171.8,
+      "length": 52,
+      "seconds": 52.4
+    }
+  ]
+}

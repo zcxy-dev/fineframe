@@ -5,7 +5,7 @@ import {
   DEFAULT_CAPTIONS,
   isCaptionStyle,
 } from "@video-editor/engine/captions";
-import { LENGTH_RANGE, parseLength } from "@video-editor/engine/length";
+import { LENGTH_RANGE, parseLength, SHORTS_COUNT, SHORTS_RANGE } from "@video-editor/engine/length";
 import { type LookId, lookIds } from "@video-editor/engine/looks";
 import { kindOf } from "@video-editor/engine/media";
 import { en, type Messages } from "./i18n/en.ts";
@@ -18,6 +18,18 @@ export type Aspect = (typeof ASPECTS)[number];
 
 /** Seconds: a short, two social lengths, and two longer edits. Any other length is typed. */
 export const LENGTH_PRESETS = [15, 30, 60, 180, 600] as const;
+
+/** The ranges a short's length can lie in, in seconds, and the one chosen unless another is. */
+export const SHORT_RANGES = [
+  [15, 30],
+  [30, 60],
+  [60, 90],
+  [90, 180],
+] as const;
+export const DEFAULT_SHORT_RANGE = SHORT_RANGES[1];
+/** How many shorts a run makes unless another number is chosen. */
+export const DEFAULT_SHORTS = 5;
+export { SHORTS_COUNT };
 
 /** Names and terms are each a hint for the speech model; a few hundred is far more than it
  * reads. */
@@ -77,6 +89,9 @@ export interface Settings {
   captions?: CaptionStyle;
   /** What the user asks of the edit, in their words, trimmed; absent when they ask nothing. */
   instructions?: string;
+  /** Several shorts instead of one video: how many, and the range each one's length lies in, in
+   * seconds; `length` is then the range's longest. */
+  shorts?: { count: number; min: number; max: number };
 }
 
 /** A file as the page offers it: its path inside what was dropped, and its size in bytes. */
@@ -123,11 +138,13 @@ export function checkSettings(
     string,
     unknown
   >;
-  const { quality, correct, captions, instructions } = input as Record<string, unknown>;
+  const { quality, correct, captions, instructions, shorts } = input as Record<string, unknown>;
   const heard = (input as Record<string, unknown>).asr ?? asr;
   if (!ASRS.includes(heard as Asr)) return `Speech is heard ${ASRS.join(" or ")}`;
-  if (typeof length !== "number") return "No length";
-  const problem = lengthProblem(length, t);
+  const several = shorts === undefined ? null : shortsProblem(shorts);
+  if (typeof several === "string") return several;
+  if (!several && typeof length !== "number") return "No length";
+  const problem = several ? null : lengthProblem(length as number, t);
   if (problem) return problem;
   if (!ASPECTS.includes(aspect as Aspect)) return `The aspect is ${ASPECTS.join(", ")}`;
   const chosen = style ?? DEFAULT_STYLE;
@@ -166,7 +183,7 @@ export function checkSettings(
   const tooLong = instructionsProblem(asked, t);
   if (tooLong) return tooLong;
   return {
-    length,
+    length: several ? several.max : (length as number),
     aspect: aspect as Aspect,
     style: chosen as Style,
     names: lists.names,
@@ -178,7 +195,27 @@ export function checkSettings(
     correct: (correct ?? false) as boolean,
     captions: chosenCaptions,
     ...(asked.trim() ? { instructions: asked.trim() } : {}),
+    ...(several ? { shorts: several } : {}),
   };
+}
+
+/** Shorts as a program asks for them, or why they cannot be made; the page offers only what
+ * can. */
+function shortsProblem(value: unknown): NonNullable<Settings["shorts"]> | string {
+  const { count, min, max } = (value ?? {}) as Record<string, unknown>;
+  const [fewest, most] = SHORTS_COUNT;
+  if (!Number.isInteger(count) || (count as number) < fewest || (count as number) > most) {
+    return `Make ${fewest} to ${most} shorts`;
+  }
+  const [shortest, longest] = SHORTS_RANGE;
+  if (
+    typeof min !== "number" ||
+    typeof max !== "number" ||
+    !(min >= shortest && max <= longest && min < max)
+  ) {
+    return `A short lasts ${shortest} s to ${longest / 60} min`;
+  }
+  return { count: count as number, min, max };
 }
 
 /** How the page reads a length: 15 s, 1 min, 1 min 30 s, 1 h, in `t`'s units. */

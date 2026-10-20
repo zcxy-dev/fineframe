@@ -4,10 +4,12 @@ import mediaIndexSchema from "../media-index.schema.json" with { type: "json" };
 import musicIndexSchema from "../music-index.schema.json" with { type: "json" };
 import progressSchema from "../progress.schema.json" with { type: "json" };
 import projectSchema from "../project.schema.json" with { type: "json" };
+import shortsSchema from "../shorts.schema.json" with { type: "json" };
 import type { MediaIndex } from "./generated/media-index.ts";
 import type { MusicIndex } from "./generated/music-index.ts";
 import type { Progress } from "./generated/progress.ts";
 import type { Clip, CropKeyframe, CropRect, Project, Rect, Source } from "./generated/project.ts";
+import type { Shorts } from "./generated/shorts.ts";
 import { ticksPerFrame } from "./time.ts";
 import { upgradeProject } from "./upgrade.ts";
 
@@ -41,6 +43,19 @@ export function describeErrors(errors: ErrorObject[], at = ""): string {
 export const validateMediaIndex = validator<MediaIndex>(mediaIndexSchema);
 export const validateMusicIndex = validator<MusicIndex>(musicIndexSchema);
 export const validateProgress = validator<Progress>(progressSchema);
+/** Also checks that the range and each stretch run forward and that folders are not shared. */
+export const validateShorts = validator<Shorts>(shortsSchema, (shorts) => {
+  const problems: string[] = [];
+  const [shortest, longest] = shorts.range;
+  if (shortest >= longest) problems.push("/range: the shortest is under the longest");
+  const folders = new Set<string>();
+  for (const [i, short] of shorts.shorts.entries()) {
+    if (short.start >= short.end) problems.push(`/shorts/${i}: its stretch runs forward`);
+    if (folders.has(short.folder)) problems.push(`/shorts/${i}/folder: ${short.folder} twice`);
+    folders.add(short.folder);
+  }
+  return problems;
+});
 const validateCurrent = validator<Project>(projectSchema, projectProblems);
 /** Also runs the checks a schema cannot express, which packages/schema/README.md lists. A project
  * an earlier version wrote is read as this version would have written it (`upgradeProject`). */

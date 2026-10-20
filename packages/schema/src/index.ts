@@ -4,6 +4,7 @@ export type * from "./generated/media-index.ts";
 export type { MusicIndex, Section as MusicSection } from "./generated/music-index.ts";
 export type * from "./generated/progress.ts";
 export type * from "./generated/project.ts";
+export type { Short, Shorts } from "./generated/shorts.ts";
 export * from "./time.ts";
 export * from "./upgrade.ts";
 export * from "./validate.ts";

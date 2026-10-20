@@ -51,14 +51,29 @@ export function RunView({ job }: { job: Job }) {
   const percent = Math.floor(fraction * 100);
   const videos = job.files.filter((file) => file.use === "video").length;
   const photos = job.files.filter((file) => file.use === "image").length;
+  const { shorts } = job.settings;
+  const short = job.progress?.short;
 
   return (
     <section className={`${styles.card} ${styles.run}`} aria-label={words.progress}>
       <div className={styles.runHead}>
         <div>
-          <h2 className={styles.runTitle}>{running ? words.running : words.stopped}</h2>
+          <h2 className={styles.runTitle}>
+            {running ? (shorts ? words.runningShorts : words.running) : words.stopped}
+          </h2>
           <p className={styles.runMeta}>
-            {words.from(formatLength(job.settings.length, t), job.settings.aspect, videos, photos)}
+            {shorts
+              ? words.shortsFrom(
+                  shorts.count,
+                  t.settings.range(formatLength(shorts.min, t), formatLength(shorts.max, t)),
+                  job.settings.aspect,
+                )
+              : words.from(
+                  formatLength(job.settings.length, t),
+                  job.settings.aspect,
+                  videos,
+                  photos,
+                )}
           </p>
         </div>
         <div className={styles.runClock}>
@@ -85,6 +100,7 @@ export function RunView({ job }: { job: Job }) {
       <p className={styles.message} aria-live="polite">
         {current ? words.doing(words.stages[current].doing) : words.starting}
         <span className={styles.messageText}>
+          {short && `${words.short(short.n, short.of)} — `}
           {job.progress?.file && `${job.progress.file} — `}
           {job.progress?.message ? progressText(job.progress.message, t) : words.gettingReady}
         </span>

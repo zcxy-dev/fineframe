@@ -12,15 +12,16 @@ import { isLookId, type LookId, lookIds } from "../looks.ts";
 import { ClaudeError, QUALITIES, type Quality } from "../plan/claude.ts";
 import { type Aspect, dollars, LENGTH_RANGE, PlanError } from "../plan/plan.ts";
 import { VISUALS, type Visuals } from "../plan/visuals.ts";
-import { edit } from "./edit.ts";
+import { edit, editShorts } from "./edit.ts";
 import { EditError } from "./error.ts";
-import { parseLength } from "./length.ts";
+import { parseLength, parseSpan, SHORTS_COUNT, SHORTS_RANGE } from "./length.ts";
 
 const [shortest, longest] = LENGTH_RANGE;
 /** The longest --instructions: a few sentences, not a script. */
 const INSTRUCTIONS_MAX = 2000;
 const usage = `Usage: pnpm edit <footage folder or file>... --length <length> \\
-    --aspect <9:16 | 1:1 | 16:9> -o <out.mp4> [--names <names.txt>] [--terms <terms.txt>] \\
+    --aspect <9:16 | 1:1 | 16:9> -o <out.mp4> [--within <start>-<end>] \\
+    [--shorts <count>] [--names <names.txt>] [--terms <terms.txt>] \\
     [--correct] [--instructions <text>] [--asr <local | cloud>] \\
     [--look <${[...lookIds, "none"].join(" | ")}>] \\
     [--captions <${CAPTION_STYLES.join(" | ")}>] \\
@@ -30,9 +31,21 @@ const usage = `Usage: pnpm edit <footage folder or file>... --length <length> \\
 Edits footage into a finished video within 5 % of the length asked. A folder stands for the
 files directly in it: videos to cut, and still images to show as B-roll.
 
-  -l, --length   ${shortest} s to ${longest / 3600} h: 60s, 90, 3m, 1m30s, 1:30, 1h
+  -l, --length   ${shortest} s to ${longest / 3600} h: 60s, 90, 3m, 1m30s, 1:30, 1h. With --shorts, the range
+                 each short's length lies in, within ${SHORTS_RANGE[0]} s to ${SHORTS_RANGE[1] / 60} min, two lengths joined by a
+                 dash: 15-30s, 30-60s, 60-90s or 90s-3m
   -a, --aspect   9:16, 1:1 or 16:9
-  -o, --output   the video; <name>.project.json, <name>.srt and edit_cuts.json go beside it
+  -o, --output   the video; <name>.project.json, <name>.srt and edit_cuts.json go beside it. With
+                 --shorts, a new folder: shorts.json and each short's folder go in it
+      --within   cut only from this stretch of the one video given, such as 612-671 or
+                 10:12-11:11, in seconds into it
+      --shorts   make this many shorts, ${SHORTS_COUNT[0]} to ${SHORTS_COUNT[1]}, from one long video instead of one edit:
+                 Claude finds the moments that stand alone, at most about one for each 2 min
+                 of footage, and the best are made, fewer when the footage holds fewer. Each is
+                 cut from one stretch of one file, at the length Claude picks within --length,
+                 into 01/edit.mp4, 02/edit.mp4, … with their projects and captions beside them;
+                 shorts.json lists each as it is done, with the title, description and
+                 hashtags Claude wrote for it in the footage's language
       --names    a text file of people's names said in the footage, one per line, given to
                  the speech model and to --correct; a name there can show in a lower third
       --terms    a text file of other words said in the footage, such as brands and jargon,
@@ -85,6 +98,8 @@ const parsed = (() => {
       allowPositionals: true,
       options: {
         length: { type: "string", short: "l" },
+        within: { type: "string" },
+        shorts: { type: "string" },
         aspect: { type: "string", short: "a" },
         output: { type: "string", short: "o" },
         names: { type: "string" },
@@ -113,8 +128,21 @@ if (values.help) {
 if (positionals.length === 0 || !values.length || !values.aspect || !values.output) {
   fail("footage, --length, --aspect and -o are required");
 }
-const length = parseLength(values.length as string);
-if (length === null) fail(`${values.length} is not a length`);
+const count = values.shorts === undefined ? null : Number(values.shorts);
+if (count !== null && !Number.isInteger(count))
+  fail(`--shorts takes a number, not ${values.shorts}`);
+const range = count === null ? null : parseSpan(values.length as string);
+if (count !== null && range === null) {
+  fail(`with --shorts, --length is a range such as 30-60s, not ${values.length}`);
+}
+const length = count === null ? parseLength(values.length as string) : null;
+if (count === null && length === null) fail(`${values.length} is not a length`);
+const within = values.within === undefined ? null : parseSpan(values.within);
+if (values.within !== undefined && within === null) {
+  fail(`--within is a stretch such as 612-671 or 10:12-11:11, not ${values.within}`);
+}
+if (within && count !== null)
+  fail("--within and --shorts go apart: each short has its own stretch");
 const aspect = values.aspect as Aspect;
 if (!["9:16", "1:1", "16:9"].includes(aspect))
   fail(`the aspect is 9:16, 1:1 or 16:9, not ${aspect}`);
@@ -154,37 +182,46 @@ if (process.env.npm_lifecycle_event === "edit" && process.env.INIT_CWD) {
 
 const say = (line: string) => process.stderr.write(`${line}\n`);
 let cost: ClaudeCost | undefined;
+const options = {
+  inputs: positionals,
+  aspect,
+  out: values.output as string,
+  ...(values.names ? { names: values.names } : {}),
+  ...(values.terms ? { terms: values.terms } : {}),
+  captions: captions as CaptionStyle,
+  ...(instructions ? { instructions } : {}),
+  correct: values.correct ?? false,
+  asr: asr as "local" | "cloud",
+  look: look as LookId | "none",
+  quality: quality as Quality,
+  visuals: visuals as Visuals,
+  music: values.music ?? [],
+  ...(values["music-license"] ? { musicLicense: values["music-license"] } : {}),
+  onProgress: (line: Progress) => {
+    process.stdout.write(`${JSON.stringify(line)}\n`);
+    const file = "file" in line && line.file ? `${line.file}: ` : "";
+    const short = "short" in line && line.short ? `short ${line.short.n}/${line.short.of} ` : "";
+    say(`edit: ${line.stage} ${Math.round(line.fraction * 100)}% ${short}${file}${line.message}`);
+    if (line.stage === "done") cost = line.claude;
+  },
+  onLog: say,
+};
 try {
-  const result = await edit({
-    inputs: positionals,
-    length: length as number,
-    aspect,
-    out: values.output as string,
-    ...(values.names ? { names: values.names } : {}),
-    ...(values.terms ? { terms: values.terms } : {}),
-    captions: captions as CaptionStyle,
-    ...(instructions ? { instructions } : {}),
-    correct: values.correct ?? false,
-    asr: asr as "local" | "cloud",
-    look: look as LookId | "none",
-    quality: quality as Quality,
-    visuals: visuals as Visuals,
-    music: values.music ?? [],
-    ...(values["music-license"] ? { musicLicense: values["music-license"] } : {}),
-    onProgress: (line) => {
-      process.stdout.write(`${JSON.stringify(line)}\n`);
-      const file = "file" in line && line.file ? `${line.file}: ` : "";
-      say(`edit: ${line.stage} ${Math.round(line.fraction * 100)}% ${file}${line.message}`);
-      if (line.stage === "done") cost = line.claude;
-    },
-    onLog: say,
-  });
+  const result =
+    count !== null && range
+      ? await editShorts({ ...options, count, range })
+      : await edit({
+          ...options,
+          length: length as number,
+          ...(within ? { within: { start: within[0], end: within[1] } } : {}),
+        });
   const { timings: t, usage: u } = result;
   const seconds = (value: number) => `${value.toFixed(1)} s`;
   say(
     `edit: analyze ${seconds(t.analyze)} (analysed ${result.analyzed}, from the cache ` +
       `${result.cached}), plan ${seconds(t.plan)}, render ${seconds(t.render)}, check ` +
-      `${seconds(t.check)} (reviews: ${result.reviews}); Claude ${dollars(u.dollars)}: plan ` +
+      `${seconds(t.check)} (reviews: ${result.reviews}); Claude ${dollars(u.dollars)}: ` +
+      `${cost?.find ? `find ${dollars(cost.find.dollars)}, ` : ""}plan ` +
       `${dollars(cost?.plan.dollars ?? null)}, graphics ${dollars(cost?.graphics?.dollars ?? 0)}, ` +
       `check ${dollars(cost?.check.dollars ?? null)} ` +
       `(requests: ${u.calls})`,

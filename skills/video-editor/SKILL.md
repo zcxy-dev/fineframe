@@ -1,6 +1,6 @@
 ---
 name: video-editor
-description: Edits footage into a finished, captioned video with Fineframe (zcxy-dev/fineframe), then changes the finished edit by conversation. Use when asked to edit, cut down or caption footage with it, or to change one of its edits (an edit.project.json): drop or trim a part, fix a caption, change the title, a lower third, a chapter, a motion graphic or B-roll, the music or the look.
+description: Edits footage into a finished, captioned video with Fineframe (zcxy-dev/fineframe), or into several shorts, then changes the finished edit by conversation. Use when asked to edit, cut down or caption footage with it, to make shorts from a long video, or to change one of its edits (an edit.project.json): drop or trim a part, fix a caption, change the title, a lower third, a chapter, a motion graphic or B-roll, the music or the look.
 ---
 
 # video-editor
@@ -28,6 +28,16 @@ mkdir -p out && pnpm -s edit footage/ --length 60s --aspect 9:16 -o out/edit.mp4
 - The first edit of new footage analyses it, about twice the footage's length on a CPU: run it in the background and follow its stderr. Later edits of the same footage start at the plan and take a minute or two. Claude's cost per edit is in the README's [Install](../../README.md#install) section.
 - Done when the last line of `out/progress.jsonl` has `"stage": "done"`. An `"error"` line carries the reason; the stderr says what to change.
 
+**Several shorts** from one long video, when the user asks for shorts or clips to post:
+
+```bash
+pnpm -s edit footage/ --shorts 5 --length 30-60s --aspect 9:16 -o out/shorts > out/progress.jsonl
+```
+
+- `--shorts` is how many, 1 to 10; `--length` is the range each one's length lies in (`15-30s`, `30-60s`, `60-90s`, `90s-3m`). Claude finds the moments, each one continuous stretch of one file, and the best are made. `-o` is a new folder.
+- Each short is an edit of its own in `out/shorts/01/`, `02/`, … with the files below; `out/shorts/shorts.json` lists them best first, each with its title, description, hashtags, file and stretch (`start`, `end` in seconds), and grows as each one is done. The done line's message says when fewer were made than asked, and why. Report every short's title, description, hashtags and length.
+- Changing a short is step 3 inside its folder.
+
 Beside the video: `edit.project.json` (the whole edit), `edit.srt` (the captions), `edit_cuts.json` (where each cut of the newest render in the folder falls, in seconds); with music, `edit.music.txt` (the licences to credit) and, with B-roll or sound effects, `edit.broll.txt` (where each came from, to credit). Tell the user what was made: its length, and what the captions and overlays say.
 
 ## 3. Change the edit
@@ -48,3 +58,5 @@ These change what the planner chose, so say so to the user and run `pnpm edit` a
 - A different length beyond ±5 % of the planned one, or a different aspect.
 - Putting back something the plan left out, reordering the story, or other footage.
 - A different music track than the one chosen (its level and removal are recipes).
+
+A short is planned again from its own file and stretch, with up to 30 s on each side inside the file, into its folder: `pnpm -s edit <its file> --within <start − 30>-<end + 30> --length 45s --aspect 9:16 -o out/shorts/01/edit-45s.mp4`, the stretch from `shorts.json`.

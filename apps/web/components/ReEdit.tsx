@@ -17,6 +17,7 @@ import { en, MESSAGES, type Messages } from "../lib/i18n/messages.ts";
 import { overlayLabel, progressText } from "../lib/i18n/program.ts";
 import type { EditView, Job } from "../lib/jobs.ts";
 import { formatClock, formatDollars } from "../lib/settings.ts";
+import { jobApi } from "../lib/shorts.ts";
 import { dollarsOf } from "../lib/summary.ts";
 import { spacedWords } from "../lib/transcript.ts";
 import { CaptionPreview } from "./CaptionPreview.tsx";
@@ -82,6 +83,7 @@ export function ReEdit({
   const rendering = job.render && !job.render.error ? job.render : null;
 
   // The version shown, again whenever another is shown; changes were to the one before.
+  const shownUrl = jobApi(job, "edit", { v: current });
   useEffect(() => {
     let live = true;
     setDraft(EMPTY);
@@ -89,7 +91,7 @@ export function ReEdit({
     setCursor(0);
     setSelection(null);
     setLanded(null);
-    void fetch(`/api/jobs/${job.id}/edit?v=${current}`)
+    void fetch(shownUrl)
       .then((response) => response.json() as Promise<EditView & { error?: string }>)
       .then((found) => {
         if (!live) return;
@@ -100,7 +102,7 @@ export function ReEdit({
     return () => {
       live = false;
     };
-  }, [job.id, current]);
+  }, [shownUrl]);
 
   // The shortcuts, on the whole page while the re-edit shows; the handler is this render's. They
   // are heard before the player's own controls, which would seek or play as well.
@@ -131,6 +133,7 @@ export function ReEdit({
 
   // Where the cuts land once moved into the pauses, asked again as they change.
   const cuts = JSON.stringify(revision.cuts ?? []);
+  const previewUrl = jobApi(job, "preview");
   useEffect(() => {
     const ranges = JSON.parse(cuts) as [number, number][];
     if (ranges.length === 0) {
@@ -139,7 +142,7 @@ export function ReEdit({
     }
     let live = true;
     const timer = setTimeout(() => {
-      void fetch(`/api/jobs/${job.id}/preview`, {
+      void fetch(previewUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cuts: ranges }),
@@ -159,7 +162,7 @@ export function ReEdit({
       live = false;
       clearTimeout(timer);
     };
-  }, [cuts, job.id]);
+  }, [cuts, previewUrl]);
 
   if (!view) {
     keys.current = () => {};
@@ -206,7 +209,7 @@ export function ReEdit({
 
   const apply = async () => {
     setError(null);
-    const response = await fetch(`/api/jobs/${job.id}/versions`, {
+    const response = await fetch(jobApi(job, "versions"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -765,7 +768,7 @@ export function Versions({ job, onJob }: { job: Job; onJob: (job: Job) => void }
   const current = job.current ?? 1;
   const busy = job.render !== undefined && !job.render.error;
   const show = async (n: number) => {
-    const response = await fetch(`/api/jobs/${job.id}/versions/${n}`, { method: "POST" });
+    const response = await fetch(jobApi(job, `versions/${n}`), { method: "POST" });
     const body = (await response.json().catch(() => ({}))) as Job & { error?: string };
     if (!response.ok) setError(body.error ?? words.notShown);
     else {

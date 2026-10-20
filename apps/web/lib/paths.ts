@@ -31,8 +31,25 @@ export function shownPlan(job: Job): { length: number; aspect: Job["settings"]["
 }
 
 /** A name for a download: the length and aspect of the version shown, which tell two edits
- * apart. */
+ * apart; a short's place and title. */
 export function downloadName(job: Job, extension: string): string {
+  const short = job.shorts?.find((each) => each.folder === job.short);
+  if (short) return `${short.folder}-${fileTitle(short.title)}.${extension}`;
   const { length, aspect } = shownPlan(job);
   return `edit-${Math.round(length)}s-${aspect.replace(":", "x")}.${extension}`;
+}
+
+/** Characters no file name may hold on Windows, macOS or Linux, and control characters. */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what it removes.
+const UNSAFE = /[\\/:*?"<>|\u0000-\u001f\u007f]/g;
+const TITLE_MAX = 60;
+
+/** `title` as part of a file name on any system: without the characters one refuses, without a
+ * trailing dot or space, at most TITLE_MAX characters; "short" when nothing is left. */
+export function fileTitle(title: string): string {
+  const safe = [...title.replace(UNSAFE, " ").replace(/\s+/g, " ").trim()]
+    .slice(0, TITLE_MAX)
+    .join("")
+    .replace(/[. ]+$/, "");
+  return safe || "short";
 }

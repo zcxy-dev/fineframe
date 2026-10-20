@@ -8,6 +8,7 @@ The files passed between the parts of the editor, defined as JSON Schemas (draft
 | Music index: a track's beats, sections, loudness and licence | `vework analyze-music` (Python) | the planner | [music-index.schema.json](music-index.schema.json) | [music-index.example.json](examples/music-index.example.json) |
 | `project.json`: the whole edit | the planner | the renderer; kept next to each output | [project.schema.json](project.schema.json) | [project.example.json](examples/project.example.json) |
 | Progress lines | `pnpm edit` | the web page | [progress.schema.json](progress.schema.json) | [below](#progress-lines) |
+| `shorts.json`: the shorts of `pnpm edit --shorts`, each one's stretch, title, description and hashtags | `pnpm edit --shorts` | the web page | [shorts.schema.json](shorts.schema.json) | [shorts.example.json](examples/shorts.example.json) |
 
 The `description` in each schema explains its fields. This page covers what spans fields.
 
@@ -19,7 +20,7 @@ import { loadJson, validateProject, type Project } from "@video-editor/schema";
 const project: Project = await loadJson("edit/project.json", validateProject);
 ```
 
-`validateMediaIndex`, `validateMusicIndex`, `validateProject` and `validateProgress` return the value typed, or throw a `SchemaError` that lists every problem with its JSON Pointer. `validateProject` also checks what a schema cannot express:
+`validateMediaIndex`, `validateMusicIndex`, `validateProject`, `validateProgress` and `validateShorts` return the value typed, or throw a `SchemaError` that lists every problem with its JSON Pointer. `validateProject` also checks what a schema cannot express:
 
 - Source ids are unique, and every source a project names exists and has a kind that fits: video or image for clips and colour references, video or audio for voice decisions, audio for music.
 - Ranges run forward, crop and scale keyframes move forward in time, and caption words lie within their line.
@@ -75,6 +76,14 @@ A project renders the same video every time from the file and the sources it nam
 {"stage": "analyze", "file": "footage/take-2.mp4", "fraction": 0.18, "message": "Transcribing 3/9"}
 {"stage": "render", "fraction": 0.72, "message": "Rendering"}
 {"stage": "done", "fraction": 1, "message": "Finished", "claude": {"plan": {"dollars": 0.07, "requests": 1}, "check": {"dollars": 0.012, "requests": 9}}, "outputs": {"video": "/work/out/edit.mp4", "project": "/work/out/edit.project.json", "captions": "/work/out/edit.srt"}}
+```
+
+With `--shorts`, the lines while a short is made name it, a `short` line says each one is done once `shorts.json` lists it, with what it cost, and the `done` line names `shorts.json` and adds what finding the moments cost as `claude.find`:
+
+```json
+{"stage": "render", "fraction": 0.41, "message": "Rendering 3/7", "short": {"n": 2, "of": 5}}
+{"stage": "short", "fraction": 0.52, "message": "Short 2 of 5: 44.6 s, \"…\"", "short": {"n": 2, "of": 5}, "claude": {"plan": {"dollars": 0.12, "requests": 2}, "graphics": {"dollars": 0.19, "requests": 1}, "check": {"dollars": 0.01, "requests": 8}}}
+{"stage": "done", "fraction": 1, "message": "Made 5 shorts in shorts", "claude": {"find": {"dollars": 0.21, "requests": 1}, "plan": {"dollars": 0.6, "requests": 10}, "graphics": {"dollars": 0.95, "requests": 5}, "check": {"dollars": 0.05, "requests": 40}}, "outputs": {"shorts": "/work/out/shorts/shorts.json"}}
 ```
 
 ## Changing a schema

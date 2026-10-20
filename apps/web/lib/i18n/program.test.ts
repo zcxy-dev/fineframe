@@ -41,6 +41,8 @@ const SAID = [
   "Reading the file",
   "Reading 3 files",
   "Analysed before",
+  "Finding the moments that stand alone as shorts",
+  "Found 12 moments",
   // The plan and its review.
   "Planning a short edit with claude-opus-4-1",
   "Planning a long edit with claude-opus-4-1",
@@ -175,8 +177,8 @@ function written(path: string): string[][] {
   return found;
 }
 
-/** The done line's message, which the page never shows. */
-const UNSHOWN = /^Finished: /;
+/** The done line's message and a short's line, which the page never shows. */
+const UNSHOWN = /^(Finished: |Made |Short )/;
 
 test("every progress line the engine, the effects, vework and the server write is listed", () => {
   const worker = join("worker", "src", "vework");

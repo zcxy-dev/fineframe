@@ -1,8 +1,9 @@
 // The page's server routes against a stand-in for `pnpm edit` (../../../lib/fixtures/edit.ts),
 // so they run without the models, FFmpeg or a real key.
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -45,6 +46,7 @@ const previewRoute = await import("./[id]/preview/route.ts");
 const versionsRoute = await import("./[id]/versions/route.ts");
 const versionRoute = await import("./[id]/versions/[n]/route.ts");
 const replanRoute = await import("./[id]/replan/route.ts");
+const shortsRoute = await import("./[id]/shorts/route.ts");
 
 test.after(() => rm(root, { recursive: true, force: true }));
 
@@ -687,4 +689,167 @@ test("a re-plan makes a new version from the same footage, at another length, as
   // Its download is named by its own length and aspect.
   const video = await videoRoute.GET(new Request(`${url}/${id}/video?download`), ctx({ id }));
   assert.match(video.headers.get("content-disposition") ?? "", /edit-30s-1x1\.mp4/);
+});
+
+test("several shorts: each made in its own folder, opened and changed on its own, all in one zip", async () => {
+  delete process.env.FAKE_RENDER_FAIL;
+  const shorts = { count: 3, min: 30, max: 60 };
+  const { body: created } = await create(
+    [
+      { path: "long.mp4", size: 2 },
+      { path: "second.mp4", size: 2 },
+    ],
+    { settings: { ...settings, shorts } },
+  );
+  const id = created.id;
+  assert.equal(created.settings.length, 60, "the length is the range's longest");
+  for (const index of [0, 1]) assert.equal((await put(id, index, new Uint8Array(2))).status, 200);
+  assert.equal((await start(id)).status, 200);
+  const read = async () =>
+    (await (await jobRoute.GET(new Request(url), ctx({ id }))).json()) as Job;
+  const until = async (done: (job: Job) => boolean) => {
+    for (;;) {
+      const job = await read();
+      if (done(job)) return job;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  };
+  const job = await until((each) => each.status === "done");
+  const args = JSON.parse(await readFile(join(root, id, "args.json"), "utf8")) as string[];
+  const after = (option: string) => args[args.indexOf(option) + 1];
+  assert.equal(after("--length"), "30-60");
+  assert.equal(after("--shorts"), "3");
+  assert.equal(after("-o"), "out");
+
+  // Two of three, in Claude's order, each with what it cost; the run with finding them too.
+  assert.deepEqual(
+    job.shorts?.map((short) => [short.folder, short.title, short.seconds, short.source]),
+    [
+      ["01", "剪輯的一天：從 0 到 1?", 44.5, join("footage", "long.mp4")],
+      ["02", "Why we cut. ", 29.5, join("footage", "long.mp4")],
+    ],
+  );
+  assert.deepEqual(job.shorts?.[0]?.claude?.plan, { dollars: 0.07, requests: 1 });
+  assert.deepEqual(job.claude?.find, { dollars: 0.1, requests: 1 });
+  assert.equal(job.shorts?.[0]?.result?.captions, true);
+  const listed = (await (await jobsRoute.GET()).json()) as ProjectSummary[];
+  assert.equal(listed.find((project) => project.id === id)?.shorts, 2);
+
+  // A short plays and downloads by its place and title, safe as a file name everywhere.
+  const short = (path: string, folder = "01") => `${url}/${id}/${path}?short=${folder}`;
+  const video = await videoRoute.GET(new Request(`${short("video")}&download`), ctx({ id }));
+  assert.equal(video.status, 200);
+  assert.equal((await video.arrayBuffer()).byteLength, 1000);
+  assert.match(
+    video.headers.get("content-disposition") ?? "",
+    new RegExp(`filename\\*=UTF-8''${encodeURIComponent("01-剪輯的一天：從 0 到 1.mp4")}`),
+  );
+  const missing = await videoRoute.GET(new Request(short("video", "07")), ctx({ id }));
+  assert.equal(missing.status, 404);
+
+  // Each short changes on its own, as versions of its own.
+  const view = (await (
+    await editRoute.GET(new Request(short("edit", "02")), ctx({ id }))
+  ).json()) as EditView;
+  assert.equal(view.version, 1);
+  const applied = await versionsRoute.POST(
+    new Request(short("versions", "02"), {
+      method: "POST",
+      body: JSON.stringify({ revision: { captions: "pop" }, summary: "captions pop" }),
+    }),
+    ctx({ id }),
+  );
+  assert.equal(applied.status, 200);
+  const changed = await until((each) => each.render === undefined);
+  assert.deepEqual(
+    changed.shorts?.map((each) => [each.current ?? 1, each.versions?.length ?? 1]),
+    [
+      [1, 1],
+      [2, 2],
+    ],
+  );
+  assert.equal(changed.versions, undefined, "the run itself has no versions");
+  assert.ok(existsSync(join(root, id, "out", "02", "edit-v2.mp4")));
+
+  // A re-plan of a short cuts from its own file and stretch, 30 s on each side within the file.
+  const replanned = await replanRoute.POST(
+    new Request(short("replan"), {
+      method: "POST",
+      body: JSON.stringify({ length: 30, aspect: "9:16", music: "auto" }),
+    }),
+    ctx({ id }),
+  );
+  assert.equal(replanned.status, 200);
+  const planned = await until((each) => each.render === undefined);
+  const again = JSON.parse(await readFile(join(root, id, "args.json"), "utf8")) as string[];
+  assert.deepEqual(
+    again.slice(0, again.indexOf("--length")),
+    [join("footage", "long.mp4")],
+    "the short's file alone",
+  );
+  assert.equal(again[again.indexOf("--within") + 1], "0-91.25");
+  assert.ok(!again.includes("--shorts"));
+  assert.equal(again[again.indexOf("-o") + 1], join("out", "01", "edit-v2.mp4"));
+  assert.equal(planned.shorts?.[0]?.current, 2);
+
+  // Download all: every short's video and captions by place and title, and their words.
+  const zipped = await shortsRoute.GET(new Request(`${url}/${id}/shorts`), ctx({ id }));
+  assert.equal(zipped.status, 200);
+  assert.match(zipped.headers.get("content-disposition") ?? "", /shorts-30-60s-9x16\.zip/);
+  const dir = join(root, "unzipped");
+  await mkdir(dir);
+  const zip = join(dir, "shorts.zip");
+  await writeFile(zip, Buffer.from(await zipped.arrayBuffer()));
+  const names = [
+    "01-剪輯的一天：從 0 到 1.mp4",
+    "01-剪輯的一天：從 0 到 1.srt",
+    "02-Why we cut.mp4",
+    "02-Why we cut.srt",
+    "shorts.txt",
+  ];
+  // Python's zipfile and the system's unzip both read it, names as written.
+  const python = execFileSync(
+    "python3",
+    [
+      "-c",
+      "import json, sys, zipfile; z = zipfile.ZipFile(sys.argv[1]); z.testzip(); " +
+        "print(json.dumps([[i.filename, i.file_size, i.flag_bits & 0x800] for i in z.infolist()]))",
+      zip,
+    ],
+    { encoding: "utf8" },
+  );
+  const entries = JSON.parse(python) as [string, number, number][];
+  assert.deepEqual(
+    entries.map(([name]) => name),
+    names,
+  );
+  assert.ok(entries.every(([, , utf8]) => utf8 === 0x800));
+  assert.equal(entries[2]?.[1], 500, "the version shown, which the change rendered");
+  execFileSync("unzip", ["-q", zip, "-d", dir]);
+  assert.equal(
+    await readFile(join(dir, "shorts.txt"), "utf8"),
+    "01. 剪輯的一天：從 0 到 1?\nDescription 1.\n#one #two #three\n\n" +
+      "02. Why we cut. \nDescription 2.\n#one #two #three\n",
+  );
+  assert.equal((await readFile(join(dir, "02-Why we cut.mp4"))).length, 500);
+});
+
+test("a project from before several shorts opens as it was", async () => {
+  const id = "00000000-0000-4000-8000-000000000001";
+  await mkdir(join(root, id), { recursive: true });
+  const old = {
+    id,
+    created: 1,
+    settings: { ...settings, style: "clean", visuals: "rich" },
+    files: [{ path: "a.mp4", size: 2, use: "video", received: 2 }],
+    status: "error",
+    stages: {},
+    error: "Stopped",
+  };
+  await writeFile(join(root, id, "job.json"), JSON.stringify(old));
+  const { Jobs } = await import("../../../lib/jobs.ts");
+  const store = new Jobs({ root, command: [], renderCommand: [], key: async () => undefined });
+  assert.deepEqual(await store.get(id), old);
+  const summary = (await store.list()).find((project) => project.id === id);
+  assert.equal(summary?.shorts, undefined);
 });

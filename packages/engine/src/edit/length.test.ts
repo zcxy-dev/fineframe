@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseLength } from "./length.ts";
+import { parseLength, parseSpan } from "./length.ts";
 
 test("lengths are read as people write them", () => {
   const cases: [string, number][] = [
@@ -42,5 +42,15 @@ test("anything else is not a length", () => {
     "1::30",
   ]) {
     assert.equal(parseLength(text), null, text);
+  }
+});
+
+test("a span is two lengths joined by a dash, the first under the second", () => {
+  assert.deepEqual(parseSpan("30-60s"), [30, 60]);
+  assert.deepEqual(parseSpan("90s-3m"), [90, 180]);
+  assert.deepEqual(parseSpan("10:12-11:30"), [612, 690]);
+  assert.deepEqual(parseSpan("612.4-671"), [612.4, 671]);
+  for (const text of ["60-30s", "30", "30-60-90", "-60", "30-", "a-b", "30-30"]) {
+    assert.equal(parseSpan(text), null, text);
   }
 });
