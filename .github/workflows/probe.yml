@@ -30,23 +30,26 @@ jobs:
           "$F" -hide_banner -v error -i "$RUNNER_TEMP/clip.mp4" -pix_fmt yuv420p -f framemd5 "$RUNNER_TEMP/sw.md5"
           diff "$RUNNER_TEMP/hw.md5" "$RUNNER_TEMP/sw.md5" && echo "CLI framemd5 identical" || echo "CLI framemd5 differ"
           uv sync --locked
-          uv run python - "$RUNNER_TEMP/clip.mp4" <<'PY'
-          import sys, av, av.codec.hwaccel as h, torch, onnxruntime
-          print("torch", torch.__version__, "mps built", torch.backends.mps.is_built(), "mps available", torch.backends.mps.is_available())
-          if torch.backends.mps.is_available():
-              x = torch.randn(256, 256, device="mps"); print("mps matmul", float((x @ x).sum().cpu()))
-          print("ort", onnxruntime.get_available_providers())
-          print("pyav", av.__version__, h.hwdevices_available())
-          def frames(accel):
-              with av.open(sys.argv[1], hwaccel=accel) as c:
+          "$F" -hide_banner -v error -f lavfi -i testsrc2=s=640x360:r=30:d=3 -c:v libx264 -pix_fmt yuv420p -bf 0 "$RUNNER_TEMP/nob.mp4"
+          "$F" -hide_banner -v error -f lavfi -i testsrc2=s=640x352:r=30:d=3 -c:v libx264 -pix_fmt yuv420p -bf 2 "$RUNNER_TEMP/m16.mp4"
+          "$F" -hide_banner -v error -f lavfi -i testsrc2=s=640x360:r=30:d=3 -c:v libx265 -pix_fmt yuv420p "$RUNNER_TEMP/hevc.mp4"
+          uv run python - "$RUNNER_TEMP" <<'PY'
+          import sys, av, av.codec.hwaccel as h, numpy as np
+          def frames(path, accel):
+              with av.open(path, hwaccel=accel) as c:
                   s = c.streams.video[0]
-                  out = [(f.pts, f.format.name, f.width, f.height, f.reformat(format="yuv420p").to_ndarray(), f.to_ndarray(format="rgb24"), f.to_ndarray(width=48, height=27, format="rgb24"), f.time) for f in c.decode(s)]
-                  print("is_hwaccel", s.codec_context.is_hwaccel)
-                  return out
-          sw = frames(None)
-          try:
-              hw = frames(h.HWAccel("videotoolbox", allow_software_fallback=False))
-              print("frames", len(sw), len(hw), "pts equal", [f[0] for f in sw] == [f[0] for f in hw], "formats", sw[0][1], hw[0][1], "yuv equal", all((a[4] == b[4]).all() for a, b in zip(sw, hw)), "rgb maxdiff", max(int(abs(a[5].astype(int) - b[5]).max()) for a, b in zip(sw, hw)), "thumb maxdiff", max(int(abs(a[6].astype(int) - b[6]).max()) for a, b in zip(sw, hw)), "times equal", [f[7] for f in sw] == [f[7] for f in hw])
-          except Exception as e:
-              print("pyav videotoolbox failed:", repr(e))
+                  return [(f.time, f.format.name, f.width, f.height, f.reformat(format="yuv420p").to_ndarray().astype(int)) for f in c.decode(s)]
+          for name in ["clip", "nob", "m16", "hevc"]:
+              path = f"{sys.argv[1]}/{name}.mp4"
+              sw = frames(path, None)
+              hw = frames(path, h.HWAccel("videotoolbox", allow_software_fallback=False))
+              print(name, len(sw), len(hw), sw[0][1:4], hw[0][1:4], "times", [a[0] for a in sw] == [b[0] for b in hw])
+              for i in [0, 1, 2, 10, 45]:
+                  d = np.abs(sw[i][4] - hw[i][4])
+                  rows = np.where(d.max(axis=1) > 3)[0]
+                  best = min(range(len(sw)), key=lambda j: np.abs(sw[j][4] - hw[i][4]).mean())
+                  print(f"  frame {i}: mean {d.mean():.3f} max {d.max()} rows>3 {len(rows)} first {rows[:5].tolist()} last {rows[-5:].tolist()} best match sw {best}")
+              y = 360 if name != "m16" else 352
+              dy = np.abs(sw[10][4][:y] - hw[10][4][:y]); dc = np.abs(sw[10][4][y:] - hw[10][4][y:])
+              print("  luma mean", dy.mean(), "max", dy.max(), "chroma mean", dc.mean(), "max", dc.max())
           PY
