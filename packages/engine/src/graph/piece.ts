@@ -225,7 +225,7 @@ export function pieceAudio(piece: Piece, timeline: Timeline): string[] {
       const { index, offset } = opened.open(clip.source, clip.in);
       sound = soundClock(`[${index}:a:0]`, offset, layer.fromSample, layer.samples);
     }
-    const shaped = fades(layer.fadeIn, layer.fadeOut, layer.samples);
+    const shaped = fades(layer.fadeIn, layer.fadeOut, layer.samples, layer.muteIn, layer.muteOut);
     graph.push(`${[sound, ...shaped].join(",")}[m${i}]`);
   }
   let base = "[m0]";

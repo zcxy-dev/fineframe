@@ -306,6 +306,30 @@ test("sound split between pieces joins sample for sample", async (t) => {
   );
 });
 
+test("a clip's sound is silent outside its sound edges, and fades in and out 20 ms inside them", async (t) => {
+  const dir = await scratch(t, "sound-edges-");
+  const [tone, , , , , , , mute] = everyKind(64, 36, 4);
+  assert.ok(tone && mute);
+  const sources = [await makeSource(dir, tone), await makeSource(dir, mute)];
+  const edit = (main: Project["main"]) =>
+    projectOf(sources, main, { ...tiny, width: 64, height: 36 });
+  // 10 ms of silence after the clip's start and 15 ms before its end, as 480 and 720 samples.
+  const tonal = { source: "a30", in: 20_000, out: 140_000 };
+  const edged = { ...tonal, soundIn: 20_000 + 1200, soundOut: 140_000 - 1800 };
+  const plain = await pieceSound(dir, edit([tonal, clip("h-mute", 0, 1)]));
+  const split = await pieceSound(dir, edit([edged, clip("h-mute", 0, 1)]));
+  const peak = (from: number, to: number) => Math.max(...split.subarray(from, to).map(Math.abs));
+  const samples = 48_000;
+  assert.equal(peak(0, 480), 0);
+  assert.ok(peak(480, 520) < 0.1 * peak(2000, 3000), "the fade in starts from silence");
+  for (let i = 480 + 960; i < samples - 720 - 960; i += 97) {
+    assert.ok(Math.abs((split[i] ?? 0) - (plain[i] ?? 0)) < 1e-5, `sample ${i}`);
+  }
+  assert.equal(peak(samples - 720, samples), 0);
+  // A project without sound edges renders its sound as before them.
+  assert.ok(peak(0, 480) < Math.max(...plain.subarray(300, 480).map(Math.abs)));
+});
+
 test("sound from Matroska and WebM lands where vework places it, to the millisecond", async (t) => {
   // FFmpeg 7.0 starts these files at the codec priming, 21 ms (AAC) and 7 ms (Opus) before the
   // time zero vework's decoder reads; the beeps start 0.6 s into every second of vework's time.

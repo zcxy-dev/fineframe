@@ -98,6 +98,20 @@ test("ranges run forward", async () => {
   rejects(project, "/plan/emphasis/0: ends at 1260000, not after its start 1260000");
 });
 
+test("a clip's sound runs forward inside it", async () => {
+  const project = await exampleProject();
+  const clip = project.main[0];
+  validateProject({
+    ...project,
+    main: [{ ...clip, soundIn: clip.in + 1000, soundOut: clip.out - 1000 }],
+  });
+  rejects(
+    { ...project, main: [{ ...clip, soundIn: clip.in - 1 }] },
+    `/main/0: its sound, ${clip.in - 1} to ${clip.out}, does not run forward inside`,
+  );
+  rejects({ ...project, main: [{ ...clip, soundOut: clip.in }] }, "/main/0: its sound");
+});
+
 test("the first clip has no transition", async () => {
   const project = await exampleProject();
   project.main[0].transition = { type: "dissolve", duration: 60_000 };

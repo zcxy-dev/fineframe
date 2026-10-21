@@ -243,6 +243,8 @@ test("an edit: files streamed in, one edit at a time, live progress, then the do
   assert.deepEqual(args, [
     ...[join("footage", "day 1", "a.mp4"), join("footage", "logo.png")],
     ...["--length", "60", "--aspect", "9:16", "--look", "warm", "--visuals=rich"],
+    // Natural filler removal unless another is chosen.
+    ...["--fillers", "natural"],
     // The advanced settings as they start: the best quality, no correction, bold captions.
     ...["--quality", "best", "--captions", "bold"],
     ...["-o", join("out", "edit.mp4")],
@@ -334,7 +336,7 @@ test("speech heard on OpenRouter needs its key, which the edit gets with --asr c
   assert.equal(credits.status, 404);
 });
 
-test("the advanced settings reach the edit, and names or terms left empty are not passed", async () => {
+test("the advanced settings and filler removal reach the edit, and names or terms left empty are not passed", async () => {
   const advanced = {
     settings: {
       ...settings,
@@ -343,6 +345,7 @@ test("the advanced settings reach the edit, and names or terms left empty are no
       quality: "economy",
       correct: true,
       captions: "pop",
+      fillers: "aggressive",
     },
   };
   const { body: job } = await create([{ path: "e.mp4", size: 2 }], advanced);
@@ -356,6 +359,7 @@ test("the advanced settings reach the edit, and names or terms left empty are no
   assert.equal(after("--quality"), "economy");
   assert.ok(args.includes("--correct"));
   assert.equal(after("--captions"), "pop");
+  assert.equal(after("--fillers"), "aggressive");
   assert.ok(!args.includes("--names"));
   assert.equal(after("--terms"), "terms.txt");
 });

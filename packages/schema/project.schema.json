@@ -325,6 +325,14 @@
           "description": "Source time where the clip ends, exclusive; after in.",
           "$ref": "#/$defs/Ticks"
         },
+        "soundIn": {
+          "description": "Source time where the clip's sound starts, after in: the sound before it is silent, and fades in over the 20 ms after it. A cut in a pause too short for a frame falls here, inside the clip's first frame. Absent: the sound starts at in.",
+          "$ref": "#/$defs/Ticks"
+        },
+        "soundOut": {
+          "description": "Source time where the clip's sound ends, before out: the sound fades out over the 20 ms before it and is silent after it. Absent: the sound ends at out.",
+          "$ref": "#/$defs/Ticks"
+        },
         "transition": {
           "description": "How this clip follows the one before it; absent is a hard cut. The first clip has none.",
           "$ref": "#/$defs/Transition"

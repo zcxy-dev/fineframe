@@ -48,12 +48,24 @@ export function silence(samples: number): string {
   return `anullsrc=r=${SAMPLE_RATE}:cl=stereo,${FORMAT},atrim=end_sample=${samples}`;
 }
 
-/** Fades over the first and last samples of a span of `samples`. */
-export function fades(fadeIn: number, fadeOut: number, samples: number): string[] {
+/** Fades over the first and last samples of a span of `samples`, after `muteIn` samples of
+ * silence and before `muteOut`: a fade in is silent before it starts, and a fade out after it
+ * ends. */
+export function fades(
+  fadeIn: number,
+  fadeOut: number,
+  samples: number,
+  muteIn = 0,
+  muteOut = 0,
+): string[] {
   return [
-    ...(fadeIn > 0 ? [`afade=t=in:ss=0:ns=${fadeIn}:curve=${EDGE_CURVE}`] : []),
-    ...(fadeOut > 0
-      ? [`afade=t=out:ss=${samples - fadeOut}:ns=${fadeOut}:curve=${EDGE_CURVE}`]
+    ...(fadeIn > 0 || muteIn > 0
+      ? [`afade=t=in:ss=${muteIn}:ns=${Math.max(1, fadeIn)}:curve=${EDGE_CURVE}`]
+      : []),
+    ...(fadeOut > 0 || muteOut > 0
+      ? [
+          `afade=t=out:ss=${samples - muteOut - Math.max(1, fadeOut)}:ns=${Math.max(1, fadeOut)}:curve=${EDGE_CURVE}`,
+        ]
       : []),
   ];
 }

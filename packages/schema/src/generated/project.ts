@@ -158,6 +158,14 @@ export interface Clip {
    */
   out: number;
   /**
+   * Source time where the clip's sound starts, after in: the sound before it is silent, and fades in over the 20 ms after it. A cut in a pause too short for a frame falls here, inside the clip's first frame. Absent: the sound starts at in.
+   */
+  soundIn?: number;
+  /**
+   * Source time where the clip's sound ends, before out: the sound fades out over the 20 ms before it and is silent after it. Absent: the sound ends at out.
+   */
+  soundOut?: number;
+  /**
    * How this clip follows the one before it; absent is a hard cut. The first clip has none.
    */
   transition?: Dissolve | Dip;

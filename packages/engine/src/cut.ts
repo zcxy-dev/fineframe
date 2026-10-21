@@ -15,6 +15,7 @@ import {
 import {
   cuttableAfter,
   endOnFrame,
+  joinAt,
   MARGIN,
   type PlacedClip,
   type PlaceSource,
@@ -75,7 +76,8 @@ export async function placeSources(
 /**
  * Takes `ranges` (output ticks, [from, to)) out of the edit. A word goes when its middle falls
  * in a range, and a clip goes when a range covers it or none of its words is left. Where words
- * go from inside a clip, each edge of what goes moves to a pause a cut fits in: inward first,
+ * go from inside a clip, each edge of what goes moves to a pause a cut fits in (with a sound edge
+ * where it is too short for a frame, as the planner cuts it: joinAt): inward first,
  * keeping some words asked for rather than taking one not asked for, and outward only when
  * none lies inside (`outside` says which words that took). The clip splits around them, each
  * new end placed in that pause as the planner places cuts, so no cut falls inside a word or
@@ -179,18 +181,31 @@ export function cutEdit(
         placeClips([{ source: clip.source, words: [index] }], sources, frame)[0] as PlacedClip;
       const first = run[0] as number;
       const lastIndex = run.at(-1) as number;
-      const clipIn = head ? clip.in : edge(first).in;
+      const opening = head ? clip : edge(first);
+      const clipIn = opening.in;
       const last = source.words[lastIndex] as Word;
       const after = source.words[lastIndex + 1];
       const limit = source.duration > 0 ? source.duration : 1e9;
-      const clipOut = endOnFrame(
-        clipIn,
-        tail ? clip.out : edge(lastIndex).out,
-        secondsToTicks(last.end + MARGIN),
-        secondsToTicks(after ? after.start - MARGIN : limit),
-        frame,
-      );
-      const split: Clip = { ...clip, in: clipIn, out: clipOut };
+      const closing = tail ? clip : edge(lastIndex);
+      // A sound edge in a pause too short for a frame ends the clip on the first frame after it.
+      const clipOut =
+        closing.soundOut !== undefined
+          ? clipIn + Math.max(1, Math.ceil((closing.soundOut - clipIn) / frame)) * frame
+          : endOnFrame(
+              clipIn,
+              closing.out,
+              secondsToTicks(last.end + MARGIN),
+              secondsToTicks(after ? after.start - MARGIN : limit),
+              frame,
+            );
+      const { soundIn: _in, soundOut: _out, ...rest } = clip;
+      const split: Clip = {
+        ...rest,
+        in: clipIn,
+        out: clipOut,
+        ...(opening.soundIn === undefined ? {} : { soundIn: opening.soundIn }),
+        ...(closing.soundOut === undefined ? {} : { soundOut: closing.soundOut }),
+      };
       if (!head) delete split.transition;
       place(split, at(clipIn));
     }
@@ -368,8 +383,9 @@ export function cutEdit(
 }
 
 /** The words to take out of a clip that plays `words` (source indices, ascending, one after
- * another) once each edge of the runs in `asked` sits in a pause a cut fits in. An edge between
- * two words said without one moves inward first, to the nearest pause inside the run, so no word
+ * another) once each edge of the runs in `asked` sits in a pause a cut fits in, on a frame or with
+ * a sound edge (joinAt). An edge between two words said without one moves inward first, to the
+ * nearest pause inside the run, so no word
  * goes that was not asked for, though some asked for may stay; only a run with no such pause
  * inside grows outward to the nearest pauses, and `beyond` lists the words that took before it
  * and after it, by the run's first word asked for. The clip's own ends are cuts already. */
@@ -380,7 +396,11 @@ function toPauses(
 ): { gone: number[]; beyond: { first: number; before: number[]; after: number[] }[] } {
   const n = words.length;
   // Edge b lies before words[b]; 0 and n are the clip's ends.
-  const fits = (b: number) => b === 0 || b === n || cuttableAfter(source, words[b - 1] as number);
+  const fits = (b: number) =>
+    b === 0 ||
+    b === n ||
+    cuttableAfter(source, words[b - 1] as number) ||
+    joinAt(source, words[b - 1] as number, "both") !== null;
   const gone = new Set<number>();
   const beyond: { first: number; before: number[]; after: number[] }[] = [];
   for (let p = 0; p < n; p++) {

@@ -8,7 +8,7 @@ import { promisify } from "node:util";
 import { type Project, validateProject, type Word } from "@video-editor/schema";
 import { cutEdit } from "./cut.ts";
 import { ffmpeg, QUIET, run as runFfmpeg } from "./ffmpeg.ts";
-import { MARGIN, type PlaceSource } from "./plan/place.ts";
+import { MARGIN, type PlaceSource, placeClips } from "./plan/place.ts";
 import { project as projectOf, SECOND, scratch } from "./testing.ts";
 
 const FRAME = 4000;
@@ -159,6 +159,46 @@ test("an edge with no pause moves inward, keeping a word asked for rather than t
   assert.ok(to <= s((words[7] as Word).start - MARGIN));
   // An edge already in a pause stays where it is: w1 alone goes.
   assert.match(cutEdit(edit(), [[s(0.6), s(0.9)]], joinedSources(false)).notes[0] ?? "", /: w1$/);
+});
+
+test("a word with too little silence beside it for a cut on a frame goes alone", () => {
+  // 0.1 s between w3 and w4: both margins fit, a frame does not. w4 alone goes, and the clip
+  // before it ends its sound in the middle of that silence, on the first frame after it.
+  const spaced = new Map(
+    [...joinedSources(false)].map(([id, source]) => [
+      id,
+      { ...source, words: source.words.map((w, k) => (k === 4 ? { ...w, start: 2.0 } : w)) },
+    ]),
+  );
+  const { project, notes } = cutEdit(edit(), [[s(2.1), s(2.3)]], spaced);
+  assert.match(notes[0] ?? "", /: w4$/);
+  const before = project.main[0] as Project["main"][number];
+  assert.equal(before.soundOut, s(1.95));
+  assert.ok(before.out > s(1.95) && before.out - s(1.95) < FRAME);
+  assert.equal((project.main[1] as Project["main"][number]).soundIn, undefined);
+  validateProject(project);
+});
+
+test("a clip that keeps its end keeps its sound edge inside it when words go from its start", () => {
+  // w2 ends 0.12 s before a filler left out: the clip ends on the frame after a sound edge at
+  // 1.44 s. Cutting w1 places the rest again; its end must still hold that sound edge.
+  const spaced: Word[] = [
+    { text: "w0", start: 0.1, end: 0.4 },
+    { text: "w1", start: 0.6, end: 0.9 },
+    { text: "w2", start: 1.1, end: 1.38 },
+    { text: "uh", start: 1.5, end: 1.7 },
+    { text: "w4", start: 1.9, end: 2.2 },
+  ];
+  const map = new Map([["a", { id: "a", words: spaced, duration: 60, frameTicks: FRAME }]]);
+  const main = placeClips([{ source: "a", words: [0, 1, 2, 4] }], map, FRAME).map(
+    ({ first: _f, last: _l, ...clip }) => clip,
+  );
+  assert.equal(main[0]?.soundOut, s(1.44));
+  const { project } = cutEdit(projectOf(main as Project["main"]), [[s(0.65), s(0.85)]], map);
+  const kept = project.main[1] as Project["main"][number];
+  assert.equal(kept.soundOut, s(1.44));
+  assert.ok(kept.out > s(1.44) && kept.out - s(1.44) < FRAME);
+  validateProject(project);
 });
 
 test("a stretch with no pause inside grows out to the nearest ones, and says what it took", () => {

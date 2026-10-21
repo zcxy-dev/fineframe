@@ -18,8 +18,13 @@ export const TAIL = 0.25;
 export const PAUSE_MAX = 0.75;
 /** Silence kept beside a word a review found clipped, where the pause has that much. */
 export const ROOM = 0.5;
-/** Seconds of a source's sound per entry of PlaceSource.peaks. */
+/** Seconds of a source's sound per entry of PlaceSource.peaks and PlaceSource.power. */
 export const PEAK_BLOCK = 0.005;
+/** How long the sound fades in after a clip's `soundIn` and out before its `soundOut`. */
+export const SOUND_EDGE_FADE = 0.02;
+/** Two words said without a pause can be cut apart where the speech over the fade's span is at
+ * least this far under the quieter of the two, in dB (joinAt). */
+const JOIN_UNDER_DB = 20;
 /** A PEAK_BLOCK of sound clicks when its peak is more than CLICK times the median peak within
  * CLICK_CONTEXT around it. `vebench render` reads a cut's clicks against the 99th percentile of
  * the samples around it instead, which this flags whenever it does (README.md, What code does).
@@ -46,6 +51,9 @@ export interface PlaceSource {
   /** The sharpest jump in the source's sound in each PEAK_BLOCK from its start (the largest
    * second difference of its samples), or none when unknown. */
   peaks?: Float32Array;
+  /** The mean square of the source's denoised speech in each PEAK_BLOCK from its start, or none
+   * when unknown. */
+  power?: Float32Array;
   /** Seconds, in order: the source's shot changes, each from its first frame to the first frame
    * of the new shot alone (the same for a hard cut). */
   shots?: readonly (readonly [number, number])[];
@@ -63,6 +71,10 @@ export interface PlacedClip {
   /** Source ticks. */
   in: number;
   out: number;
+  /** Where its sound starts and ends, in source ticks, when that is inside its first or last
+   * frame: at a cut between two words with no pause a frame fits in (joinAt). */
+  soundIn?: number;
+  soundOut?: number;
   first: number;
   last: number;
 }
@@ -89,6 +101,10 @@ interface Run {
  *   a cut fits in, and the next one starts in the last such silence before its first, or in the
  *   longest silence there when none fits, each at least MARGIN from the sound on either side. Up to TAIL and LEAD of silence stay with the
  *   sound, less when the silence is shorter.
+ * - Where the silence between a word left out and the word kept beside it is too short for a cut
+ *   on a frame, or there is none, the cut falls where joinAt allows it: the clip starts on the
+ *   source frame before that point or ends on the output frame after it, and its sound starts or
+ *   ends at the point itself (`soundIn`, `soundOut`), so the frame's sliver beyond it is silent.
  * - A clip whose opening silence holds a click in its source's sound or a shot change, such as a
  *   splice the source was edited with, starts on the first frame after the last of them, and one
  *   whose closing silence holds one ends on the last output frame before the first, where that
@@ -133,6 +149,8 @@ export function placeClips(
     const fits = (pause: boolean) => (a: number, b: number) =>
       pause ? b - a > PAUSE_MAX : b - a >= gap || a <= 0 || b >= end;
 
+    const joinIn = pauseBefore ? null : joinBefore(source, first, "after");
+    const joinOut = pauseAfter ? null : joinBefore(source, last + 1, "before");
     const [s0, s1] = nearest(silencesAfter(source, first - 1), fits(pauseBefore), true) ?? [
       words[first - 1]?.end ?? 0,
       head.start,
@@ -140,16 +158,20 @@ export function placeClips(
     const bounded = s0 > 0 || first > 0;
     const lead = source.roomy?.has(first) ? ROOM : LEAD * breath;
     const wantIn = s1 - Math.min(lead, bounded ? (s1 - s0) / 2 : s1 - s0);
-    const clipIn = pastSplices(
-      source,
-      startOnFrame(
-        ticks(Math.max(0, wantIn)),
-        ticks(bounded ? s0 + MARGIN : 0),
-        ticks(s1 - MARGIN),
-        source.frameTicks,
-      ),
-      s1,
-    );
+    const soundIn = joinIn === null ? null : ticks(joinIn);
+    const clipIn =
+      soundIn === null
+        ? pastSplices(
+            source,
+            startOnFrame(
+              ticks(Math.max(0, wantIn)),
+              ticks(bounded ? s0 + MARGIN : 0),
+              ticks(s1 - MARGIN),
+              source.frameTicks,
+            ),
+            s1,
+          )
+        : frameBefore(soundIn, source.frameTicks);
 
     const [t0, t1] = nearest(silencesAfter(source, last), fits(pauseAfter), false) ?? [
       tail.end,
@@ -158,20 +180,33 @@ export function placeClips(
     const closed = t1 < end;
     const trail = source.roomy?.has(last) ? ROOM : TAIL * breath;
     const wantOut = t0 + Math.min(trail, closed ? (t1 - t0) / 2 : t1 - t0);
-    const clipOut = beforeSplices(
-      source,
-      clipIn,
-      endOnFrame(
-        clipIn,
-        ticks(Math.min(wantOut, end)),
-        ticks(t0 + MARGIN),
-        closed ? ticks(t1 - MARGIN) : ticks(Math.min(end, 1e9)),
-        outputFrameTicks,
-      ),
-      t0,
-      outputFrameTicks,
-    );
-    return { source: source.id, in: clipIn, out: clipOut, first, last };
+    const soundOut = joinOut === null ? null : ticks(joinOut);
+    const clipOut =
+      soundOut === null
+        ? beforeSplices(
+            source,
+            clipIn,
+            endOnFrame(
+              clipIn,
+              ticks(Math.min(wantOut, end)),
+              ticks(t0 + MARGIN),
+              closed ? ticks(t1 - MARGIN) : ticks(Math.min(end, 1e9)),
+              outputFrameTicks,
+            ),
+            t0,
+            outputFrameTicks,
+          )
+        : clipIn +
+          Math.max(1, Math.ceil((soundOut - clipIn) / outputFrameTicks)) * outputFrameTicks;
+    return {
+      source: source.id,
+      in: clipIn,
+      out: clipOut,
+      ...(soundIn !== null && soundIn > clipIn ? { soundIn } : {}),
+      ...(soundOut !== null && soundOut < clipOut ? { soundOut } : {}),
+      first,
+      last,
+    };
   });
 }
 
@@ -295,6 +330,79 @@ function beforeSplices(
     if (next >= at || next < earliest || next <= clipIn) return clipOut;
     at = next;
   }
+}
+
+/** Where a cut may fall between word `i` - 1 and word `i`, the one on the `kept` side playing,
+ * when no silence a cut on a frame fits in lies between them: joinAt; null where one does, or at
+ * the source's start or end. */
+function joinBefore(source: PlaceSource, i: number, kept: "before" | "after"): number | null {
+  if (i <= 0 || i >= source.words.length || cuttableAfter(source, i - 1)) return null;
+  return joinAt(source, i - 1, kept);
+}
+
+/**
+ * Where a cut may fall between words `i` and `i` + 1 of a source with no silence a cut on a frame
+ * fits in between them (cuttableAfter), in seconds; the clip's picture then cuts on the frame
+ * beyond it and its sound at the point itself, faded over SOUND_EDGE_FADE on the side of the word
+ * kept (`kept`, or both sides when either word may be). It is the middle of the longest silence
+ * between them, or where they meet when none, and needs either
+ * - MARGIN of silence on both sides of it, or
+ * - the speech's power over each fade's span to be JOIN_UNDER_DB or more under the quieter of the
+ *   two words, so the cut lies in the dip between them and clips neither (Q211).
+ * No speech the transcript missed may lie within MARGIN of it, no click in the source's sound in
+ * the silence or the fades' span, and no shot change in it or within a frame of it: there is no
+ * room to move past one. Null where any fails. This is the only test of whether two words with no
+ * pause a frame fits in may be cut apart.
+ */
+export function joinAt(
+  source: PlaceSource,
+  i: number,
+  kept: "before" | "after" | "both",
+): number | null {
+  const word = source.words[i];
+  const next = source.words[i + 1];
+  if (!word || !next) return null;
+  const silence = silencesAfter(source, i).reduce<[number, number] | null>(
+    (best, s) => (!best || s[1] - s[0] > best[1] - best[0] ? s : best),
+    null,
+  );
+  const roomy = silence !== null && silence[1] - silence[0] >= 2 * MARGIN;
+  const at = silence ? (silence[0] + silence[1]) / 2 : (word.end + next.start) / 2;
+  if (!roomy) {
+    const level = (from: number, to: number) => decibels(source, from, to);
+    const under =
+      Math.min(level(word.start, word.end), level(next.start, next.end)) - JOIN_UNDER_DB;
+    const fades = [
+      ...(kept === "after" ? [] : [level(at - SOUND_EDGE_FADE, at)]),
+      ...(kept === "before" ? [] : [level(at, at + SOUND_EDGE_FADE)]),
+    ];
+    if (!fades.every((fade) => fade <= under)) return null;
+    if ((source.unheard ?? []).some(([a, b]) => a < at + MARGIN && b > at - MARGIN)) return null;
+  }
+  const from = Math.min(silence?.[0] ?? at, at - SOUND_EDGE_FADE);
+  const to = Math.max(silence?.[1] ?? at, at + SOUND_EDGE_FADE);
+  const frame = (source.frameTicks ?? 0) / TICKS_PER_SECOND;
+  if ((source.shots ?? []).some(([a, b]) => a < to + frame && b > from - frame)) return null;
+  if (clicks(source, from, to).length > 0) return null;
+  return at;
+}
+
+/** The mean power of a source's speech over [from, to], in dB; NaN, which no test passes, where
+ * it is unknown. */
+function decibels(source: PlaceSource, from: number, to: number): number {
+  const power = source.power;
+  if (!power) return Number.NaN;
+  const first = Math.max(0, Math.floor(from / PEAK_BLOCK));
+  const last = Math.min(power.length, Math.max(first + 1, Math.ceil(to / PEAK_BLOCK)));
+  if (last <= first) return Number.NaN;
+  let sum = 0;
+  for (let k = first; k < last; k++) sum += power[k] as number;
+  return 10 * Math.log10(sum / (last - first) + 1e-12);
+}
+
+/** The source frame start at or before `t`, or `t` itself without a grid. */
+function frameBefore(t: number, grid: number | null): number {
+  return grid ? Math.floor(t / grid) * grid : t;
 }
 
 /** The source frame start nearest `want` inside [low, high]; without a grid, or with no frame

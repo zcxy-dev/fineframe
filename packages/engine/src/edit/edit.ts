@@ -28,6 +28,7 @@ import {
   totalUsage,
   type Usage,
 } from "../plan/claude.ts";
+import type { FillerMode } from "../plan/fillers.ts";
 import { findMoments, type Moment } from "../plan/moments.ts";
 import type { MusicInput } from "../plan/music.ts";
 import {
@@ -112,6 +113,8 @@ export interface EditOptions {
   onLog?: (line: string) => void;
   /** The model that plans and judges doubtful cut checks: best (Opus) unless given. */
   quality?: Quality;
+  /** Which fillers are cut: natural (hesitations and stutters) unless given. */
+  fillers?: FillerMode;
   /** Defaults to the Anthropic API, checked before any analysis. */
   claude?: Claude;
   /** Defaults to vework in the repository's worker/. */
@@ -528,6 +531,7 @@ async function cutEdit(
         claude: prepared.claude,
         ...(options.quality ? { quality: options.quality } : {}),
         ...(options.visuals ? { visuals: options.visuals } : {}),
+        ...(options.fillers ? { fillers: options.fillers } : {}),
         onProgress: (message) => planProgress(message),
       }),
     );

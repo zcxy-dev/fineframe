@@ -5,6 +5,7 @@ import {
   DEFAULT_CAPTIONS,
   isCaptionStyle,
 } from "@video-editor/engine/captions";
+import { DEFAULT_FILLERS, FILLER_MODES, type FillerMode } from "@video-editor/engine/fillers";
 import { LENGTH_RANGE, parseLength, SHORTS_COUNT, SHORTS_RANGE } from "@video-editor/engine/length";
 import { type LookId, lookIds } from "@video-editor/engine/looks";
 import { kindOf } from "@video-editor/engine/media";
@@ -65,6 +66,9 @@ export const VISUALS = ["rich", "minimal"] as const;
 export type Visuals = (typeof VISUALS)[number];
 export const DEFAULT_VISUALS: Visuals = "rich";
 
+/** Which fillers are cut (`--fillers`): hesitations and stutters, verbal tics too, or none. */
+export { DEFAULT_FILLERS, FILLER_MODES, type FillerMode };
+
 /** The model that plans (`--quality`): Claude Opus, or Claude Sonnet for about half the cost. */
 export const QUALITIES = ["best", "economy"] as const;
 export type Quality = (typeof QUALITIES)[number];
@@ -84,6 +88,8 @@ export interface Settings {
   musicLicense?: string;
   asr: Asr;
   visuals: Visuals;
+  /** Edits from before the setting had none: natural. */
+  fillers?: FillerMode;
   /** Edits from before the advanced settings had none of these: best, uncorrected and bold. */
   quality?: Quality;
   correct?: boolean;
@@ -142,7 +148,7 @@ export function checkSettings(
     string,
     unknown
   >;
-  const { quality, correct, captions, instructions, shorts, brand } = input as Record<
+  const { quality, correct, captions, instructions, shorts, brand, fillers } = input as Record<
     string,
     unknown
   >;
@@ -158,6 +164,10 @@ export function checkSettings(
   if (!STYLES.includes(chosen as Style)) return `The style is ${STYLES.join(", ")}`;
   const shown = visuals ?? DEFAULT_VISUALS;
   if (!VISUALS.includes(shown as Visuals)) return `Visuals are ${VISUALS.join(" or ")}`;
+  const cut = fillers ?? DEFAULT_FILLERS;
+  if (!FILLER_MODES.includes(cut as FillerMode)) {
+    return `Filler removal is ${FILLER_MODES.join(", ")}`;
+  }
   const chosenQuality = quality ?? "best";
   if (!QUALITIES.includes(chosenQuality as Quality)) return `Quality is ${QUALITIES.join(" or ")}`;
   if (typeof (correct ?? false) !== "boolean") return "Transcript correction is on or off";
@@ -202,6 +212,7 @@ export function checkSettings(
     ...(license.trim() ? { musicLicense: license.trim() } : {}),
     asr: heard as Asr,
     visuals: shown as Visuals,
+    fillers: cut as FillerMode,
     quality: chosenQuality as Quality,
     correct: (correct ?? false) as boolean,
     captions: chosenCaptions as CaptionStyle | "brand",

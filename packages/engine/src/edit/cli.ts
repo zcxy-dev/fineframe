@@ -6,6 +6,7 @@ import { CAPTION_STYLES, type CaptionStyle, isCaptionStyle } from "../captions/p
 import { LinkError } from "../link.ts";
 import { isLookId, type LookId, lookIds } from "../looks.ts";
 import { ClaudeError, QUALITIES, type Quality } from "../plan/claude.ts";
+import { DEFAULT_FILLERS, FILLER_MODES, type FillerMode } from "../plan/fillers.ts";
 import { type Aspect, dollars, LENGTH_RANGE, PlanError } from "../plan/plan.ts";
 import { VISUALS, type Visuals } from "../plan/visuals.ts";
 import { edit, editShorts } from "./edit.ts";
@@ -22,7 +23,8 @@ const usage = `Usage: pnpm edit <footage folder, file or link>... --length <leng
     [--look <${[...lookIds, "none"].join(" | ")}>] \\
     [--captions <${CAPTION_STYLES.join(" | ")}>] [--brand <kit folder>] \\
     [--quality <best | economy>] [--visuals <rich | minimal>] \\
-    [--music <track or folder>]... [--music-license <licence>]
+    [--fillers <${FILLER_MODES.join(" | ")}>] [--music <track or folder>]... \\
+    [--music-license <licence>]
 
 Edits footage into a finished video within 5 % of the length asked. A folder stands for the
 files directly in it: videos to cut, and still images to show as B-roll. A link (http or
@@ -83,6 +85,10 @@ SHA2-256SUMS, and updated before each link is fetched.
                  footage, in full frame or a split screen, with a soft sound on a
                  visible action; their credits go to <name>.broll.txt beside the
                  video. minimal shows none
+      --fillers  which fillers are cut: natural (the default) cuts hesitations (嗯, 呃, um)
+                 and stutters (我我, the the); aggressive also words that are often verbal
+                 tics, where Claude finds they add nothing (然後, 就是, 對, like, you know, I
+                 mean); off keeps every word said
   -m, --music    background music Claude may choose from: an audio file, or a folder of them.
                  Use only music you have the right to use. Each track's licence is the first
                  line of <name>.txt beside it (a web address and a credit line may follow);
@@ -124,6 +130,7 @@ const parsed = (() => {
         look: { type: "string" },
         quality: { type: "string" },
         visuals: { type: "string" },
+        fillers: { type: "string" },
         music: { type: "string", short: "m", multiple: true },
         "music-license": { type: "string" },
         help: { type: "boolean", short: "h" },
@@ -185,6 +192,11 @@ if (instructions !== undefined && instructions.length > INSTRUCTIONS_MAX) {
 const visuals = values.visuals ?? "rich";
 if (!VISUALS.includes(visuals as Visuals)) fail(`--visuals is rich or minimal, not ${visuals}`);
 
+const fillers = values.fillers ?? DEFAULT_FILLERS;
+if (!FILLER_MODES.includes(fillers as FillerMode)) {
+  fail(`--fillers is ${FILLER_MODES.join(", ")}, not ${fillers}`);
+}
+
 const env = new URL("../../../../.env", import.meta.url);
 if (existsSync(env)) process.loadEnvFile(env);
 // pnpm runs scripts in the package's folder; the paths, and the files progress names, are the
@@ -210,6 +222,7 @@ const options = {
   look: look as LookId | "none",
   quality: quality as Quality,
   visuals: visuals as Visuals,
+  fillers: fillers as FillerMode,
   music: values.music ?? [],
   ...(values["music-license"] ? { musicLicense: values["music-license"] } : {}),
   onProgress: (line: Progress) => {

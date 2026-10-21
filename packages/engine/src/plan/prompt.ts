@@ -1,6 +1,7 @@
 // The planner's instructions and the shape of its answer.
 
 import { catalog, type TemplateId } from "@video-editor/effects";
+import { DEFAULT_FILLERS, type FillerMode } from "./fillers.ts";
 import type { CalloutWish } from "./locate.ts";
 import { SFX_WISHES, type VisualWish } from "./visuals.ts";
 
@@ -10,18 +11,53 @@ const most = (id: TemplateId, param: string) =>
     ?.maxLength;
 
 /** The planner's instructions, which tell of chapters only when the request may ask for them,
- * of callouts only when a file has a screen recording and of visuals only when the edit is rich
- * with them; the same for every plan of either kind, so it is cached with the transcripts after
- * it. */
+ * of callouts only when a file has a screen recording, of visuals only when the edit is rich
+ * with them and of the fillers the mode cuts; the same for every plan of either kind, so it is
+ * cached with the transcripts after it. */
 export function planSystem(
   extras: Pick<PlanExtras, "chapters" | "callouts"> &
-    Partial<Pick<PlanExtras, "visuals" | "stock">>,
+    Partial<Pick<PlanExtras, "visuals" | "stock" | "fillers">>,
 ): string {
   return (
-    system((extras.chapters ? CHAPTERS_EFFECT : "") + (extras.callouts ? CALLOUTS_EFFECT : "")) +
-    (extras.visuals ? visualsSection(extras.stock ?? false) : "")
+    system(
+      (extras.chapters ? CHAPTERS_EFFECT : "") + (extras.callouts ? CALLOUTS_EFFECT : ""),
+      extras.fillers ?? DEFAULT_FILLERS,
+    ) + (extras.visuals ? visualsSection(extras.stock ?? false) : "")
   );
 }
+
+/** What a filler mark means, by mode; off marks none. */
+const MARKS: Record<FillerMode, string> = {
+  natural: `⟨f3 嗯⟩ marks a possible filler: a hesitation, or words said again at once \
+(⟨f4 我⟩我媽); f3 is its id. `,
+  aggressive: `⟨f3 嗯⟩ marks a possible filler: a hesitation, words said again at once \
+(⟨f4 我⟩我媽), or a word that is often a verbal tic (⟨f5 然後⟩); f3 is its id. `,
+  off: "",
+};
+
+const CLEAR_FILLERS = `- fillers: ids of marked words to cut: hesitations, which 嗯, 呃 and um almost always \
+are, and stutters, the first of words said twice (the first 我 of 我我媽, the first the of the \
+the). Keep a repeat that is one word, said for emphasis or two different words (謝謝, 慢慢, \
+最最最, 對對對 agreeing, 差不多，多一點).`;
+
+const CUT_WORDS = (missed: string) => `- cut_words: words inside a line to cut. ${missed} the \
+marks missed, such as a hesitation the speech model wrote as another character at the start of \
+a sentence (您大家好 for 嗯，大家好), or a false start the speaker restarts within the line \
+(第一件事是剪輯，不對， before 第一件事是自動剪輯). Give the file, the line, the text exactly as \
+it appears in the line, and which kind it is.`;
+
+/** The answer's fillers and cut_words, by mode. */
+const FILLERS: Record<FillerMode, string> = {
+  natural: `${CLEAR_FILLERS}
+${CUT_WORDS("A hesitation or stutter")}`,
+  aggressive: `${CLEAR_FILLERS} Also cut each marked tic (啊, 喔, 欸, 那個, 這個, 就是, 然後, 對, \
+like, you know, I mean, so opening a sentence, basically) that adds nothing where it is said, \
+and keep it where it carries meaning: 那個 click 聲 means "that click", 然後 can order two \
+events, 對 can answer a question, and like can mean to enjoy or to be similar.
+${CUT_WORDS("A filler")}`,
+  off: `- fillers and cut_words: always empty: the user keeps every word said, fillers and false \
+starts included.`,
+};
 
 /** How the planner proposes B-roll for each point: stock footage when a key allows it, or a web
  * capture of a page the speaker names. Motion graphics are written once the cut is known. */
@@ -85,7 +121,7 @@ key field), and a label of at most ${most("callout", "label")} characters in the
 language, or an empty one. Code finds the thing on the frame shown as it is named, and leaves \
 the callout out when it is not there or does not hold still.`;
 
-const system = (effects: string) => `\
+const system = (effects: string, fillers: FillerMode) => `\
 You are the editor in an automatic video editor. You read the transcripts of raw footage and \
 decide what the finished video uses and in what order. Code then does the precise work: it \
 cuts on word boundaries inside pauses, removes the fillers you confirm, shortens dead air, \
@@ -102,8 +138,8 @@ numbered within the file:
 
 A line is a phrase between pauses of 0.5 s or more, or a sentence. Times are seconds into that \
 file. The transcript comes from a speech model: it mishears some words, and writes Chinese in \
-Taiwan Traditional characters. ⟨f3 那個⟩ marks a word that is often a filler; f3 is its id. A \
-file without speech is B-roll: pictures to show over a long talking stretch.
+Taiwan Traditional characters. ${MARKS[fillers]}A file without speech is B-roll: pictures to \
+show over a long talking stretch.
 
 ## What you decide
 
@@ -118,14 +154,7 @@ half could go on its own.
 is said again; keep the best take, usually the last complete one, and remove the others), \
 mistake (a slip, a false start, an abandoned sentence, a correction such as 不對，我重講), \
 off_topic, or other. A line is never both in a segment and removed.
-- fillers: ids of marked words that are hesitations to cut. 嗯, 呃 and um at the start of a \
-sentence almost always are. 那個 and 就是 are often real words (那個 click 聲 means "that \
-click"); leave those.
-- cut_words: words inside a line to cut. A filler the marks missed, such as a hesitation the \
-speech model wrote as another character at the start of a sentence (您大家好 for 嗯，大家好), \
-or a false start the speaker restarts within the line (第一件事是剪輯，不對， before \
-第一件事是自動剪輯). Give the file, the line, the text exactly as it appears in the line, \
-and which kind it is.
+${FILLERS[fillers]}
 - broll: shots from B-roll files to show over long talking stretches, each over one line of a \
 segment; empty when there is no B-roll. Give the B-roll file, the seconds of it to show (2 to \
 8 s), and the file and line it covers.
@@ -335,6 +364,8 @@ export interface PlanExtras {
   callouts: boolean;
   visuals?: boolean;
   stock?: boolean;
+  /** Which fillers the planner cuts: DEFAULT_FILLERS unless given. */
+  fillers?: FillerMode;
 }
 
 /** The visuals in the plan's schema, stock footage only when it can be searched. */

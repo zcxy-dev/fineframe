@@ -187,6 +187,13 @@ function projectProblems(project: Project): string[] {
     problems.push("/main/0/transition: the first clip has no clip before it");
   }
   for (const [i, clip] of project.main.entries()) {
+    const soundIn = clip.soundIn ?? clip.in;
+    const soundOut = clip.soundOut ?? clip.out;
+    if (soundIn < clip.in || soundOut > clip.out || soundIn >= soundOut) {
+      problems.push(
+        `/main/${i}: its sound, ${soundIn} to ${soundOut}, does not run forward inside ${clip.in} to ${clip.out}`,
+      );
+    }
     const used = overlap(clip.transition)[1] + overlap(project.main[i + 1]?.transition)[0];
     const length = clip.out - clip.in;
     if (length > 0 && used > length) {

@@ -59,5 +59,6 @@ These change what the planner chose, so say so to the user and run `pnpm edit` a
 - A different length beyond ±5 % of the planned one, or a different aspect.
 - Putting back something the plan left out, reordering the story, or other footage.
 - A different music track than the one chosen (its level and removal are recipes).
+- More or fewer fillers cut throughout: `--fillers aggressive` also cuts words that are often verbal tics (然後, 就是, like, you know) where Claude finds they add nothing, and `--fillers off` keeps every word; `natural`, the default, cuts hesitations (嗯, 呃, um) and stutters. One filler is cut with `--cut` (recipes).
 
 A short is planned again from its own file and stretch, with up to 30 s on each side inside the file, into its folder, as a short about its moment: `pnpm -s edit <its file> --within <start − 30>-<end + 30> --short "<title>. <description>" --length 45s --aspect 9:16 -o out/shorts/01/edit-45s.mp4`, the stretch, title and description from `shorts.json`.

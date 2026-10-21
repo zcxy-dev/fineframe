@@ -13,6 +13,7 @@ import type { Service } from "../lib/key.ts";
 import type { Remembered } from "../lib/remembered.ts";
 import {
   DEFAULT_CAPTIONS,
+  DEFAULT_FILLERS,
   DEFAULT_SHORT_RANGE,
   DEFAULT_SHORTS,
   DEFAULT_STYLE,
@@ -88,6 +89,7 @@ export function Editor() {
     musicLicense: "",
     asr: "local",
     visuals: DEFAULT_VISUALS,
+    fillers: DEFAULT_FILLERS,
     quality: "best",
     correct: false,
     captions: DEFAULT_CAPTIONS,
@@ -350,6 +352,7 @@ export function Editor() {
             ...(music > 0 ? { musicLicense: choices.musicLicense.trim() } : {}),
             asr: choices.asr,
             visuals: choices.visuals,
+            fillers: choices.fillers,
             quality: choices.quality,
             correct: choices.correct,
             captions: choices.captions,
