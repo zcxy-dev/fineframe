@@ -15,7 +15,7 @@
     "dist": "node scripts/stage.ts && electron-builder --publish never",
     "smoke": "node scripts/smoke.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test 'src/**/*.test.ts'"
+    "test": "node --test 'src/**/*.test.ts' 'scripts/**/*.test.ts'"
   },
   "devDependencies": {
     "electron": "44.5.1",
