@@ -21,7 +21,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { _electron as electron, type Page } from "playwright-core";
@@ -53,11 +53,12 @@ const SENTENCES = [
 ];
 
 const work = await mkdtemp(join(tmpdir(), "video-editor-smoke-"));
-// The app's own folders and caches start empty, so every first-use download happens. Its home
-// folder, where the command and the skill install, is the smoke's own too.
+// The app's own folders and caches start empty, so every first-use download happens. On macOS
+// and Linux its home folder, where the command and the skill install, is the smoke's own too; on
+// Windows the app does not start with another USERPROFILE, so the skill goes in the runner's.
 const home = { XDG_CONFIG_HOME: join(work, "config"), XDG_CACHE_HOME: join(work, "cache") };
-const homeDir = join(work, "home");
 const windows = process.platform === "win32";
+const homeDir = windows ? homedir() : join(work, "home");
 /** The files under `dir`, three levels deep, to say what a cache holds when a check fails. */
 const contents = (dir: string, depth = 3): string => {
   if (!existsSync(dir)) return `${dir} does not exist`;
@@ -380,7 +381,7 @@ await mkdir(homeDir, { recursive: true });
 const env: Record<string, string> = {
   ...Object.fromEntries(inherited),
   ...home,
-  ...(windows ? { USERPROFILE: homeDir } : { HOME: homeDir }),
+  ...(windows ? {} : { HOME: homeDir }),
   ANTHROPIC_BASE_URL: await listen(anthropic),
   OPENROUTER_BASE_URL: `${await listen(openrouter)}/api/v1`,
   APPIMAGE_EXTRACT_AND_RUN: "1",
@@ -614,7 +615,7 @@ async function makeEdit(): Promise<string[]> {
 
 /**
  * Chooses both install items in the app's menu, with each dialog's words printed in place of the
- * dialog, then checks the skill's files and runs the installed command as its owner would in a
+ * dialog and nothing already there replaced, then checks the skill's files and runs the installed command as its owner would in a
  * terminal: its help, then a 15 s edit of the clip, with only the keys saved in the app.
  */
 async function useCommandLine(): Promise<string[]> {
@@ -623,6 +624,11 @@ async function useCommandLine(): Promise<string[]> {
     (globalThis as { shown?: string[] }).shown = shown;
     dialog.showMessageBox = (async (...args: unknown[]) => {
       const options = args.at(-1) as Electron.MessageBoxOptions;
+      // Asked to replace something the app did not install: kept.
+      if (options.cancelId !== undefined) {
+        console.log(`declined: ${options.message}`);
+        return { response: options.cancelId, checkboxChecked: false };
+      }
       shown.push(`${options.message}: ${options.detail}`);
       return { response: 0, checkboxChecked: false };
     }) as typeof dialog.showMessageBox;
