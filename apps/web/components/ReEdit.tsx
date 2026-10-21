@@ -185,7 +185,7 @@ export function ReEdit({
   // The kit chosen here, and whether the version made will draw a kit's custom captions.
   const chosenKit = draft.kit ? kits?.kits.find((each) => each.id === draft.kit?.id) : undefined;
   const brandCaptions =
-    draft.kit === undefined ? view.captions === "brand" : Boolean(chosenKit?.brand.captions);
+    draft.kit === undefined ? Boolean(view.brand?.captions) : Boolean(chosenKit?.brand.captions);
   const shownCaptions = draft.captions ?? (brandCaptions ? "brand" : view.captions);
   const blocked = !view.footage
     ? words.noFootage
@@ -662,7 +662,8 @@ export function ReEdit({
                 aria-pressed={shownCaptions === style}
                 onClick={() => {
                   const { captions: _, ...rest } = draft;
-                  const unchanged = style === view.captions && draft.kit === undefined;
+                  const unchanged =
+                    style === view.captions && !view.brand?.captions && draft.kit === undefined;
                   change(unchanged ? rest : { ...draft, captions: style });
                 }}
               >

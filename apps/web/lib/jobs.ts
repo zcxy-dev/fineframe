@@ -280,9 +280,9 @@ export interface EditView {
   /** The music's level, by its first track; null without music. */
   music: { gainDb: number } | null;
   look: string;
-  /** The caption style, or "brand" for the brand kit's custom captions. */
   captions: string | null;
-  /** The brand kit the version is in, by name, and whether its custom captions draw. */
+  /** The brand kit the version is in, by name, and whether its custom captions draw in place of
+   * the caption style. */
   brand: { name: string; captions: boolean } | null;
   /** Made by an earlier version, whose motion-graphics cards and keyword pops this one leaves out
    * when it renders the edit again. */
@@ -1059,7 +1059,7 @@ export class Jobs {
       ),
       music: project.audio.music?.[0] ? { gainDb: project.audio.music[0].gainDb ?? 0 } : null,
       look: lookOf(project),
-      captions: project.captions ? captionsOf(project) : null,
+      captions: project.captions?.preset ?? null,
       brand: project.brand
         ? { name: project.brand.name, captions: project.brand.captions !== undefined }
         : null,
