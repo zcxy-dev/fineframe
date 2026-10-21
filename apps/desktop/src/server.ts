@@ -61,13 +61,13 @@ function freePort(): Promise<number> {
 }
 
 /**
- * The server's environment: the inherited one, run as plain Node by this app's own binary, with
- * the keys in the app's folder rather than a repository's .env, and uv told to install the
- * analysis's Python and its locked packages there too, never anything of the user's own.
+ * What runs the editor with the app's parts: the inherited environment, run as plain Node by this
+ * app's own binary, with uv told to run the analysis's Python and its locked packages from the
+ * app's folder, never anything of the user's own. The page's server and the `fineframe` command
+ * (cli.ts) both run with it.
  */
-export function serverEnvironment(
-  places: Places,
-  port: number,
+export function runtimeEnvironment(
+  places: Pick<Places, "bin" | "data">,
   inherited: NodeJS.ProcessEnv = process.env,
 ): NodeJS.ProcessEnv {
   const python = join(places.data, "python");
@@ -76,14 +76,6 @@ export function serverEnvironment(
   return {
     ...inherited,
     ELECTRON_RUN_AS_NODE: "1",
-    NODE_ENV: "production",
-    NEXT_TELEMETRY_DISABLED: "1",
-    VIDEO_EDITOR_HOST: "127.0.0.1",
-    PORT: String(port),
-    VIDEO_EDITOR_ENV_FILE: join(places.data, "keys.env"),
-    VIDEO_EDITOR_BRAND_KITS: join(places.data, "brand-kits"),
-    VIDEO_EDITOR_SETUP: "1",
-    VIDEO_EDITOR_STOP_WITH_STDIN: "1",
     [path]: [places.bin, inherited[path]].filter(Boolean).join(delimiter),
     UV_PROJECT_ENVIRONMENT: join(python, "env"),
     UV_PYTHON_INSTALL_DIR: join(python, "cpython"),
@@ -93,6 +85,31 @@ export function serverEnvironment(
     UV_FROZEN: "1",
     UV_NO_DEV: "1",
     UV_NO_EDITABLE: "1",
+  };
+}
+
+/** The keys' file in the app's folder, which the page saves and the `fineframe` command reads. */
+export const keysFile = (places: Pick<Places, "data">) => join(places.data, "keys.env");
+
+/**
+ * The server's environment: the editor's runtime, with the keys in the app's folder rather than a
+ * repository's .env, and the Python environment installed on the first start.
+ */
+export function serverEnvironment(
+  places: Places,
+  port: number,
+  inherited: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  return {
+    ...runtimeEnvironment(places, inherited),
+    NODE_ENV: "production",
+    NEXT_TELEMETRY_DISABLED: "1",
+    VIDEO_EDITOR_HOST: "127.0.0.1",
+    PORT: String(port),
+    VIDEO_EDITOR_ENV_FILE: keysFile(places),
+    VIDEO_EDITOR_BRAND_KITS: join(places.data, "brand-kits"),
+    VIDEO_EDITOR_SETUP: "1",
+    VIDEO_EDITOR_STOP_WITH_STDIN: "1",
   };
 }
 

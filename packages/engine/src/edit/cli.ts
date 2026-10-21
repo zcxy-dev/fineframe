@@ -16,7 +16,9 @@ import { parseLength, parseSpan, SHORTS_COUNT, SHORTS_RANGE } from "./length.ts"
 const [shortest, longest] = LENGTH_RANGE;
 /** The longest --instructions: a few sentences, not a script. */
 const INSTRUCTIONS_MAX = 2000;
-const usage = `Usage: pnpm edit <footage folder, file or link>... --length <length> \\
+/** What runs this: pnpm in a clone, or the desktop app's `fineframe` command (apps/desktop). */
+const command = process.env.VIDEO_EDITOR_COMMAND ?? "pnpm";
+const usage = `Usage: ${command} edit <footage folder, file or link>... --length <length> \\
     --aspect <9:16 | 1:1 | 16:9> -o <out.mp4> [--within <start>-<end>] [--short <about>] \\
     [--shorts <count>] [--names <names.txt>] [--terms <terms.txt>] \\
     [--correct] [--instructions <text>] [--asr <local | cloud>] \\

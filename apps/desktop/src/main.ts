@@ -1,8 +1,27 @@
 // The desktop app: the page's server on a free loopback port, the page in the app's own window,
-// and everything the server started stopped when the app quits.
+// and everything the server started stopped when the app quits. Its menu installs the `fineframe`
+// command and the agent skill.
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { app, BrowserWindow, dialog, nativeTheme, session, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  Menu,
+  MenuItem,
+  type MessageBoxOptions,
+  nativeTheme,
+  session,
+  shell,
+} from "electron";
+import {
+  installCommand,
+  installSkill,
+  repointLauncher,
+  skillFolders,
+  type Target,
+} from "./install.ts";
 import { type Places, type Server, startServer } from "./server.ts";
 
 const NAME = "Fineframe";
@@ -56,6 +75,92 @@ else {
   void app.whenReady().then(open);
 }
 
+/** The app as the `fineframe` command starts it: on Linux the AppImage, wherever it is now. */
+const target = (): Target => ({
+  program: process.env.APPIMAGE ?? process.execPath,
+  data: app.getPath("userData"),
+});
+
+type Words = Awaited<ReturnType<typeof words>>;
+
+/** A message over the window, or alone when there is none; the button chosen. */
+async function show(options: MessageBoxOptions): Promise<number> {
+  const { response } = window
+    ? await dialog.showMessageBox(window, options)
+    : await dialog.showMessageBox(options);
+  return response;
+}
+
+/** Asks before replacing what is at `path`, which the app did not install. */
+const confirmReplace = (t: Words) => async (path: string) =>
+  (await show({
+    type: "question",
+    message: t.replace(path),
+    detail: t.replaceDetail,
+    buttons: [t.replaceButton, t.cancel],
+    defaultId: 1,
+    cancelId: 1,
+  })) === 0;
+
+async function installCommandFromMenu(t: Words): Promise<void> {
+  try {
+    const installed = await installCommand(target(), {
+      confirm: confirmReplace(t),
+      home: homedir(),
+    });
+    if (!installed) return;
+    await show({
+      type: "info",
+      message: t.commandInstalled,
+      detail: t.commandDetail(installed.path, installed.remove, installed.offPath),
+    });
+  } catch (error) {
+    dialog.showErrorBox(t.notInstalled, (error as Error).message);
+  }
+}
+
+async function installSkillFromMenu(t: Words): Promise<void> {
+  try {
+    const skill = join(places().editor, "skills", "video-editor");
+    const installed: string[] = [];
+    const kept: string[] = [];
+    for (const folder of skillFolders(homedir())) {
+      ((await installSkill(skill, folder, confirmReplace(t))) ? installed : kept).push(folder);
+    }
+    await show({ type: "info", message: t.skillInstalled, detail: t.skillDetail(installed, kept) });
+  } catch (error) {
+    dialog.showErrorBox(t.notInstalled, (error as Error).message);
+  }
+}
+
+/** The two install items, first in the app's menu on macOS (after About) and in File elsewhere;
+ * the command only from an installed app, whose resources it runs. */
+function addInstallItems(t: Words): void {
+  const menu = Menu.getApplicationMenu();
+  const first = menu?.items[0]?.submenu;
+  if (!menu || !first) return;
+  let at = process.platform === "darwin" ? 2 : 0;
+  const add = (item: MenuItem) => first.insert(at++, item);
+  if (app.isPackaged) {
+    add(
+      new MenuItem({
+        id: "install-command",
+        label: t.installCommand,
+        click: () => void installCommandFromMenu(t),
+      }),
+    );
+  }
+  add(
+    new MenuItem({
+      id: "install-skill",
+      label: t.installSkill,
+      click: () => void installSkillFromMenu(t),
+    }),
+  );
+  add(new MenuItem({ type: "separator" }));
+  Menu.setApplicationMenu(menu);
+}
+
 async function open(): Promise<void> {
   window = new BrowserWindow({
     title: NAME,
@@ -76,6 +181,13 @@ async function open(): Promise<void> {
     window = null;
   });
   const t = await words();
+  addInstallItems(t);
+  // An installed command follows the app when it moves, or to a newer AppImage.
+  if (app.isPackaged) {
+    void repointLauncher(target()).catch((error: Error) =>
+      console.error(`Could not update the fineframe command: ${error.message}`),
+    );
+  }
   void window.loadURL(
     `data:text/html;charset=utf-8,${encodeURIComponent(startingPage(t.starting(NAME)))}`,
   );

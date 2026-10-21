@@ -5,5 +5,5 @@
     "packages/*": { "entry": ["scripts/*.ts"] }
   },
   "ignore": ["packages/schema/src/generated/**"],
-  "ignoreBinaries": ["uv"]
+  "ignoreBinaries": ["uv", "osascript"]
 }
