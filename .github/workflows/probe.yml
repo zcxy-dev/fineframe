@@ -26,8 +26,8 @@ jobs:
           chmod +x "$RUNNER_TEMP/ffmpeg"; F="$RUNNER_TEMP/ffmpeg"
           "$F" -hide_banner -hwaccels
           "$F" -hide_banner -v error -f lavfi -i testsrc2=s=640x360:r=30000/1001:d=3 -c:v libx264 -pix_fmt yuv420p -bf 2 "$RUNNER_TEMP/clip.mp4"
-          "$F" -hide_banner -v verbose -hwaccel videotoolbox -i "$RUNNER_TEMP/clip.mp4" -f framemd5 "$RUNNER_TEMP/hw.md5" 2>&1 | grep -i -E "videotoolbox|hwaccel|error" | head -20 || true
-          "$F" -hide_banner -v error -i "$RUNNER_TEMP/clip.mp4" -f framemd5 "$RUNNER_TEMP/sw.md5"
+          "$F" -hide_banner -v verbose -hwaccel videotoolbox -i "$RUNNER_TEMP/clip.mp4" -pix_fmt yuv420p -f framemd5 "$RUNNER_TEMP/hw.md5" 2>&1 | grep -i -E "videotoolbox|hwaccel|error" | head -20 || true
+          "$F" -hide_banner -v error -i "$RUNNER_TEMP/clip.mp4" -pix_fmt yuv420p -f framemd5 "$RUNNER_TEMP/sw.md5"
           diff "$RUNNER_TEMP/hw.md5" "$RUNNER_TEMP/sw.md5" && echo "CLI framemd5 identical" || echo "CLI framemd5 differ"
           uv sync --locked
           uv run python - "$RUNNER_TEMP/clip.mp4" <<'PY'
@@ -40,13 +40,13 @@ jobs:
           def frames(accel):
               with av.open(sys.argv[1], hwaccel=accel) as c:
                   s = c.streams.video[0]
-                  out = [(f.pts, f.format.name, f.width, f.height, f.to_ndarray(format="rgb24").tobytes()) for f in c.decode(s)]
+                  out = [(f.pts, f.format.name, f.width, f.height, f.reformat(format="yuv420p").to_ndarray(), f.to_ndarray(format="rgb24"), f.to_ndarray(width=48, height=27, format="rgb24"), f.time) for f in c.decode(s)]
                   print("is_hwaccel", s.codec_context.is_hwaccel)
                   return out
           sw = frames(None)
           try:
               hw = frames(h.HWAccel("videotoolbox", allow_software_fallback=False))
-              print("frames", len(sw), len(hw), "pts equal", [f[0] for f in sw] == [f[0] for f in hw], "formats", sw[0][1], hw[0][1], "rgb equal", all(a[4] == b[4] for a, b in zip(sw, hw)))
+              print("frames", len(sw), len(hw), "pts equal", [f[0] for f in sw] == [f[0] for f in hw], "formats", sw[0][1], hw[0][1], "yuv equal", all((a[4] == b[4]).all() for a, b in zip(sw, hw)), "rgb maxdiff", max(int(abs(a[5].astype(int) - b[5]).max()) for a, b in zip(sw, hw)), "thumb maxdiff", max(int(abs(a[6].astype(int) - b[6]).max()) for a, b in zip(sw, hw)), "times equal", [f[7] for f in sw] == [f[7] for f in hw])
           except Exception as e:
               print("pyav videotoolbox failed:", repr(e))
           PY
