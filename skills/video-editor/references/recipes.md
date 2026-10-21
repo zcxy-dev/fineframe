@@ -122,5 +122,5 @@ Apply or change a kit with a render alone; `none` takes the kit out:
 pnpm -s render out/edit.project.json --brand path/to/kit -o out/edit-v2.mp4
 ```
 
-It checks the kit, copies its files into `out/brand/` by their content (an SVG logo drawn to a PNG), and writes `out/edit-v2.project.json` with them in `brand`. To change one setting of the kit an edit carries, edit `brand` in the copy and render it; a file it names has to stay the one copied, whose SHA-256 the render checks.
+It checks the kit, copies its files into `out/brand/` by their content, and writes `out/edit-v2.project.json` with them in `brand`. To change one setting of the kit an edit carries, edit `brand` in the copy and render it; a file it names has to stay the one copied, whose SHA-256 the render checks.
 

@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, realpath, rename, writeFile } from "node:fs/promises";
 import { basename, join, relative, resolve, sep } from "node:path";
 import type { BrandLook } from "@video-editor/effects";
-import { rasterizeSvg, svgProblem } from "@video-editor/effects/logo";
+import { svgProblem } from "@video-editor/effects/logo";
 import {
   type Brand,
   type BrandFile,
@@ -62,7 +62,7 @@ export function logoKind(data: Buffer): "png" | "svg" | string {
     const size = pngSize(data);
     return typeof size === "string" ? size : "png";
   }
-  const text = data.toString("utf8").replace(/^﻿/, "");
+  const text = data.toString("utf8").replace(/^\ufeff/, "");
   if (!/^\s*</.test(text)) return "it is neither a PNG nor an SVG image";
   return svgProblem(text) ?? "svg";
 }
@@ -132,15 +132,14 @@ export async function loadKit(folder: string): Promise<Brand> {
 
 /**
  * Copies the files of `brand`, a kit whose paths are relative to `from`, into `into`, each named
- * by its content's hash, an SVG logo drawn to a PNG with `chrome` first, and returns the kit with
- * its paths relative to `base`, the project's folder, and their SHA-256 filled in.
+ * by its content's hash, and returns the kit with its paths relative to `base`, the project's
+ * folder, and their SHA-256 filled in. An SVG logo stays one: a render draws it.
  */
 export async function stageBrand(
   brand: Brand,
   from: string,
   into: string,
   base: string,
-  chrome: () => Promise<string>,
 ): Promise<Brand> {
   await mkdir(into, { recursive: true });
   const put = async (data: Buffer, extension: string): Promise<BrandFile> => {
@@ -161,12 +160,8 @@ export async function stageBrand(
   const staged: Brand = structuredClone(brand);
   if (brand.logo) {
     const data = await readFile(await inside(from, brand.logo.file.path));
-    const kind = logoKind(data);
-    const png =
-      kind === "svg"
-        ? await rasterizeSvg(data.toString("utf8").replace(/^﻿/, ""), await chrome())
-        : data;
-    (staged.logo as NonNullable<Brand["logo"]>).file = await put(png, ".png");
+    const extension = logoKind(data) === "svg" ? ".svg" : ".png";
+    (staged.logo as NonNullable<Brand["logo"]>).file = await put(data, extension);
   }
   const graphics = await font(brand.fonts?.graphics);
   const captions = await font(brand.fonts?.captions);
@@ -253,10 +248,12 @@ async function brandFile(file: BrandFile, base: string): Promise<{ path: string;
 }
 
 /** Reads the files of a project's `brand`, whose paths are relative to `base`, for a render:
- * each checked, the bundled faces downloaded on first use. */
+ * each checked, the bundled faces downloaded on first use, and an SVG logo drawn to a PNG by
+ * `rasterize` into the cache, once. */
 export async function resolveBrand(
   brand: Brand,
   base: string,
+  rasterize: (svg: string) => Promise<Buffer>,
   onDownload?: (name: string, bytes: number, total: number) => void,
 ): Promise<ResolvedBrand> {
   const face = async (font: BrandFont | undefined) => {
@@ -271,7 +268,18 @@ export async function resolveBrand(
   const captions = await face(brand.fonts?.captions);
   let watermark: ResolvedBrand["watermark"] = null;
   if (brand.logo?.show) {
-    const { path, data } = await brandFile(brand.logo.file, base);
+    let { path, data } = await brandFile(brand.logo.file, base);
+    if (logoKind(data) === "svg") {
+      const svg = data.toString("utf8").replace(/^\ufeff/, "");
+      path = join(cacheDir(), "brand-logos", `${sha256(data).slice(0, 16)}.png`);
+      if (!(await exists(path))) {
+        await mkdir(join(cacheDir(), "brand-logos"), { recursive: true });
+        const partial = `${path}.${process.pid}.partial`;
+        await writeFile(partial, await rasterize(svg));
+        await rename(partial, path);
+      }
+      data = await readFile(path);
+    }
     const size = pngSize(data);
     if (typeof size === "string") throw new BrandError(`The brand kit's logo: ${size}`);
     const { corner, opacity } = brand.logo;

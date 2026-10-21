@@ -1153,8 +1153,6 @@ export class Jobs {
       folder,
       join(this.#dir(job), "brand"),
       dirname(path),
-      // Only an SVG logo is drawn, in Chrome, loaded then: the server starts without it.
-      async () => (await import("@video-editor/engine/chrome")).chrome(),
     );
     return { ...revision, brand };
   }

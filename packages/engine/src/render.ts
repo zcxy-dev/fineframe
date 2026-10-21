@@ -6,6 +6,7 @@ import {
   type RenderOptions as EffectOptions,
   type GraphicJob,
   type OverlayJob,
+  rasterizeSvg,
   renderGraphics,
   renderOverlays,
   type TemplateId,
@@ -171,7 +172,12 @@ export async function render(
   report(0, "Checking sources");
   const sources = await loadSources(project, projectPath);
   const brand = project.brand
-    ? await resolveBrand(project.brand, dirname(resolve(projectPath)), options.onDownload)
+    ? await resolveBrand(
+        project.brand,
+        dirname(resolve(projectPath)),
+        async (svg) => rasterizeSvg(svg, await chrome()),
+        options.onDownload,
+      )
     : null;
   const timeline = buildTimeline(project, sources);
   const pieces = cutPieces(timeline);

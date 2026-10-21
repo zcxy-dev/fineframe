@@ -94,9 +94,7 @@ test("an edit copies the kit's files by their content and a render refuses one c
   const dir = await scratch(t, "kit-");
   const folder = await kitFolder(dir);
   const edit = join(dir, "edit");
-  const staged = await stageBrand(await loadKit(folder), folder, join(edit, "brand"), edit, () => {
-    throw new Error("A PNG logo needs no Chrome");
-  });
+  const staged = await stageBrand(await loadKit(folder), folder, join(edit, "brand"), edit);
   const files = await readdir(join(edit, "brand"));
   assert.equal(files.length, 2);
   assert.match(staged.logo?.file.path ?? "", /^brand\/[0-9a-f]{16}\.png$/);
@@ -105,12 +103,15 @@ test("an edit copies the kit's files by their content and a render refuses one c
   const font = staged.fonts?.captions;
   assert.ok(font && "path" in font && /^brand\/[0-9a-f]{16}\.otf$/.test(font.path));
   // The bundled face downloads on first use; the uploaded one is the kit's own.
-  const resolved = await resolveBrand(staged, edit);
+  const drawn = async () => {
+    throw new Error("A PNG logo is not drawn");
+  };
+  const resolved = await resolveBrand(staged, edit, drawn);
   assert.equal(resolved.captions?.family, "Noto Sans CJK TC");
   assert.deepEqual([resolved.watermark?.width, resolved.watermark?.height], [64, 32]);
   assert.ok(resolved.look.font?.path.endsWith("jf-openhuninn-2.1.ttf"));
   await writeFile(join(edit, staged.logo?.file.path ?? ""), "changed");
-  await assert.rejects(resolveBrand(staged, edit), /has changed since the edit was made/);
+  await assert.rejects(resolveBrand(staged, edit, drawn), /has changed since the edit was made/);
 });
 
 test("a kit's custom captions draw over the edit's style, which taking the kit off brings back", () => {

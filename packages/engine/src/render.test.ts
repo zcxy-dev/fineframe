@@ -2100,3 +2100,31 @@ test(
     assert.ok(bright > 300, `${bright} bright pixels of the number in the badge`);
   },
 );
+
+test("an SVG logo is drawn to its watermark as the edit renders, once", chrome, async (t) => {
+  const dir = await scratch(t, "svg-logo-");
+  const source = await makeSource(dir, {
+    id: "a",
+    pattern: "color",
+    filter: "lutyuv=y=60:u=128:v=128",
+    width: 160,
+    height: 90,
+    fps: 30,
+    seconds: 2,
+    sound: 220,
+  });
+  await writeFile(
+    join(dir, "logo.svg"),
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 16"><rect width="32" height="16" fill="#ffffff"/></svg>',
+  );
+  const project = projectOf([source], [clip("a", 0, 1)], tiny);
+  project.brand = {
+    name: "Test kit",
+    colors: { primary: "#2f6bff" },
+    logo: { file: { path: "logo.svg" }, show: true, corner: "top-right", size: 0.2, opacity: 1 },
+  };
+  const result = await render(await write(dir, project), join(dir, "out", "edit.mp4"));
+  for (const frame of await grey(result.video, 160, 90)) {
+    assert.ok((frame[13 * 160 + 137] ?? 0) > 220, "the watermark shows");
+  }
+});

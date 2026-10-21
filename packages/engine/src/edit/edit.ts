@@ -14,7 +14,6 @@ import {
 } from "@video-editor/schema";
 import { BrandError, loadKit, moveBrand, stageBrand } from "../brand/kit.ts";
 import type { CaptionStyle } from "../captions/presets.ts";
-import { chrome } from "../chrome.ts";
 import { ffmpeg, QUIET, run } from "../ffmpeg.ts";
 import { fetchLink, isLink, ytDlp } from "../link.ts";
 import type { LookId } from "../looks.ts";
@@ -359,15 +358,10 @@ async function prepare(
   // The renderer's FFmpeg, downloaded on its first use, before the long analysis rather than
   // after it.
   await ffmpeg((bytes, total) => download("FFmpeg", bytes, total));
-  // The kit's files are copied before the analysis too; an SVG logo is drawn in Chrome.
+  // The kit's files are copied before the analysis too.
   const brand =
     kit && options.brand
-      ? {
-          kit: await stageBrand(kit, options.brand, brandFolder, brandFolder, () =>
-            chrome((bytes, total) => download("Chrome Headless Shell", bytes, total)),
-          ),
-          folder: brandFolder,
-        }
+      ? { kit: await stageBrand(kit, options.brand, brandFolder, brandFolder), folder: brandFolder }
       : null;
   const worker = options.worker ?? (await localWorker());
   const cache = options.cache ?? defaultCache();

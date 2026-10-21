@@ -642,7 +642,7 @@ export interface Brand {
     captions?: BrandFont;
   };
   /**
-   * The logo, a PNG, and the watermark it is drawn as through the whole video when `show` is true: in a corner, as large as a square whose side is `size` of the frame's shorter side, at `opacity`.
+   * The logo, a PNG or an SVG, and the watermark it is drawn as through the whole video when `show` is true: in a corner, as large as a square whose side is `size` of the frame's shorter side, at `opacity`.
    */
   logo?: {
     file: BrandFile;

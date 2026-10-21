@@ -10,7 +10,6 @@ import {
   validateProject,
 } from "@video-editor/schema";
 import { loadKit, stageBrand, withBrand } from "./brand/kit.ts";
-import { chrome } from "./chrome.ts";
 import { cutEdit, placeSources } from "./cut.ts";
 import { rebase, render } from "./render.ts";
 
@@ -101,7 +100,6 @@ try {
               resolve(here, values.brand),
               join(folder, "brand"),
               dirname(projectPath),
-              () => chrome(),
             );
       project = withBrand(project, kit);
     }
