@@ -30,7 +30,7 @@
       "9.6 GB"
     ],
     [
-      "Local Qwen3-ASR-1.7B (the GPU default)",
+      "Local Qwen3-ASR-1.7B (the CUDA GPU default)",
       "s02, s04 (724)",
       "9.94 %",
       "6.37 / 26.8 %",
