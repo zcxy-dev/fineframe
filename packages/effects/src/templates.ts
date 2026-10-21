@@ -11,8 +11,8 @@ import type {
   TitleParams,
   WipeParams,
 } from "./catalog.ts";
+import { PALETTE } from "./colour.ts";
 import { type Aspect, type Layout, layoutFor, MOTION } from "./layout.ts";
-import { PALETTE } from "./style.ts";
 
 /** An effect's markup and its own styles, for `page()`. */
 export interface Markup {

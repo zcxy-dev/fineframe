@@ -2,7 +2,6 @@
 
 import { CAPTION_STYLES, type CaptionStyle } from "@video-editor/engine/captions";
 import { lookIds } from "@video-editor/engine/looks";
-import type { Revision } from "@video-editor/engine/revise";
 import {
   Fragment,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -20,6 +19,8 @@ import { formatClock, formatDollars } from "../lib/settings.ts";
 import { jobApi } from "../lib/shorts.ts";
 import { dollarsOf } from "../lib/summary.ts";
 import { spacedWords } from "../lib/transcript.ts";
+import type { PageRevision } from "../lib/versions.ts";
+import { KitCaptionPreview, useKits } from "./BrandKits.tsx";
 import { CaptionPreview } from "./CaptionPreview.tsx";
 import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
@@ -39,6 +40,8 @@ interface Draft {
   music?: { gainDb: number } | "remove";
   look?: string;
   captions?: CaptionStyle;
+  /** Another brand kit, by its id and name, or null for none. */
+  kit?: { id: string; name: string } | null;
 }
 const EMPTY: Draft = { cuts: [], words: {}, titles: {}, remove: [] };
 
@@ -79,6 +82,7 @@ export function ReEdit({
   const [selection, setSelection] = useState<[number, number] | null>(null);
   const [landed, setLanded] = useState<Landed | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { list: kits } = useKits();
   const current = job.current ?? 1;
   const rendering = job.render && !job.render.error ? job.render : null;
 
@@ -178,6 +182,11 @@ export function ReEdit({
   }
 
   const count = changes(draft);
+  // The kit chosen here, and whether the version made will draw a kit's custom captions.
+  const chosenKit = draft.kit ? kits?.kits.find((each) => each.id === draft.kit?.id) : undefined;
+  const brandCaptions =
+    draft.kit === undefined ? view.captions === "brand" : Boolean(chosenKit?.brand.captions);
+  const shownCaptions = draft.captions ?? (brandCaptions ? "brand" : view.captions);
   const blocked = !view.footage
     ? words.noFootage
     : rendering
@@ -592,19 +601,69 @@ export function ReEdit({
         </div>
       </div>
 
+      <div className={styles.section}>
+        <h3 className={styles.sectionTitle}>{t.kits.picker}</h3>
+        <select
+          className={styles.input}
+          aria-label={t.kits.picker}
+          value={draft.kit === undefined ? (view.brand ? "keep" : "") : (draft.kit?.id ?? "")}
+          onChange={(event) => {
+            const { kit: _, captions: __, ...rest } = draft;
+            const picked = event.target.value;
+            if (picked === "keep" || (picked === "" && !view.brand)) {
+              change(draft.captions ? { ...rest, captions: draft.captions } : rest);
+              return;
+            }
+            const chosen = kits?.kits.find((each) => each.id === picked);
+            const kit = chosen ? { id: chosen.id, name: chosen.brand.name } : null;
+            // A kit with custom captions draws them, in place of a style picked here.
+            const keeps = draft.captions && !chosen?.brand.captions;
+            change({ ...rest, kit, ...(keeps ? { captions: draft.captions } : {}) });
+          }}
+        >
+          {view.brand && <option value="keep">{words.brandKeep(view.brand.name)}</option>}
+          <option value="">{t.kits.none}</option>
+          {kits?.kits.map((each) => (
+            <option key={each.id} value={each.id}>
+              {each.brand.name}
+            </option>
+          ))}
+        </select>
+        <p className={styles.help}>{words.brandHelp}</p>
+      </div>
+
       {view.captions && (
         <div className={styles.section}>
           <h3 className={styles.sectionTitle}>{words.captionStyle}</h3>
           <div className={styles.captionStyles}>
+            {brandCaptions && (
+              <button
+                type="button"
+                className={styles.captionStyle}
+                aria-pressed={shownCaptions === "brand"}
+                onClick={() => {
+                  const { captions: _, ...rest } = draft;
+                  change(rest);
+                }}
+              >
+                {chosenKit ? (
+                  <KitCaptionPreview kit={chosenKit} />
+                ) : (
+                  <CaptionPreview style="bold" />
+                )}
+                {t.kits.captionsName}
+              </button>
+            )}
             {CAPTION_STYLES.map((style) => (
               <button
                 key={style}
                 type="button"
                 className={styles.captionStyle}
-                aria-pressed={(draft.captions ?? view.captions) === style}
+                aria-pressed={shownCaptions === style}
                 onClick={() => {
                   const { captions: _, ...rest } = draft;
-                  change(style === view.captions ? rest : { ...draft, captions: style });
+                  const unchanged = style === view.captions && draft.kit === undefined;
+                  change(unchanged ? rest : { ...draft, captions: style });
                 }}
               >
                 <CaptionPreview style={style} />
@@ -833,8 +892,8 @@ function nextVersion(job: Job): number {
   return Math.max(1, ...(job.versions ?? []).map((version) => version.n)) + 1;
 }
 
-function toRevision(draft: Draft, words: readonly Word[]): Revision {
-  const revision: Revision = {};
+function toRevision(draft: Draft, words: readonly Word[]): PageRevision {
+  const revision: PageRevision = {};
   const cuts = draft.cuts.flatMap(([a, b]): [number, number][] => {
     const first = words[a];
     const last = words[b];
@@ -858,8 +917,9 @@ function toRevision(draft: Draft, words: readonly Word[]): Revision {
     });
   }
   if (draft.music) revision.music = draft.music;
-  if (draft.look) revision.look = draft.look as Revision["look"];
-  if (draft.captions) revision.captions = draft.captions as Revision["captions"];
+  if (draft.look) revision.look = draft.look as PageRevision["look"];
+  if (draft.captions) revision.captions = draft.captions;
+  if (draft.kit !== undefined) revision.kit = draft.kit?.id ?? null;
   return revision;
 }
 
@@ -871,7 +931,8 @@ function changes(draft: Draft): number {
     draft.remove.length +
     (draft.music ? 1 : 0) +
     (draft.look ? 1 : 0) +
-    (draft.captions ? 1 : 0)
+    (draft.captions ? 1 : 0) +
+    (draft.kit !== undefined ? 1 : 0)
   );
 }
 
@@ -889,6 +950,7 @@ function describe(draft: Draft, t: Messages): string {
     draft.look &&
       words.look(draft.look, t.looks[draft.look as keyof Messages["looks"]]?.name ?? draft.look),
     draft.captions && words.captions(draft.captions, t.captions[draft.captions].name),
+    draft.kit !== undefined && (draft.kit ? words.brand(draft.kit.name) : words.noBrand),
   ].filter((part): part is string => Boolean(part));
   const text = parts.join(t.list);
   return text ? text[0]?.toUpperCase() + text.slice(1) : words.none;

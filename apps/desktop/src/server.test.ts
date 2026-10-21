@@ -60,6 +60,7 @@ test("the server runs from the app's folders and keeps keys and Python out of an
   assert.equal(env.PORT, "4321");
   assert.equal(env.VIDEO_EDITOR_HOST, "127.0.0.1");
   assert.equal(env.VIDEO_EDITOR_ENV_FILE, join("/home/a/App", "keys.env"));
+  assert.equal(env.VIDEO_EDITOR_BRAND_KITS, join("/home/a/App", "brand-kits"));
   assert.equal(env.ELECTRON_RUN_AS_NODE, "1");
   assert.equal(env.UV_PROJECT_ENVIRONMENT, join("/home/a/App", "python", "env"));
   assert.equal(env.UV_PYTHON_PREFERENCE, "only-managed");

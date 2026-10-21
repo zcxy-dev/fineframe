@@ -5,7 +5,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./layout": "./src/layout.ts"
+    "./layout": "./src/layout.ts",
+    "./colour": "./src/colour.ts",
+    "./logo": "./src/logo.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

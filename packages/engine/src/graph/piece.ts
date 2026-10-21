@@ -1,5 +1,6 @@
 // One piece's FFmpeg run: its inputs and its filter graph, for the video pass or the audio pass.
 
+import { watermarkPlacement } from "@video-editor/effects";
 import { type Framing, type Grade, TICKS_PER_SECOND } from "@video-editor/schema";
 import { QUIET } from "../ffmpeg.ts";
 import { framingCuts } from "../framing.ts";
@@ -16,6 +17,7 @@ import { graphicPlacement, overlayInput, overlayTiming, slideIn } from "./overla
 import { crossfade, dissolve } from "./transitions.ts";
 import { clock, colour, dips, fill, ON_SCREEN_TOLERANCE, push } from "./video.ts";
 import { lead, voiceSound } from "./voice.ts";
+import { type Watermark, watermarkLines } from "./watermark.ts";
 
 /** Collects inputs, numbering them as FFmpeg will. */
 function inputs(timeline: Timeline) {
@@ -37,13 +39,14 @@ function inputs(timeline: Timeline) {
 
 /** The piece's picture, written to stdout as raw frames. `overlays` are the rendered files of
  * `timeline.overlays`, in its order, and `graphics` those of `timeline.graphics`; `luts` the
- * .cube file of each clip's match and look, by lutKey. */
+ * .cube file of each clip's match and look, by lutKey; `watermark` a brand kit's logo. */
 export function pieceVideo(
   piece: Piece,
   timeline: Timeline,
   overlays: string[] = [],
   luts: ReadonlyMap<string, string> = new Map(),
   graphics: string[] = [],
+  watermark: Watermark | null = null,
 ): string[] {
   const lut = (grade: Grade | undefined) => {
     const key = lutKey(grade);
@@ -113,6 +116,12 @@ export function pieceVideo(
       `${base}[e${k}]${whole}[f${k}]`,
     );
     base = `[f${k}]`;
+  }
+  if (watermark) {
+    const index = opened.add(["-i", watermark.path]);
+    const at = watermarkPlacement(watermark, output);
+    graph.push(...watermarkLines(index, watermark, at, piece.graphics, base, "[wm]"));
+    base = "[wm]";
   }
   graph.push(`${base}format=yuv420p[v]`);
   return [

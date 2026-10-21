@@ -1303,12 +1303,12 @@ test("every caption preset is drawn in the face its layout was measured in", asy
     });
     edit.output = { ...edit.output, ...tiny };
     const built = await buildCaptions(edit, { main: [], broll: [], frames: 15, frameTicks: 4000 });
-    assert.ok(built?.ass && built.font);
+    assert.ok(built?.ass && built.fonts.length === 1);
     const folder = join(dir, name);
     await mkdir(folder);
     await writeFile(join(folder, "captions.ass"), built.ass);
     // Staged as the render stages them; libass has to find the face whatever fonts the machine has.
-    const env = { ...process.env, ...(await stageFonts(folder, [built.font])) };
+    const env = { ...process.env, ...(await stageFonts(folder, built.fonts)) };
     const lavfi = `color=black:s=${tiny.width}x${tiny.height}:r=30:d=0.5`;
     const args = [
       "-hide_banner",
@@ -1328,7 +1328,7 @@ test("every caption preset is drawn in the face its layout was measured in", asy
     const { stderr } = await execFileAsync(bin, args, { cwd: folder, env });
     const selected = [...stderr.matchAll(/fontselect: \(.*?\) -> ([^,]+),/g)].map((m) => m[1]);
     assert.ok(selected.length > 0, `${name}: libass selected no face`);
-    const face = basename(built.font, ".otf");
+    const face = basename(built.fonts[0] as string, ".otf");
     assert.deepEqual(
       new Set(selected.map((path) => basename(path ?? "", ".otf"))),
       new Set([face]),

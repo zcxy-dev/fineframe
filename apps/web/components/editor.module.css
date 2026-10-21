@@ -2297,3 +2297,216 @@ legend.label {
   font-size: var(--text-xs);
   line-height: 1.5;
 }
+
+/* The Brand kit page: a sample frame in the viewer, the kits and their settings in the
+   inspector. The frame is laid out at the output's size and scaled to fit, as the edit is. */
+
+.kitPreview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  background: var(--viewer);
+}
+
+.kitPreviewFrame {
+  width: 100%;
+}
+
+.kitPreviewFrame[data-aspect="9:16"] {
+  width: min(100%, calc(64vh * 9 / 16));
+}
+
+.kitFrame {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: #000;
+}
+
+.kitStage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 30% 42% at 50% 62%, #8b6f5c 0 60%, transparent 61%),
+    radial-gradient(ellipse 14% 18% at 50% 34%, #c9a48a 0 60%, transparent 61%),
+    linear-gradient(170deg, #5d6a73, #3b4249 55%, #23272c);
+}
+
+.kitThird {
+  position: absolute;
+  display: flex;
+  align-items: stretch;
+  background: rgba(13, 14, 17, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f5f6f8;
+}
+
+.kitBar {
+  flex: none;
+  border-radius: 99px;
+}
+
+.kitName,
+.kitRole {
+  display: block;
+  white-space: nowrap;
+}
+
+.kitName {
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.kitRole {
+  margin-top: 0.15em;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #a9adb5;
+}
+
+.kitCaption {
+  position: absolute;
+  left: 50%;
+  translate: -50% 0;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.kitLogo {
+  position: absolute;
+  object-fit: contain;
+}
+
+.kitList {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--well);
+}
+
+.kitList li + li {
+  border-top: 1px solid var(--line);
+}
+
+.kitItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
+.kitItem:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.kitItem[aria-pressed="true"] {
+  background: var(--raised);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--text);
+}
+
+.kitSwatch {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.2);
+}
+
+.kitItemName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kitNew {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.kitNew .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.kitColour {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  font-size: var(--text-sm);
+}
+
+.kitColourInput {
+  flex: none;
+  width: 36px;
+  height: 28px;
+  padding: 2px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--well);
+}
+
+.kitColourInput:disabled {
+  opacity: 0.5;
+}
+
+.kitColourName {
+  flex: 1;
+}
+
+.kitCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+
+.kitCheck input {
+  accent-color: var(--accent);
+}
+
+.kitUpload {
+  align-self: flex-start;
+  cursor: pointer;
+}
+
+.kitUpload:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.kitRange {
+  display: grid;
+  grid-template-columns: 5.5em minmax(0, 1fr) 3.5em;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+
+.kitRange input {
+  accent-color: var(--accent);
+}
+
+.kitSub {
+  color: var(--text-2);
+  font-size: var(--text-xs);
+}

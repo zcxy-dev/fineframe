@@ -153,3 +153,71 @@ function zonesOf(
   }
   return zones;
 }
+
+/**
+ * Where the labels, lower thirds and template overlays draw, over the frames each shows, as boxes
+ * a caption keeps clear of: a label's or lower third's own box, and the region a title, a name, a
+ * chapter marker or a callout lays its text out in. Graphics and overlays are placed clear of the
+ * house captions alone, so only custom captions, which may sit elsewhere, need these.
+ */
+export function overlayZones(
+  timeline: Partial<Pick<Timeline, "graphics" | "overlays">>,
+  output: Pick<Project["output"], "width" | "height" | "aspect">,
+): FaceZone[] {
+  const layout = layoutFor(output.aspect, output.width, output.height);
+  const { safe, u, type } = layout;
+  const zone = (start: number, end: number, x0: number, y0: number, x1: number, y1: number) => ({
+    start,
+    end,
+    boxes: [{ x0, y0, x1, y1 }],
+    hard: true,
+  });
+  const labels = (timeline.graphics ?? [])
+    .filter((clip) => clip.graphic.layout === "label" || clip.graphic.layout === "lower-third")
+    .map((clip) => {
+      const at = graphicPlacement(clip.graphic, output);
+      return zone(clip.start, clip.end, at.x, at.y, at.x + at.width, at.y + at.height);
+    });
+  const left = safe.left;
+  const right = output.width - safe.right;
+  const top = safe.top;
+  const bottom = output.height - safe.bottom;
+  const templates = (timeline.overlays ?? []).flatMap(({ overlay, start, end }) => {
+    switch (overlay.template) {
+      case "title": {
+        const middle = (top + bottom) / 2 - 3 * u;
+        const half = type("title") * 1.2 + type("subtitle") * 1.4;
+        return [zone(start, end, left, middle - half, right, middle + half)];
+      }
+      case "lower-third": {
+        const height = type("name") * 1.25 + type("role") * 1.35 + 3.7 * u;
+        return output.aspect === "9:16"
+          ? [zone(start, end, left, top, right, top + height)]
+          : [zone(start, end, left, bottom - height, right, bottom)];
+      }
+      case "chapter": {
+        const height = type("count") * 1.2 + type("chapter") * 1.25 + 6.4 * u;
+        return [zone(start, end, left, top, right, top + height)];
+      }
+      case "callout": {
+        const rect = (overlay.params as { rect?: { x: number; y: number; w: number; h: number } })
+          .rect;
+        if (!rect) return [];
+        const label = type("label") * 1.3 + 2 * u;
+        return [
+          zone(
+            start,
+            end,
+            rect.x * output.width,
+            rect.y * output.height - label,
+            (rect.x + rect.w) * output.width,
+            (rect.y + rect.h) * output.height + label,
+          ),
+        ];
+      }
+      default:
+        return [];
+    }
+  });
+  return [...labels, ...templates];
+}

@@ -198,7 +198,7 @@ test("with no captions on the picture, the SubRip file is the one bold writes", 
   const none = await built("none", LINES, 25);
   const bold = await built("bold", LINES, 25);
   assert.equal(none.files.ass, null);
-  assert.equal(none.files.font, null);
+  assert.deepEqual(none.files.fonts, []);
   assert.equal(none.files.srt, bold.files.srt);
 });
 

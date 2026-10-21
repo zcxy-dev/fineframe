@@ -1,7 +1,7 @@
 "use client";
 
 import { rgba } from "@video-editor/effects/layout";
-import { type CaptionStyle, PRESETS } from "@video-editor/engine/captions";
+import { type CaptionStyle, PRESETS, type Preset } from "@video-editor/engine/captions";
 import type { CSSProperties } from "react";
 import styles from "./editor.module.css";
 import { useT } from "./I18n.tsx";
@@ -9,16 +9,26 @@ import { useT } from "./I18n.tsx";
 /**
  * A caption style over a dark frame, in a 2.4 s loop of four sample words said 0.45 s apart: an
  * approximation of what libass draws, from the preset's own values, to choose by. The motion is
- * the module's CSS; with reduced motion it holds one frame.
+ * the module's CSS; with reduced motion it holds one frame. A brand kit's captions give their own
+ * preset and the family their face is loaded as.
  */
-export function CaptionPreview({ style }: { style: CaptionStyle }) {
+export function CaptionPreview({
+  style,
+  preset: own,
+  font,
+}: {
+  style: CaptionStyle;
+  preset?: Preset;
+  font?: string;
+}) {
   const { sample, sampleGap } = useT().settings;
   if (style === "none") {
     return <span className={styles.captionFrame} data-style={style} aria-hidden="true" />;
   }
-  const preset = PRESETS[style];
+  const preset = own ?? PRESETS[style];
   const em = (value: number) => `${value}em`;
   const text: CSSProperties = {
+    ...(font ? { fontFamily: `${font}, var(--font)` } : {}),
     color: preset.text,
     fontWeight: preset.weight,
     fontSize: em(preset.scale),

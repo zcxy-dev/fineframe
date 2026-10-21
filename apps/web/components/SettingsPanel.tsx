@@ -8,6 +8,7 @@ import {
   type Aspect,
   type Asr,
   CAPTION_STYLES,
+  DEFAULT_CAPTIONS,
   formatLength,
   formatRange,
   INSTRUCTIONS_MAX,
@@ -27,6 +28,7 @@ import {
   VISUALS,
   type Visuals,
 } from "../lib/settings.ts";
+import { type Kit, KitCaptionPreview } from "./BrandKits.tsx";
 import { CaptionPreview } from "./CaptionPreview.tsx";
 import styles from "./editor.module.css";
 import { useT } from "./I18n.tsx";
@@ -55,8 +57,10 @@ export interface Choices {
   quality: Quality;
   /** Whether Claude corrects each transcript. */
   correct: boolean;
-  /** The caption style. */
-  captions: CaptionStyle;
+  /** The caption style, or "brand" for the brand kit's custom captions. */
+  captions: CaptionStyle | "brand";
+  /** The brand kit, by its id, or none. */
+  brand: string | null;
   /** What the user tells Claude about this edit; never kept for the next. */
   instructions: string;
 }
@@ -103,6 +107,11 @@ interface Props {
   /** Whether the optional stock footage keys are saved; null until the server says. */
   stock: { pexels: boolean; pixabay: boolean } | null;
   onAddStock: (service: "pexels" | "pixabay") => void;
+  /** The brand kits; null until the server says. */
+  kits: Kit[] | null;
+  /** Called when the owner picks a kit, after which the default no longer replaces it. */
+  onBrand: () => void;
+  onEditKits: () => void;
 }
 
 export function SettingsPanel({
@@ -115,6 +124,9 @@ export function SettingsPanel({
   onAddOpenRouter,
   stock,
   onAddStock,
+  kits,
+  onBrand,
+  onEditKits,
 }: Props) {
   const t = useT();
   const words = t.settings;
@@ -126,6 +138,7 @@ export function SettingsPanel({
   const tooLong = "seconds" in length && footageSeconds > 0 && length.seconds > footageSeconds;
 
   const several = choices.make === "shorts";
+  const kit = kits?.find((each) => each.id === choices.brand) ?? null;
   const [fewest, most] = SHORTS_COUNT;
   const counts = Array.from({ length: most - fewest + 1 }, (_, i) => fewest + i);
 
@@ -312,9 +325,57 @@ export function SettingsPanel({
         </p>
       </fieldset>
 
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor={`${id}-brand`}>
+          {t.kits.picker}
+        </label>
+        <select
+          id={`${id}-brand`}
+          className={styles.input}
+          value={choices.brand ?? ""}
+          onChange={(event) => {
+            const picked = kits?.find((kit) => kit.id === event.target.value) ?? null;
+            onBrand();
+            set({
+              brand: picked?.id ?? null,
+              captions: picked?.brand.captions
+                ? "brand"
+                : choices.captions === "brand"
+                  ? DEFAULT_CAPTIONS
+                  : choices.captions,
+            });
+          }}
+        >
+          <option value="">{t.kits.none}</option>
+          {kits?.map((kit) => (
+            <option key={kit.id} value={kit.id}>
+              {kit.brand.name}
+            </option>
+          ))}
+        </select>
+        <button type="button" className={styles.linkButton} onClick={onEditKits}>
+          {t.kits.edit}
+        </button>
+        <p className={styles.help}>{t.kits.pickerHelp}</p>
+      </div>
+
       <fieldset className={styles.field}>
         <legend className={styles.label}>{words.captionStyle}</legend>
         <div className={styles.captionStyles}>
+          {kit?.brand.captions && (
+            <label className={styles.captionStyle}>
+              <input
+                type="radio"
+                name={`${id}-captions`}
+                className={styles.radio}
+                value="brand"
+                checked={choices.captions === "brand"}
+                onChange={() => set({ captions: "brand" })}
+              />
+              <KitCaptionPreview kit={kit} />
+              <span className={styles.aspectName}>{t.kits.captionsName}</span>
+            </label>
+          )}
           {CAPTION_STYLES.map((captions) => (
             <label key={captions} className={styles.captionStyle}>
               <input
@@ -330,7 +391,11 @@ export function SettingsPanel({
             </label>
           ))}
         </div>
-        <p className={styles.help}>{t.captions[choices.captions].description}</p>
+        <p className={styles.help}>
+          {choices.captions === "brand"
+            ? t.kits.captionsDescription
+            : t.captions[choices.captions].description}
+        </p>
       </fieldset>
 
       <div className={styles.field}>

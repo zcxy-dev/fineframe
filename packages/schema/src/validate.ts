@@ -8,7 +8,15 @@ import shortsSchema from "../shorts.schema.json" with { type: "json" };
 import type { MediaIndex } from "./generated/media-index.ts";
 import type { MusicIndex } from "./generated/music-index.ts";
 import type { Progress } from "./generated/progress.ts";
-import type { Clip, CropKeyframe, CropRect, Project, Rect, Source } from "./generated/project.ts";
+import type {
+  Brand,
+  Clip,
+  CropKeyframe,
+  CropRect,
+  Project,
+  Rect,
+  Source,
+} from "./generated/project.ts";
 import type { Shorts } from "./generated/shorts.ts";
 import { ticksPerFrame } from "./time.ts";
 import { upgradeProject } from "./upgrade.ts";
@@ -55,6 +63,11 @@ export const validateShorts = validator<Shorts>(shortsSchema, (shorts) => {
     folders.add(short.folder);
   }
   return problems;
+});
+/** A brand kit, as a kit folder's kit.json holds it and project.json's `brand`. */
+export const validateBrand = validator<Brand>({
+  $ref: "#/$defs/Brand",
+  $defs: projectSchema.$defs,
 });
 const validateCurrent = validator<Project>(projectSchema, projectProblems);
 /** Also runs the checks a schema cannot express, which packages/schema/README.md lists. A project

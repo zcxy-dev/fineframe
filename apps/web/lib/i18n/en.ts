@@ -2,6 +2,7 @@
 // takes what a sentence counts or names; the page's own formatting (lengths, prices, rounding)
 // stays in lib and puts these words around it.
 import type { CaptionStyle } from "@video-editor/engine/captions";
+import type { FaceId } from "@video-editor/engine/faces";
 import { LOOKS, type LookId, lookIds } from "@video-editor/engine/looks";
 
 /** Where a graphic draws, as the engine names its layouts (packages/effects/src/graphics.ts),
@@ -218,6 +219,83 @@ export const en = {
       description: "No captions on the video; the subtitle file (.srt) is still made.",
     },
   } as Record<CaptionStyle, { name: string; description: string }>,
+  /** The Brand kit page and the kit pickers. */
+  kits: {
+    menu: "Brand kits",
+    title: "Brand kits",
+    lede: "Your logo, colours, fonts and captions, kept on this computer and applied to any edit. Changing an edit's kit only renders it again: no new plan, no Claude cost.",
+    back: "← Back",
+    kits: "Kits",
+    isDefault: "Default",
+    newName: "New kit's name",
+    untitled: "My brand",
+    create: "New kit",
+    empty: "No brand kits yet. Name one on the right to start.",
+    failed: "The brand kit could not be saved.",
+    preview: "Preview",
+    previewLabel: "A sample frame in this kit's look",
+    previewHelp:
+      "A sample frame as an edit draws it: a caption, a name lower third and the logo. Motion graphics take the same colours and font.",
+    sampleName: "Alex Lin",
+    sampleRole: "Product designer",
+    name: "Name",
+    makeDefault: "Use this kit for new edits",
+    coloursTitle: "Colours",
+    colours: { primary: "Primary", secondary: "Secondary", accent: "Accent" },
+    fromPrimary: "From the primary",
+    coloursHelp:
+      "They replace amber in the motion graphics, the titles and the caption highlight. Text that would be hard to read on them turns black or white.",
+    graphicsFont: "Font for graphics and titles",
+    captionsFont: "Font for captions",
+    faceName: (_id: FaceId, name: string) => name,
+    uploaded: (name: string) => `Uploaded: ${name}`,
+    uploadFont: "Upload a font (TTF or OTF)…",
+    fontNote:
+      "Make sure you have the right to use this font. A character a font lacks is drawn in Noto Sans TC.",
+    logo: "Logo",
+    uploadLogo: "Upload a logo (PNG or SVG)",
+    replaceLogo: "Replace the logo",
+    removeLogo: "Remove",
+    watermark: "Show it as a watermark",
+    corners: {
+      "top-left": "Top left",
+      "top-right": "Top right",
+      "bottom-left": "Bottom left",
+      "bottom-right": "Bottom right",
+    },
+    size: "Size",
+    opacity: "Opacity",
+    logoHelp:
+      "The watermark stays in its corner through the whole video, under the captions, and steps aside while a full-frame graphic or a top panel shows.",
+    captions: "Custom captions",
+    useCaptions: "Use custom captions",
+    startsFrom: "Starts from",
+    sizes: { S: "Small", M: "Medium", L: "Large" },
+    text: "Text",
+    highlight: "Highlight",
+    keywords: "Numbers and English words",
+    frame: "Frame",
+    frames: { outline: "Outline", box: "Box" },
+    position: "Position",
+    positions: { bottom: "Bottom", middle: "Middle", top: "Top" },
+    lines: "Lines",
+    lineCount: (n: 1 | 2): string => (n === 1 ? "One" : "Two"),
+    captionsHelp:
+      "An edit with this kit uses them as its caption style. Like other captions, they move off faces, graphics and titles.",
+    captionsOff:
+      "Off: an edit with this kit uses the caption style it picks, in the kit's colours and font.",
+    save: "Save",
+    saved: "Saved",
+    remove: "Delete kit",
+    sure: "Delete it? Click again",
+    removeHelp: "Edits made with it keep their own copy.",
+    picker: "Brand kit",
+    none: "None",
+    edit: "Edit brand kits…",
+    pickerHelp: "Its logo, colours and fonts; nothing in it is sent to Claude.",
+    captionsName: "Brand kit",
+    captionsDescription: "The brand kit's custom captions.",
+  },
   keys: {
     anthropic: {
       title: "Connect Claude",
@@ -379,6 +457,7 @@ export const en = {
     aspect: "Aspect",
     style: "Style",
     captions: "Captions",
+    brand: "Brand kit",
     speech: "Speech",
     local: "On this computer",
     visuals: "Visuals",
@@ -470,6 +549,8 @@ export const en = {
     noMusic: "This edit has no music.",
     look: "Look",
     captionStyle: "Caption style",
+    brandKeep: (name: string) => `${name} (as made)`,
+    brandHelp: "Another kit, or none, only renders again: no new plan, no Claude cost.",
     overlays: "Overlays",
     keep: "Keep",
     remove: "Remove",
@@ -499,6 +580,8 @@ export const en = {
       music: (gain: string) => `music ${gain} dB`,
       look: (id: string, _name: string) => `look ${id}`,
       captions: (id: string, _name: string) => `captions ${id}`,
+      brand: (name: string) => `brand kit ${name}`,
+      noBrand: "no brand kit",
       none: "No changes",
     },
   },
@@ -754,6 +837,11 @@ export const en = {
     uncheckable: (name: string, status: number) =>
       `${name} could not check the key (HTTP ${status}). Try again`,
     anthropicSaid: (message: string) => `Anthropic could not check the key: ${message}`,
+    noKit: "No such brand kit; it may have been deleted",
+    kitName: "Give the brand kit a name",
+    badLogo: (why: string) => `The logo cannot be used: ${why}`,
+    badFont: (why: string) => `The font cannot be used: ${why}`,
+    fileTooLarge: (megabytes: number) => `The file is larger than ${megabytes} MB`,
   },
 };
 

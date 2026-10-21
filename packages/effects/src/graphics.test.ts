@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { catalog, templateIds } from "./catalog.ts";
+import { PALETTE } from "./colour.ts";
 import { graphicFrame, graphicPage, graphicsGuide } from "./graphics.ts";
 import { markFiles, marksIn } from "./icons.ts";
 import { markupProblem } from "./markup.ts";
 import { page } from "./page.ts";
-import { HOUSE_CSS, PALETTE } from "./style.ts";
+import { HOUSE_CSS } from "./style.ts";
 import { templateMarkup } from "./templates.ts";
 import { graphicProblems } from "./validate.ts";
 

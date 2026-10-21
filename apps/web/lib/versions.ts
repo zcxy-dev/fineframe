@@ -21,9 +21,11 @@ export interface Version {
   seconds?: number;
   /** What Claude cost to plan it again; absent for a version no plan made. */
   claude?: ClaudeCost;
-  /** Its look and caption style; absent for the edit itself, whose settings say them. */
+  /** Its look and caption style ("brand" for the brand kit's custom captions), and its brand
+   * kit's name, null for none; absent for the edit itself, whose settings say them. */
   look?: string;
   captions?: string;
+  brand?: string | null;
   /** The length and aspect it was planned for, when a re-plan changed them from the edit's. */
   length?: number;
   aspect?: "9:16" | "1:1" | "16:9";
@@ -63,11 +65,15 @@ export function videosToPrune(versions: readonly Version[], shown: number): numb
     .map((version) => version.n);
 }
 
+/** A revision as the page sends it: a brand kit by its id, or null for none, in place of the kit
+ * itself, which the server copies in. */
+export type PageRevision = Omit<Revision, "brand"> & { kit?: string | null };
+
 /** A revision as the page sends it, or what is wrong with it. The engine checks what each change
  * names; this checks only its shape. */
-export function checkRevision(value: unknown): Revision | string {
+export function checkRevision(value: unknown): PageRevision | string {
   if (typeof value !== "object" || value === null) return "No changes";
-  const revision = value as Revision;
+  const revision = value as PageRevision;
   const integer = (n: unknown) => Number.isSafeInteger(n) && (n as number) >= 0;
   if (
     revision.cuts !== undefined &&
@@ -129,10 +135,13 @@ export function checkRevision(value: unknown): Revision | string {
   if (revision.captions !== undefined && typeof revision.captions !== "string") {
     return "No such caption style";
   }
-  const { cuts, words, overlays, remove, music, look, captions } = revision;
+  if (revision.kit !== undefined && revision.kit !== null && typeof revision.kit !== "string") {
+    return "The brand kit is named by its id";
+  }
+  const { cuts, words, overlays, remove, music, look, captions, kit } = revision;
   return Object.fromEntries(
-    Object.entries({ cuts, words, overlays, remove, music, look, captions }).filter(
+    Object.entries({ cuts, words, overlays, remove, music, look, captions, kit }).filter(
       ([, change]) => change !== undefined,
     ),
-  ) as Revision;
+  ) as PageRevision;
 }

@@ -91,3 +91,18 @@ export function errorResponse(error: unknown, request?: Request): Response {
   console.error(error);
   return Response.json({ error: t.server.wrong }, { status: 500 });
 }
+
+/** A request's body, an uploaded file, refused past `max` bytes before or while it is read. */
+export async function uploaded(request: Request, max: number): Promise<Buffer> {
+  const tooLarge = () =>
+    new JobError((t) => t.server.fileTooLarge(Math.round(max / 1024 ** 2)), 400);
+  if (Number(request.headers.get("content-length") ?? 0) > max) throw tooLarge();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for await (const chunk of request.body ?? []) {
+    size += chunk.length;
+    if (size > max) throw tooLarge();
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}

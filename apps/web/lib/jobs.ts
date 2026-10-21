@@ -7,6 +7,8 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
+import { loadKit, stageBrand, writeKit } from "@video-editor/engine/brand";
+import { chrome } from "@video-editor/engine/chrome";
 import { cacheDir } from "@video-editor/engine/download";
 import { ffmpeg } from "@video-editor/engine/ffmpeg";
 import {
@@ -43,6 +45,7 @@ import type { FixKind } from "./fixes.ts";
 import { LOCALES } from "./i18n/locale.ts";
 import { en, MESSAGES, type Messages } from "./i18n/messages.ts";
 import { readKey, type Service, VARIABLES } from "./key.ts";
+import { kitFolder, readKit } from "./kits.ts";
 import { fileTitle, safeRelativePath } from "./paths.ts";
 import { FOOTAGE_KEPT } from "./retention.ts";
 import { type Run, runEdit } from "./runner.ts";
@@ -59,7 +62,7 @@ import {
 } from "./settings.ts";
 import { REPLAN_MARGIN } from "./shorts.ts";
 import { dollarsOf } from "./summary.ts";
-import { type Version, versionFiles, videosToPrune } from "./versions.ts";
+import { type PageRevision, type Version, versionFiles, videosToPrune } from "./versions.ts";
 import type { ArchiveEntry } from "./zip.ts";
 
 export type Stage = "analyze" | "plan" | "render" | "check";
@@ -222,6 +225,12 @@ function linkProblem(error: LinkError, t: Messages = en): string {
   return t.server.link[error.problem](error.message);
 }
 
+/** A project's caption style, or "brand" when a brand kit's custom captions draw. */
+function captionsOf(project: Project): string {
+  const preset = project.captions?.preset ?? DEFAULT_CAPTIONS;
+  return project.brand?.captions && preset !== "none" ? "brand" : preset;
+}
+
 /** The look over a project, by its first clip with one, or none. */
 function lookOf(project: Project): string {
   return project.main.find((clip) => clip.grade?.look)?.grade?.look?.id ?? "none";
@@ -242,9 +251,11 @@ interface EditPlan {
   within?: [number, number];
   /** What a short planned again is about: its title and description. */
   short?: string;
-  /** The look and caption style, when not the edit's settings', as a version changed them. */
+  /** The look, caption style and brand kit, when not the edit's settings', as a version changed
+   * them: the kit as a folder, or null for none. */
   look?: string;
   captions?: string;
+  brand?: string | null;
 }
 
 /** What the re-edit panel shows of one version, in output ticks. */
@@ -269,7 +280,10 @@ export interface EditView {
   /** The music's level, by its first track; null without music. */
   music: { gainDb: number } | null;
   look: string;
+  /** The caption style, or "brand" for the brand kit's custom captions. */
   captions: string | null;
+  /** The brand kit the version is in, by name, and whether its custom captions draw. */
+  brand: { name: string; captions: boolean } | null;
   /** Made by an earlier version, whose motion-graphics cards and keyword pops this one leaves out
    * when it renders the edit again. */
   older: boolean;
@@ -442,6 +456,10 @@ export class Jobs {
     // Refused now rather than at start, before the page sends any footage.
     this.#refuseWhileRunning();
     await this.#requireKeys(settings);
+    if (settings.brand) {
+      const kit = await readKit(settings.brand.id);
+      settings = { ...settings, brand: { id: kit.id, name: kit.brand.name } };
+    }
     const files: JobFile[] = [];
     const seen = new Set<string>();
     for (const entry of entries) {
@@ -763,6 +781,12 @@ export class Jobs {
     const { style, names, terms = [], musicLicense, visuals } = job.settings;
     const footage = (file: JobFile) => join("footage", file.path);
     const cut = plan.footage ?? job.files.filter((file) => file.use === "video");
+    const captions = plan.captions ?? job.settings.captions ?? DEFAULT_CAPTIONS;
+    // The kit as it is now; one deleted since the edit was asked for is refused.
+    let kit = plan.brand ?? null;
+    if (plan.brand === undefined && job.settings.brand) {
+      kit = kitFolder((await readKit(job.settings.brand.id)).id);
+    }
     const args = [
       ...job.files.filter((file) => cut.includes(file) || file.use === "image").map(footage),
       "--length",
@@ -778,7 +802,9 @@ export class Jobs {
       `--visuals=${visuals}`,
       ...["--quality", job.settings.quality ?? "best"],
       ...(job.settings.correct ? ["--correct"] : []),
-      ...["--captions", plan.captions ?? job.settings.captions ?? DEFAULT_CAPTIONS],
+      // The brand kit's custom captions go with --brand, and no --captions.
+      ...(captions === "brand" ? [] : ["--captions", captions]),
+      ...(kit ? ["--brand", kit] : []),
       "-o",
       output,
       ...plan.music.flatMap((file) => ["--music", footage(file)]),
@@ -1033,17 +1059,22 @@ export class Jobs {
       ),
       music: project.audio.music?.[0] ? { gainDb: project.audio.music[0].gainDb ?? 0 } : null,
       look: lookOf(project),
-      captions: project.captions?.preset ?? null,
+      captions: project.captions ? captionsOf(project) : null,
+      brand: project.brand
+        ? { name: project.brand.name, captions: project.brand.captions !== undefined }
+        : null,
       older,
     };
   }
 
   /** What `revision` would do to the version shown, without rendering it: where its cuts land
    * and the length it leaves. */
-  async preview(id: string, revision: Revision, short?: string) {
+  async preview(id: string, asked: PageRevision, short?: string) {
     const job = await this.#finished(id);
     const slot = this.#slot(job, short);
     const { project, path } = await this.#project(job, slot.current ?? 1, slot);
+    // A kit changes no cut or length.
+    const { kit: _, ...revision } = asked;
     try {
       const { length, removed, notes, outside } = revise(
         project,
@@ -1060,7 +1091,7 @@ export class Jobs {
    * stays until it is done. */
   async revise(
     id: string,
-    revision: Revision,
+    asked: PageRevision,
     summary: string,
     summaries?: Version["summaries"],
     short?: string,
@@ -1083,6 +1114,7 @@ export class Jobs {
     let revised: Project;
     try {
       const { project, path } = await this.#project(job, from, slot);
+      const revision = await this.#revision(job, asked, path);
       try {
         revised = revise(project, revision, await wordsFor(revision, project, path)).project;
       } catch (error) {
@@ -1103,10 +1135,28 @@ export class Jobs {
       from,
       video: false,
       look: lookOf(revised),
-      ...(revised.captions ? { captions: revised.captions.preset } : {}),
+      ...(revised.captions ? { captions: captionsOf(revised) } : {}),
+      brand: revised.brand?.name ?? null,
     });
     this.#render(job, n, true, slot);
     return job;
+  }
+
+  /** The engine's revision for what the page asked: a brand kit, by its id, copied into the job's
+   * `brand` folder with its paths relative to the version's record at `path`. */
+  async #revision(job: Job, asked: PageRevision, path: string): Promise<Revision> {
+    const { kit, ...revision } = asked;
+    if (kit === undefined) return revision;
+    if (kit === null) return { ...revision, brand: null };
+    const folder = kitFolder((await readKit(kit)).id);
+    const brand = await stageBrand(
+      await loadKit(folder),
+      folder,
+      join(this.#dir(job), "brand"),
+      dirname(path),
+      () => chrome(),
+    );
+    return { ...revision, brand };
   }
 
   /** Plans the edit again from the same footage, its analysis cached, as the next version: at
@@ -1141,14 +1191,19 @@ export class Jobs {
     };
     const files = versionFiles(n, short);
     let args: string[];
-    let kept: { look: string; captions?: string };
+    let kept: { look: string; captions?: string; brand: string | null };
+    // The version's brand kit, written as a kit folder for --brand while the plan runs.
+    const kit = join(this.#dir(job), `${files.video}.kit`);
     try {
-      // The look and caption style the version shown has, which the panel may have changed.
+      // The look, caption style and brand kit the version shown has, which the panel may have
+      // changed.
       const { project, path } = await this.#project(job, from, slot);
       kept = {
         look: lookOf(project),
-        ...(project.captions ? { captions: project.captions.preset } : {}),
+        ...(project.captions ? { captions: captionsOf(project) } : {}),
+        brand: project.brand?.name ?? null,
       };
+      if (project.brand) await writeKit(project.brand, dirname(path), kit);
       args = await this.#editArgs(
         job,
         {
@@ -1156,13 +1211,16 @@ export class Jobs {
           aspect: choice.aspect,
           music,
           ...(choice.instructions ? { instructions: choice.instructions } : {}),
-          ...kept,
+          look: kept.look,
+          ...(kept.captions ? { captions: kept.captions } : {}),
+          brand: project.brand ? kit : null,
           ...("folder" in slot ? await this.#stretch(job, slot, project, path) : {}),
         },
         files.video,
       );
     } catch (error) {
       delete job.render;
+      await rm(kit, { recursive: true, force: true });
       throw error;
     }
     const version: Version = {
@@ -1201,7 +1259,8 @@ export class Jobs {
     this.#emit(job);
     void run.exited
       .then(({ code }) => this.#rendered(job, n, code, log, slot, failed))
-      .catch((error: Error) => this.#rendered(job, n, null, [...log, error.message], slot, failed));
+      .catch((error: Error) => this.#rendered(job, n, null, [...log, error.message], slot, failed))
+      .finally(() => rm(kit, { recursive: true, force: true }));
     return job;
   }
 

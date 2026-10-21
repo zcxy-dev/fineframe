@@ -2,7 +2,8 @@
 // change is a recipe of skills/video-editor/references/recipes.md, and cuts go through cutEdit
 // as `pnpm render --cut --retarget` takes them.
 
-import { type CaptionLine, type Project, ticksPerFrame } from "@video-editor/schema";
+import { type Brand, type CaptionLine, type Project, ticksPerFrame } from "@video-editor/schema";
+import { withBrand } from "./brand/kit.ts";
 import { cutEdit } from "./cut.ts";
 
 export { placeSources } from "./cut.ts";
@@ -38,7 +39,11 @@ export interface Revision {
   /** Raises or lowers every music track by this many dB, or takes the music out. */
   music?: { gainDb: number } | "remove";
   look?: LookId | "none";
+  /** A caption style; it turns a brand kit's custom captions off. */
   captions?: CaptionStyle;
+  /** A brand kit, its paths relative to the project revised (../brand/kit.ts stageBrand), or
+   * null for the house look. */
+  brand?: Brand | null;
 }
 
 export interface RevisionResult {
@@ -64,12 +69,14 @@ export function revise(
   sources: ReadonlyMap<string, PlaceSource>,
 ): RevisionResult {
   let out: Project = structuredClone(project);
+  if (revision.brand !== undefined) out = withBrand(out, revision.brand);
   if (revision.captions !== undefined) {
     if (!isCaptionStyle(revision.captions)) {
       throw new Error(`No caption style ${JSON.stringify(revision.captions)}`);
     }
     if (!out.captions) throw new Error("This edit has no captions to restyle");
     out.captions.preset = revision.captions;
+    delete out.brand?.captions;
   }
   for (const fix of revision.words ?? []) {
     const lines = out.captions?.lines ?? [];

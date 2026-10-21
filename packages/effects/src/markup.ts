@@ -92,11 +92,26 @@ const escapeText = (text: string) =>
   text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 const escapeAttribute = (value: string) => escapeText(value).replaceAll('"', "&quot;");
 
-function serialize(node: Node | string): string {
+/** What rebuilding markup changes: each style attribute's declarations, and each image's
+ * source. */
+export interface Restyle {
+  style(declarations: string): string;
+  src(src: string): string;
+}
+
+function serialize(node: Node | string, restyle?: Restyle): string {
   if (typeof node === "string") return escapeText(node);
-  const inner = node.children.map(serialize).join("");
+  const inner = node.children.map((child) => serialize(child, restyle)).join("");
   if (!node.name) return inner;
-  const attributes = node.attributes.map(([key, value]) => ` ${key}="${escapeAttribute(value)}"`);
+  const attributes = node.attributes.map(([key, value]) => {
+    const changed =
+      restyle && key === "style"
+        ? restyle.style(value)
+        : restyle && key === "src"
+          ? restyle.src(value)
+          : value;
+    return ` ${key}="${escapeAttribute(changed)}"`;
+  });
   const open = `<${node.name}${attributes.join("")}>`;
   return VOID.has(node.name) ? open : `${open}${inner}</${node.name}>`;
 }
@@ -143,7 +158,7 @@ export function markupProblem(html: string, css: string): string | null {
 }
 
 /** The markup as rebuilt from its parse, for the page: only what the checks read reaches the
- * browser. Call it on markup that markupProblem passes. */
-export function cleanMarkup(html: string): string {
-  return serialize(parse(html).root);
+ * browser. Call it on markup that markupProblem passes; `restyle` puts it in a brand kit's look. */
+export function cleanMarkup(html: string, restyle?: Restyle): string {
+  return serialize(parse(html).root, restyle);
 }

@@ -13,6 +13,7 @@ import {
   validateOverlays,
 } from "@video-editor/effects";
 import { loadJson, type Project, TICKS_PER_SECOND, validateProject } from "@video-editor/schema";
+import { moveBrand, resolveBrand } from "./brand/kit.ts";
 import { type Credit, creditText, markCredits } from "./broll/credits.ts";
 import { buildCaptions, stageFonts } from "./captions/index.ts";
 import { chrome } from "./chrome.ts";
@@ -169,10 +170,23 @@ export async function render(
   const report = options.onProgress ?? (() => {});
   report(0, "Checking sources");
   const sources = await loadSources(project, projectPath);
+  const brand = project.brand
+    ? await resolveBrand(project.brand, dirname(resolve(projectPath)), options.onDownload)
+    : null;
   const timeline = buildTimeline(project, sources);
   const pieces = cutPieces(timeline);
   // Before anything renders, so a line the caption font cannot draw fails at once.
-  const captions = await buildCaptions(project, timeline);
+  const captions = await buildCaptions(
+    project,
+    timeline,
+    brand
+      ? {
+          colors: brand.brand.colors,
+          ...(brand.brand.captions ? { custom: brand.brand.captions } : {}),
+          face: brand.captions,
+        }
+      : undefined,
+  );
   const bin = await ffmpeg();
 
   const effects = timeline.overlays.length + timeline.graphics.length;
@@ -202,6 +216,7 @@ export async function render(
               height,
               fps,
               frames: end - start,
+              ...(brand ? { brand: brand.look } : {}),
             }),
           ),
           { onProgress: (fraction, message) => report(fraction * share * part, message) },
@@ -222,6 +237,7 @@ export async function render(
               ...(graphic.box ? { box: at } : {}),
               output: project.output,
               frames: end - start,
+              ...(brand ? { brand: brand.look } : {}),
             };
           }),
           {
@@ -335,9 +351,9 @@ export async function render(
 
     const encoded = join(work, "out.mp4");
     let fonts: NodeJS.ProcessEnv = {};
-    if (captions?.ass && captions.font) {
+    if (captions?.ass && captions.fonts.length > 0) {
       await writeFile(join(work, "captions.ass"), captions.ass);
-      fonts = await stageFonts(work, [captions.font]);
+      fonts = await stageFonts(work, captions.fonts);
     }
     const subtitles = captions?.ass ? "captions.ass" : undefined;
     const args = encoderArgs(project.output, finished, timeline.samples, encoded, subtitles);
@@ -350,7 +366,14 @@ export async function render(
           progress((pieces.length + 1 + i) / steps, `Rendering ${i + 1}/${pieces.length}`);
           // A crop path's expression can outgrow one command-line argument (128 KiB on Linux),
           // so FFmpeg reads the graph from a file.
-          const args = pieceVideo(piece, timeline, overlays, luts, graphics);
+          const args = pieceVideo(
+            piece,
+            timeline,
+            overlays,
+            luts,
+            graphics,
+            brand?.watermark ?? null,
+          );
           const at = args.indexOf("-filter_complex");
           const graph = join(work, "graph.txt");
           await writeFile(graph, args[at + 1] ?? "");
@@ -600,5 +623,6 @@ export function rebase(project: Project, projectPath: string, folder: string): P
       path: move(source.path),
       ...(source.index ? { index: move(source.index) } : {}),
     })) as Project["sources"],
+    ...(project.brand ? { brand: moveBrand(project.brand, move) } : {}),
   };
 }

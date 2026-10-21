@@ -2,8 +2,9 @@
 // the type scale and safe areas they share. Lengths are in ems of the caption face, so a preset
 // looks the same at every output size; the aspect sets the em.
 
+import { type BrandColors, brandTones, readable } from "@video-editor/effects/colour";
 import { COLORS } from "@video-editor/effects/layout";
-import type { Captions, Project } from "@video-editor/schema";
+import type { BrandCaptions, Captions, Project } from "@video-editor/schema";
 import type { Weight } from "./fonts.ts";
 
 type Aspect = Project["output"]["aspect"];
@@ -145,4 +146,50 @@ export const DEFAULT_CAPTIONS: CaptionStyle = "bold";
 
 export function isCaptionStyle(id: string): id is CaptionStyle {
   return (CAPTION_STYLES as readonly string[]).includes(id);
+}
+
+/** Custom captions' sizes against the style's own. */
+export const CAPTION_SIZES: Record<BrandCaptions["size"], number> = { S: 0.8, M: 1, L: 1.25 };
+
+/** The box custom captions draw behind the text, the one the creator style has. */
+const BOX = PRESETS.creator.plate as NonNullable<Preset["plate"]>;
+
+/**
+ * A style in a brand kit's look. With custom captions, their style with its size, colours, and an
+ * outline or a box; the highlight lights what the style lights, the word being spoken or the
+ * keywords, and the minimal and pop styles light nothing. Without them, `style` with the kit's
+ * primary in place of the amber. Text that would not read on its outline or box is white or
+ * black instead.
+ */
+export function brandPreset(
+  style: DrawnStyle,
+  colors: BrandColors,
+  custom: BrandCaptions | undefined,
+): Preset {
+  if (!custom) {
+    const primary = readable(brandTones(colors).primary, INK);
+    const swap = (colour: string | undefined) => (colour === ACCENT ? primary : colour);
+    const preset = PRESETS[style];
+    return {
+      ...preset,
+      active: swap(preset.active) as string,
+      ...(preset.keyword ? { keyword: swap(preset.keyword) } : {}),
+    };
+  }
+  const base = PRESETS[custom.style];
+  const text = readable(custom.text, INK);
+  const highlight = readable(custom.highlight, INK);
+  const { stroke, shadow, plate, ...rest } = base;
+  const outline = {
+    stroke: { width: (stroke ?? BOLD.stroke)?.width as number, color: INK },
+    shadow: (shadow ?? BOLD.shadow) as NonNullable<Preset["shadow"]>,
+  };
+  return {
+    ...rest,
+    ...(custom.frame === "box" ? { plate: BOX } : outline),
+    scale: base.scale * CAPTION_SIZES[custom.size],
+    text,
+    active: base.active === base.text ? text : highlight,
+    ...(base.keyword ? { keyword: highlight } : {}),
+  } as Preset;
 }

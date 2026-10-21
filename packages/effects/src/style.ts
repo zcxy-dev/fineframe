@@ -5,20 +5,9 @@
 
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+import { PALETTE } from "./colour.ts";
 
 const require = createRequire(import.meta.url);
-
-/** The palette, from the app's own colours. */
-export const PALETTE = {
-  ink: "#0b0c0f",
-  text: "#f5f6f8",
-  muted: "#a9adb5",
-  accent: "#ffb547",
-  accentDeep: "#e8941f",
-  accentSoft: "#ffd48a",
-  good: "#7bc29a",
-  bad: "#e0807a",
-} as const;
 
 /** The classes graphics are written with. `--u` is 1 % of the frame's short side. */
 export const HOUSE_CSS = `:root {

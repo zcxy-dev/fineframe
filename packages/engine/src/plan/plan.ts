@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import {
+  type Brand,
   type BrollClip,
   type Dropped,
   type Emphasis,
@@ -137,6 +138,9 @@ export interface PlanOptions {
   names?: string[];
   /** The caption style (../captions/presets.ts): DEFAULT_CAPTIONS unless given. */
   captions?: CaptionStyle;
+  /** The brand kit the edit renders in, its paths relative to `out`'s folder; it changes nothing
+   * the plan asks Claude. */
+  brand?: Brand;
   /** What the user asks of this edit, in their words, passed on in every planning request. */
   instructions?: string;
   /** Plans only from this stretch of the one video given, in seconds: the lines said wholly
@@ -252,6 +256,7 @@ export interface PlanState {
   look: Look | null;
   /** The caption style. */
   captions: CaptionStyle;
+  brand?: Brand;
   /** The model that answered the last planning request. */
   model: string;
   planCalls: number;
@@ -359,6 +364,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
     assets: new Map(),
     look: options.look === undefined ? DEFAULT_LOOK : options.look,
     captions: options.captions ?? DEFAULT_CAPTIONS,
+    ...(options.brand ? { brand: options.brand } : {}),
     model: PLAN_MODELS[options.quality ?? "best"],
     planCalls: 0,
     reviews: 0,
@@ -902,6 +908,7 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
     });
     state.graphicsFixed = true;
   }
+  if (state.brand) project = { ...project, brand: state.brand };
   await writeFile(state.out, `${JSON.stringify(validateProject(project), null, 2)}\n`);
   return { path: state.out, project, assembly, state };
 }

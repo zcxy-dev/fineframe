@@ -10,7 +10,7 @@
 // Every row is its own event, placed by its centre, so the rows' spacing is the preset's. A preset
 // whose words pop in draws each word as its own event instead, placed where the row puts it.
 
-import { family, type Metrics } from "./fonts.ts";
+import type { Metrics } from "./fonts.ts";
 import type { Page, Row } from "./layout.ts";
 import { EASE_OUT, ENTER, EXIT, LEADING, POP, type Preset } from "./presets.ts";
 
@@ -22,6 +22,16 @@ export interface Geometry {
   em: number;
   /** Ticks per output frame. */
   frameTicks: number;
+}
+
+/** The face a script is drawn in: the family its style selects it by, with Bold or not, and its
+ * metrics, which a page's widths were measured with. A brand kit's face has the house face as
+ * `fallback` for each character it lacks, drawn at the same em. */
+export interface CaptionFace {
+  family: string;
+  bold: boolean;
+  metrics: Metrics;
+  fallback?: { family: string; bold: boolean; metrics: Metrics };
 }
 
 type State = "spoken" | "active" | "upcoming";
@@ -99,11 +109,34 @@ export function writeAss(
   pages: Page[],
   bottoms: number[],
   preset: Preset,
-  metrics: Metrics,
+  face: CaptionFace,
   geometry: Geometry,
 ): string {
   const { width, height, em, frameTicks } = geometry;
+  const { metrics, fallback } = face;
   const size = round(em * metrics.lineHeight);
+  const select = (each: { family: string; bold: boolean }, fs: number) =>
+    `\\fn${each.family}\\b${each.bold ? 1 : 0}\\fs${fs}`;
+  /** Text with each run of characters the face lacks drawn in its fallback at the same em. */
+  const drawn = (text: string): string => {
+    if (!fallback) return text;
+    const back = `{${select(fallback, round(em * fallback.metrics.lineHeight))}}`;
+    const home = `{${select(face, size)}}`;
+    let out = "";
+    let away = false;
+    for (const char of text) {
+      const lacks =
+        /\S/u.test(char) && metrics.advance(char.codePointAt(0) as number) === undefined;
+      if (lacks !== away) out += lacks ? back : home;
+      away = lacks;
+      out += char;
+    }
+    return away ? out + home : out;
+  };
+  /** Widths as the page was measured: the face's, else its fallback's. */
+  const measured: Pick<Metrics, "advance"> = {
+    advance: (codePoint) => metrics.advance(codePoint) ?? fallback?.metrics.advance(codePoint),
+  };
   const frameMs = ms(1, frameTicks);
   const events: string[] = [];
   const event = (layer: number, start: number, end: number, text: string) =>
@@ -201,18 +234,18 @@ export function writeAss(
       const pop = round(preset.wordPop * 100);
       for (const [r] of page.rows.entries()) {
         const { centre, left } = geometryOf(r);
-        for (const word of wordsOf(page, r, metrics, preset.tracking)) {
+        for (const word of wordsOf(page, r, measured, preset.tracking)) {
           const from =
             word.word === null ? page.start : (page.words[word.word]?.start ?? page.start);
           const x = left + (word.x + word.width / 2) * em;
           const tags = `\\an5\\pos(${round(x)},${round(centre)})${tracking}${motion(from, false)}\\fscx${pop}\\fscy${pop}\\t(0,${POP},${EASE_OUT},\\fscx100\\fscy100)`;
           const below = shadow(1);
-          if (below) event(SHADOW, from, page.end, `{${tags}${below}}${word.text}`);
+          if (below) event(SHADOW, from, page.end, `{${tags}${below}}${drawn(word.text)}`);
           event(
             FACE,
             from,
             page.end,
-            `{${tags}\\1c${colour(preset.text)}${stroke}\\shad0}${word.text}`,
+            `{${tags}\\1c${colour(preset.text)}${stroke}\\shad0}${drawn(word.text)}`,
           );
         }
       }
@@ -234,7 +267,7 @@ export function writeAss(
         const rowStates = states[r] as State[];
         const visibility = (state: State) => (state === "upcoming" ? preset.upcoming : 1);
         const layer = (index: number, tags: (s: number) => string) => {
-          const text = row.segments.map((segment, s) => `{${tags(s)}}${segment.text}`);
+          const text = row.segments.map((segment, s) => `{${tags(s)}}${drawn(segment.text)}`);
           event(index, from, to, `{${anchor}${motion(from, true)}}${text.join("")}`);
         };
         if (preset.shadow) {
@@ -268,7 +301,7 @@ export function writeAss(
     "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    `Style: Caption,${family(preset.weight)},${size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,0,0,5,0,0,0,1`,
+    `Style: Caption,${face.family},${size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,${face.bold ? 1 : 0},0,0,0,100,100,0,0,1,0,0,5,0,0,0,1`,
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
@@ -285,7 +318,7 @@ export function writeAss(
 function wordsOf(
   page: Page,
   r: number,
-  metrics: Metrics,
+  metrics: Pick<Metrics, "advance">,
   tracking: number,
 ): { text: string; word: number | null; x: number; width: number }[] {
   const row = page.rows[r] as Row;

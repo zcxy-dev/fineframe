@@ -1,6 +1,7 @@
 // The page's words in Traditional Chinese as Taiwan writes it, key for key as in English. The
 // same terms throughout: 剪輯 (an edit), 影片, 素材 (footage), 字幕, 逐字稿, 配樂, 風格 (a look),
 // 畫面比例, 版本, 專案, 設定, 輸出 (to render), 規劃 (to plan), 剪接點 (a cut), API 金鑰.
+import type { FaceId } from "@video-editor/engine/faces";
 import { type Messages, SETUP_DOWNLOAD } from "./en.ts";
 
 /** A date and time as Taiwan writes them: 2026/10/19 下午 1:47. */
@@ -16,6 +17,18 @@ function date(milliseconds: number): string {
     .replace(/\s+/g, " ")
     .replace(/([^\d ])(\d{1,2}:\d{2})$/, "$1 $2");
 }
+
+/** The bundled faces' names as Taiwan knows them. */
+const FACE_NAMES: Record<FaceId, string> = {
+  "noto-sans-tc": "思源黑體 Noto Sans TC",
+  "noto-serif-tc": "思源宋體 Noto Serif TC",
+  "lxgw-wenkai-tc": "霞鶩文楷 TC",
+  "jf-openhuninn": "jf open 粉圓",
+  iansui: "芫荽 Iansui",
+  "chocolate-classical-sans": "朱古力黑體",
+  "cactus-classical-serif": "仙人掌明體",
+  "lxgw-marker-gothic": "霞鶩漫黑",
+};
 
 /** A space between Chinese and a name that starts in Latin letters or digits. */
 const spaced = (name: string) => (/^[A-Za-z0-9]/.test(name) ? ` ${name}` : name);
@@ -206,6 +219,79 @@ export const zhTW: Messages = {
     pop: { name: "跳字", description: "每個字在說出來時跳出來。" },
     none: { name: "無字幕", description: "影片上不放字幕；仍會產生字幕檔（.srt）。" },
   },
+  kits: {
+    menu: "品牌套組",
+    title: "品牌套組",
+    lede: "你的標誌、顏色、字型和自訂字幕，保存在這台電腦上，可以套用到任何剪輯。改用其他套組只需重新輸出：不必重新規劃，也沒有 Claude 費用。",
+    back: "← 返回",
+    kits: "套組",
+    isDefault: "預設",
+    newName: "新套組名稱",
+    untitled: "我的品牌",
+    create: "新增套組",
+    empty: "還沒有品牌套組。在右側輸入名稱即可建立。",
+    failed: "無法儲存品牌套組。",
+    preview: "預覽",
+    previewLabel: "套用這個套組的範例畫面",
+    previewHelp: "剪輯中實際呈現的範例畫面：字幕、人名條與標誌。動態圖卡也會使用同樣的顏色與字型。",
+    sampleName: "林語安",
+    sampleRole: "產品設計師",
+    name: "名稱",
+    makeDefault: "新剪輯預設使用這個套組",
+    coloursTitle: "顏色",
+    colours: { primary: "主色", secondary: "輔色", accent: "強調色" },
+    fromPrimary: "依主色自動產生",
+    coloursHelp:
+      "取代動態圖卡、標題與字幕標亮中的琥珀色。文字放在這些顏色上若不易閱讀，會自動改成黑色或白色。",
+    graphicsFont: "圖卡與標題字型",
+    captionsFont: "字幕字型",
+    faceName: (id, _name) => FACE_NAMES[id],
+    uploaded: (name) => `已上傳：${name}`,
+    uploadFont: "上傳字型（TTF 或 OTF）…",
+    fontNote: "請確認你有權使用這個字型。字型缺少的字，會改用思源黑體（Noto Sans TC）顯示。",
+    logo: "標誌",
+    uploadLogo: "上傳標誌（PNG 或 SVG）",
+    replaceLogo: "更換標誌",
+    removeLogo: "移除",
+    watermark: "顯示為浮水印",
+    corners: {
+      "top-left": "左上",
+      "top-right": "右上",
+      "bottom-left": "左下",
+      "bottom-right": "右下",
+    },
+    size: "大小",
+    opacity: "不透明度",
+    logoHelp:
+      "浮水印會固定在角落，出現在整部影片中，位於字幕下方；滿版圖卡或上方面板出現時會暫時隱藏。",
+    captions: "自訂字幕",
+    useCaptions: "使用自訂字幕",
+    startsFrom: "以此樣式為基礎",
+    sizes: { S: "小", M: "中", L: "大" },
+    text: "文字",
+    highlight: "標亮",
+    keywords: "數字與英文",
+    frame: "外框",
+    frames: { outline: "描邊", box: "底框" },
+    position: "位置",
+    positions: { bottom: "下方", middle: "中間", top: "上方" },
+    lines: "行數",
+    lineCount: (n) => (n === 1 ? "一行" : "兩行"),
+    captionsHelp:
+      "使用這個套組的剪輯，會以這組字幕作為字幕樣式。和其他字幕一樣，會避開人臉、圖卡與標題。",
+    captionsOff: "未開啟：使用這個套組的剪輯會用所選的字幕樣式，並套用套組的顏色與字型。",
+    save: "儲存",
+    saved: "已儲存",
+    remove: "刪除套組",
+    sure: "確定刪除？再按一次",
+    removeHelp: "用它做好的剪輯，會保留各自的副本。",
+    picker: "品牌套組",
+    none: "不使用",
+    edit: "編輯品牌套組…",
+    pickerHelp: "套用它的標誌、顏色與字型；套組內容不會傳送給 Claude。",
+    captionsName: "品牌套組",
+    captionsDescription: "品牌套組的自訂字幕。",
+  },
   keys: {
     anthropic: {
       title: "連接 Claude",
@@ -355,6 +441,7 @@ export const zhTW: Messages = {
     aspect: "畫面比例",
     style: "風格",
     captions: "字幕",
+    brand: "品牌套組",
     speech: "語音辨識",
     local: "在這台電腦上",
     visuals: "視覺元素",
@@ -436,6 +523,8 @@ export const zhTW: Messages = {
     noMusic: "這次剪輯沒有配樂。",
     look: "風格",
     captionStyle: "字幕樣式",
+    brandKeep: (name) => `${name}（目前使用）`,
+    brandHelp: "改用其他套組或不使用，只需重新輸出：不必重新規劃，也沒有 Claude 費用。",
     overlays: "疊加元素",
     keep: "保留",
     remove: "移除",
@@ -464,6 +553,8 @@ export const zhTW: Messages = {
       music: (gain) => `配樂 ${gain} dB`,
       look: (_id, name) => `風格改為${name}`,
       captions: (_id, name) => `字幕改為${name}`,
+      brand: (name) => `品牌套組改為${name}`,
+      noBrand: "不使用品牌套組",
       none: "沒有修改",
     },
   },
@@ -687,5 +778,10 @@ export const zhTW: Messages = {
     unreachable: (name) => `無法連上 ${name} 確認金鑰。請檢查網路連線後再試一次`,
     uncheckable: (name, status) => `${name} 無法確認金鑰（HTTP ${status}）。請再試一次`,
     anthropicSaid: (message) => `Anthropic 無法確認金鑰：${message}`,
+    noKit: "找不到這個品牌套組，可能已被刪除",
+    kitName: "請為品牌套組命名",
+    badLogo: (why) => `無法使用這個標誌：${why}`,
+    badFont: (why) => `無法使用這個字型：${why}`,
+    fileTooLarge: (megabytes) => `檔案超過 ${megabytes} MB`,
   },
 };
