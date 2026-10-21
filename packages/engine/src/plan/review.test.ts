@@ -162,6 +162,28 @@ test("a declined second plan during a review leaves the edit as it was", async (
   assert.equal(edit.state.excluded.size, 0);
 });
 
+test("a review that fails returns only once every check it started has ended", async (t) => {
+  // A run stopped at its cost limit deletes the short's folder next: nothing may still read it.
+  const { edit, video } = await planned(t, [fine, fine]);
+  const inner = edit.state.claude;
+  let started = 0;
+  let ended = 0;
+  edit.state.claude = async (request) => {
+    if (request.purpose !== "check") return inner(request);
+    started++;
+    try {
+      if (started === 1) throw new Error("Stopped at the cost limit");
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return await inner(request);
+    } finally {
+      ended++;
+    }
+  };
+  await assert.rejects(review(edit, video), /Stopped at the cost limit/);
+  assert.equal(started, 2, "both checks started");
+  assert.equal(ended, started, "the review returned while a check was still running");
+});
+
 test(`an edit is reviewed at most ${MAX_REVIEW_PASSES} times`, async (t) => {
   const { edit, video } = await planned(t, [clipped, clipped]);
   const passes = [];
