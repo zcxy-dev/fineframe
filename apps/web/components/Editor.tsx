@@ -34,7 +34,7 @@ import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
 import { Footage, type Item, type LinkItem } from "./Footage.tsx";
 import { useLocale, useT } from "./I18n.tsx";
-import { CaptionsIcon, CheckIcon, DownloadIcon, LockIcon } from "./icons.tsx";
+import { CaptionsIcon, CheckIcon, DownloadIcon, ExportIcon, LockIcon } from "./icons.tsx";
 import { KeyDialog } from "./KeyDialog.tsx";
 import { Projects } from "./Projects.tsx";
 import { ReEdit, Versions } from "./ReEdit.tsx";
@@ -741,6 +741,48 @@ function Running({ job, onCancel }: { job: Job; onCancel: () => void }) {
   );
 }
 
+/** "Export to an editing app": has the server export the version shown, saying so while it
+ * does, then downloads the zip. */
+function ExportButton({ job }: { job: Job }) {
+  const t = useT();
+  const [state, setState] = useState<"idle" | "busy" | { error: string }>("idle");
+  const run = async () => {
+    setState("busy");
+    try {
+      const response = await fetch(jobApi(job, "export"), { method: "POST" });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        setState({ error: body.error ?? t.failed.wrong });
+        return;
+      }
+      setState("idle");
+      const link = document.createElement("a");
+      link.href = jobApi(job, "export");
+      link.download = "";
+      link.click();
+    } catch {
+      setState({ error: t.failed.wrong });
+    }
+  };
+  return (
+    <>
+      <button
+        type="button"
+        className={styles.button}
+        onClick={run}
+        disabled={state === "busy"}
+        title={t.done.exportHelp}
+      >
+        <ExportIcon width={18} height={18} />
+        {state === "busy" ? t.done.exporting : t.done.exportApp}
+      </button>
+      {typeof state === "object" && (
+        <ErrorNote message={state.error} fallback={t.done.exportFallback} />
+      )}
+    </>
+  );
+}
+
 /** A finished edit, or one short of several with its title, description and hashtags and a way
  * back to the others. */
 function Done({
@@ -790,6 +832,7 @@ function Done({
               {t.done.downloadCredits}
             </a>
           )}
+          <ExportButton job={job} />
         </div>
       </div>
       {short && <ShortText short={short} />}

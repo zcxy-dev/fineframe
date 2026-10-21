@@ -165,7 +165,8 @@ export const REQUIRED_FILTERS = [
   "xfade",
   "zscale",
 ];
-export const REQUIRED_ENCODERS = ["libx264", "aac"];
+/** prores_ks writes the overlay video an export lays over the footage (ProRes 4444 with alpha). */
+export const REQUIRED_ENCODERS = ["libx264", "aac", "prores_ks"];
 /** libvpx reads the alpha of the effect overlays (VP9 in WebM). */
 export const REQUIRED_DECODERS = ["libvpx-vp9"];
 

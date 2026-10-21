@@ -16,7 +16,7 @@ export const RAW_AUDIO = ["-f", "f32le", "-ar", String(SAMPLE_RATE), "-ac", "2"]
 /** BT.709 colour tags, limited range. The encoder reads them on its raw input too: FFmpeg 7.1
  * and later take primaries and transfer from the frames, not from output options, and convert
  * untagged frames, read as BT.601, to an output matrix that differs. */
-const BT709 = [
+export const BT709 = [
   "-colorspace",
   "bt709",
   "-color_primaries",

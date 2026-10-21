@@ -70,6 +70,7 @@ A single web page drives it: drop the files or paste a video's link, pick the le
 - **Desktop app:** [installers](#install) for Apple silicon Macs, Windows and Linux run the web page with nothing else to install ([details](apps/desktop/README.md)).
 - **Web page:** [one page](apps/web/README.md) runs `pnpm edit` on dropped footage, with live progress, cost estimates and downloads.
 - **Changing an edit:** [`pnpm render`](packages/engine/README.md#changing-an-edit) renders a changed `project.json` again, and the [agent skill](#use-it-from-an-ai-agent) changes an edit by conversation.
+- **Editing apps:** [`pnpm render --export`](packages/engine/README.md#exporting-to-an-editing-app) and the page's "Export to an editing app" turn a finished edit into timelines for Final Cut Pro, DaVinci Resolve and Premiere Pro, with its B-roll, music, captions and graphics.
 - **Effects:** five animated [templates](packages/effects/#templates) for titles, names, chapters, callouts and wipes, rendered with [HyperFrames](https://github.com/heygen-com/hyperframes) ([placement](packages/engine/README.md#planning)).
 - **B-roll:** a rich edit, the default, cuts away to stock footage and captures of the pages the speaker names, from free sources ([details](packages/engine/README.md#visuals)).
 - **Motion graphics:** Claude writes each edit's [graphics](packages/effects/#graphics) as HTML and CSS once its cut is known: corner labels and lower thirds over the speaker, a panel over the speaker at 9:16, and full-frame graphics, each checked as drawn and against the speech.

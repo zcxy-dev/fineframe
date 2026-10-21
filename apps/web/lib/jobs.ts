@@ -45,7 +45,7 @@ import { LOCALES } from "./i18n/locale.ts";
 import { en, MESSAGES, type Messages } from "./i18n/messages.ts";
 import { readKey, type Service, VARIABLES } from "./key.ts";
 import { kitFolder, readKit } from "./kits.ts";
-import { fileTitle, safeRelativePath } from "./paths.ts";
+import { downloadName, fileTitle, safeRelativePath } from "./paths.ts";
 import { FOOTAGE_KEPT } from "./retention.ts";
 import { type Run, runEdit } from "./runner.ts";
 import {
@@ -405,6 +405,8 @@ export class Jobs {
   readonly #finishes = new Map<string, Finish>();
   readonly #jobs = new Map<string, Job>();
   readonly #runs = new Map<string, Run>();
+  /** Exports being made or made, by their folder. */
+  readonly #exports = new Map<string, Promise<void>>();
   /** Jobs whose render was stopped, until it exits. */
   readonly #stopped = new Set<string>();
   readonly #listeners = new Map<string, Set<(job: Job) => void>>();
@@ -1493,6 +1495,63 @@ export class Jobs {
     const { min, max } = job.settings.shorts ?? { min: 0, max: job.settings.length };
     const name = `shorts-${min}-${max}s-${job.settings.aspect.replace(":", "x")}.zip`;
     return { name, entries };
+  }
+
+  /** "Export to an editing app": the version shown of the edit, or of the short in `short`,
+   * exported once by `pnpm render --export` into a folder beside its video, and what its zip
+   * holds, in a folder named as the downloads are. */
+  async exportArchive(
+    id: string,
+    short?: string,
+  ): Promise<{ name: string; entries: ArchiveEntry[] }> {
+    const job = await this.get(id);
+    if (job.status !== "done" && !short) throw new JobError((t) => t.server.notFinished, 409);
+    const slot = this.#slot(job, short);
+    const { project } = versionFiles(slot.current ?? 1, short);
+    const folder = join(this.#dir(job), project.replace(/\.project\.json$/, ".export"));
+    let made = this.#exports.get(folder);
+    if (!made) {
+      made = this.#export(job, project, folder);
+      this.#exports.set(folder, made);
+      // Made once; a failed export is tried again on the next request.
+      made.catch(() => this.#exports.delete(folder));
+    }
+    await made;
+    const name = downloadName({ ...job, ...(short ? { short } : {}) }, "zip");
+    const top = name.replace(/\.zip$/, "");
+    const entries: ArchiveEntry[] = [];
+    for (const entry of await readdir(folder, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      const path = join(entry.parentPath, entry.name);
+      entries.push({ name: `${top}/${relative(folder, path).split(sep).join("/")}`, path });
+    }
+    return { name, entries };
+  }
+
+  /** Exports the project `project` of the job into `folder`, unless a finished export (its
+   * README.txt, written last) is there, dropping the other versions' exports beside it. */
+  async #export(job: Job, project: string, folder: string): Promise<void> {
+    if (existsSync(join(folder, "README.txt"))) return;
+    this.#requireFootage(job);
+    const beside = dirname(folder);
+    for (const other of await readdir(beside)) {
+      if (other.endsWith(".export"))
+        await rm(join(beside, other), { recursive: true, force: true });
+    }
+    const log: string[] = [];
+    const run = runEdit({
+      command: this.#renderCommand,
+      args: [project, "--export", folder],
+      cwd: this.#dir(job),
+      onProgress: () => {},
+      onLog: (line) => log.push(line),
+    });
+    const { code } = await run.exited;
+    if (code === 0) return;
+    await rm(folder, { recursive: true, force: true });
+    const reason = [...log].reverse().find((line) => line.startsWith("render: error: "));
+    const error = reason ? reason.slice("render: error: ".length) : `exit code ${code}`;
+    throw new JobError((t) => t.server.exportFailed(error), 409);
   }
 
   /** Calls `listener` with the job after every change; returns the call that stops it. */

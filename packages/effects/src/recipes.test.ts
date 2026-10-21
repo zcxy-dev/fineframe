@@ -59,7 +59,7 @@ test("every project.json path the agent skill names is in the schema or the effe
   // Dotted names in backticks, such as `captions.lines[].words`; file names are not paths.
   const paths = [...recipes.matchAll(/`([a-z]\w*(?:\[\w*\])?(?:\.[a-z]\w*(?:\[\w*\])?)+)`/gi)]
     .map((match) => match[1] ?? "")
-    .filter((path) => !/\.(json|md|ts|srt|txt|mp4)$/.test(path));
+    .filter((path) => !/\.(json|md|ts|srt|txt|mp4|mov|xml|fcpxml)$/.test(path));
   assert.ok(paths.length > 10, `only ${paths.length} paths found`);
   const nodes = [...objects(projectSchema as Node), ...Object.values(defs)];
   const missing = paths.filter((path) => {
