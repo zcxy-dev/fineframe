@@ -16,7 +16,7 @@
 //
 // On Linux, run it under a display, such as `xvfb-run -a`. The clip's speech comes from the
 // system's voice: `say` on macOS, the speech synthesizer .NET ships on Windows, espeak-ng on Linux.
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -652,19 +652,21 @@ async function useCommandLine(): Promise<string[]> {
   const command = windows
     ? launcherPath(join(process.env.APPDATA as string, "Fineframe"))
     : join(homeDir, ".local", "bin", "fineframe");
+  // Run without waiting on it, so the stand-ins in this process answer it.
   const fineframe = (args: string[], timeout: number) => {
     say(`fineframe ${args.join(" ")}`);
     // Without FUSE, the AppImage lists every file it unpacks before it runs, into the folder the
     // app runs from too, which it would delete when it ends.
-    const maxBuffer = 1024 ** 3;
-    return spawnSync(command, args, {
-      env: { ...env, NO_CLEANUP: "1" },
-      ...{ encoding: "utf8", shell: windows, timeout, maxBuffer },
+    const options = { env: { ...env, NO_CLEANUP: "1" }, shell: windows, timeout };
+    return new Promise<{ status: number | null; stdout: string; stderr: string }>((done) => {
+      execFile(command, args, { ...options, maxBuffer: 1024 ** 3 }, (error, stdout, stderr) =>
+        done({ status: error ? ((error.code as number | undefined) ?? null) : 0, stdout, stderr }),
+      );
     });
   };
-  const help = fineframe(["--help"], 120_000);
+  const help = await fineframe(["--help"], 120_000);
   const video = join(work, "command", "edit.mp4");
-  const edit = fineframe(
+  const edit = await fineframe(
     ["edit", clip, "--length", `${LENGTH}s`, "--aspect", "16:9", "--asr", "cloud", "-o", video],
     1_800_000,
   );
@@ -676,10 +678,10 @@ async function useCommandLine(): Promise<string[]> {
     !dialogs.some((line) => line.startsWith("The agent skill is installed")) &&
       `the menu did not install the skill: ${dialogs.join("; ")}`,
     missing.length > 0 && `the skill's files did not land: ${missing.join(", ")}`,
-    !help.stdout?.includes("Usage: fineframe edit") &&
+    !help.stdout.includes("Usage: fineframe edit") &&
       `fineframe --help exited ${help.status}: ${help.stdout}${help.stderr}`,
     edit.status !== 0 &&
-      `fineframe edit exited ${edit.status}: ${(edit.stderr ?? "").split("\n").slice(-20).join("\n")}`,
+      `fineframe edit exited ${edit.status}: ${edit.stderr.split("\n").slice(-20).join("\n")}`,
     edit.status === 0 &&
       Math.abs(seconds - LENGTH) > LENGTH * 0.05 &&
       `the command's edit is ${seconds} s, not ${LENGTH} s ± 5 %`,

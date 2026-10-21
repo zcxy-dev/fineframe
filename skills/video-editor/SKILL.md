@@ -20,7 +20,7 @@ Done when each of these holds:
 
 - With the app: `fineframe --help` works. If there is no `fineframe` command, ask the user to install the Fineframe app, choose "Install Command Line Tool…" in its menu (the Fineframe menu on macOS, File on Windows and Linux) and open a new terminal. If it says Fineframe is not set up yet, ask them to open the app once and wait until it is ready.
 - From a clone: `mise --version`, `pnpm --version` and `uv --version` work. If `mise` is missing, ask the user to install it (https://mise.jdx.dev). Then run `mise install`, `pnpm install`, and `uv sync` in `worker/`.
-- The key is checked by the edit itself, which fails at once without it. Never read or print `.env` or the app's `keys.env`. On that error, ask the user to paste their key in the app, or, from a clone, to copy `.env.example` to `.env` and paste their key, or to run `mise run start`.
+- The key is checked by the edit itself, which fails at once without it. Never read or print `.env` or the keys file in the app's folder. On that error, ask the user to paste their key in the app, or, from a clone, to copy `.env.example` to `.env` and paste their key, or to run `mise run start`.
 - `fineframe edit --help` prints the options.
 
 ## 2. Make the edit
@@ -54,7 +54,7 @@ Each change makes a new version beside the last, so the user can compare them an
 1. Read the project and find what the user means; the recipe says where each thing lives.
 2. Find the recipe in [references/recipes.md](references/recipes.md) and follow it. Each recipe either renders with `--cut`, or edits a copy, `edit-v2.project.json` in the same folder (paths in it are relative to its folder), and renders that.
 3. Render: `fineframe render out/edit-v2.project.json -o out/edit-v2.mp4`. It validates the project first and names every problem by its JSON path; fix them and render again. A re-render of a one-minute video takes about half a minute on 8 free cores, a few minutes on a busy machine, plus a few seconds for each new or changed overlay.
-4. Check the result before reporting it: the length the render prints (`seconds` in its JSON), a frame from where the change is (`ffmpeg -ss <seconds> -i out/edit-v2.mp4 -frames:v 1 frame.png`, then look at the image), and the captions near it in `edit-v2.srt`. Without `ffmpeg` on the PATH, use the renderer's own, `~/.cache/video-editor/ffmpeg-*/ffmpeg` (`ffmpeg.exe` on Windows). Tell the user what changed and where, and the new length.
+4. Check the result before reporting it: the length the render prints (`seconds` in its JSON), a frame from where the change is (`ffmpeg -ss <seconds> -i out/edit-v2.mp4 -frames:v 1 frame.png`, then look at the image), and the captions near it in `edit-v2.srt`. Without `ffmpeg` on the PATH, use the renderer's own, `~/.cache/video-editor/ffmpeg-*/ffmpeg` (with `.exe` on Windows). Tell the user what changed and where, and the new length.
 
 The next change starts from the newest version (`edit-v2.project.json`, then `-v3`, …).
 
