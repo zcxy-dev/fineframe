@@ -29,7 +29,7 @@ import { type ColourSample, matchColour } from "../match.ts";
 import { punchIns, type ShotFacts } from "../punch.ts";
 import { fingerprintOf, gridTicks } from "../sources.ts";
 import { loudnessFor, planVoice } from "../voice.ts";
-import { captionLines, outputWords, type TimedWord } from "./captions.ts";
+import { captionLines, EMOJI, outputWords, type TimedWord } from "./captions.ts";
 import {
   anthropicClaude,
   type Claude,
@@ -145,6 +145,8 @@ export interface PlanOptions {
   names?: string[];
   /** The caption style (../captions/presets.ts): DEFAULT_CAPTIONS unless given. */
   captions?: CaptionStyle;
+  /** Shows the emoji Claude picks at the end of their captions; they are picked either way. */
+  emoji?: boolean;
   /** The brand kit the edit renders in, its paths relative to `out`'s folder; it changes nothing
    * the plan asks Claude. */
   brand?: Brand;
@@ -265,6 +267,8 @@ export interface PlanState {
   look: Look | null;
   /** The caption style. */
   captions: CaptionStyle;
+  /** Whether the captions show their emoji. */
+  emoji: boolean;
   brand?: Brand;
   /** The model that answered the last planning request. */
   model: string;
@@ -375,6 +379,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
     assets: new Map(),
     look: options.look === undefined ? DEFAULT_LOOK : options.look,
     captions: options.captions ?? DEFAULT_CAPTIONS,
+    emoji: options.emoji ?? false,
     ...(options.brand ? { brand: options.brand } : {}),
     model: PLAN_MODELS[options.quality ?? "best"],
     planCalls: 0,
@@ -761,6 +766,12 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
       for (let i = line.first; i <= line.last; i++) lineOf.set(`${source.id}:${i}`, line.n);
     }
   }
+  // One emoji a line, of one code point, as project.json takes it.
+  const emoji = new Map(
+    state.decisions.emoji
+      .filter((pick) => EMOJI.test(pick.emoji))
+      .map((pick) => [`${pick.source}:${pick.line}`, pick.emoji]),
+  );
   const [width, height] = outputSize(state.aspect, state.sources);
   const covered = broll.map((clip) => ({ start: clip.start, duration: clip.out - clip.in }));
   let joined = 0;
@@ -896,7 +907,12 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
     captions: {
       preset: state.captions,
       srt: true,
-      lines: captionLines(words, (source, i) => lineOf.get(`${source}:${i}`) ?? -1),
+      ...(state.emoji ? { emoji: true } : {}),
+      lines: captionLines(
+        words,
+        (source, i) => lineOf.get(`${source}:${i}`) ?? -1,
+        (source, line) => emoji.get(`${source}:${line}`),
+      ),
     },
     audio: { loudness: loudnessFor(state.aspect), ...(music.length > 0 ? { music } : {}) },
     plan: {
@@ -1390,6 +1406,7 @@ function emptyDecisions(): Decisions {
     cut_words: [],
     broll: [],
     emphasis: [],
+    emoji: [],
   };
 }
 

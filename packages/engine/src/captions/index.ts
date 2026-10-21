@@ -11,7 +11,8 @@ import {
 } from "@video-editor/schema";
 import type { BrandFace } from "../brand/kit.ts";
 import type { Timeline } from "../timeline.ts";
-import { type CaptionFace, writeAss } from "./ass.ts";
+import { type CaptionFace, type EmojiEvent, placeEmoji, writeAss } from "./ass.ts";
+import { type EmojiImage, emojiImage } from "./emoji.ts";
 import { faceZones, overlayZones, visualZones } from "./faces.ts";
 import { family, fontFile, type Metrics, metrics } from "./fonts.ts";
 import { layoutCaptions, type Page, rowText } from "./layout.ts";
@@ -39,6 +40,8 @@ export interface CaptionFiles {
   pages: Page[];
   /** The face files the script is drawn in, for stageFonts; none with no script. */
   fonts: string[];
+  /** The lines' emoji, drawn over the script, when `captions.emoji` is on and a style draws. */
+  emoji: EmojiEvent[];
 }
 
 /** A brand kit as captions take it: its colours, its custom captions and its caption face. */
@@ -156,6 +159,7 @@ export async function buildCaptions(
     style ?? "bold",
     style ? brand : undefined,
   );
+  const emoji = captions.emoji ? await lineEmoji(captions) : new Map<number, LineEmoji>();
   const geometry = {
     width: output.width,
     height: output.height,
@@ -167,10 +171,32 @@ export async function buildCaptions(
   };
   return {
     ass: style ? writeAss(pages, bottoms, chosen, face, geometry) : null,
-    srt: toSrt(pages, timeline.frameTicks),
+    srt: toSrt(pages, timeline.frameTicks, (line) => emoji.get(line)?.emoji),
     pages,
     fonts: style ? fonts : [],
+    emoji: style
+      ? placeEmoji(pages, bottoms, chosen, face.metrics, geometry, (line) => emoji.get(line))
+      : [],
   };
+}
+
+type LineEmoji = { emoji: string; image: EmojiImage };
+
+/** Each line's emoji, by its position in `lines`, with its image. Fails, naming the line, on an
+ * emoji the font has no image of, so an emoji never shows as a box. */
+async function lineEmoji(captions: Captions): Promise<Map<number, LineEmoji>> {
+  const found = new Map<number, LineEmoji>();
+  for (const [i, line] of captions.lines.entries()) {
+    if (!line.emoji) continue;
+    const image = await emojiImage(line.emoji);
+    if (!image) {
+      throw new Error(
+        `Caption line ${i} ("${line.text}") has an emoji the emoji font lacks: ${line.emoji}`,
+      );
+    }
+    found.set(i, { emoji: line.emoji, image });
+  }
+  return found;
 }
 
 /**
@@ -222,11 +248,18 @@ function srtTime(frame: number, frameTicks: number): string {
   return `${pad(hours)}:${pad(Math.floor(ms / 60_000) % 60)}:${pad(Math.floor(ms / 1000) % 60)},${pad(ms % 1000, 3)}`;
 }
 
-function toSrt(pages: Page[], frameTicks: number): string {
+/** The pages as SubRip, each line's emoji after the text of its last page. */
+function toSrt(
+  pages: Page[],
+  frameTicks: number,
+  emojiOf: (line: number) => string | undefined,
+): string {
   return pages
     .map((page, i) => {
       const time = `${srtTime(page.start, frameTicks)} --> ${srtTime(page.end, frameTicks)}`;
-      return `${i + 1}\n${time}\n${page.rows.map(rowText).join("\n")}\n`;
+      const emoji = pages[i + 1]?.line === page.line ? undefined : emojiOf(page.line);
+      const text = page.rows.map(rowText).join("\n") + (emoji ? ` ${emoji}` : "");
+      return `${i + 1}\n${time}\n${text}\n`;
     })
     .join("\n");
 }

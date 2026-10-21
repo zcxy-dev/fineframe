@@ -345,6 +345,7 @@ test("the advanced settings and filler removal reach the edit, and names or term
       quality: "economy",
       correct: true,
       captions: "pop",
+      emoji: true,
       fillers: "aggressive",
     },
   };
@@ -359,6 +360,7 @@ test("the advanced settings and filler removal reach the edit, and names or term
   assert.equal(after("--quality"), "economy");
   assert.ok(args.includes("--correct"));
   assert.equal(after("--captions"), "pop");
+  assert.ok(args.includes("--emoji"));
   assert.equal(after("--fillers"), "aggressive");
   assert.ok(!args.includes("--names"));
   assert.equal(after("--terms"), "terms.txt");

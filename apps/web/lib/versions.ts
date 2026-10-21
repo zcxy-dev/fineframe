@@ -135,12 +135,15 @@ export function checkRevision(value: unknown): PageRevision | string {
   if (revision.captions !== undefined && typeof revision.captions !== "string") {
     return "No such caption style";
   }
+  if (revision.emoji !== undefined && typeof revision.emoji !== "boolean") {
+    return "Caption emoji are on or off";
+  }
   if (revision.kit !== undefined && revision.kit !== null && typeof revision.kit !== "string") {
     return "The brand kit is named by its id";
   }
-  const { cuts, words, overlays, remove, music, look, captions, kit } = revision;
+  const { cuts, words, overlays, remove, music, look, captions, emoji, kit } = revision;
   return Object.fromEntries(
-    Object.entries({ cuts, words, overlays, remove, music, look, captions, kit }).filter(
+    Object.entries({ cuts, words, overlays, remove, music, look, captions, emoji, kit }).filter(
       ([, change]) => change !== undefined,
     ),
   ) as PageRevision;

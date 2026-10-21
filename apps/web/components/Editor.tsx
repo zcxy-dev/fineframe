@@ -93,6 +93,7 @@ export function Editor() {
     quality: "best",
     correct: false,
     captions: DEFAULT_CAPTIONS,
+    emoji: false,
     brand: null,
     instructions: "",
   });
@@ -356,6 +357,7 @@ export function Editor() {
             quality: choices.quality,
             correct: choices.correct,
             captions: choices.captions,
+            ...(choices.emoji ? { emoji: true } : {}),
             ...(choices.brand ? { brand: choices.brand } : {}),
             // Nothing asked, nothing sent: the request is the same as without the box.
             ...(instructions.trim() ? { instructions: instructions.trim() } : {}),

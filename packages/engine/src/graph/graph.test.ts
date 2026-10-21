@@ -388,6 +388,31 @@ test("the encoder fills whole AAC frames, then writes H.264 High and AAC for str
   );
 });
 
+test("images go over the captions on their own frames, each file at each size read once", () => {
+  const output = project([{ source: "a", in: 0, out: SECOND }]).output;
+  const image = { x: 900, y: 1400, width: 80, height: 75 };
+  const args = encoderArgs(output, "/tmp/mix.f32", 48000, "/out.mp4", "captions.ass", [
+    { file: "emoji/1f525.png", ...image, start: 10, end: 40 },
+    { file: "emoji/1f4b0.png", ...image, start: 50, end: 60 },
+    { file: "emoji/1f525.png", ...image, start: 70, end: 90 },
+  ]);
+  const joined = args.join(" ");
+  assert.match(
+    joined,
+    /-i \/tmp\/mix\.f32 -i emoji\/1f525\.png -i emoji\/1f4b0\.png -filter_complex/,
+  );
+  const graph = args[args.indexOf("-filter_complex") + 1] ?? "";
+  assert.deepEqual(graph.split(";").slice(1), [
+    "[0:v]setparams=colorspace=bt709:range=tv,ass=filename=captions.ass:fontsdir=fonts[c0]",
+    "[2:v]scale=80:75:flags=lanczos:out_color_matrix=bt709:out_range=tv,format=yuva420p,split=2[i0u0][i0u1]",
+    "[3:v]scale=80:75:flags=lanczos:out_color_matrix=bt709:out_range=tv,format=yuva420p,split=1[i1u0]",
+    "[c0][i0u0]overlay=x=900:y=1400:enable='between(n,10,39)'[c1]",
+    "[c1][i1u0]overlay=x=900:y=1400:enable='between(n,50,59)'[c2]",
+    "[c2][i0u1]overlay=x=900:y=1400:enable='between(n,70,89)'[v]",
+  ]);
+  assert.equal(args[args.indexOf("-map") + 1], "[v]");
+});
+
 const timeline = (main: Project["main"], extra: Partial<Project> = {}) =>
   buildTimeline(
     project(main, extra),

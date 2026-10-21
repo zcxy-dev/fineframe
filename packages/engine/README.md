@@ -353,6 +353,8 @@ At 9:16 the rows keep to about the middle 70 % of the width, and even when moved
 
 **Font.** Noto Sans CJK TC (OFL-1.1), Bold and Black: the full CJK font rather than the smaller Noto Sans TC, which lacks rarer ideographs such as 𠮷. It is downloaded on first use from a pinned commit, checked against its SHA-256 and kept in `~/.cache/video-editor/`. The render hands libass the face files itself, so captions are drawn in the faces their layout was measured in whatever fonts the machine has; a line with a character they lack fails the render, naming the line, before anything is rendered.
 
+**Emoji.** The planner may pick one emoji for a transcript line, which goes on the caption line that ends it (`captions.lines[].emoji`); with `captions.emoji` on, the render draws it and the SubRip file writes it after the line's last caption. libass draws no colour glyphs, so the emoji is the PNG that Noto Color Emoji (OFL-1.1) holds for it in its CBDT table, downloaded and checked as the caption face is, and the encoder lays it over the captions. It sits after the last row of the line's last caption, 0.15 em clear of its text or plate, at that caption's size, from the frame its last word lights until the caption leaves, and never past the frame's edge. Only a single emoji character is drawn: one with a skin tone, a flag or one joined from several is left out at planning. The switch changes with a render alone.
+
 **Samples.** `node scripts/caption-samples.ts <project.json> <folder>` renders a planned edit in every style that draws, at every aspect, each with a strip of eight frames on which a word starts, labelled with the frame, its time and the word.
 
 ## Brand kits

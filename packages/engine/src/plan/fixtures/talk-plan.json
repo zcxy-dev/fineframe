@@ -62,6 +62,10 @@
         "text": "自動剪輯",
         "reason": "Key topic, the main subject of the talk."
       }
+    ],
+    "emoji": [
+      { "source": "talk", "line": 2, "emoji": "🎬" },
+      { "source": "talk", "line": 3, "emoji": "👍🏽" }
     ]
   }
 ]

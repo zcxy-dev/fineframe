@@ -161,6 +161,16 @@ test("one revision restyles, retitles, relevels the music and changes the look",
   assert.throws(() => revise(edit(), { overlays: [{ index: 1, params: { text: "x" } }] }, sources));
 });
 
+test("the captions' emoji turn on and off with nothing else changed", () => {
+  const on = revise(edit(), { emoji: true }, sources).project;
+  assert.deepEqual(on.captions, { ...edit().captions, emoji: true });
+  validateProject(on);
+  const off = revise(on, { emoji: false }, sources).project;
+  assert.deepEqual(off, edit());
+  const { captions: _, ...silent } = edit();
+  assert.throws(() => revise(silent, { emoji: true }, sources), /no captions/);
+});
+
 test("what goes with a removal goes too: a chapter's wipe, a panel's speaker, their sounds", () => {
   assert.deepEqual(
     removables(edit()).map((item) => [item.kind, item.index, item.label]),

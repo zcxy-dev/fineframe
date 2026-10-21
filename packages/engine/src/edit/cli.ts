@@ -21,7 +21,7 @@ const usage = `Usage: pnpm edit <footage folder, file or link>... --length <leng
     [--shorts <count>] [--names <names.txt>] [--terms <terms.txt>] \\
     [--correct] [--instructions <text>] [--asr <local | cloud>] \\
     [--look <${[...lookIds, "none"].join(" | ")}>] \\
-    [--captions <${CAPTION_STYLES.join(" | ")}>] [--brand <kit folder>] \\
+    [--captions <${CAPTION_STYLES.join(" | ")}>] [--emoji] [--brand <kit folder>] \\
     [--quality <best | economy>] [--visuals <rich | minimal>] \\
     [--fillers <${FILLER_MODES.join(" | ")}>] [--music <track or folder>]... \\
     [--music-license <licence>]
@@ -72,6 +72,10 @@ SHA2-256SUMS, and updated before each link is fetched.
                  minimal (small white type), pop (each word pops in as it is said) or
                  none (no captions on the picture; the .srt is still written). With a
                  --brand kit that has custom captions, those unless a style is named
+      --emoji    show at the end of a caption line the emoji Claude picked for it, where one
+                 fits, drawn in Noto Color Emoji and written in the .srt. Claude picks them
+                 either way, so captions.emoji in the project turns them on or off with a
+                 render alone
       --brand    a brand kit's folder: kit.json with its logo and fonts beside it. Its colours
                  replace the amber in the graphics, titles and caption highlight, its fonts
                  set their type, its logo is a corner watermark when the kit shows it, and its
@@ -123,6 +127,7 @@ const parsed = (() => {
         names: { type: "string" },
         terms: { type: "string" },
         captions: { type: "string" },
+        emoji: { type: "boolean" },
         brand: { type: "string" },
         instructions: { type: "string" },
         correct: { type: "boolean" },
@@ -215,6 +220,7 @@ const options = {
   ...(values.names ? { names: values.names } : {}),
   ...(values.terms ? { terms: values.terms } : {}),
   ...(captions ? { captions: captions as CaptionStyle } : {}),
+  ...(values.emoji ? { emoji: true } : {}),
   ...(values.brand ? { brand: values.brand } : {}),
   ...(instructions ? { instructions } : {}),
   correct: values.correct ?? false,

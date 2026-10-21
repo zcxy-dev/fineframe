@@ -367,6 +367,10 @@ export interface Captions {
    */
   srt: boolean;
   /**
+   * Draw each line's emoji at its end, and write it in the SubRip lines. Off when absent.
+   */
+  emoji?: boolean;
+  /**
    * In time order, on the output timeline.
    */
   lines: CaptionLine[];
@@ -382,6 +386,10 @@ export interface CaptionLine {
    * The line as shown and as the SubRip export writes it, punctuation included.
    */
   text: string;
+  /**
+   * An emoji the planner chose for the line: one pictographic emoji code point, with U+FE0F or not, drawn at its end when `captions.emoji` is on.
+   */
+  emoji?: string;
   /**
    * The line's words with their times, for word-by-word animation; their texts appear in `text` in this order.
    */

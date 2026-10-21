@@ -196,6 +196,9 @@ export const zhTW: Messages = {
     correctionHelp:
       "Claude 會參照你的人名與專有名詞讀過每份逐字稿，在對齊字詞時間點之前，修正語音模型聽錯的地方。會增加 Claude 費用。",
     captionStyle: "字幕樣式",
+    emoji: "Emoji",
+    emojiHelp:
+      "在適合的字幕行尾加上 Claude 為它挑的 emoji。Claude 規劃時一律會挑，所以之後開或關只需重新輸出，沒有 Claude 費用。",
     sample: ["剪片", "只要", "10", "分鐘"],
     sampleGap: "",
     license: "配樂授權",
@@ -537,6 +540,8 @@ export const zhTW: Messages = {
     noMusic: "這次剪輯沒有配樂。",
     look: "風格",
     captionStyle: "字幕樣式",
+    emoji: "字幕行尾的 emoji",
+    emojiHelp: "只需重新輸出：不必重新規劃，也沒有 Claude 費用。",
     brandKeep: (name) => `${name}（目前使用）`,
     brandHelp: "改用其他套組或不使用，只需重新輸出：不必重新規劃，也沒有 Claude 費用。",
     overlays: "疊加元素",
@@ -567,6 +572,7 @@ export const zhTW: Messages = {
       music: (gain) => `配樂 ${gain} dB`,
       look: (_id, name) => `風格改為${name}`,
       captions: (_id, name) => `字幕改為${name}`,
+      emoji: (on) => (on ? "顯示 emoji" : "隱藏 emoji"),
       brand: (name) => `品牌套組改為${name}`,
       noBrand: "不使用品牌套組",
       none: "沒有修改",

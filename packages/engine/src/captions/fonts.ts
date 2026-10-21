@@ -189,7 +189,7 @@ function parseMetrics(
 
 /** A code point's glyph by the cmap's Unicode subtable: format 12, which maps every plane, or
  * else format 4, the Basic Multilingual Plane's. */
-function cmapLookup(
+export function cmapLookup(
   font: Buffer,
   cmap: number,
   bounds: { offset: number; length: number },

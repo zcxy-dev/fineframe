@@ -32,5 +32,7 @@ test("a revision's shape is checked, and only the changes it knows are kept", ()
   // A brand kit is named by its id, or null for none; the server copies the kit in.
   assert.deepEqual(checkRevision({ kit: null, captions: "pop" }), { captions: "pop", kit: null });
   assert.equal(typeof checkRevision({ kit: 5 }), "string");
+  assert.deepEqual(checkRevision({ emoji: false }), { emoji: false });
+  assert.equal(typeof checkRevision({ emoji: "on" }), "string");
   assert.equal("brand" in (checkRevision({ brand: { name: "x" } }) as object), false);
 });

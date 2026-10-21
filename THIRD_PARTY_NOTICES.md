@@ -14,6 +14,7 @@ The project's own code is proprietary, all rights reserved ([LICENSE](LICENSE)).
 | [Beat This!](https://github.com/CPJKU/beat_this) `final0` checkpoint | MIT | JKU Linz's file server, SHA-256 checked; worker `ml` group |
 | [DeepFilterNet3](https://github.com/Rikorose/DeepFilterNet) ONNX export | MIT OR Apache-2.0 | GitHub, pinned commit and SHA-256; worker `ml` group |
 | [Noto Sans CJK TC](https://github.com/notofonts/noto-cjk) Bold and Black | OFL-1.1 | GitHub, pinned commit and SHA-256; renderer, for captions |
+| [Noto Color Emoji](https://github.com/googlefonts/noto-emoji) | OFL-1.1 | GitHub, pinned commit and SHA-256; renderer, for caption emoji |
 | [Noto Serif CJK TC](https://github.com/notofonts/noto-cjk) Bold | OFL-1.1 | GitHub, pinned commit and SHA-256; renderer and the Brand kit page, for a kit that names it |
 | [LXGW WenKai TC](https://github.com/lxgw/LxgwWenkaiTC) Bold | OFL-1.1 | [google/fonts](https://github.com/google/fonts), pinned commit and SHA-256; renderer and the Brand kit page, for a kit that names it |
 | [jf open huninn](https://github.com/justfont/open-huninn-font) 2.1 (jf open 粉圓) | OFL-1.1; its Hanzi derive from Kosugi Maru under Apache-2.0, as its licence file says | GitHub, pinned commit and SHA-256; renderer and the Brand kit page, for a kit that names it |

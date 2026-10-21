@@ -63,6 +63,8 @@ export interface Choices {
   correct: boolean;
   /** The caption style, or "brand" for the brand kit's custom captions. */
   captions: CaptionStyle | "brand";
+  /** Whether the captions show the emoji Claude picks. */
+  emoji: boolean;
   /** The brand kit, by its id, or none. */
   brand: string | null;
   /** What the user tells Claude about this edit; never kept for the next. */
@@ -400,6 +402,24 @@ export function SettingsPanel({
             ? t.kits.captionsDescription
             : t.captions[choices.captions].description}
         </p>
+      </fieldset>
+
+      <fieldset className={styles.field}>
+        <legend className={styles.label}>{words.emoji}</legend>
+        <div className={styles.chips}>
+          {[false, true].map((emoji) => (
+            <button
+              key={String(emoji)}
+              type="button"
+              className={styles.chip}
+              aria-pressed={choices.emoji === emoji}
+              onClick={() => set({ emoji })}
+            >
+              {emoji ? words.on : words.off}
+            </button>
+          ))}
+        </div>
+        <p className={styles.help}>{words.emojiHelp}</p>
       </fieldset>
 
       <div className={styles.field}>
