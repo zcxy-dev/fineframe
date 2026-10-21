@@ -33,13 +33,13 @@
           "type": "string"
         },
         "download": {
-          "description": "A model or program downloading on its first use, while it downloads: a model the analysis runs, FFmpeg, or Chrome Headless Shell for the effects.",
+          "description": "A model or program downloading on its first use, while it downloads: a model the analysis runs, FFmpeg, or Chrome Headless Shell for the effects; or a link's video, named by its title, and yt-dlp, which fetches it.",
           "type": "object",
           "required": ["name", "bytes", "total"],
           "additionalProperties": false,
           "properties": {
             "name": {
-              "description": "The model, as its repository names it, or the program.",
+              "description": "The model, as its repository names it, the program, or the video's title.",
               "type": "string",
               "minLength": 1
             },

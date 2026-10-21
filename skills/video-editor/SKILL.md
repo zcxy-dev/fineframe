@@ -23,7 +23,7 @@ Done when each of these holds:
 mkdir -p out && pnpm -s edit footage/ --length 60s --aspect 9:16 -o out/edit.mp4 > out/progress.jsonl
 ```
 
-- Footage: files or folders of video and still images. `--length` is 15 s to 1 h (`60s`, `90`, `3m`, `1:30`); `--aspect` is `9:16`, `1:1` or `16:9`.
+- Footage: files or folders of video and still images, and links to public videos (YouTube's; other sites may work), fetched beside the output as `<title> [<id>].mp4` (or `.mkv`). Ask before importing a video the user has not said they have the right to use. A playlist, channel, private, members-only, age-restricted or live video fails, saying so. `--length` is 15 s to 1 h (`60s`, `90`, `3m`, `1:30`); `--aspect` is `9:16`, `1:1` or `16:9`.
 - Options are in `pnpm edit --help`. What the user wants of the story ("open with the demo", "keep the part about pricing") goes to Claude as `--instructions "<their words>"`. Ask before using music the user has not said they have the right to use. Stock footage needs a free `PEXELS_API_KEY` or `PIXABAY_API_KEY` in `.env`; without either, visuals are motion graphics and web pages.
 - The first edit of new footage analyses it, about twice the footage's length on a CPU: run it in the background and follow its stderr. Later edits of the same footage start at the plan and take a minute or two. Claude's cost per edit is in the README's [Install](../../README.md#install) section.
 - Done when the last line of `out/progress.jsonl` has `"stage": "done"`. An `"error"` line carries the reason; the stderr says what to change.

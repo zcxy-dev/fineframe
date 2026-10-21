@@ -13,6 +13,7 @@ import {
 } from "@video-editor/schema";
 import type { CaptionStyle } from "../captions/presets.ts";
 import { ffmpeg, QUIET, run } from "../ffmpeg.ts";
+import { fetchLink, isLink, ytDlp } from "../link.ts";
 import type { LookId } from "../looks.ts";
 import {
   anthropicClaude,
@@ -58,7 +59,7 @@ import { collectMusic } from "./music.ts";
 export type Stage = "analyze" | "plan" | "render" | "check";
 
 export interface EditOptions {
-  /** Footage files and folders. */
+  /** Footage files, folders and links to public videos, fetched beside `out`. */
   inputs: string[];
   /** Seconds, LENGTH_RANGE inclusive. */
   length: number;
@@ -205,12 +206,13 @@ type Reporter = (
  * it is. */
 function downloading(report: Reporter, stage: Stage) {
   const shown = new Map<string, number>();
-  return (name: string, bytes: number, total: number) => {
+  return (name: string, bytes: number, total: number, message?: string) => {
     const now = Date.now();
     if (total <= 0 || (bytes < total && now - (shown.get(name) ?? 0) < 250)) return;
     shown.set(name, now);
     const download = { name, bytes: Math.min(bytes, total), total };
-    report(stage, 0, `Downloading ${name}, the first time it is used`, undefined, download);
+    const said = message ? `${message} ${name}` : `Downloading ${name}, the first time it is used`;
+    report(stage, 0, said, undefined, download);
   };
 }
 
@@ -271,7 +273,26 @@ async function prepare(
     }
   };
 
-  const files = await collectInputs(options.inputs, output);
+  const download = downloading(report, "analyze");
+  // Links are fetched beside the output, then edited as the files they became.
+  const given: string[] = [];
+  for (const input of options.inputs) {
+    if (!isLink(input)) {
+      given.push(input);
+      continue;
+    }
+    await mkdir(dirname(output), { recursive: true });
+    report("analyze", 0, `Reading ${input}`);
+    const program = [
+      await ytDlp({ onDownload: (bytes, total) => download("yt-dlp", bytes, total) }),
+    ];
+    const fetched = await fetchLink(input, dirname(output), {
+      program,
+      onProgress: (bytes, total, linked) => download(linked.title, bytes, total, "Downloading"),
+    });
+    given.push(fetched.path);
+  }
+  const files = await collectInputs(given, output);
   const audio = files.filter((file) => file.kind === "audio").map((file) => file.given);
   if (audio.length > 0) {
     throw new EditError(
@@ -316,7 +337,6 @@ async function prepare(
   };
   // The renderer's FFmpeg, downloaded on its first use, before the long analysis rather than
   // after it.
-  const download = downloading(report, "analyze");
   await ffmpeg((bytes, total) => download("FFmpeg", bytes, total));
   const worker = options.worker ?? (await localWorker());
   const cache = options.cache ?? defaultCache();

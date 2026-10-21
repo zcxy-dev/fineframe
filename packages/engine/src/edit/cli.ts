@@ -8,6 +8,7 @@ import {
   DEFAULT_CAPTIONS,
   isCaptionStyle,
 } from "../captions/presets.ts";
+import { LinkError } from "../link.ts";
 import { isLookId, type LookId, lookIds } from "../looks.ts";
 import { ClaudeError, QUALITIES, type Quality } from "../plan/claude.ts";
 import { type Aspect, dollars, LENGTH_RANGE, PlanError } from "../plan/plan.ts";
@@ -19,7 +20,7 @@ import { parseLength, parseSpan, SHORTS_COUNT, SHORTS_RANGE } from "./length.ts"
 const [shortest, longest] = LENGTH_RANGE;
 /** The longest --instructions: a few sentences, not a script. */
 const INSTRUCTIONS_MAX = 2000;
-const usage = `Usage: pnpm edit <footage folder or file>... --length <length> \\
+const usage = `Usage: pnpm edit <footage folder, file or link>... --length <length> \\
     --aspect <9:16 | 1:1 | 16:9> -o <out.mp4> [--within <start>-<end>] [--short <about>] \\
     [--shorts <count>] [--names <names.txt>] [--terms <terms.txt>] \\
     [--correct] [--instructions <text>] [--asr <local | cloud>] \\
@@ -29,7 +30,13 @@ const usage = `Usage: pnpm edit <footage folder or file>... --length <length> \\
     [--music <track or folder>]... [--music-license <licence>]
 
 Edits footage into a finished video within 5 % of the length asked. A folder stands for the
-files directly in it: videos to cut, and still images to show as B-roll.
+files directly in it: videos to cut, and still images to show as B-roll. A link (http or
+https) is a public video's page, such as a YouTube video's; other sites yt-dlp reads may
+work. Its video is fetched at up to 1080p beside the output, as <title> [<id>].mp4 (or .mkv),
+and edited like a file. Use only videos you have the right to use. A playlist, a channel, and a
+private, members-only, age-restricted or live video cannot be fetched; browser cookies are
+never read. The latest yt-dlp is downloaded from GitHub, checked against its release's
+SHA2-256SUMS, and updated before each link is fetched.
 
   -l, --length   ${shortest} s to ${longest / 3600} h: 60s, 90, 3m, 1m30s, 1:30, 1h. With --shorts, the range
                  each short's length lies in, within ${SHORTS_RANGE[0]} s to ${SHORTS_RANGE[1] / 60} min, two lengths joined by a
@@ -235,7 +242,9 @@ try {
 } catch (error) {
   // A known error reached the caller as the last progress line and on stderr; anything else
   // is a bug, and its stack says where.
-  const known = [EditError, PlanError, ClaudeError].some((kind) => error instanceof kind);
+  const known = [EditError, PlanError, ClaudeError, LinkError].some(
+    (kind) => error instanceof kind,
+  );
   if (!known) say(String((error as Error).stack));
   process.exit(1);
 }

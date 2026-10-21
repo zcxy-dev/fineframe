@@ -21,11 +21,11 @@ export interface StageProgress {
    */
   message: string;
   /**
-   * A model or program downloading on its first use, while it downloads: a model the analysis runs, FFmpeg, or Chrome Headless Shell for the effects.
+   * A model or program downloading on its first use, while it downloads: a model the analysis runs, FFmpeg, or Chrome Headless Shell for the effects; or a link's video, named by its title, and yt-dlp, which fetches it.
    */
   download?: {
     /**
-     * The model, as its repository names it, or the program.
+     * The model, as its repository names it, the program, or the video's title.
      */
     name: string;
     /**

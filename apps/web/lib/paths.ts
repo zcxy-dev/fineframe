@@ -45,11 +45,14 @@ const UNSAFE = /[\\/:*?"<>|\u0000-\u001f\u007f]/g;
 const TITLE_MAX = 60;
 
 /** `title` as part of a file name on any system: without the characters one refuses, without a
- * trailing dot or space, at most TITLE_MAX characters; "short" when nothing is left. */
+ * trailing dot or space, not a name Windows keeps for a device, at most TITLE_MAX characters;
+ * "short" when nothing is left. */
 export function fileTitle(title: string): string {
   const safe = [...title.replace(UNSAFE, " ").replace(/\s+/g, " ").trim()]
     .slice(0, TITLE_MAX)
     .join("")
     .replace(/[. ]+$/, "");
-  return safe || "short";
+  // Windows keeps these names for devices, with any extension after them.
+  const device = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?=\.|$)/i;
+  return safe.replace(device, "$1_") || "short";
 }

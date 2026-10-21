@@ -28,6 +28,13 @@ export const UploadIcon = (props: SVGProps<SVGSVGElement>) => (
   </Icon>
 );
 
+export const LinkIcon = (props: SVGProps<SVGSVGElement>) => (
+  <Icon {...props}>
+    <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
+    <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
+  </Icon>
+);
+
 export const FilmIcon = (props: SVGProps<SVGSVGElement>) => (
   <Icon {...props}>
     <rect x="3" y="4" width="18" height="16" rx="2" />

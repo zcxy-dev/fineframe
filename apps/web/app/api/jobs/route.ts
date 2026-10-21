@@ -15,13 +15,14 @@ export async function GET(): Promise<Response> {
   }
 }
 
-/** A new edit: its settings and the files the page will send. */
+/** A new edit: its settings, the files the page will send and the links the server will fetch. */
 export async function POST(request: Request): Promise<Response> {
   try {
     checkOrigin(request);
     const body = (await request.json().catch(() => null)) as {
       settings?: unknown;
       files?: FileEntry[];
+      links?: unknown[];
     } | null;
     const settings = checkSettings(body?.settings, defaultAsr(), messagesOf(request));
     if (typeof settings === "string") throw new JobError(settings, 400);
@@ -33,14 +34,15 @@ export async function POST(request: Request): Promise<Response> {
         409,
       );
     }
-    if (!Array.isArray(body?.files) || body.files.length === 0) {
+    const links = Array.isArray(body?.links) ? body.links.map(String) : [];
+    if (!Array.isArray(body?.files) || body.files.length + links.length === 0) {
       throw new JobError((t) => t.server.noFootage, 400);
     }
     const files = body.files.map((file) => ({
       path: String(file?.path),
       size: Number(file?.size),
     }));
-    return Response.json(await jobs().create(settings, files), { status: 201 });
+    return Response.json(await jobs().create(settings, files, links), { status: 201 });
   } catch (error) {
     return errorResponse(error, request);
   }

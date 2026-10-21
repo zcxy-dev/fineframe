@@ -97,6 +97,15 @@ export const en = {
     asMusicLabel: (path: string) => `Use ${path} as music`,
     notMusicLabel: (path: string) => `Don't use ${path} as music`,
     remove: (path: string) => `Remove ${path}`,
+    link: "Paste a link",
+    linkPlaceholder: "https://www.youtube.com/watch?v=…",
+    addLink: "Add",
+    linkHint:
+      "YouTube videos, one link or several. Instagram, TikTok, Facebook, X, Vimeo, Bilibili and other sites may work.",
+    rights: "Only import videos you have the right to use.",
+    reading: "Reading the link…",
+    fromLink: "Fetched when the edit starts",
+    linkFailed: (url: string, why: string) => `${url}: ${why}`,
   },
   settings: {
     what: "What to make",
@@ -301,6 +310,7 @@ export const en = {
       ffprobe: "ffprobe",
     } as Record<string, string>,
     left: (time: string) => ` · about ${time} left`,
+    speed: (rate: string) => ` · ${rate}/s`,
     firstTime: " · only the first time it is used",
     cancel: "Cancel",
     sure: "Stop the edit? Click again",
@@ -677,6 +687,24 @@ export const en = {
   server: {
     wrong: "Something went wrong on the server",
     otherSite: "Requests from another site are refused",
+    badLink: (url: string) =>
+      `${url}: not a link to a video; paste an address starting with https://`,
+    /** Why a link's video cannot be imported; `said` is the English, with what yt-dlp said. */
+    link: {
+      playlist: () => "This link is a playlist or a channel: paste the link of one video in it",
+      private: () => "This video is private: only public videos can be imported",
+      members: () =>
+        "This video is for the channel's members only: only public videos can be imported",
+      age: () => "This video is age-restricted: only public videos can be imported",
+      live: () => "This is a live video, which cannot be imported yet: try again once it has ended",
+      blocked: () =>
+        "The site asked this computer to sign in to show it is not a bot: try again later, or from another network",
+      unavailable: () =>
+        "This video is not available: it may have been removed, or the link is wrong",
+      unsupported: () => "No video found at this link",
+      offline: () => "Could not reach the site: check the connection and try again",
+      failed: (said: string) => `The video could not be fetched: ${said}`,
+    },
     badName: (path: string) => `${path}: not a file name the page can keep`,
     twice: (path: string) => `${path}: given twice`,
     notMedia: (path: string) =>

@@ -8,6 +8,15 @@ import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { cacheDir } from "@video-editor/engine/download";
+import { ffmpeg } from "@video-editor/engine/ffmpeg";
+import {
+  fetchLink,
+  isLink,
+  LinkError,
+  type LinkVideo,
+  readLink,
+  ytDlp,
+} from "@video-editor/engine/link";
 import {
   editLength,
   OVERLAY_TEXT,
@@ -61,6 +70,11 @@ interface JobFile extends FileEntry {
   use: Role;
   /** Bytes the server has of it. */
   received: number;
+  /** The public video's link the server fetches it from, rather than receiving it; its path,
+   * size and title are set once it is fetched. */
+  url?: string;
+  /** That video's title. */
+  title?: string;
 }
 
 /** One short of a run of several, as shorts.json lists it, with its own versions. */
@@ -111,8 +125,16 @@ export interface Job {
   /** When the edit will likely finish, in epoch milliseconds, at the rate it has gone so far;
    * once there is enough to go on. */
   finish?: number;
-  /** A model downloading on its first use, while it downloads. */
-  download?: { name: string; bytes: number; total: number; secondsLeft?: number };
+  /** A model downloading on its first use, or a link's video, while it downloads. */
+  download?: {
+    name: string;
+    bytes: number;
+    total: number;
+    secondsLeft?: number;
+    bytesPerSecond?: number;
+    /** A link's video, rather than something downloaded only the first time it is used. */
+    video?: boolean;
+  };
   /** What Claude cost, by stage, once the edit is done or failed after a request. */
   claude?: ClaudeCost;
   result?: {
@@ -186,6 +208,18 @@ export function checkReplan(value: unknown): ReplanChoice | string {
     music: choice.music,
     ...(instructions ? { instructions } : {}),
   };
+}
+
+/** What the project list calls a job: its first link's title, else its first video's path, or
+ * the link of one not fetched yet. */
+function nameOf(job: Job): string {
+  const first = job.files.find((file) => file.use === "video");
+  return job.files.find((file) => file.title)?.title ?? (first?.path || first?.url || "");
+}
+
+/** Why a link cannot be imported, in `t`'s words. */
+function linkProblem(error: LinkError, t: Messages = en): string {
+  return t.server.link[error.problem](error.message);
 }
 
 /** The look over a project, by its first clip with one, or none. */
@@ -270,19 +304,23 @@ export interface JobsOptions {
   renderCommand: readonly string[];
   /** The API key the edit uses for each service, read when an edit is created and started. */
   key: (service: Service) => Promise<string | undefined>;
+  /** yt-dlp and its first arguments; the latest yt-dlp unless a test gives a stand-in. */
+  ytDlp?: readonly string[];
 }
 
-/** Seconds a download has left at its rate since it started; undefined until it can say. */
+/** A download's bytes a second since it started, and the seconds it has left at that rate;
+ * undefined until it can say. */
 export function secondsLeft(
   start: { at: number; bytes: number },
   now: { at: number; bytes: number },
   total: number,
-): number | undefined {
+): { seconds: number; bytesPerSecond: number } | undefined {
   const elapsed = now.at - start.at;
   const arrived = now.bytes - start.bytes;
   // The first seconds' rate says little: connections are still opening.
   if (elapsed < 3000 || arrived <= 0) return undefined;
-  return ((total - now.bytes) * elapsed) / arrived / 1000;
+  const bytesPerSecond = (arrived * 1000) / elapsed;
+  return { seconds: (total - now.bytes) / bytesPerSecond, bytesPerSecond };
 }
 
 const VIDEO = versionFiles(1).video;
@@ -298,7 +336,7 @@ export interface ProjectSummary {
   status: Status;
   length: number;
   aspect: Settings["aspect"];
-  /** Its first video's path, to tell projects apart. */
+  /** Its first link's title, else its first video's path or link, to tell projects apart. */
   name: string;
   /** Bytes its folder takes on disk. */
   bytes: number;
@@ -344,6 +382,9 @@ export class Jobs {
   readonly #command: readonly string[];
   readonly #renderCommand: readonly string[];
   readonly #key: (service: Service) => Promise<string | undefined>;
+  readonly #ytDlp: readonly string[] | undefined;
+  /** Each job fetching its links, until they are fetched: what stops it, and when it ended. */
+  readonly #fetches = new Map<string, { stop: AbortController; done: Promise<void> }>();
   /** Where each running job's current download started, for its time left. */
   readonly #downloads = new Map<string, { name: string; at: number; bytes: number }>();
   /** Each running job's estimate of when it finishes. */
@@ -364,6 +405,7 @@ export class Jobs {
     this.#command = options.command;
     this.#renderCommand = options.renderCommand;
     this.#key = options.key;
+    this.#ytDlp = options.ytDlp;
     this.#loaded = this.#load();
   }
 
@@ -390,7 +432,12 @@ export class Jobs {
     }
   }
 
-  async create(settings: Settings, entries: readonly FileEntry[]): Promise<Job> {
+  /** A new edit of the files the page will send and the links' videos the server will fetch. */
+  async create(
+    settings: Settings,
+    entries: readonly FileEntry[],
+    links: readonly string[] = [],
+  ): Promise<Job> {
     await this.#loaded;
     // Refused now rather than at start, before the page sends any footage.
     this.#refuseWhileRunning();
@@ -411,6 +458,14 @@ export class Jobs {
       }
       files.push({ path, size: entry.size, use, received: 0 });
     }
+    for (const url of links) {
+      if (!isLink(url) || url.length > 2000 || !URL.canParse(url)) {
+        throw new JobError((t) => t.server.badLink(url), 400);
+      }
+      if (seen.has(url)) throw new JobError((t) => t.server.twice(url), 400);
+      seen.add(url);
+      files.push({ path: "", size: 0, use: "video", received: 0, url });
+    }
     if (!files.some((file) => file.use === "video")) {
       throw new JobError((t) => t.server.noVideo, 400);
     }
@@ -418,17 +473,7 @@ export class Jobs {
       throw new JobError((t) => t.server.musicLicense, 400);
     }
     await this.#prune();
-    const { bavail, bsize } = await statfs(this.#root);
-    const needed = files.reduce((sum, file) => sum + file.size, 0);
-    // The edit's work files and outputs need room too; footage the size of what is left would
-    // fail halfway through the render instead of now.
-    if (needed * 1.2 > bavail * bsize) {
-      throw new JobError(
-        (t) => t.server.disk(gigabytes(needed * 1.2), gigabytes(bavail * bsize)),
-        507,
-        "disk",
-      );
-    }
+    await this.#checkDisk(files.reduce((sum, file) => sum + file.size, 0));
     const job: Job = {
       id: randomUUID(),
       created: Date.now(),
@@ -485,7 +530,7 @@ export class Jobs {
         status: job.status,
         length: job.settings.length,
         aspect: job.settings.aspect,
-        name: job.files.find((file) => file.use === "video")?.path ?? "",
+        name: nameOf(job),
         bytes: await diskUsage(this.#dir(job)),
         footage: existsSync(join(this.#dir(job), "footage")),
         ...(job.settings.shorts ? { shorts: job.shorts?.length ?? 0 } : {}),
@@ -516,7 +561,7 @@ export class Jobs {
     const job = await this.get(id);
     if (job.status !== "uploading") throw new JobError((t) => t.server.noMoreFiles, 409);
     const file = job.files[index];
-    if (!file) throw new JobError((t) => t.server.noFile, 404);
+    if (!file || file.url) throw new JobError((t) => t.server.noFile, 404);
     const path = join(this.#dir(job), "footage", file.path);
     await mkdir(dirname(path), { recursive: true });
     file.received = 0;
@@ -546,17 +591,56 @@ export class Jobs {
     return job;
   }
 
-  /** Starts the edit once every file has arrived. */
-  async start(id: string): Promise<Job> {
+  /** Refuses footage of `bytes` that does not fit the free disk space with room to spare: the
+   * edit's work files and outputs need room too, and footage the size of what is left would fail
+   * halfway through the render instead of now. */
+  async #checkDisk(bytes: number): Promise<void> {
+    const { bavail, bsize } = await statfs(this.#root);
+    if (bytes * 1.2 > bavail * bsize) {
+      throw new JobError(
+        (t) => t.server.disk(gigabytes(bytes * 1.2), gigabytes(bavail * bsize)),
+        507,
+        "disk",
+      );
+    }
+  }
+
+  /** Starts the edit once every file has arrived; a link that cannot be imported fails it, said
+   * in `t`'s words, the page's. */
+  async start(id: string, t: Messages = en): Promise<Job> {
     const job = await this.get(id);
     const keys = await this.#requireKeys(job.settings);
     if (job.status !== "uploading") throw new JobError((t) => t.server.started, 409);
-    const missing = job.files.find((file) => file.received !== file.size);
+    const missing = job.files.find((file) => !file.url && file.received !== file.size);
     if (missing) throw new JobError((t) => t.server.notArrived(missing.path), 409);
     this.#refuseWhileRunning();
     // Running from here, before the next await, so a second start at the same moment is refused.
     job.status = "running";
     job.started = Date.now();
+    await this.#save(job);
+    void this.#run(job, keys, t);
+    return job;
+  }
+
+  /** Fetches the edit's links into its footage, then runs the edit. */
+  async #run(job: Job, keys: Record<string, string>, t: Messages): Promise<void> {
+    try {
+      const stop = new AbortController();
+      const done = this.#fetchLinks(job, stop.signal);
+      this.#fetches.set(job.id, { stop, done });
+      await done.finally(() => this.#fetches.delete(job.id));
+    } catch (error) {
+      if (job.status === "cancelled") return;
+      job.error =
+        error instanceof LinkError
+          ? linkProblem(error, t)
+          : error instanceof JobError
+            ? error.say(t)
+            : (error as Error).message;
+      await this.#finish(job, null, [(error as Error).message]);
+      return;
+    }
+    if (job.status === "cancelled") return;
     const dir = this.#dir(job);
     const { length, aspect, instructions, shorts } = job.settings;
     const music = job.files.filter((file) => file.use === "music");
@@ -575,10 +659,12 @@ export class Jobs {
       );
       await this.#save(job);
     } catch (error) {
-      job.status = "error";
       job.error = "The server could not prepare this edit";
-      throw error;
+      await this.#finish(job, null, [(error as Error).message]);
+      return;
     }
+    // Cancelled while its arguments were written.
+    if ((job.status as Status) === "cancelled") return;
     const log: string[] = [];
     const run = runEdit({
       command: this.#command,
@@ -594,7 +680,81 @@ export class Jobs {
     void run.exited
       .then(({ code }) => this.#finish(job, code, log))
       .catch((error: Error) => this.#finish(job, null, [...log, error.message]));
-    return job;
+  }
+
+  /** Fetches each link's video into the job's footage, named after its title, with its progress
+   * as the job's download; FFmpeg, which joins the video and the sound, and the latest yt-dlp
+   * first, which the job runs throughout. A video too big for the free disk space, as the site
+   * gives its size, is refused before it is fetched. `signal` stops it. */
+  async #fetchLinks(job: Job, signal: AbortSignal): Promise<void> {
+    const links = job.files.filter((file) => file.url && file.received === 0);
+    if (links.length === 0) return;
+    try {
+      const program = this.#ytDlp ?? [
+        await ytDlp({
+          onDownload: (bytes, total) => this.#downloaded(job, "yt-dlp", bytes, total),
+        }),
+      ];
+      await ffmpeg((bytes, total) => this.#downloaded(job, "FFmpeg", bytes, total));
+      const footage = join(this.#dir(job), "footage");
+      for (const file of links) {
+        signal.throwIfAborted();
+        const { path, video } = await fetchLink(file.url as string, footage, {
+          program,
+          signal,
+          check: async (linked) => {
+            if (linked.bytes) await this.#checkDisk(linked.bytes);
+          },
+          stem: (linked) => fileTitle(linked.title),
+          onProgress: (bytes, total, linked) => {
+            this.#downloaded(job, linked.title, bytes, total, true);
+          },
+        });
+        const { size } = await stat(path);
+        Object.assign(file, {
+          path: relative(footage, path),
+          size,
+          received: size,
+          title: video.title,
+        });
+        await this.#save(job);
+      }
+    } finally {
+      this.#downloads.delete(job.id);
+      delete job.download;
+    }
+  }
+
+  /** A download's progress as the job's, with its rate and time left. */
+  #downloaded(job: Job, name: string, bytes: number, total: number, video = false): void {
+    const now = Date.now();
+    let start = this.#downloads.get(job.id);
+    if (start?.name !== name) {
+      start = { name, at: now, bytes };
+      this.#downloads.set(job.id, start);
+    }
+    const rate = secondsLeft(start, { at: now, bytes }, total);
+    job.download = {
+      name,
+      bytes,
+      total,
+      ...(rate ? { secondsLeft: rate.seconds, bytesPerSecond: rate.bytesPerSecond } : {}),
+      ...(video ? { video } : {}),
+    };
+    this.#emit(job);
+  }
+
+  /** What a link shows, for the page to list it, or why it cannot be imported. */
+  async readLink(url: string): Promise<LinkVideo> {
+    if (!isLink(url) || url.length > 2000 || !URL.canParse(url)) {
+      throw new JobError((t) => t.server.badLink(url), 400);
+    }
+    try {
+      return await readLink(url, this.#ytDlp ? { program: this.#ytDlp } : {});
+    } catch (error) {
+      if (error instanceof LinkError) throw new JobError((t) => linkProblem(error, t), 400);
+      throw error;
+    }
   }
 
   /** `pnpm edit`'s arguments for `job` planned as `plan` says, writing to `output`, and the
@@ -680,8 +840,13 @@ export class Jobs {
         start = { name, at: now, bytes };
         this.#downloads.set(job.id, start);
       }
-      const left = secondsLeft(start, { at: now, bytes }, total);
-      job.download = { name, bytes, total, ...(left === undefined ? {} : { secondsLeft: left }) };
+      const rate = secondsLeft(start, { at: now, bytes }, total);
+      job.download = {
+        name,
+        bytes,
+        total,
+        ...(rate ? { secondsLeft: rate.seconds, bytesPerSecond: rate.bytesPerSecond } : {}),
+      };
     } else {
       delete job.download;
       this.#downloads.delete(job.id);
@@ -1213,7 +1378,11 @@ export class Jobs {
     job.status = "cancelled";
     job.finished = Date.now();
     if (wasRunning) this.#runs.get(job.id)?.stop();
-    await rm(join(this.#dir(job), "footage"), { recursive: true, force: true });
+    // A link's download ends first, so nothing writes in the footage as it is deleted.
+    const fetching = this.#fetches.get(job.id);
+    fetching?.stop.abort();
+    await fetching?.done.catch(() => {});
+    await rm(join(this.#dir(job), "footage"), { recursive: true, force: true, maxRetries: 10 });
     await this.#save(job);
     this.#emit(job);
     return job;
@@ -1375,6 +1544,10 @@ export function jobs(): Jobs {
   global.videoEditorJobs ??= new Jobs({
     root: defaultRoot(),
     key: readKey,
+    // A stand-in for yt-dlp, run by Node, only in tests.
+    ...(process.env.VIDEO_EDITOR_YT_DLP
+      ? { ytDlp: [process.execPath, process.env.VIDEO_EDITOR_YT_DLP] }
+      : {}),
     command: [
       process.execPath,
       process.env.VIDEO_EDITOR_EDIT_CLI ??
