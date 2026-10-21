@@ -12,7 +12,9 @@ import math
 from dataclasses import dataclass
 from pathlib import Path
 
-from vebench import transcript
+import numpy as np
+
+from vebench import render, transcript
 
 TICKS = 120_000
 TRANSCRIPT_NAMES = ("transcript.json", "transcript.srt", "transcript.txt")
@@ -26,6 +28,12 @@ NEAR = 1.0
 DEAD_AIR = 1.0
 # How much of a filler or take must play for it to count as kept.
 KEPT = 0.5
+# An edge inside a truth word is heard there unless the recording over the span its sound fades
+# in or out on, beside the edge, is this far under the quieter of that word and the one beside it
+# (the engine's joinAt).
+FADE = 0.02
+UNDER_DB = 20.0
+LEVEL_RATE = 16_000
 # An edge this close to a beat of the music under it is one the planner should have put on it.
 NEAR_BEAT = 0.15
 # A callout starts this long before the thing it points at is named (the effect catalog), and is
@@ -68,7 +76,7 @@ def score(project_path: Path, edges: str = "sound") -> dict:
             "error": length / (target["duration"] / TICKS) - 1,
             "within": abs(length / (target["duration"] / TICKS) - 1) <= target["tolerance"],
         },
-        "cuts": {"checked": 0, "in_words": 0, "deepest_ms": 0.0},
+        "cuts": {"checked": 0, "in_words": 0, "in_words_heard": 0, "deepest_ms": 0.0},
         "fillers": {"total": 0, "removed": 0, "removed_words": 0, "filler_words": 0},
         "retakes": {"scored": 0, "correct": 0, "unused": 0},
         "dead_air": {"count": 0, "seconds": 0.0},
@@ -87,7 +95,7 @@ def score(project_path: Path, edges: str = "sound") -> dict:
         units = _units(truth)
         words = [u for u in units if u.start is not None and u.end is not None]
         mine = sorted((c for c in heard if c.source == source["id"]), key=lambda c: c.start)
-        _cuts(result["cuts"], mine, words, _duration(base, source))
+        _cuts(result["cuts"], mine, words, _duration(base, source), _Sound(base / source["path"]))
         _fillers(result["fillers"], mine, edit, words)
         _retakes(result["retakes"], mine, edit)
         silences_by_source[source["id"]] = _silences(edit, units)
@@ -296,18 +304,56 @@ def _covered(clips: list[Clip], start: float, end: float) -> float:
     return min(1.0, seconds / (end - start))
 
 
-def _cuts(out: dict, clips: list[Clip], words: list, duration: float | None) -> None:
-    """Every clip edge inside a timed truth word (_inside). The start and end of the file are
-    not cuts."""
+def _cuts(out: dict, clips: list[Clip], words: list, duration: float | None, sound) -> None:
+    """Every clip edge inside a timed truth word (_inside), and of those, the ones where the
+    sound beside the edge is heard (_heard). The start and end of the file are not cuts."""
     for clip in clips:
-        for edge in (clip.start, clip.end):
+        for edge, plays_after in ((clip.start, True), (clip.end, False)):
             if edge <= 0 or (duration is not None and edge >= duration - 1e-3):
                 continue
             out["checked"] += 1
             depth = _inside(edge, words)
             if depth is not None:
                 out["in_words"] += 1
+                out["in_words_heard"] += _heard(edge, plays_after, words, sound)
                 out["deepest_ms"] = max(out["deepest_ms"], round(depth * 1000, 1))
+
+
+class _Sound:
+    """A source's recording, decoded when first asked for; None where it cannot be."""
+
+    def __init__(self, path: Path) -> None:
+        self.path, self._samples = path, False
+
+    def samples(self) -> np.ndarray | None:
+        if self._samples is False:
+            try:
+                self._samples = render.decode_audio(self.path, LEVEL_RATE).astype(np.float64)
+            except (OSError, ValueError, RuntimeError):
+                self._samples = None
+        return self._samples
+
+    def db(self, start: float, end: float) -> float | None:
+        samples = self.samples()
+        if samples is None:
+            return None
+        part = samples[max(0, int(start * LEVEL_RATE)) : max(0, int(end * LEVEL_RATE))]
+        return 10 * float(np.log10(np.mean(part**2) + 1e-12)) if len(part) else None
+
+
+def _heard(edge: float, plays_after: bool, words: list, sound: _Sound) -> bool:
+    """Whether an edge inside a truth word is heard there: its recording over FADE on the side
+    that plays is less than UNDER_DB under the quieter of the word and the truth word beside it
+    on the edge's nearer side. Heard when the recording cannot be read."""
+    word = next(w for w in words if w.start < edge < w.end)
+    k = words.index(word)
+    nearer = k - 1 if edge - word.start < word.end - edge else k + 1
+    beside = words[nearer] if 0 <= nearer < len(words) else word
+    span = (edge, edge + FADE) if plays_after else (edge - FADE, edge)
+    levels = [sound.db(w.start, w.end) for w in (word, beside)] + [sound.db(*span)]
+    if any(level is None for level in levels):
+        return True
+    return levels[2] > min(levels[:2]) - UNDER_DB
 
 
 def _inside(edge: float, words: list) -> float | None:

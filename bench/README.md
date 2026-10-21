@@ -261,8 +261,13 @@ Run times and memory in this repository's docs were measured on 8 cores of an EP
   `in` and `out` otherwise. `--edges picture` judges every clip at `in` and `out`, as `edit`
   did before sound edges.
   - `length`: the edit's length against its target, and whether it lands within the tolerance.
-  - `cuts`: clip edges strictly inside a timed truth word, and the deepest, in milliseconds.
-    The start and end of a source file are not cuts.
+  - `cuts`: clip edges strictly inside a timed truth word (`in_words`), and the deepest, in
+    milliseconds. `in_words_heard` counts those of them where the edge is heard: the
+    recording, decoded at 16 kHz, over the 20 ms beside the edge on the side that plays is less
+    than 20 dB under the quieter of the word and the truth word beside it on the edge's nearer
+    side, or the recording cannot be read. An edge in the dip between two words said without a
+    pause, where the engine cuts a filler said straight into the next word, counts in
+    `in_words` and not in `in_words_heard`. The start and end of a source file are not cuts.
   - `fillers`: recall is the share of truth fillers within 1 s of a played clip that do not
     play. Precision is the share of fillers among the timed truth words cut out between clips
     less than 3 s apart in their source. Fillers and words of a take the truth does not keep

@@ -1,5 +1,7 @@
+import { SOUND_EDGE_FADE } from "./plan/place.ts";
 import {
   type Dip,
+  SAMPLE_RATE,
   type Timeline,
   type TimelineBroll,
   type TimelineClip,
@@ -11,9 +13,9 @@ import {
 /** 5 ms fades on the sound at a hard cut: twice what the click measurement needed, far too short
  * to hear (packages/engine/README.md). */
 export const EDGE_FADE_SAMPLES = 240;
-/** 20 ms fades on the sound where a clip's sound starts after its first sample or ends before
- * its last (`soundIn`, `soundOut`): the edge of a word said straight into the one cut. */
-const SOUND_EDGE_FADE_SAMPLES = 960;
+/** Fades on the sound where a clip's sound starts after its first sample or ends before its last
+ * (`soundIn`, `soundOut`): the edge of a word said straight into the one cut. */
+const SOUND_EDGE_FADE_SAMPLES = Math.round(SOUND_EDGE_FADE * SAMPLE_RATE);
 
 /** A range of one clip: `frames` output frames and `samples` output samples, starting
  * `fromFrame` frames and `fromSample` samples after the clip's own start. */

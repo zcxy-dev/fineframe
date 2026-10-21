@@ -1,5 +1,6 @@
 // What a source's voice stem holds that its words do not say: speech the transcript missed, which
-// no cut may fall in, and how sharply its sound jumps, which a cut must not start or end on.
+// no cut may fall in, how sharply its sound jumps, which a cut must not start or end on, and how
+// loud its speech is, which says whether two words said without a pause may be cut apart.
 
 import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
@@ -22,12 +23,12 @@ const DIP = 0.03;
 /** Speech shorter than this, in seconds, is a click or a breath and does not count. */
 const SHORTEST = 0.05;
 
-/** The speech no word covers, and the peaks a cut is checked against, of a source whose index has
- * a voice stem; none for one without speech. */
+/** The speech no word covers, the peaks a cut is checked against and the speech's power, of a
+ * source whose index has a voice stem; none for one without speech. */
 export async function stemMarks(
   index: MediaIndex,
   indexPath: string,
-): Promise<Pick<PlaceSource, "unheard" | "peaks">> {
+): Promise<Pick<PlaceSource, "unheard" | "peaks" | "power">> {
   if (!index.voice) return {};
   const path = resolve(dirname(indexPath), index.voice.stem);
   await access(path).catch(() => {
@@ -44,16 +45,19 @@ export async function stemMarks(
  *   SHORTEST or longer, in seconds: words the transcript missed, or a word's sound it timed short.
  * - `peaks`: the largest second difference of the recording's samples in each PEAK_BLOCK, the
  *   jump `vebench render` reads a click by.
+ * - `power`: the denoised speech's mean square in each PEAK_BLOCK.
  */
 export async function readStem(
   path: string,
   words: readonly Word[],
-): Promise<{ unheard: [number, number][]; peaks: Float32Array }> {
+): Promise<{ unheard: [number, number][]; peaks: Float32Array; power: Float32Array }> {
   const frame = Math.round(FRAME * RATE);
   const block = Math.round(PEAK_BLOCK * RATE);
   const power: number[] = [];
   const peaks: number[] = [];
+  const blocks: number[] = [];
   let sum = 0;
+  let blockSum = 0;
   let peak = 0;
   let n = 0;
   let a = 0;
@@ -73,6 +77,7 @@ export async function readStem(
       const recorded = data.readFloatLE(at);
       const denoised = data.readFloatLE(at + 4);
       sum += denoised * denoised;
+      blockSum += denoised * denoised;
       if (n >= 2) peak = Math.max(peak, Math.abs(recorded - 2 * a + b));
       b = a;
       a = recorded;
@@ -83,7 +88,9 @@ export async function readStem(
       }
       if (n % block === 0) {
         peaks.push(peak);
+        blocks.push(blockSum / block);
         peak = 0;
+        blockSum = 0;
       }
     }
     rest = Buffer.from(data.subarray(whole));
@@ -95,8 +102,15 @@ export async function readStem(
       else fail(new Error(`${path}: ffmpeg could not read it:\n${Buffer.concat(err).toString()}`));
     });
   });
-  if (n % block > 0) peaks.push(peak);
-  return { unheard: unheardSpeech(power, words), peaks: Float32Array.from(peaks) };
+  if (n % block > 0) {
+    peaks.push(peak);
+    blocks.push(blockSum / (n % block));
+  }
+  return {
+    unheard: unheardSpeech(power, words),
+    peaks: Float32Array.from(peaks),
+    power: Float32Array.from(blocks),
+  };
 }
 
 /** Where `power`, the denoised speech's mean square per FRAME, holds speech that no word covers. */

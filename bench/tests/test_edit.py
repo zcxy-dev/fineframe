@@ -1,5 +1,7 @@
 import json
+import wave
 
+import numpy as np
 import pytest
 
 from vebench import edit
@@ -63,7 +65,7 @@ def test_a_clean_edit_scores_clean(tmp_path):
     path = corpus(tmp_path, [(1.2, 2.0), (5.45, 6.45)], target=1.8)
     result = edit.score(path)
     assert result["length"] == {"seconds": 1.8, "target": 1.8, "error": 0.0, "within": True}
-    assert result["cuts"] == {"checked": 4, "in_words": 0, "deepest_ms": 0.0}
+    assert result["cuts"] == {"checked": 4, "in_words": 0, "in_words_heard": 0, "deepest_ms": 0.0}
     assert result["fillers"] == {"total": 1, "removed": 1, "removed_words": 0, "filler_words": 0}
     assert result["retakes"] == {"scored": 1, "correct": 1, "unused": 0}
     assert result["dead_air"] == {"count": 0, "seconds": 0.0}
@@ -89,12 +91,41 @@ def test_a_clip_is_judged_where_its_sound_starts_and_ends(tmp_path):
     project["main"][0]["soundIn"] = round(1.2 * T)
     path.write_text(json.dumps(project))
     heard = edit.score(path)
-    assert heard["cuts"] == {"checked": 2, "in_words": 0, "deepest_ms": 0.0}
+    assert heard["cuts"] == {"checked": 2, "in_words": 0, "in_words_heard": 0, "deepest_ms": 0.0}
     assert heard["fillers"]["removed"] == 1
     seen = edit.score(path, edges="picture")
-    assert seen["cuts"] == {"checked": 2, "in_words": 1, "deepest_ms": 20.0}
+    # No recording to read: an edge inside a word counts as heard.
+    assert seen["cuts"] == {"checked": 2, "in_words": 1, "in_words_heard": 1, "deepest_ms": 20.0}
     # Both judge the length by the picture.
     assert heard["length"] == seen["length"]
+
+
+def test_an_edge_inside_a_word_in_the_dip_between_two_words_is_not_heard(tmp_path):
+    # Two words said without a pause, 0.5 s of tone each, the sound 40 dB down for 60 ms where
+    # they meet at 1.5 s; truth times 嗯 to 1.52 s, so an edge at 1.5 s is 20 ms inside it.
+    rate = 16_000
+    t = np.arange(int(3.0 * rate)) / rate
+    tone = 0.3 * np.sin(2 * np.pi * 220 * t)
+    tone[(t < 1.0) | (t >= 2.0)] = 0.0
+    tone[(t >= 1.47) & (t < 1.53)] *= 0.01
+    words = [word("嗯", 1.0, 1.52), word("好", 1.52, 2.0)]
+    truth = {"fillers": [{"start": 1.0, "end": 1.52, "text": "嗯"}]}
+    path = corpus(tmp_path, [(0.2, 1.5)], target=1.3, words=words, truth=truth)
+    source = tmp_path / "a1" / "source.wav"
+    with wave.open(str(source), "wb") as out:
+        out.setnchannels(1)
+        out.setsampwidth(2)
+        out.setframerate(rate)
+        out.writeframes((tone * 32767).astype(np.int16).tobytes())
+    project = json.loads(path.read_text())
+    project["sources"][0]["path"] = "../../source.wav"
+    path.write_text(json.dumps(project))
+    assert edit.score(path)["cuts"]["in_words"] == 1
+    assert edit.score(path)["cuts"]["in_words_heard"] == 0
+    # 100 ms earlier, in the body of the word, it is heard.
+    project["main"][0]["out"] = round(1.4 * T)
+    path.write_text(json.dumps(project))
+    assert edit.score(path)["cuts"]["in_words_heard"] == 1
 
 
 def test_a_word_cut_out_that_is_no_filler_lowers_precision(tmp_path):

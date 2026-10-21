@@ -348,17 +348,17 @@ test("a silence too short for a cut on a frame takes one at its middle, the soun
   ];
   const spaced = source(words, FRAME_30);
   assert.ok(!cuttableAfter(spaced, 0));
-  assert.equal(joinAt(spaced, 0), 1.35);
+  assert.equal(joinAt(spaced, 0, "both"), 1.35);
   // Less than both margins, speech the transcript missed in it, or a shot change at it: none.
   const tight = [words[0] as Word, { text: "w1", start: 1.37, end: 1.6 }];
-  assert.equal(joinAt(source(tight, FRAME_30), 0), null);
-  assert.equal(joinAt({ ...spaced, unheard: [[1.32, 1.36]] }, 0), null);
-  assert.equal(joinAt({ ...spaced, shots: [[1.34, 1.34]] }, 0), null);
+  assert.equal(joinAt(source(tight, FRAME_30), 0, "both"), null);
+  assert.equal(joinAt({ ...spaced, unheard: [[1.32, 1.36]] }, 0, "both"), null);
+  assert.equal(joinAt({ ...spaced, shots: [[1.34, 1.34]] }, 0, "both"), null);
   // A shot change or a click anywhere in that silence, as a splice the source was edited with
   // leaves, would show the take before or click at the cut: none either.
-  assert.equal(joinAt({ ...spaced, shots: [[1.39, 1.39]] }, 0), null);
-  assert.equal(joinAt({ ...spaced, peaks: peaks(60, [1.38]) }, 0), null);
-  assert.equal(joinAt({ ...spaced, peaks: peaks(60, [5]) }, 0), 1.35);
+  assert.equal(joinAt({ ...spaced, shots: [[1.39, 1.39]] }, 0, "both"), null);
+  assert.equal(joinAt({ ...spaced, peaks: peaks(60, [1.38]) }, 0, "both"), null);
+  assert.equal(joinAt({ ...spaced, peaks: peaks(60, [5]) }, 0, "both"), 1.35);
 
   const [before, after] = placeClips([{ source: "a", words: [0, 2] }], map(spaced), FRAME_30) as [
     PlacedClip,
@@ -380,4 +380,51 @@ test("a silence too short for a cut on a frame takes one at its middle, the soun
   )[0] as PlacedClip;
   assert.equal(grid.in, secondsToTicks(1.65));
   assert.equal(grid.soundIn, undefined);
+});
+
+/** A source's speech power as placeClips reads it, one mean square per PEAK_BLOCK: 0.01 (-20 dB)
+ * through each word, and `dip` within 30 ms of each point in `dips`; 1e-7 elsewhere. */
+function power(words: Word[], dip: number, dips: number[], seconds = 60): Float32Array {
+  const blocks = new Float32Array(Math.round(seconds / PEAK_BLOCK)).fill(1e-7);
+  for (const word of words) {
+    blocks.fill(0.01, Math.round(word.start / PEAK_BLOCK), Math.round(word.end / PEAK_BLOCK));
+  }
+  for (const t of dips) {
+    blocks.fill(dip, Math.round((t - 0.03) / PEAK_BLOCK), Math.round((t + 0.03) / PEAK_BLOCK));
+  }
+  return blocks;
+}
+
+test("two words said without a pause are cut apart where the speech is 20 dB under both", () => {
+  // w1, a filler, runs straight into w0 before it and w2 after it.
+  const words = [
+    { text: "w0", start: 1, end: 1.31 },
+    { text: "w1", start: 1.31, end: 1.615 },
+    { text: "w2", start: 1.615, end: 1.9 },
+  ];
+  const quiet = { ...source(words, FRAME_30), power: power(words, 1e-5, [1.31, 1.615]) };
+  // -50 dB at the meeting point, 30 dB under the words: the cut falls there, on either side.
+  assert.equal(joinAt(quiet, 0, "before"), 1.31);
+  assert.equal(joinAt(quiet, 1, "after"), 1.615);
+  // -35 dB is only 15 dB under: no cut. Nor without the speech's power.
+  const loud = { ...quiet, power: power(words, 10 ** -3.5, [1.31, 1.615]) };
+  assert.equal(joinAt(loud, 0, "before"), null);
+  assert.equal(joinAt(source(words, FRAME_30), 0, "before"), null);
+  // Only the 20 ms the kept word fades over counts: a dip on the other side is not enough.
+  const after = { ...quiet, power: power(words, 1e-5, [1.335]) };
+  assert.equal(joinAt(after, 0, "after"), 1.31);
+  assert.equal(joinAt(after, 0, "before"), null);
+  // Speech the transcript missed, a click or a shot change at it: no cut.
+  assert.equal(joinAt({ ...quiet, unheard: [[1.32, 1.36]] }, 0, "before"), null);
+  assert.equal(joinAt({ ...quiet, peaks: peaks(60, [1.315]) }, 0, "before"), null);
+  assert.equal(joinAt({ ...quiet, shots: [[1.33, 1.33]] }, 0, "before"), null);
+
+  const [before, next] = placeClips([{ source: "a", words: [0, 2] }], map(quiet), FRAME_30) as [
+    PlacedClip,
+    PlacedClip,
+  ];
+  assert.equal(before.soundOut, secondsToTicks(1.31));
+  assert.ok(before.out > secondsToTicks(1.31) && before.out - secondsToTicks(1.31) < FRAME_30);
+  assert.equal(next.soundIn, secondsToTicks(1.615));
+  assert.ok(next.in < secondsToTicks(1.615) && secondsToTicks(1.615) - next.in < FRAME_30);
 });

@@ -400,7 +400,7 @@ function toPauses(
     b === 0 ||
     b === n ||
     cuttableAfter(source, words[b - 1] as number) ||
-    joinAt(source, words[b - 1] as number) !== null;
+    joinAt(source, words[b - 1] as number, "both") !== null;
   const gone = new Set<number>();
   const beyond: { first: number; before: number[]; after: number[] }[] = [];
   for (let p = 0; p < n; p++) {

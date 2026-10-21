@@ -625,9 +625,9 @@ async function assemble(state: PlanState): Promise<Assembly> {
 
 /**
  * The words of a segment that play, line by line: every word, less the fillers and false starts
- * cut inside its lines and the words a review took out. A cut needs a pause to fall in, for a
- * filler or false start one too short for a frame too (joinAt), so one with no pause beside it
- * stays, and a review's removal grows to the nearest pauses.
+ * cut inside its lines and the words a review took out. A cut needs a pause to fall in, or for a
+ * filler or false start a point joinAt allows beside it, so one with neither stays, and a
+ * review's removal grows to the nearest pauses.
  */
 function keptWords(state: PlanState, segment: Segment): number[][] {
   const source = state.sources.get(segment.source) as PlanSource;
@@ -651,10 +651,10 @@ function keptWords(state: PlanState, segment: Segment): number[][] {
       while (b < to && !kept(b + 1)) b++;
       let excluded = false;
       for (let i = a; i <= b; i++) excluded ||= taken(i);
-      const apart = (i: number) =>
-        cuttableAfter(source, i) || (!excluded && joinAt(source, i) !== null);
-      const left = kept(a - 1) && !apart(a - 1);
-      const right = kept(b + 1) && !apart(b);
+      const apart = (i: number, side: "before" | "after") =>
+        cuttableAfter(source, i) || (!excluded && joinAt(source, i, side) !== null);
+      const left = kept(a - 1) && !apart(a - 1, "before");
+      const right = kept(b + 1) && !apart(b, "after");
       if (left || right) {
         if (excluded) {
           for (const i of [left ? a - 1 : -1, right ? b + 1 : -1].filter((i) => i >= 0)) {
