@@ -5,12 +5,12 @@ import { createHash } from "node:crypto";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
-import { pathToFileURL } from "node:url";
 import type { Project, Source } from "@video-editor/schema";
 import { ffmpeg, QUIET, run } from "../ffmpeg.ts";
 import { makeSource, projectOf } from "../fixtures.ts";
 import { SECOND, scratch } from "../testing.ts";
 import { exportEdit } from "./export.ts";
+import { fileUrl } from "./xml.ts";
 
 /** A VP9 overlay of `frames` frames, opaque white on its left half and clear on its right. */
 async function halfWhite(file: string, frames: number, width: number, height: number) {
@@ -200,10 +200,8 @@ test("an edit exports its timelines, its captions, the files they play and its o
     assert.deepEqual(
       [...new Set(urls)].sort(),
       [
-        pathToFileURL(join(dir, "speaker.mp4")).href.replace(
-          "file://",
-          name.endsWith(".xml") ? "file://localhost" : "file://",
-        ),
+        // As xml.test.ts checks fileUrl on each system's paths.
+        fileUrl(join(dir, "speaker.mp4"), name.endsWith(".xml") ? "localhost" : ""),
         "media/%E9%85%8D%E6%A8%82%20%E4%B8%80.wav",
         "media/overlay.mov",
         "media/page.png",
