@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
+import { pathToFileURL } from "node:url";
 import type { Project, Source } from "@video-editor/schema";
 import { ffmpeg, QUIET, run } from "../ffmpeg.ts";
 import { makeSource, projectOf } from "../fixtures.ts";
@@ -199,7 +200,10 @@ test("an edit exports its timelines, its captions, the files they play and its o
     assert.deepEqual(
       [...new Set(urls)].sort(),
       [
-        `file://${name.endsWith(".xml") ? "localhost" : ""}${encodeURI(join(dir, "speaker.mp4"))}`,
+        pathToFileURL(join(dir, "speaker.mp4")).href.replace(
+          "file://",
+          name.endsWith(".xml") ? "file://localhost" : "file://",
+        ),
         "media/%E9%85%8D%E6%A8%82%20%E4%B8%80.wav",
         "media/overlay.mov",
         "media/page.png",
