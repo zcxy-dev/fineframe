@@ -23,6 +23,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { _electron as electron, type Page } from "playwright-core";
+import { descendantsOf, type ProcessRow } from "./processes.ts";
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -326,8 +327,8 @@ async function shot(page: Page, name: string): Promise<void> {
   say(`saved ${name}.png`);
 }
 
-/** The processes `root` started, and theirs, by their ids: a process in a group of its own is
- * still its parent's child. */
+/** The processes `root` started, and theirs, by their ids, from a listing of every process with,
+ * on Windows, when each started. */
 function descendants(root: number): number[] {
   const listing =
     process.platform === "win32"
@@ -336,28 +337,23 @@ function descendants(root: number): number[] {
           [
             "-NoProfile",
             "-Command",
-            'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId)" }',
+            'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId) $(if ($_.CreationDate) { ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() })" }',
           ],
           { encoding: "utf8" },
         ).stdout
       : spawnSync("ps", ["-A", "-o", "pid=,ppid="], { encoding: "utf8" }).stdout;
-  const children = new Map<number, number[]>();
-  for (const line of listing.trim().split("\n")) {
-    const [child, parent] = line.trim().split(/\s+/).map(Number) as [number, number];
-    children.set(parent, [...(children.get(parent) ?? []), child]);
-  }
-  // Windows reuses ids: a process whose parent has ended can name, as its parent, an id a process
-  // below it now has, so each id is followed once.
-  const found = new Set<number>();
-  const queue = [root];
-  while (queue.length > 0) {
-    for (const child of children.get(queue.shift() as number) ?? []) {
-      if (child === root || found.has(child)) continue;
-      found.add(child);
-      queue.push(child);
-    }
-  }
-  return [...found];
+  const rows = listing
+    .trim()
+    .split("\n")
+    .map((line): ProcessRow => {
+      const [pid, parent, created] = line.trim().split(/\s+/).map(Number) as number[];
+      return {
+        pid: pid as number,
+        parent: parent as number,
+        ...(Number.isFinite(created) ? { created } : {}),
+      };
+    });
+  return descendantsOf(rows, root);
 }
 
 const alive = (pid: number) => {
