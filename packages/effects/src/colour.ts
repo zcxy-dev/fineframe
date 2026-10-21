@@ -28,7 +28,7 @@ const BLACK: Rgb = [0, 0, 0];
 const WHITE: Rgb = [255, 255, 255];
 
 /** Text this far from its backdrop in contrast, or more, reads at the sizes effects use. */
-const READABLE = 3;
+export const READABLE = 3;
 
 export function hex(value: string): Rgb {
   const n = Number.parseInt(value.slice(1), 16);

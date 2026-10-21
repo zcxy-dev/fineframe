@@ -98,7 +98,7 @@ export function graphicPage(job: GraphicJob): {
       frames: job.frames,
       html: cleanMarkup(job.html, brand ?? undefined),
       css: brand ? brand.css(job.css) : job.css,
-      ...(brand ? { house: brand.house() } : {}),
+      ...(brand ? { house: brand.house(), script: brand.script() } : {}),
     }),
     width: box?.width ?? frame.width,
     height: box?.height ?? frame.height,

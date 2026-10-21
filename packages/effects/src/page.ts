@@ -25,8 +25,10 @@ export interface PageSpec {
   /** The effect's markup and its own styles. */
   html: string;
   css: string;
-  /** The house stylesheet in a brand kit's look, in place of house.css (brand.ts). */
+  /** The house stylesheet in a brand kit's look, in place of house.css, and the script that
+   * keeps its text readable (brand.ts). */
   house?: string;
+  script?: string;
 }
 
 /** No request leaves the page but for its stylesheets, fonts and the bundled icons and logos, all
@@ -55,6 +57,6 @@ html, body { width: ${box.width}px; height: ${box.height}px; }
 ${spec.css}
 </style></head><body>
 <div id="root" data-composition-id="effect" data-no-timeline data-start="0" data-duration="${seconds}" data-width="${box.width}" data-height="${box.height}"><div id="frame" class="ff">${spec.html}</div></div>
-</body></html>
+${spec.script === undefined ? "" : `<script>${spec.script}</script>\n`}</body></html>
 `;
 }

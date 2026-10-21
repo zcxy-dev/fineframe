@@ -222,7 +222,12 @@ export function renderOverlays(
         fps,
         frames,
         ...(brand
-          ? { html: markup.html, css: brand.css(markup.css), house: brand.house() }
+          ? {
+              html: markup.html,
+              css: brand.css(markup.css),
+              house: brand.house(),
+              script: brand.script(),
+            }
           : markup),
       }),
       width,

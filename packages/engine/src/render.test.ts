@@ -1950,3 +1950,49 @@ test(
     assert.ok((await ambers(true)) < 0.001, "an amber is left in the kit's look");
   },
 );
+
+test(
+  "text in a box another rule fills with a dark kit's colour turns white, as the cascade draws it",
+  chrome,
+  async (t) => {
+    const dir = await scratch(t, "contrast-");
+    const [width, height] = [320, 180];
+    const source = await makeSource(dir, {
+      id: "grey",
+      pattern: "color",
+      filter: "lutyuv=y=128:u=128:v=128",
+      width,
+      height,
+      fps: 30,
+      seconds: 3,
+      sound: 220,
+    });
+    // The house look's accent is light, so the graphic set its text in ink; navy is not.
+    const css =
+      ".badge { position: absolute; left: 10%; top: 25%; width: 80%; height: 50%; background: var(--accent); } " +
+      ".badge b { color: var(--ink); font-size: calc(var(--u) * 30); }";
+    const project = projectOf([source], [clip("grey", 0, 2)], {
+      aspect: "16:9",
+      width,
+      height,
+      fps: { num: 30, den: 1 },
+    });
+    project.graphics = [
+      {
+        layout: "full",
+        html: '<div class="badge"><b>27</b></div>',
+        css,
+        start: 0,
+        duration: 2 * SECOND,
+      },
+    ];
+    project.brand = { name: "Navy", colors: { primary: "#14213d" } };
+    const result = await render(await write(dir, project), join(dir, "navy.mp4"));
+    const frame = (await grey(result.video, width, height))[45] as Uint8Array;
+    let bright = 0;
+    for (let y = 50; y < 130; y++) {
+      for (let x = 40; x < 280; x++) if ((frame[y * width + x] ?? 0) > 200) bright++;
+    }
+    assert.ok(bright > 300, `${bright} bright pixels of the number in the badge`);
+  },
+);

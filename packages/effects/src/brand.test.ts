@@ -42,20 +42,22 @@ test("the house's ambers and a graphic's stray near-ambers all become the kit's 
   assert.match(rebranded, /\.c \{ color: #7bc29a; background: #ffffff; animation: gold-in 1s; \}/);
 });
 
-test("text in the accent stays readable on the stage, and text on it turns black or white", () => {
+test("text in an amber takes the kit's primary, and a page in a kit's look keeps its text readable", () => {
   const navy = new Rebrand({ colors: { primary: "#14213d" } });
   const css = navy.css(
-    ".k { color: var(--accent); } .t { color: #ffb547; } .tag { background: #ffb547; color: #0b0c0f; }",
+    ".k { color: var(--accent); } .t { color: #f5a623; } .tag { background: #ffb547; color: #0b0c0f; }",
   );
-  // Navy would vanish on the near-black stage: its text is white instead.
-  assert.match(css, /\.k \{ color: #ffffff; \}/);
-  assert.match(css, /\.t \{ color: #ffffff; \}/);
-  assert.match(css, /\.tag \{ background: #14213d; color: #ffffff; \}/);
-  const light = new Rebrand({ colors: { primary: "#9be7ff" } });
+  // Read against what fills each box once the page has its cascade: the page's script.
+  assert.equal(
+    css,
+    ".k { color: var(--accent); } .t { color: #14213d; } .tag { background: #14213d; color: #0b0c0f; }",
+  );
+  const job = { layout: "full" as const, html: "<b>27</b>", css: "", output, frames: 30 };
   assert.match(
-    light.css(".tag { background: var(--accent); color: var(--ink); }"),
-    /color: #000000/,
+    graphicPage({ ...job, brand: { colors: BLUE } }).page,
+    /<script>\(\(\) => \{[\s\S]*getComputedStyle[\s\S]*<\/script>/,
   );
+  assert.doesNotMatch(graphicPage(job).page, /<script>/);
   assert.equal(readable("#9be7ff", PALETTE.ink), "#9be7ff");
   assert.ok(contrast(hex(readable("#14213d", PALETTE.ink)), hex(PALETTE.ink)) >= 3);
 });
@@ -150,4 +152,53 @@ test("without a kit, every graphic and template page is the one drawn before kit
   }
   assert.equal(Object.keys(out).length, 16);
   assert.equal(hash(out), "cb122141f132b56a");
+});
+
+test("only colours are recoloured: every amber named or written in CSS Color 4, and nothing else", () => {
+  const brand = new Rebrand({ colors: BLUE });
+  const css = brand.css(
+    ".a { color: chocolate; fill: peachpuff; stop-color: papayawhip; background: hsl(36 100 64); border-color: rgb(255 181 71 / .5); outline: 2px solid hsl(36deg 100% 64% / 50%); --glow: rgba(255, 181, 71, 0.4); --tone: gold; }" +
+      " .b { animation: gold 1s var(--enter) both; transition: color 1s; font-family: 'Gold Sans'; --name: gold-rise; }",
+  );
+  assert.deepEqual(ambers(css), []);
+  for (const amber of [
+    "chocolate",
+    "peachpuff",
+    "papayawhip",
+    "hsl(36",
+    "255 181 71",
+    "hsl(36deg",
+  ]) {
+    assert.ok(!css.includes(amber), `${amber} is left: ${css}`);
+  }
+  assert.match(css, /border-color: rgba\(\d+, \d+, \d+, 0\.5\)/);
+  assert.match(css, /--glow: rgba\(\d+, \d+, \d+, 0\.4\)/);
+  assert.doesNotMatch(css, /--tone: gold/);
+  assert.match(
+    css,
+    /\.b \{ animation: gold 1s var\(--enter\) both; transition: color 1s; font-family: 'Gold Sans'; --name: gold-rise; \}/,
+  );
+});
+
+test("a kit's face replaces the family in a font shorthand too, and nothing else of it", () => {
+  const brand = new Rebrand({
+    colors: BLUE,
+    font: { path: "/k/Face.ttf", sha256: "ab".repeat(32) },
+  });
+  const css = brand.css(
+    ".a { font: 800 calc(var(--u) * 6)/1.1 Inter, 'Gold Sans', sans-serif; } .b { font: italic 700 32px Inter; }",
+  );
+  assert.match(
+    css,
+    /\.a \{ font: 800 calc\(var\(--u\) \* 6\)\/1\.1 "Fineframe Brand", "Noto Sans TC", sans-serif; \}/,
+  );
+  assert.match(
+    css,
+    /\.b \{ font: italic 700 32px "Fineframe Brand", "Noto Sans TC", sans-serif; \}/,
+  );
+  // Without a face, the shorthand is the graphic's own.
+  assert.equal(
+    new Rebrand({ colors: BLUE }).css(".a { font: 800 32px 'Gold Sans'; }"),
+    ".a { font: 800 32px 'Gold Sans'; }",
+  );
 });
