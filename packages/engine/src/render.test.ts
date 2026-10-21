@@ -1734,6 +1734,110 @@ test("a brand kit's logo is a watermark in its corner, away while a full-frame g
   assert.equal(copy.brand?.logo?.file.path, "../logo.png");
 });
 
+test("the watermark steps aside for a name, a label or a chapter it would cover, and only then", async (t) => {
+  const dir = await scratch(t, "watermark-text-");
+  const [width, height] = [90, 160];
+  const source = await makeSource(dir, {
+    id: "a",
+    pattern: "color",
+    filter: "lutyuv=y=60:u=128:v=128",
+    width,
+    height,
+    fps: 30,
+    seconds: 8,
+    sound: 220,
+  });
+  const logo = join(dir, "logo.png");
+  await run(await ffmpeg(), [
+    ...QUIET,
+    "-f",
+    "lavfi",
+    "-i",
+    "color=c=white:s=32x16",
+    "-frames:v",
+    "1",
+    logo,
+  ]);
+  const project = projectOf([source], [clip("a", 0, 7)], {
+    aspect: "9:16",
+    width,
+    height,
+    fps: { num: 30, den: 1 },
+  });
+  project.brand = {
+    name: "Test kit",
+    colors: { primary: "#2f6bff" },
+    logo: { file: { path: "logo.png" }, show: true, corner: "top-right", size: 0.2, opacity: 1 },
+  };
+  // At 9:16 the name sits at the top, under the watermark, from 1 to 3 s; a label beside the
+  // watermark from 3.5 to 5 s, and one far from it from 5.2 to 6.7 s.
+  project.overlays = [
+    { template: "lower-third", params: { name: "林語安" }, start: SECOND, duration: 2 * SECOND },
+  ];
+  project.graphics = [
+    {
+      layout: "label",
+      html: "<b>27</b>",
+      css: "",
+      box: { x: 0.5, y: 0.15, w: 0.4, h: 0.1 },
+      start: 3.5 * SECOND,
+      duration: 1.5 * SECOND,
+    },
+    {
+      layout: "label",
+      html: "<b>27</b>",
+      css: "",
+      box: { x: 0.1, y: 0.6, w: 0.4, h: 0.1 },
+      start: 5.2 * SECOND,
+      duration: 1.5 * SECOND,
+    },
+  ];
+  const path = await write(dir, project);
+  const clear = async (file: string, frames: number, w: number, h: number) => {
+    // Drawn as nothing: fully transparent.
+    await run(await ffmpeg(), [
+      ...QUIET,
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      `color=s=${w}x${h}:r=30`,
+      "-vf",
+      "format=yuva420p,geq=lum=16:cb=128:cr=128:a=0",
+      "-frames:v",
+      String(frames),
+      "-c:v",
+      "libvpx-vp9",
+      "-lossless",
+      "1",
+      file,
+    ]);
+    return file;
+  };
+  const result = await render(path, join(dir, "out", "edit.mp4"), {
+    renderOverlays: async () => [await clear(join(dir, "name.webm"), 60, width, height)],
+    renderGraphics: async (jobs) =>
+      Promise.all(
+        jobs.map((job, i) =>
+          clear(
+            join(dir, `label-${i}.webm`),
+            job.frames,
+            job.box?.width ?? 2,
+            job.box?.height ?? 2,
+          ),
+        ),
+      ),
+  });
+  // 26 × 12 at the top right of the safe area: x 50-76, y 18-30.
+  const picture = await grey(result.video, width, height);
+  for (const [n, frame] of picture.entries()) {
+    const mark = frame[24 * width + 63] ?? 0;
+    const covered = (n >= 30 && n < 90) || (n >= 105 && n < 150);
+    if (covered) assert.ok(mark < 200, `frame ${n}: the watermark covers the text`);
+    else assert.ok(mark > 220, `frame ${n}: the watermark is away (${mark})`);
+  }
+});
+
 // HyperFrames renders in Chrome Headless Shell, which downloads on the first run; CI skips it, and
 // the graph and the frame placement are tested above.
 const chrome = { skip: process.env.CI ? "renders with Chrome: run it locally" : false };

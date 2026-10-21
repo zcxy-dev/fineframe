@@ -41,6 +41,7 @@ export {
   renderGraphics,
   renderOverlays,
 } from "./render.ts";
+export { templateRegion } from "./templates.ts";
 export {
   graphicProblems,
   overlayProblems,

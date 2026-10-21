@@ -2,7 +2,7 @@
 // boxes, seen through the crop of the clip that shows them, on the main track or in a B-roll rect
 // such as the speaker's half of a split screen.
 
-import { layoutFor } from "@video-editor/effects";
+import { layoutFor, templateRegion } from "@video-editor/effects";
 import { type Framing, type Project, TICKS_PER_SECOND } from "@video-editor/schema";
 import { panes } from "../framing.ts";
 import { placement } from "../graph/broll.ts";
@@ -164,60 +164,28 @@ export function overlayZones(
   timeline: Partial<Pick<Timeline, "graphics" | "overlays">>,
   output: Pick<Project["output"], "width" | "height" | "aspect">,
 ): FaceZone[] {
-  const layout = layoutFor(output.aspect, output.width, output.height);
-  const { safe, u, type } = layout;
-  const zone = (start: number, end: number, x0: number, y0: number, x1: number, y1: number) => ({
+  const zone = (
+    start: number,
+    end: number,
+    box: { x: number; y: number; width: number; height: number },
+  ) => ({
     start,
     end,
-    boxes: [{ x0, y0, x1, y1 }],
+    boxes: [{ x0: box.x, y0: box.y, x1: box.x + box.width, y1: box.y + box.height }],
     hard: true,
   });
   const labels = (timeline.graphics ?? [])
     .filter((clip) => clip.graphic.layout === "label" || clip.graphic.layout === "lower-third")
-    .map((clip) => {
-      const at = graphicPlacement(clip.graphic, output);
-      return zone(clip.start, clip.end, at.x, at.y, at.x + at.width, at.y + at.height);
-    });
-  const left = safe.left;
-  const right = output.width - safe.right;
-  const top = safe.top;
-  const bottom = output.height - safe.bottom;
+    .map((clip) => zone(clip.start, clip.end, graphicPlacement(clip.graphic, output)));
   const templates = (timeline.overlays ?? []).flatMap(({ overlay, start, end }) => {
-    switch (overlay.template) {
-      case "title": {
-        const middle = (top + bottom) / 2 - 3 * u;
-        const half = type("title") * 1.2 + type("subtitle") * 1.4;
-        return [zone(start, end, left, middle - half, right, middle + half)];
-      }
-      case "lower-third": {
-        const height = type("name") * 1.25 + type("role") * 1.35 + 3.7 * u;
-        return output.aspect === "9:16"
-          ? [zone(start, end, left, top, right, top + height)]
-          : [zone(start, end, left, bottom - height, right, bottom)];
-      }
-      case "chapter": {
-        const height = type("count") * 1.2 + type("chapter") * 1.25 + 6.4 * u;
-        return [zone(start, end, left, top, right, top + height)];
-      }
-      case "callout": {
-        const rect = (overlay.params as { rect?: { x: number; y: number; w: number; h: number } })
-          .rect;
-        if (!rect) return [];
-        const label = type("label") * 1.3 + 2 * u;
-        return [
-          zone(
-            start,
-            end,
-            rect.x * output.width,
-            rect.y * output.height - label,
-            (rect.x + rect.w) * output.width,
-            (rect.y + rect.h) * output.height + label,
-          ),
-        ];
-      }
-      default:
-        return [];
-    }
+    const box = templateRegion(
+      overlay.template,
+      overlay.params,
+      output.aspect,
+      output.width,
+      output.height,
+    );
+    return box ? [zone(start, end, box)] : [];
   });
   return [...labels, ...templates];
 }
