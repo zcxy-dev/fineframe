@@ -40,6 +40,8 @@ interface Draft {
   music?: { gainDb: number } | "remove";
   look?: string;
   captions?: CaptionStyle;
+  /** The captions' emoji shown or hidden, when not as the version has them. */
+  emoji?: boolean;
   /** Another brand kit, by its id and name, or null for none. */
   kit?: { id: string; name: string } | null;
 }
@@ -672,6 +674,19 @@ export function ReEdit({
               </button>
             ))}
           </div>
+          <label className={styles.check}>
+            <input
+              type="checkbox"
+              checked={draft.emoji ?? view.emoji}
+              onChange={(event) => {
+                const { emoji: _, ...rest } = draft;
+                const emoji = event.target.checked;
+                change(emoji === view.emoji ? rest : { ...draft, emoji });
+              }}
+            />
+            {words.emoji}
+          </label>
+          <p className={styles.help}>{words.emojiHelp}</p>
         </div>
       )}
 
@@ -920,6 +935,7 @@ function toRevision(draft: Draft, words: readonly Word[]): PageRevision {
   if (draft.music) revision.music = draft.music;
   if (draft.look) revision.look = draft.look as PageRevision["look"];
   if (draft.captions) revision.captions = draft.captions;
+  if (draft.emoji !== undefined) revision.emoji = draft.emoji;
   if (draft.kit !== undefined) revision.kit = draft.kit?.id ?? null;
   return revision;
 }
@@ -933,6 +949,7 @@ function changes(draft: Draft): number {
     (draft.music ? 1 : 0) +
     (draft.look ? 1 : 0) +
     (draft.captions ? 1 : 0) +
+    (draft.emoji !== undefined ? 1 : 0) +
     (draft.kit !== undefined ? 1 : 0)
   );
 }
@@ -951,6 +968,7 @@ function describe(draft: Draft, t: Messages): string {
     draft.look &&
       words.look(draft.look, t.looks[draft.look as keyof Messages["looks"]]?.name ?? draft.look),
     draft.captions && words.captions(draft.captions, t.captions[draft.captions].name),
+    draft.emoji !== undefined && words.emoji(draft.emoji),
     draft.kit !== undefined && (draft.kit ? words.brand(draft.kit.name) : words.noBrand),
   ].filter((part): part is string => Boolean(part));
   const text = parts.join(t.list);

@@ -10,6 +10,7 @@
 // Every row is its own event, placed by its centre, so the rows' spacing is the preset's. A preset
 // whose words pop in draws each word as its own event instead, placed where the row puts it.
 
+import type { EmojiImage } from "./emoji.ts";
 import type { Metrics } from "./fonts.ts";
 import type { Page, Row } from "./layout.ts";
 import { EASE_OUT, ENTER, EXIT, LEADING, POP, type Preset } from "./presets.ts";
@@ -322,6 +323,63 @@ export function writeAss(
     ...events,
     "",
   ].join("\n");
+}
+
+/** An emoji over the picture, in output pixels, from frame `start` until `end`. */
+export interface EmojiEvent {
+  emoji: string;
+  image: EmojiImage;
+  start: number;
+  end: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Room between a caption's text, or its plate, and its emoji, in ems. */
+const EMOJI_GAP = 0.15;
+
+/**
+ * Where and when each line's emoji is drawn: at the end of the last row of the line's last page,
+ * at the page's size, as the face would set it there, from the frame the line's last word is lit
+ * until the page leaves. It never leaves the frame.
+ */
+export function placeEmoji(
+  pages: Page[],
+  bottoms: number[],
+  preset: Preset,
+  metrics: Metrics,
+  geometry: Geometry,
+  emojiOf: (line: number) => { emoji: string; image: EmojiImage } | undefined,
+): EmojiEvent[] {
+  const { width, height } = geometry;
+  return pages.flatMap((page, p): EmojiEvent[] => {
+    const chosen = pages[p + 1]?.line === page.line ? undefined : emojiOf(page.line);
+    if (!chosen) return [];
+    const widest = Math.max(...page.rows.map((row) => row.width));
+    const k = geometry.fit !== undefined && widest > geometry.fit ? geometry.fit / widest : 1;
+    const em = geometry.em * k;
+    const row = page.rows.at(-1) as Row;
+    const right = width / 2 + ((row.width - preset.tracking) * em) / 2;
+    const baseline = (bottoms[p] as number) - em + metrics.emTop * em;
+    const { image } = chosen;
+    const scale = em / image.ppem;
+    const w = Math.round(image.width * scale);
+    const h = Math.round(image.height * scale);
+    const pen = right + ((preset.plate?.padX ?? 0) + EMOJI_GAP) * em;
+    return [
+      {
+        ...chosen,
+        start: page.words.at(-1)?.start ?? page.start,
+        end: page.end,
+        x: Math.max(0, Math.min(width - w, Math.round(pen + image.left * scale))),
+        y: Math.max(0, Math.min(height - h, Math.round(baseline - image.top * scale))),
+        width: w,
+        height: h,
+      },
+    ];
+  });
 }
 
 /**

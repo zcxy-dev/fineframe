@@ -8,6 +8,10 @@ import { GAP, holdsTogether, insideWord } from "../captions/layout.ts";
 import type { PlacedClip, PlaceSource } from "./place.ts";
 import { bare, endsSentence, halfWidth, joinWords, wordLanguage } from "./text.ts";
 
+/** An emoji a caption line may end with: one pictographic emoji code point, with the emoji
+ * presentation selector or not, as project.json's `captions.lines[].emoji` takes it. */
+export const EMOJI = /^(?=\p{Extended_Pictographic})\p{Emoji}\uFE0F?$/u;
+
 /** A kept word on the output timeline. */
 export interface TimedWord {
   source: string;
@@ -93,11 +97,13 @@ export function subtitled(words: readonly string[]): { text: string; words: stri
  * on the output timeline. Splitting them to fit the screen is the caption renderer's job. A line
  * is tagged with the language most of its words are in, and a word in the other language with
  * its own. A Chinese line drops its commas and full stops as Taiwanese subtitles do; an English
- * line keeps its punctuation, half-width.
+ * line keeps its punctuation, half-width. A transcript line's emoji goes on the caption line that
+ * ends it.
  */
 export function captionLines(
   words: readonly TimedWord[],
   lineOf: (source: string, index: number) => number,
+  emojiOf: (source: string, line: number) => string | undefined = () => undefined,
 ): CaptionLine[] {
   const groups: TimedWord[][] = [];
   for (const [i, word] of words.entries()) {
@@ -122,7 +128,7 @@ export function captionLines(
     if (continues) group.push(word);
     else groups.push([word]);
   }
-  return groups.flatMap((group): CaptionLine[] => {
+  return groups.flatMap((group, g): CaptionLine[] => {
     const counts = { "zh-TW": 0, en: 0 };
     for (const word of group) {
       const language = wordLanguage(word.text);
@@ -150,12 +156,17 @@ export function captionLines(
     if (!shown.text) return [];
     const first = group[0] as TimedWord;
     const last = group.at(-1) as TimedWord;
+    const next = groups[g + 1]?.[0];
+    const line = lineOf(last.source, last.index);
+    const ends = next?.source !== last.source || lineOf(next.source, next.index) !== line;
+    const emoji = ends ? emojiOf(last.source, line) : undefined;
     return [
       {
         start: first.start,
         end: last.end,
         language,
         text: shown.text,
+        ...(emoji ? { emoji } : {}),
         words: captionWords,
       },
     ];

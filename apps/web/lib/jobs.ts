@@ -256,6 +256,9 @@ interface EditPlan {
   look?: string;
   captions?: string;
   brand?: string | null;
+  /** Whether the captions show their emoji, when not the edit's settings', as a version changed
+   * it. */
+  emoji?: boolean;
 }
 
 /** What the re-edit panel shows of one version, in output ticks. */
@@ -281,6 +284,8 @@ export interface EditView {
   music: { gainDb: number } | null;
   look: string;
   captions: string | null;
+  /** Whether its captions show their emoji. */
+  emoji: boolean;
   /** The brand kit the version is in, by name, and whether its custom captions draw in place of
    * the caption style. */
   brand: { name: string; captions: boolean } | null;
@@ -807,6 +812,7 @@ export class Jobs {
       ...(job.settings.correct ? ["--correct"] : []),
       // The brand kit's custom captions go with --brand, and no --captions.
       ...(captions === "brand" ? [] : ["--captions", captions]),
+      ...((plan.emoji ?? job.settings.emoji) ? ["--emoji"] : []),
       ...(kit ? ["--brand", kit] : []),
       "-o",
       output,
@@ -1066,6 +1072,7 @@ export class Jobs {
       music: project.audio.music?.[0] ? { gainDb: project.audio.music[0].gainDb ?? 0 } : null,
       look: lookOf(project),
       captions: project.captions?.preset ?? null,
+      emoji: project.captions?.emoji ?? false,
       brand: project.brand
         ? { name: project.brand.name, captions: project.brand.captions !== undefined }
         : null,
@@ -1218,6 +1225,7 @@ export class Jobs {
           ...(choice.instructions ? { instructions: choice.instructions } : {}),
           look: kept.look,
           ...(kept.captions ? { captions: kept.captions } : {}),
+          emoji: project.captions?.emoji ?? false,
           brand: project.brand ? kit : null,
           ...("folder" in slot ? await this.#stretch(job, slot, project, path) : {}),
         },

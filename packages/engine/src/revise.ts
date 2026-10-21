@@ -41,6 +41,8 @@ export interface Revision {
   look?: LookId | "none";
   /** A caption style; it turns a brand kit's custom captions off. */
   captions?: CaptionStyle;
+  /** Shows or hides the captions' emoji. */
+  emoji?: boolean;
   /** A brand kit, its paths relative to the project revised (../brand/kit.ts stageBrand), or
    * null for the house look. */
   brand?: Brand | null;
@@ -77,6 +79,11 @@ export function revise(
     if (!out.captions) throw new Error("This edit has no captions to restyle");
     out.captions.preset = revision.captions;
     delete out.brand?.captions;
+  }
+  if (revision.emoji !== undefined) {
+    if (!out.captions) throw new Error("This edit has no captions to show emoji in");
+    if (revision.emoji) out.captions.emoji = true;
+    else delete out.captions.emoji;
   }
   for (const fix of revision.words ?? []) {
     const lines = out.captions?.lines ?? [];

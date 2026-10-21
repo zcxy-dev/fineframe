@@ -84,6 +84,8 @@ export interface EditOptions {
   /** The caption style (../captions/presets.ts): bold unless given, or the brand kit's custom
    * captions when it has them. */
   captions?: CaptionStyle;
+  /** Shows the emoji Claude picks for the captions, at the end of their lines. */
+  emoji?: boolean;
   /** A brand kit's folder (../brand/kit.ts): its kit.json, logo and fonts. Its files are copied
    * into `brand/` beside the video, or in the shorts' folder, and the edit renders in its look. */
   brand?: string;
@@ -520,6 +522,7 @@ async function cutEdit(
         music: prepared.music,
         names: prepared.names,
         ...(options.captions ? { captions: options.captions } : {}),
+        ...(options.emoji ? { emoji: true } : {}),
         ...(prepared.brand
           ? { brand: moveBrand(prepared.brand.kit, (path) => kitPath(prepared, work, path)) }
           : {}),

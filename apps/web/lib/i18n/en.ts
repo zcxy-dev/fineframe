@@ -194,6 +194,9 @@ export const en = {
     correctionHelp:
       "Claude reads each transcript with your names and terms and fixes what the speech model misheard, before its words are timed. Adds a Claude cost.",
     captionStyle: "Caption style",
+    emoji: "Emoji",
+    emojiHelp:
+      "Ends a caption line with the emoji Claude picked for it, where one fits. Claude picks them either way, so turning them on or off later only renders again, with no Claude cost.",
     /** The four words a caption preview says, a number among them, and what goes between them. */
     sample: ["Edit", "in", "10", "minutes"],
     sampleGap: " ",
@@ -566,6 +569,8 @@ export const en = {
     noMusic: "This edit has no music.",
     look: "Look",
     captionStyle: "Caption style",
+    emoji: "Emoji at the end of caption lines",
+    emojiHelp: "Only renders again: no new plan, no Claude cost.",
     brandKeep: (name: string) => `${name} (as made)`,
     brandHelp: "Another kit, or none, only renders again: no new plan, no Claude cost.",
     overlays: "Overlays",
@@ -597,6 +602,7 @@ export const en = {
       music: (gain: string) => `music ${gain} dB`,
       look: (id: string, _name: string) => `look ${id}`,
       captions: (id: string, _name: string) => `captions ${id}`,
+      emoji: (on: boolean) => `emoji ${on ? "on" : "off"}`,
       brand: (name: string) => `brand kit ${name}`,
       noBrand: "no brand kit",
       none: "No changes",

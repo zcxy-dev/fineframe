@@ -92,6 +92,13 @@ test("a recorded plan becomes a project that validates, fits and cuts only betwe
     ["video", "editor"],
   );
   assert.ok((project.plan?.emphasis ?? []).length > 0);
+  // Line 2's emoji ends the caption that ends it, hidden until the switch shows it; line 3's,
+  // with a skin tone, is left out.
+  assert.deepEqual(
+    captions.flatMap((line) => (line.emoji ? [[line.text.slice(-3), line.emoji]] : [])),
+    [["三件事", "🎬"]],
+  );
+  assert.equal(project.captions?.emoji, undefined);
   for (const clip of project.main) assert.ok(clip.grade?.auto, "every clip is graded");
   // Landscape long-form loudness; the talk's index measured no voice, so it plays as recorded.
   assert.deepEqual(project.audio, { loudness: { integratedLufs: -16, truePeakDbtp: -1 } });

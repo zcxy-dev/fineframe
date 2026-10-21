@@ -173,3 +173,25 @@ test("an English word takes half-width punctuation", () => {
   const mixed = captionLines(spoken(["I", "love", "台", "灣，", "really"]), () => 1);
   assert.equal(mixed[0]?.text, "I love 台灣, really");
 });
+
+test("a transcript line's emoji goes on the caption line that ends it, and nowhere else", () => {
+  // Line 1 is two sentences, so two caption lines; line 2 is one.
+  const words = spoken(["走", "吧。", "好", "嗎。", "其", "實"]);
+  const emoji = new Map([
+    [1, "🚶"],
+    [2, "💡"],
+  ]);
+  const lines = captionLines(
+    words,
+    (_, i) => (i < 4 ? 1 : 2),
+    (_, line) => emoji.get(line),
+  );
+  assert.deepEqual(
+    lines.map((line) => [line.text, line.emoji]),
+    [
+      ["走吧", undefined],
+      ["好嗎", "🚶"],
+      ["其實", "💡"],
+    ],
+  );
+});

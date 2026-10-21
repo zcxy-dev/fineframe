@@ -16,11 +16,18 @@ import {
 import { loadJson, type Project, TICKS_PER_SECOND, validateProject } from "@video-editor/schema";
 import { moveBrand, type ResolvedBrand, resolveBrand } from "./brand/kit.ts";
 import { type Credit, creditText, markCredits } from "./broll/credits.ts";
+import type { EmojiEvent } from "./captions/ass.ts";
 import { buildCaptions, stageFonts } from "./captions/index.ts";
 import { chrome } from "./chrome.ts";
 import { ffmpeg, ffprobe, QUIET, run } from "./ffmpeg.ts";
 import { pastPicture } from "./framing.ts";
-import { AAC, alignToAacFrames, encoderArgs, RAW_AUDIO } from "./graph/encode.ts";
+import {
+  AAC,
+  alignToAacFrames,
+  encoderArgs,
+  type ImageOverlay,
+  RAW_AUDIO,
+} from "./graph/encode.ts";
 import {
   linearReach,
   type Measurement,
@@ -283,7 +290,13 @@ export async function render(
       fonts = await stageFonts(work, captions.fonts);
     }
     const subtitles = captions?.ass ? "captions.ass" : undefined;
-    const args = encoderArgs(project.output, finished, timeline.samples, encoded, subtitles);
+    const emoji = await writeEmoji(work, captions?.emoji ?? []);
+    const args = encoderArgs(project.output, finished, timeline.samples, encoded, subtitles, emoji);
+    // An overlay for each emoji can outgrow a command line (32 KiB on Windows), so FFmpeg reads
+    // the graph from a file, as the pieces do.
+    const at = args.indexOf("-filter_complex");
+    await writeFile(join(work, "encode-graph.txt"), args[at + 1] ?? "");
+    args.splice(at, 2, "-/filter_complex", "encode-graph.txt");
     const frames = await encode(
       bin,
       args,
@@ -545,6 +558,30 @@ async function checkSamples(path: string, samples: number, what: string): Promis
   const bytes = (await stat(path)).size;
   if (bytes !== samples * 8)
     throw new Error(`${what} has ${bytes / 8} samples, expected ${samples}`);
+}
+
+/** Writes each emoji's image into `work`'s emoji folder, named by its code points, and returns
+ * the emoji as the encoder lays them over the captions. */
+async function writeEmoji(work: string, events: readonly EmojiEvent[]): Promise<ImageOverlay[]> {
+  if (events.length === 0) return [];
+  await mkdir(join(work, "emoji"), { recursive: true });
+  const files = new Map<string, string>();
+  for (const { emoji, image } of events) {
+    if (files.has(emoji)) continue;
+    const name = [...emoji].map((char) => char.codePointAt(0)?.toString(16)).join("-");
+    const file = `emoji/${name}.png`;
+    await writeFile(join(work, file), image.png);
+    files.set(emoji, file);
+  }
+  return events.map(({ emoji, x, y, width, height, start, end }) => ({
+    file: files.get(emoji) as string,
+    x,
+    y,
+    width,
+    height,
+    start,
+    end,
+  }));
 }
 
 /** FFmpeg's arguments that copy a raw stereo float file into a WAV file, as it is. */

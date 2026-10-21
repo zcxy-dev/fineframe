@@ -95,6 +95,8 @@ export interface Settings {
   correct?: boolean;
   /** A caption style, or "brand" for the brand kit's custom captions. */
   captions?: CaptionStyle | "brand";
+  /** Whether the captions show the emoji Claude picks; edits from before the switch had none. */
+  emoji?: boolean;
   /** The brand kit the edit is made in, by its id, and its name when the edit started. */
   brand?: { id: string; name: string };
   /** What the user asks of the edit, in their words, trimmed; absent when they ask nothing. */
@@ -148,10 +150,8 @@ export function checkSettings(
     string,
     unknown
   >;
-  const { quality, correct, captions, instructions, shorts, brand, fillers } = input as Record<
-    string,
-    unknown
-  >;
+  const { quality, correct, captions, emoji, instructions, shorts, brand, fillers } =
+    input as Record<string, unknown>;
   const heard = (input as Record<string, unknown>).asr ?? asr;
   if (!ASRS.includes(heard as Asr)) return `Speech is heard ${ASRS.join(" or ")}`;
   const several = shorts === undefined ? null : shortsProblem(shorts);
@@ -171,6 +171,7 @@ export function checkSettings(
   const chosenQuality = quality ?? "best";
   if (!QUALITIES.includes(chosenQuality as Quality)) return `Quality is ${QUALITIES.join(" or ")}`;
   if (typeof (correct ?? false) !== "boolean") return "Transcript correction is on or off";
+  if (typeof (emoji ?? false) !== "boolean") return "Caption emoji are on or off";
   if (brand !== undefined && brand !== null && typeof brand !== "string") {
     return "The brand kit is named by its id";
   }
@@ -216,6 +217,7 @@ export function checkSettings(
     quality: chosenQuality as Quality,
     correct: (correct ?? false) as boolean,
     captions: chosenCaptions as CaptionStyle | "brand",
+    ...(emoji ? { emoji: true } : {}),
     // Its name is the kit's own, read as the edit is made.
     ...(typeof brand === "string" ? { brand: { id: brand, name: "" } } : {}),
     ...(asked.trim() ? { instructions: asked.trim() } : {}),

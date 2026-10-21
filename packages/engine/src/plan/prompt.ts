@@ -161,6 +161,9 @@ segment; empty when there is no B-roll. Give the B-roll file, the seconds of it 
 - emphasis: the strongest beats of the edit, about one every 15 to 30 seconds: a key number, a \
 punchline, the promise of the video. Give the file, the line and the words exactly as they \
 appear in it. Code pushes the picture in there.
+- emoji: lines a single emoji fits, such as a laugh, money, a warning or a win; most lines have \
+none. Give the file, the line and one emoji character (🔥, 💰, 😂), never one with a skin tone, a \
+flag or one joined from several. The user may show it at the end of the line's caption.
 - content: in two or three sentences, what the footage is and the story the edit tells.
 
 ## Length
@@ -219,7 +222,16 @@ const lineRange = {
 const PLAN_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["content", "segments", "removed", "fillers", "cut_words", "broll", "emphasis"],
+  required: [
+    "content",
+    "segments",
+    "removed",
+    "fillers",
+    "cut_words",
+    "broll",
+    "emphasis",
+    "emoji",
+  ],
   properties: {
     content: { type: "string" },
     segments: {
@@ -290,6 +302,19 @@ const PLAN_SCHEMA = {
           line: { type: "integer" },
           text: { type: "string" },
           reason: { type: "string" },
+        },
+      },
+    },
+    emoji: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["source", "line", "emoji"],
+        properties: {
+          source: { type: "string" },
+          line: { type: "integer" },
+          emoji: { type: "string" },
         },
       },
     },
@@ -437,6 +462,8 @@ export interface Decisions {
     reason: string;
   }[];
   emphasis: { source: string; line: number; text: string; reason: string }[];
+  /** An emoji for a line; code keeps one per line, of a single code point. */
+  emoji: { source: string; line: number; emoji: string }[];
   /** Present when music was offered. */
   music?: { track: string; section: number; reason: string };
   /** Present for a long edit; an empty text is no title. */

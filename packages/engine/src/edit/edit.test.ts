@@ -362,12 +362,14 @@ test("terms help the analysis hear the speech but never name a lower third", asy
   assert.deepEqual((await analyses()).at(-1)?.slice(4), ["--asr", "cloud"]);
 });
 
-test("the edit's captions take the style asked for, and each analysis step is named", async (t) => {
+test("the edit's captions take the style and emoji asked for, and each analysis step is named", async (t) => {
   const dir = await scratch(t, "edit-captions-");
   const { options, lines } = await footage(dir);
-  const result = await edit({ ...options, captions: "creator" });
+  const result = await edit({ ...options, captions: "creator", emoji: true });
   const project = await loadJson(result.outputs.project, validateProject);
   assert.equal(project.captions?.preset, "creator");
+  assert.equal(project.captions?.emoji, true);
+  assert.match(await readFile(result.outputs.captions ?? "", "utf8"), / 🎬\n/);
   const steps = lines.flatMap((line) => ("step" in line && line.step ? [line.step] : []));
   assert.deepEqual(
     [...new Set(steps)],
