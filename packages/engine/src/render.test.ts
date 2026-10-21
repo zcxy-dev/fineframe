@@ -8,6 +8,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
 import { COLORS, catalog, type OverlayJob, templateIds } from "@video-editor/effects";
+import { isAmber } from "@video-editor/effects/colour";
 import {
   type CropPath,
   type FaceBox,
@@ -1303,12 +1304,12 @@ test("every caption preset is drawn in the face its layout was measured in", asy
     });
     edit.output = { ...edit.output, ...tiny };
     const built = await buildCaptions(edit, { main: [], broll: [], frames: 15, frameTicks: 4000 });
-    assert.ok(built?.ass && built.font);
+    assert.ok(built?.ass && built.fonts.length === 1);
     const folder = join(dir, name);
     await mkdir(folder);
     await writeFile(join(folder, "captions.ass"), built.ass);
     // Staged as the render stages them; libass has to find the face whatever fonts the machine has.
-    const env = { ...process.env, ...(await stageFonts(folder, [built.font])) };
+    const env = { ...process.env, ...(await stageFonts(folder, built.fonts)) };
     const lavfi = `color=black:s=${tiny.width}x${tiny.height}:r=30:d=0.5`;
     const args = [
       "-hide_banner",
@@ -1328,7 +1329,7 @@ test("every caption preset is drawn in the face its layout was measured in", asy
     const { stderr } = await execFileAsync(bin, args, { cwd: folder, env });
     const selected = [...stderr.matchAll(/fontselect: \(.*?\) -> ([^,]+),/g)].map((m) => m[1]);
     assert.ok(selected.length > 0, `${name}: libass selected no face`);
-    const face = basename(built.font, ".otf");
+    const face = basename(built.fonts[0] as string, ".otf");
     assert.deepEqual(
       new Set(selected.map((path) => basename(path ?? "", ".otf"))),
       new Set([face]),
@@ -1679,6 +1680,164 @@ test("a split screen: a graphic in the panel, the speaker in step below it, a so
   );
 });
 
+test("a brand kit's logo is a watermark in its corner, away while a full-frame graphic shows", async (t) => {
+  const dir = await scratch(t, "watermark-");
+  const source = await makeSource(dir, {
+    id: "a",
+    pattern: "color",
+    filter: "lutyuv=y=60:u=128:v=128",
+    width: 160,
+    height: 90,
+    fps: 30,
+    seconds: 4,
+    sound: 220,
+  });
+  const logo = join(dir, "logo.png");
+  await run(await ffmpeg(), [
+    ...QUIET,
+    "-f",
+    "lavfi",
+    "-i",
+    "color=c=white:s=32x16",
+    "-frames:v",
+    "1",
+    logo,
+  ]);
+  const project = projectOf([source], [clip("a", 0, 3)], tiny);
+  project.brand = {
+    name: "Test kit",
+    colors: { primary: "#2f6bff" },
+    logo: { file: { path: "logo.png" }, show: true, corner: "top-right", size: 0.2, opacity: 1 },
+  };
+  project.graphics = [
+    { layout: "full", html: "<b>27</b>", css: "", start: SECOND, duration: SECOND },
+  ];
+  const path = await write(dir, project);
+  const result = await render(path, join(dir, "out", "edit.mp4"), {
+    renderGraphics: async () => [await numbered(join(dir, "full.webm"), 30, 160, 90)],
+  });
+  // 18 pixels square in area, 26 × 12, inside the safe area's top right: x 124-150, y 7-19.
+  const picture = await grey(result.video, 160, 90);
+  for (const [n, frame] of picture.entries()) {
+    const mark = frame[13 * 160 + 137] ?? 0;
+    const beside = frame[13 * 160 + 115] ?? 0;
+    if (n >= 30 && n < 60)
+      assert.ok(mark < 200, `frame ${n}: the watermark shows over the graphic`);
+    else {
+      assert.ok(mark > 220, `frame ${n}: the watermark is ${mark}`);
+      const ground = frame[80 * 160 + 10] ?? 0;
+      assert.ok(Math.abs(beside - ground) < 4, `frame ${n}: the picture beside it is ${beside}`);
+    }
+  }
+  // The copy beside the video finds the logo from where it is.
+  const copy = await loadJson(result.project, validateProject);
+  assert.equal(copy.brand?.logo?.file.path, "../logo.png");
+});
+
+test("the watermark steps aside for a name, a label or a chapter it would cover, and only then", async (t) => {
+  const dir = await scratch(t, "watermark-text-");
+  const [width, height] = [90, 160];
+  const source = await makeSource(dir, {
+    id: "a",
+    pattern: "color",
+    filter: "lutyuv=y=60:u=128:v=128",
+    width,
+    height,
+    fps: 30,
+    seconds: 8,
+    sound: 220,
+  });
+  const logo = join(dir, "logo.png");
+  await run(await ffmpeg(), [
+    ...QUIET,
+    "-f",
+    "lavfi",
+    "-i",
+    "color=c=white:s=32x16",
+    "-frames:v",
+    "1",
+    logo,
+  ]);
+  const project = projectOf([source], [clip("a", 0, 7)], {
+    aspect: "9:16",
+    width,
+    height,
+    fps: { num: 30, den: 1 },
+  });
+  project.brand = {
+    name: "Test kit",
+    colors: { primary: "#2f6bff" },
+    logo: { file: { path: "logo.png" }, show: true, corner: "top-right", size: 0.2, opacity: 1 },
+  };
+  // At 9:16 the name sits at the top, under the watermark, from 1 to 3 s; a label beside the
+  // watermark from 3.5 to 5 s, and one far from it from 5.2 to 6.7 s.
+  project.overlays = [
+    { template: "lower-third", params: { name: "林語安" }, start: SECOND, duration: 2 * SECOND },
+  ];
+  project.graphics = [
+    {
+      layout: "label",
+      html: "<b>27</b>",
+      css: "",
+      box: { x: 0.5, y: 0.15, w: 0.4, h: 0.1 },
+      start: 3.5 * SECOND,
+      duration: 1.5 * SECOND,
+    },
+    {
+      layout: "label",
+      html: "<b>27</b>",
+      css: "",
+      box: { x: 0.1, y: 0.6, w: 0.4, h: 0.1 },
+      start: 5.2 * SECOND,
+      duration: 1.5 * SECOND,
+    },
+  ];
+  const path = await write(dir, project);
+  const clear = async (file: string, frames: number, w: number, h: number) => {
+    // Drawn as nothing: fully transparent.
+    await run(await ffmpeg(), [
+      ...QUIET,
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      `color=s=${w}x${h}:r=30`,
+      "-vf",
+      "format=yuva420p,geq=lum=16:cb=128:cr=128:a=0",
+      "-frames:v",
+      String(frames),
+      "-c:v",
+      "libvpx-vp9",
+      "-lossless",
+      "1",
+      file,
+    ]);
+    return file;
+  };
+  const result = await render(path, join(dir, "out", "edit.mp4"), {
+    renderOverlays: async () => [await clear(join(dir, "name.webm"), 60, width, height)],
+    renderGraphics: async (jobs) =>
+      Promise.all(
+        jobs.map((job, i) =>
+          clear(
+            join(dir, `label-${i}.webm`),
+            job.frames,
+            job.box?.width ?? 2,
+            job.box?.height ?? 2,
+          ),
+        ),
+      ),
+  });
+  // 26 × 12 at the top right of the safe area: x 50-76, y 18-30.
+  const picture = await grey(result.video, width, height);
+  for (const [n, frame] of picture.entries()) {
+    const mark = frame[24 * width + 63] ?? 0;
+    const covered = (n >= 30 && n < 90) || (n >= 105 && n < 150);
+    if (covered) assert.ok(mark < 200, `frame ${n}: the watermark covers the text`);
+    else assert.ok(mark > 220, `frame ${n}: the watermark is away (${mark})`);
+  }
+});
+
 // HyperFrames renders in Chrome Headless Shell, which downloads on the first run; CI skips it, and
 // the graph and the frame placement are tested above.
 const chrome = { skip: process.env.CI ? "renders with Chrome: run it locally" : false };
@@ -1834,3 +1993,138 @@ test(
     assert.equal(changed(picture[360], 0, 0.5 * height + 2, width, height), 0);
   },
 );
+
+test(
+  "a graphic written with near-ambers of its own renders with no amber left in a brand kit's look",
+  chrome,
+  async (t) => {
+    const dir = await scratch(t, "rebrand-");
+    const [width, height] = [320, 180];
+    const source = await makeSource(dir, {
+      id: "grey",
+      pattern: "color",
+      filter: "lutyuv=y=128:u=128:v=128",
+      width,
+      height,
+      fps: 30,
+      seconds: 3,
+      sound: 220,
+    });
+    // Ambers the house stylesheet never names, as Claude may write them, and its own.
+    const css =
+      ".n { position: absolute; left: 8%; top: 18%; font-size: calc(var(--u) * 34); color: #f5a623; text-shadow: 0 0 calc(var(--u) * 3) rgba(245, 166, 35, 0.6); } " +
+      ".p { position: absolute; right: 8%; top: 30%; padding: calc(var(--u) * 4); background: hsl(38 92% 56%); color: #0b0c0f; font-size: calc(var(--u) * 12); }";
+    const html =
+      '<div class="ff-stage"></div><div class="n">72</div><div class="p ff-lit">每週</div><img src="icons/accent/rocket.svg" style="position:absolute;left:40%;bottom:10%;width:calc(var(--u)*20);height:calc(var(--u)*20)">';
+    const ambers = async (brand: boolean) => {
+      const project = projectOf([source], [clip("grey", 0, 2)], {
+        aspect: "16:9",
+        width,
+        height,
+        fps: { num: 30, den: 1 },
+      });
+      project.graphics = [{ layout: "full", html, css, start: 0, duration: 2 * SECOND }];
+      if (brand) project.brand = { name: "Blue", colors: { primary: "#2f6bff" } };
+      const name = brand ? "brand" : "house";
+      const result = await render(await write(dir, project), join(dir, `${name}.mp4`));
+      const raw = join(dir, `${name}.rgb`);
+      await run(await ffmpeg(), [
+        ...QUIET,
+        "-y",
+        "-ss",
+        "1.5",
+        "-i",
+        result.video,
+        "-frames:v",
+        "1",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        raw,
+      ]);
+      const pixels = await readFile(raw);
+      let count = 0;
+      for (let i = 0; i < pixels.length; i += 3) {
+        if (isAmber([pixels[i] ?? 0, pixels[i + 1] ?? 0, pixels[i + 2] ?? 0])) count++;
+      }
+      return count / (width * height);
+    };
+    assert.ok((await ambers(false)) > 0.03, "the house look shows its ambers");
+    assert.ok((await ambers(true)) < 0.001, "an amber is left in the kit's look");
+  },
+);
+
+test(
+  "text in a box another rule fills with a dark kit's colour turns white, as the cascade draws it",
+  chrome,
+  async (t) => {
+    const dir = await scratch(t, "contrast-");
+    const [width, height] = [320, 180];
+    const source = await makeSource(dir, {
+      id: "grey",
+      pattern: "color",
+      filter: "lutyuv=y=128:u=128:v=128",
+      width,
+      height,
+      fps: 30,
+      seconds: 3,
+      sound: 220,
+    });
+    // The house look's accent is light, so the graphic set its text in ink; navy is not.
+    const css =
+      ".badge { position: absolute; left: 10%; top: 25%; width: 80%; height: 50%; background: var(--accent); } " +
+      ".badge b { color: var(--ink); font-size: calc(var(--u) * 30); }";
+    const project = projectOf([source], [clip("grey", 0, 2)], {
+      aspect: "16:9",
+      width,
+      height,
+      fps: { num: 30, den: 1 },
+    });
+    project.graphics = [
+      {
+        layout: "full",
+        html: '<div class="badge"><b>27</b></div>',
+        css,
+        start: 0,
+        duration: 2 * SECOND,
+      },
+    ];
+    project.brand = { name: "Navy", colors: { primary: "#14213d" } };
+    const result = await render(await write(dir, project), join(dir, "navy.mp4"));
+    const frame = (await grey(result.video, width, height))[45] as Uint8Array;
+    let bright = 0;
+    for (let y = 50; y < 130; y++) {
+      for (let x = 40; x < 280; x++) if ((frame[y * width + x] ?? 0) > 200) bright++;
+    }
+    assert.ok(bright > 300, `${bright} bright pixels of the number in the badge`);
+  },
+);
+
+test("an SVG logo is drawn to its watermark as the edit renders, once", chrome, async (t) => {
+  const dir = await scratch(t, "svg-logo-");
+  const source = await makeSource(dir, {
+    id: "a",
+    pattern: "color",
+    filter: "lutyuv=y=60:u=128:v=128",
+    width: 160,
+    height: 90,
+    fps: 30,
+    seconds: 2,
+    sound: 220,
+  });
+  await writeFile(
+    join(dir, "logo.svg"),
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 16"><rect width="32" height="16" fill="#ffffff"/></svg>',
+  );
+  const project = projectOf([source], [clip("a", 0, 1)], tiny);
+  project.brand = {
+    name: "Test kit",
+    colors: { primary: "#2f6bff" },
+    logo: { file: { path: "logo.svg" }, show: true, corner: "top-right", size: 0.2, opacity: 1 },
+  };
+  const result = await render(await write(dir, project), join(dir, "out", "edit.mp4"));
+  for (const frame of await grey(result.video, 160, 90)) {
+    assert.ok((frame[13 * 160 + 137] ?? 0) > 220, "the watermark shows");
+  }
+});

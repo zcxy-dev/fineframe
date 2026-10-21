@@ -1,5 +1,6 @@
 // One piece's FFmpeg run: its inputs and its filter graph, for the video pass or the audio pass.
 
+import { templateRegion, watermarkPlacement } from "@video-editor/effects";
 import { type Framing, type Grade, TICKS_PER_SECOND } from "@video-editor/schema";
 import { QUIET } from "../ffmpeg.ts";
 import { framingCuts } from "../framing.ts";
@@ -9,13 +10,14 @@ import { EDGE_FADE_SAMPLES } from "../pieces.ts";
 import type { SourceFacts } from "../sources.ts";
 import { type Timeline, type TimelineClip, ticksToSamples } from "../timeline.ts";
 import { fades, silence, soundClock, span } from "./audio.ts";
-import { brollSound, brollTiming, mix, overlay, placement } from "./broll.ts";
+import { brollSound, brollTiming, mix, overlay, type Placement, placement } from "./broll.ts";
 import { RAW_AUDIO, RAW_VIDEO } from "./encode.ts";
 import { openSource } from "./inputs.ts";
 import { graphicPlacement, overlayInput, overlayTiming, slideIn } from "./overlays.ts";
 import { crossfade, dissolve } from "./transitions.ts";
 import { clock, colour, dips, fill, ON_SCREEN_TOLERANCE, push } from "./video.ts";
 import { lead, voiceSound } from "./voice.ts";
+import { type Watermark, watermarkLines } from "./watermark.ts";
 
 /** Collects inputs, numbering them as FFmpeg will. */
 function inputs(timeline: Timeline) {
@@ -37,13 +39,14 @@ function inputs(timeline: Timeline) {
 
 /** The piece's picture, written to stdout as raw frames. `overlays` are the rendered files of
  * `timeline.overlays`, in its order, and `graphics` those of `timeline.graphics`; `luts` the
- * .cube file of each clip's match and look, by lutKey. */
+ * .cube file of each clip's match and look, by lutKey; `watermark` a brand kit's logo. */
 export function pieceVideo(
   piece: Piece,
   timeline: Timeline,
   overlays: string[] = [],
   luts: ReadonlyMap<string, string> = new Map(),
   graphics: string[] = [],
+  watermark: Watermark | null = null,
 ): string[] {
   const lut = (grade: Grade | undefined) => {
     const key = lutKey(grade);
@@ -113,6 +116,25 @@ export function pieceVideo(
       `${base}[e${k}]${whole}[f${k}]`,
     );
     base = `[f${k}]`;
+  }
+  if (watermark) {
+    const index = opened.add(["-i", watermark.path]);
+    const at = watermarkPlacement(watermark, output);
+    const meets = (box: Placement | null) =>
+      box !== null &&
+      box.x < at.x + at.width &&
+      at.x < box.x + box.width &&
+      box.y < at.y + at.height &&
+      at.y < box.y + box.height;
+    const hidden = [
+      ...piece.graphics.filter((layer) => meets(graphicPlacement(layer.clip.graphic, output))),
+      ...piece.overlays.filter((layer) => {
+        const { template, params } = layer.clip.overlay;
+        return meets(templateRegion(template, params, output.aspect, output.width, output.height));
+      }),
+    ].map((layer): [number, number] => [layer.atFrame, layer.atFrame + layer.frames - 1]);
+    graph.push(...watermarkLines(index, watermark, at, hidden, base, "[wm]"));
+    base = "[wm]";
   }
   graph.push(`${base}format=yuv420p[v]`);
   return [

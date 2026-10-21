@@ -2,14 +2,29 @@
 
 import { copyFile, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { type Captions, type Project, secondsToTicks } from "@video-editor/schema";
+import type { BrandColors } from "@video-editor/effects/colour";
+import {
+  type BrandCaptions,
+  type Captions,
+  type Project,
+  secondsToTicks,
+} from "@video-editor/schema";
+import type { BrandFace } from "../brand/kit.ts";
 import type { Timeline } from "../timeline.ts";
-import { writeAss } from "./ass.ts";
-import { faceZones, visualZones } from "./faces.ts";
-import { fontFile, metrics } from "./fonts.ts";
+import { type CaptionFace, writeAss } from "./ass.ts";
+import { faceZones, overlayZones, visualZones } from "./faces.ts";
+import { family, fontFile, type Metrics, metrics } from "./fonts.ts";
 import { layoutCaptions, type Page, rowText } from "./layout.ts";
 import { placeBlocks } from "./place.ts";
-import { type DrawnStyle, HOLD, LEADING, PRESETS, TAIL, TYPE_SCALE } from "./presets.ts";
+import {
+  brandPreset,
+  type DrawnStyle,
+  HOLD,
+  LEADING,
+  PRESETS,
+  TAIL,
+  TYPE_SCALE,
+} from "./presets.ts";
 
 export { type CaptionStyle, PRESETS, type Preset } from "./presets.ts";
 
@@ -22,30 +37,54 @@ export interface CaptionFiles {
    * picture shows them; for `none`, as `bold` would. */
   srt: string;
   pages: Page[];
-  /** The face file the script is drawn in, for stageFonts; null with no script. */
-  font: string | null;
+  /** The face files the script is drawn in, for stageFonts; none with no script. */
+  fonts: string[];
+}
+
+/** A brand kit as captions take it: its colours, its custom captions and its caption face. */
+export interface CaptionBrand {
+  colors: BrandColors;
+  custom?: BrandCaptions;
+  face?: BrandFace | null;
 }
 
 /** Room kept around a caption's em boxes when moving it clear of a face, in ems. */
 const CLEARANCE = 0.3;
 
 type Placeable = Pick<Timeline, "main" | "broll" | "frames" | "frameTicks"> &
-  Partial<Pick<Timeline, "graphics">>;
+  Partial<Pick<Timeline, "graphics" | "overlays">>;
 
-/** The pages of `style`, where each is drawn, and what drawing them takes. */
-async function place(project: Project, timeline: Placeable, style: DrawnStyle) {
+/** The pages of `style`, in a brand kit's look when given, where each is drawn, and what drawing
+ * them takes. */
+async function place(
+  project: Project,
+  timeline: Placeable,
+  style: DrawnStyle,
+  brand?: CaptionBrand,
+) {
   const { captions, output } = project as Project & { captions: Captions };
-  const chosen = PRESETS[style];
+  const custom = brand?.custom;
+  const chosen = brand ? brandPreset(style, brand.colors, custom) : PRESETS[style];
   const scale = TYPE_SCALE[output.aspect];
   const { frameTicks } = timeline;
-  const font = await fontFile(chosen.weight);
-  const face = await metrics(font);
+  const house = await fontFile(chosen.weight);
+  const houseFace = { family: family(chosen.weight), bold: true, metrics: await metrics(house) };
+  const own = brand?.face;
+  const face: CaptionFace = own
+    ? { family: own.family, bold: false, metrics: own.metrics, fallback: houseFace }
+    : houseFace;
+  const fonts = own ? [own.path, house] : [house];
+  // A character the kit's face lacks is measured, as it is drawn, in the house face.
+  const measured: Metrics = own
+    ? { ...own.metrics, advance: (c) => own.metrics.advance(c) ?? houseFace.metrics.advance(c) }
+    : houseFace.metrics;
   const em = scale.em * Math.min(output.width, output.height) * chosen.scale;
-  const pages = layoutCaptions(captions, face, {
+  const rows = custom?.lines ?? (chosen.chunk ? 1 : scale.rows);
+  const pages = layoutCaptions(captions, measured, {
     maxWidth:
       (chosen.chunk?.chars ?? Math.floor(scale.chars / chosen.scale)) * (1 + chosen.tracking),
-    maxRows: chosen.chunk ? 1 : scale.rows,
-    ...(chosen.chunk ? { maxWords: chosen.chunk.words } : {}),
+    maxRows: rows,
+    ...(chosen.chunk ? { maxWords: chosen.chunk.words * rows } : {}),
     keywords: chosen.keyword !== undefined,
     tracking: chosen.tracking,
     frameTicks,
@@ -66,14 +105,22 @@ async function place(project: Project, timeline: Placeable, style: DrawnStyle) {
       height: height * em,
     };
   });
-  // A caption sits at its aspect's place, inside the platforms' safe area, unless a face the
-  // media index found is under it.
-  const bottoms = placeBlocks(
-    blocks,
-    scale.bottom * output.height + CLEARANCE * em,
-    [scale.band[0] * output.height, scale.band[1] * output.height],
-    [...faceZones(timeline, output), ...visualZones(timeline, output)],
-  ).map((bottom) => bottom - CLEARANCE * em);
+  // A caption sits at its aspect's place, or the custom captions' own, inside the platforms' safe
+  // area, unless a face the media index found is under it. Custom captions also keep clear of
+  // the labels, lower thirds and titles, which were placed clear of the house captions alone.
+  const band: [number, number] = [scale.band[0] * output.height, scale.band[1] * output.height];
+  const position = custom?.position ?? "bottom";
+  const rest = (height: number) =>
+    position === "top"
+      ? band[0] + height
+      : position === "middle"
+        ? (output.height + height) / 2
+        : scale.bottom * output.height + CLEARANCE * em;
+  const bottoms = placeBlocks(blocks, rest, band, [
+    ...faceZones(timeline, output),
+    ...visualZones(timeline, output),
+    ...(custom ? overlayZones(timeline, output) : []),
+  ]).map((bottom) => bottom - CLEARANCE * em);
   const boxes = blocks.map((block, i): Box => {
     const bottom = (bottoms[i] as number) + CLEARANCE * em;
     return {
@@ -85,7 +132,9 @@ async function place(project: Project, timeline: Placeable, style: DrawnStyle) {
       height: block.height,
     };
   });
-  return { chosen, font, face, em, pages, bottoms, boxes };
+  // The width the aspect keeps captions to (70 % of a 9:16 frame), in this style's ems.
+  const fit = (scale.chars / chosen.scale) * (1 + chosen.tracking);
+  return { chosen, fonts, face, em, pages, bottoms, boxes, fit };
 }
 
 /**
@@ -95,26 +144,32 @@ async function place(project: Project, timeline: Placeable, style: DrawnStyle) {
 export async function buildCaptions(
   project: Project,
   timeline: Placeable,
+  brand?: CaptionBrand,
 ): Promise<CaptionFiles | null> {
   const { captions, output } = project;
   if (!captions) return null;
-  const style = captions.preset === "none" ? null : captions.preset;
-  const { chosen, font, face, em, pages, bottoms } = await place(
+  // Custom captions draw their own style; none draws nothing, and its SubRip copy is bold's.
+  const style = captions.preset === "none" ? null : (brand?.custom?.style ?? captions.preset);
+  const { chosen, fonts, face, em, pages, bottoms, fit } = await place(
     project,
     timeline,
     style ?? "bold",
+    style ? brand : undefined,
   );
   const geometry = {
     width: output.width,
     height: output.height,
     em,
     frameTicks: timeline.frameTicks,
+    // In a kit's look, a page too wide for the frame, as a long word in a large size can be, is
+    // set smaller to fit.
+    ...(brand ? { fit } : {}),
   };
   return {
     ass: style ? writeAss(pages, bottoms, chosen, face, geometry) : null,
     srt: toSrt(pages, timeline.frameTicks),
     pages,
-    font: style ? font : null,
+    fonts: style ? fonts : [],
   };
 }
 

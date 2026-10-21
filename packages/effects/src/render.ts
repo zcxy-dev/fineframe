@@ -8,6 +8,7 @@ import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { FrameRate } from "@video-editor/schema";
+import { type BrandLook, Rebrand } from "./brand.ts";
 import type { TemplateId, TemplateParams } from "./catalog.ts";
 import { type GraphicJob, graphicPage } from "./graphics.ts";
 import { markFiles } from "./icons.ts";
@@ -38,6 +39,9 @@ export interface PageJob {
   /** Rendered with its alpha, as VP9 in WebM, for an effect laid over the picture; otherwise
    * opaque, as H.264 in MP4, for one that fills its area. */
   transparent: boolean;
+  /** Files a brand kit's look loads besides the render folder's own, by their path in it: each
+   * named by what it holds, so it is written once. */
+  files?: Map<string, { text: string } | { copy: string }>;
 }
 
 export interface RenderOptions {
@@ -130,6 +134,17 @@ async function renderPages(
   if (missing.size === 0) return files;
   await mkdir(out, { recursive: true });
   const dir = await site();
+  for (const job of missing.values()) {
+    for (const [path, file] of job.files ?? []) {
+      const to = join(dir, path);
+      if (await exists(to)) continue;
+      await mkdir(dirname(to), { recursive: true });
+      const partial = `${to}.${process.pid}.partial`;
+      if ("copy" in file) await copyFile(file.copy, partial);
+      else await writeFile(partial, file.text);
+      await rename(partial, to);
+    }
+  }
   // Each page is written into the folder under its own name for the render, and removed after.
   const task: WorkerTask = { site: dir, binaries, jobs: [] };
   for (const [file, job] of missing) {
@@ -182,6 +197,8 @@ export interface OverlayJob {
   height: number;
   fps: FrameRate;
   frames: number;
+  /** The brand kit it is drawn in; the house look without one. */
+  brand?: BrandLook;
 }
 
 /** Renders each overlay as VP9 with alpha in WebM, as renderPages does. */
@@ -196,13 +213,29 @@ export function renderOverlays(
     const last = ((frames - 1) * fps.den) / fps.num;
     const markup = templateMarkup(job.template, job.params, job.aspect, width, height, last);
     const u = Math.min(width, height) / 100;
+    const brand = job.brand ? new Rebrand(job.brand) : null;
     return {
-      page: page({ width, height, u, fps, frames, ...markup }),
+      page: page({
+        width,
+        height,
+        u,
+        fps,
+        frames,
+        ...(brand
+          ? {
+              html: markup.html,
+              css: brand.css(markup.css),
+              house: brand.house(),
+              script: brand.script(),
+            }
+          : markup),
+      }),
       width,
       height,
       fps,
       frames,
       transparent: true,
+      ...(brand ? { files: brand.files() } : {}),
     };
   });
   return renderPages(pages, "overlays", binaries, options);

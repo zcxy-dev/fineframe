@@ -2,7 +2,7 @@
 // boxes, seen through the crop of the clip that shows them, on the main track or in a B-roll rect
 // such as the speaker's half of a split screen.
 
-import { layoutFor } from "@video-editor/effects";
+import { layoutFor, templateRegion } from "@video-editor/effects";
 import { type Framing, type Project, TICKS_PER_SECOND } from "@video-editor/schema";
 import { panes } from "../framing.ts";
 import { placement } from "../graph/broll.ts";
@@ -152,4 +152,40 @@ function zonesOf(
     }
   }
   return zones;
+}
+
+/**
+ * Where the labels, lower thirds and template overlays draw, over the frames each shows, as boxes
+ * a caption keeps clear of: a label's or lower third's own box, and the region a title, a name, a
+ * chapter marker or a callout lays its text out in. Graphics and overlays are placed clear of the
+ * house captions alone, so only custom captions, which may sit elsewhere, need these.
+ */
+export function overlayZones(
+  timeline: Partial<Pick<Timeline, "graphics" | "overlays">>,
+  output: Pick<Project["output"], "width" | "height" | "aspect">,
+): FaceZone[] {
+  const zone = (
+    start: number,
+    end: number,
+    box: { x: number; y: number; width: number; height: number },
+  ) => ({
+    start,
+    end,
+    boxes: [{ x0: box.x, y0: box.y, x1: box.x + box.width, y1: box.y + box.height }],
+    hard: true,
+  });
+  const labels = (timeline.graphics ?? [])
+    .filter((clip) => clip.graphic.layout === "label" || clip.graphic.layout === "lower-third")
+    .map((clip) => zone(clip.start, clip.end, graphicPlacement(clip.graphic, output)));
+  const templates = (timeline.overlays ?? []).flatMap(({ overlay, start, end }) => {
+    const box = templateRegion(
+      overlay.template,
+      overlay.params,
+      output.aspect,
+      output.width,
+      output.height,
+    );
+    return box ? [zone(start, end, box)] : [];
+  });
+  return [...labels, ...templates];
 }

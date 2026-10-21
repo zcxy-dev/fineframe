@@ -49,9 +49,10 @@ export function styleName(style: Style, t: Messages = en): string {
   return t.looks[style]?.name ?? style;
 }
 
-/** A caption style's name. One 0.4.0 had and this version does not (spotlight, sweep, boxed)
- * now renders as bold, and is named so. */
+/** A caption style's name, or the brand kit's captions'. One 0.4.0 had and this version does not
+ * (spotlight, sweep, boxed) now renders as bold, and is named so. */
 export function captionStyleName(id: string, t: Messages = en): string {
+  if (id === "brand") return t.kits.captionsName;
   return t.captions[isCaptionStyle(id) ? id : DEFAULT_CAPTIONS].name;
 }
 
@@ -86,7 +87,10 @@ export interface Settings {
   /** Edits from before the advanced settings had none of these: best, uncorrected and bold. */
   quality?: Quality;
   correct?: boolean;
-  captions?: CaptionStyle;
+  /** A caption style, or "brand" for the brand kit's custom captions. */
+  captions?: CaptionStyle | "brand";
+  /** The brand kit the edit is made in, by its id, and its name when the edit started. */
+  brand?: { id: string; name: string };
   /** What the user asks of the edit, in their words, trimmed; absent when they ask nothing. */
   instructions?: string;
   /** Several shorts instead of one video: how many, and the range each one's length lies in, in
@@ -138,7 +142,10 @@ export function checkSettings(
     string,
     unknown
   >;
-  const { quality, correct, captions, instructions, shorts } = input as Record<string, unknown>;
+  const { quality, correct, captions, instructions, shorts, brand } = input as Record<
+    string,
+    unknown
+  >;
   const heard = (input as Record<string, unknown>).asr ?? asr;
   if (!ASRS.includes(heard as Asr)) return `Speech is heard ${ASRS.join(" or ")}`;
   const several = shorts === undefined ? null : shortsProblem(shorts);
@@ -154,9 +161,13 @@ export function checkSettings(
   const chosenQuality = quality ?? "best";
   if (!QUALITIES.includes(chosenQuality as Quality)) return `Quality is ${QUALITIES.join(" or ")}`;
   if (typeof (correct ?? false) !== "boolean") return "Transcript correction is on or off";
+  if (brand !== undefined && brand !== null && typeof brand !== "string") {
+    return "The brand kit is named by its id";
+  }
   const chosenCaptions = captions ?? DEFAULT_CAPTIONS;
-  if (typeof chosenCaptions !== "string" || !isCaptionStyle(chosenCaptions)) {
-    return `The caption style is ${CAPTION_STYLES.join(", ")}`;
+  const kitCaptions = chosenCaptions === "brand" && typeof brand === "string";
+  if (typeof chosenCaptions !== "string" || !(kitCaptions || isCaptionStyle(chosenCaptions))) {
+    return `The caption style is ${CAPTION_STYLES.join(", ")}, or the brand kit's`;
   }
   const lists: Record<"names" | "terms", string[]> = { names: [], terms: [] };
   for (const [key, value] of [
@@ -193,7 +204,9 @@ export function checkSettings(
     visuals: shown as Visuals,
     quality: chosenQuality as Quality,
     correct: (correct ?? false) as boolean,
-    captions: chosenCaptions,
+    captions: chosenCaptions as CaptionStyle | "brand",
+    // Its name is the kit's own, read as the edit is made.
+    ...(typeof brand === "string" ? { brand: { id: brand, name: "" } } : {}),
     ...(asked.trim() ? { instructions: asked.trim() } : {}),
     ...(several ? { shorts: several } : {}),
   };

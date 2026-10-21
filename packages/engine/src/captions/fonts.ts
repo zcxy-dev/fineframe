@@ -56,54 +56,121 @@ const cache = new Map<string, Promise<Metrics>>();
 export function metrics(path: string): Promise<Metrics> {
   let loaded = cache.get(path);
   if (!loaded) {
-    loaded = readFile(path).then(parseMetrics);
+    loaded = readFile(path).then((font) => readFace(font).metrics);
     cache.set(path, loaded);
   }
   return loaded;
 }
 
-/** Reads head, hhea, hmtx, OS/2 and the format 12 cmap of an OpenType font. */
-function parseMetrics(font: Buffer): Metrics {
-  const tables = new Map<string, number>();
-  for (let i = 0; i < font.readUInt16BE(4); i++) {
-    const record = 12 + 16 * i;
-    tables.set(font.toString("latin1", record, record + 4), font.readUInt32BE(record + 8));
+/** The largest face file read: a full CJK face is about 30 MB. */
+export const MAX_FONT_BYTES = 64 * 1024 * 1024;
+const REQUIRED = ["cmap", "head", "hhea", "hmtx", "OS/2", "name", "maxp"];
+
+/**
+ * A TrueType or OpenType face's family name, the one libass selects it by, and its metrics, or a
+ * FaceError saying why it cannot be used. It reads only the tables it needs, each checked to lie
+ * inside the file, so a file someone uploaded is read without trusting its offsets.
+ */
+export function readFace(font: Buffer): { family: string; metrics: Metrics } {
+  if (font.length > MAX_FONT_BYTES) throw new FaceError("it is larger than 64 MB");
+  if (font.length < 12) throw new FaceError("it is not a font");
+  const version = font.readUInt32BE(0);
+  // 1.0 and "true" outline TrueType, "OTTO" CFF; collections and web fonts are not read.
+  if (version !== 0x00010000 && version !== 0x74727565 && version !== 0x4f54544f) {
+    throw new FaceError("it is not a TrueType or OpenType font (.ttf or .otf)");
   }
-  const table = (tag: string) => {
-    const offset = tables.get(tag);
-    if (offset === undefined) throw new Error(`The font has no ${tag} table`);
-    return offset;
-  };
+  const count = font.readUInt16BE(4);
+  if (count === 0 || count > 200 || 12 + 16 * count > font.length) {
+    throw new FaceError("its table directory is damaged");
+  }
+  const tables = new Map<string, { offset: number; length: number }>();
+  for (let i = 0; i < count; i++) {
+    const record = 12 + 16 * i;
+    const offset = font.readUInt32BE(record + 8);
+    const length = font.readUInt32BE(record + 12);
+    if (offset + length > font.length) throw new FaceError("a table runs past its end");
+    tables.set(font.toString("latin1", record, record + 4), { offset, length });
+  }
+  const missing = REQUIRED.filter((tag) => !tables.has(tag));
+  if (missing.length > 0) throw new FaceError(`it has no ${missing.join(", ")} table`);
+  // Every read below is inside the file, or Buffer throws a RangeError: the file is damaged.
+  try {
+    const parsed = {
+      family: familyName(font, tables.get("name")?.offset as number),
+      metrics: parseMetrics(font, tables),
+    };
+    if (!parsed.family) throw new FaceError("it has no family name");
+    // The family goes into the ASS script, where these would end its field or a tag.
+    if (/[,{}\\\p{Cc}]/u.test(parsed.family)) {
+      throw new FaceError(`its family name ${JSON.stringify(parsed.family)} cannot be used`);
+    }
+    const draws = [..."A中"].some((char) => parsed.metrics.advance(char.codePointAt(0) as number));
+    if (!draws) throw new FaceError("it has neither Latin letters nor Chinese characters");
+    return parsed;
+  } catch (error) {
+    if (error instanceof RangeError) throw new FaceError("its tables are damaged");
+    throw error;
+  }
+}
+
+/** Why a face file cannot be used. */
+export class FaceError extends Error {
+  override name = "FaceError";
+}
+
+/** The family name in a name table: Windows English, else any Windows one, else Macintosh. */
+function familyName(font: Buffer, name: number): string {
+  const count = font.readUInt16BE(name + 2);
+  const strings = name + font.readUInt16BE(name + 4);
+  let found: { rank: number; text: string } | null = null;
+  for (let i = 0; i < count; i++) {
+    const record = name + 6 + 12 * i;
+    const [platform, encoding, language, id, length, offset] = [0, 2, 4, 6, 8, 10].map((at) =>
+      font.readUInt16BE(record + at),
+    ) as [number, number, number, number, number, number];
+    if (id !== 1) continue;
+    const start = strings + offset;
+    const bytes = font.subarray(start, start + length);
+    if (bytes.length !== length) throw new FaceError("its family name runs past the file");
+    const windows = platform === 3 && (encoding === 1 || encoding === 0 || encoding === 10);
+    const rank = windows ? (language === 0x409 ? 0 : 1) : platform === 1 && encoding === 0 ? 2 : -1;
+    if (rank < 0 || (found && found.rank <= rank)) continue;
+    // UTF-16 big-endian, swapped in a copy to Node's little-endian.
+    const text = windows
+      ? Buffer.from(bytes).swap16().toString("utf16le")
+      : bytes.toString("latin1");
+    found = { rank, text: text.trim() };
+  }
+  return found?.text ?? "";
+}
+
+/** Reads head, hhea, hmtx, OS/2 and a format 12 or 4 Unicode cmap of an OpenType font. */
+function parseMetrics(
+  font: Buffer,
+  tables: Map<string, { offset: number; length: number }>,
+): Metrics {
+  const table = (tag: string) => tables.get(tag)?.offset as number;
+  const glyphs = font.readUInt16BE(table("maxp") + 4);
   const units = font.readUInt16BE(table("head") + 18);
+  if (units < 16 || units > 16384) throw new FaceError("its units per em are out of range");
   const hmetrics = font.readUInt16BE(table("hhea") + 34);
+  if (hmetrics === 0) throw new FaceError("it has no glyph widths");
+  if (4 * hmetrics > (tables.get("hmtx")?.length as number)) {
+    throw new FaceError("its glyph widths run past their table");
+  }
   const hmtx = table("hmtx");
   const os2 = table("OS/2");
   const winAscent = font.readUInt16BE(os2 + 74);
   const winDescent = font.readUInt16BE(os2 + 76);
-
-  // Format 12 maps every code point, supplementary planes included, in sorted groups.
-  const cmap = table("cmap");
-  let groups = -1;
-  for (let i = 0; i < font.readUInt16BE(cmap + 2); i++) {
-    const subtable = cmap + font.readUInt32BE(cmap + 4 + 8 * i + 4);
-    if (font.readUInt16BE(subtable) === 12) {
-      groups = subtable;
-      break;
-    }
-  }
-  if (groups < 0) throw new Error("The font has no format 12 cmap");
-  const count = font.readUInt32BE(groups + 12);
-  const glyph = (codePoint: number): number | undefined => {
-    let low = 0;
-    let high = count - 1;
-    while (low <= high) {
-      const middle = (low + high) >> 1;
-      const group = groups + 16 + 12 * middle;
-      if (codePoint < font.readUInt32BE(group)) high = middle - 1;
-      else if (codePoint > font.readUInt32BE(group + 4)) low = middle + 1;
-      else return font.readUInt32BE(group + 8) + codePoint - font.readUInt32BE(group);
-    }
-    return undefined;
+  const lookup = cmapLookup(
+    font,
+    table("cmap"),
+    tables.get("cmap") as { offset: number; length: number },
+  );
+  // A glyph the face does not have counts as missing.
+  const glyph = (codePoint: number) => {
+    const id = lookup(codePoint);
+    return id !== undefined && id < glyphs ? id : undefined;
   };
   return {
     advance(codePoint) {
@@ -117,5 +184,75 @@ function parseMetrics(font: Buffer): Metrics {
     descent: -font.readInt16BE(table("hhea") + 6) / units,
     emTop: font.readInt16BE(os2 + 68) / units,
     emBottom: -font.readInt16BE(os2 + 70) / units,
+  };
+}
+
+/** A code point's glyph by the cmap's Unicode subtable: format 12, which maps every plane, or
+ * else format 4, the Basic Multilingual Plane's. */
+function cmapLookup(
+  font: Buffer,
+  cmap: number,
+  bounds: { offset: number; length: number },
+): (codePoint: number) => number | undefined {
+  const end = bounds.offset + bounds.length;
+  const subtables: number[] = [];
+  for (let i = 0; i < font.readUInt16BE(cmap + 2); i++) {
+    const record = cmap + 4 + 8 * i;
+    const platform = font.readUInt16BE(record);
+    const encoding = font.readUInt16BE(record + 2);
+    if (platform === 0 || (platform === 3 && (encoding === 1 || encoding === 10))) {
+      subtables.push(cmap + font.readUInt32BE(record + 4));
+    }
+  }
+  const twelve = subtables.find((at) => font.readUInt16BE(at) === 12);
+  if (twelve !== undefined) {
+    const count = font.readUInt32BE(twelve + 12);
+    if (twelve + 16 + 12 * count > end)
+      throw new FaceError("its character map runs past its table");
+    return (codePoint) => {
+      let low = 0;
+      let high = count - 1;
+      while (low <= high) {
+        const middle = (low + high) >> 1;
+        const group = twelve + 16 + 12 * middle;
+        if (codePoint < font.readUInt32BE(group)) high = middle - 1;
+        else if (codePoint > font.readUInt32BE(group + 4)) low = middle + 1;
+        else return font.readUInt32BE(group + 8) + codePoint - font.readUInt32BE(group);
+      }
+      return undefined;
+    };
+  }
+  const four = subtables.find((at) => font.readUInt16BE(at) === 4);
+  if (four === undefined) throw new FaceError("it has no Unicode character map");
+  const segments = font.readUInt16BE(four + 6) / 2;
+  const ends = four + 14;
+  const starts = ends + 2 * segments + 2;
+  const deltas = starts + 2 * segments;
+  const ranges = deltas + 2 * segments;
+  // The glyph ids a range offset points at lie inside the subtable, or the code point is missing.
+  const tail = Math.min(end, four + font.readUInt16BE(four + 2));
+  if (ranges + 2 * segments > tail) throw new FaceError("its character map runs past its table");
+  return (codePoint) => {
+    if (codePoint > 0xffff) return undefined;
+    let low = 0;
+    let high = segments - 1;
+    while (low <= high) {
+      const middle = (low + high) >> 1;
+      if (codePoint > font.readUInt16BE(ends + 2 * middle)) low = middle + 1;
+      else if (middle > 0 && codePoint <= font.readUInt16BE(ends + 2 * (middle - 1)))
+        high = middle - 1;
+      else {
+        const start = font.readUInt16BE(starts + 2 * middle);
+        if (codePoint < start) return undefined;
+        const delta = font.readUInt16BE(deltas + 2 * middle);
+        const range = font.readUInt16BE(ranges + 2 * middle);
+        if (range === 0) return (codePoint + delta) & 0xffff;
+        const at = ranges + 2 * middle + range + 2 * (codePoint - start);
+        if (at + 2 > tail) return undefined;
+        const id = font.readUInt16BE(at);
+        return id === 0 ? 0 : (id + delta) & 0xffff;
+      }
+    }
+    return undefined;
   };
 }

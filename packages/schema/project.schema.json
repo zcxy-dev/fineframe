@@ -33,9 +33,129 @@
       "items": { "$ref": "#/$defs/Overlay" }
     },
     "audio": { "$ref": "#/$defs/Audio" },
-    "plan": { "$ref": "#/$defs/Plan" }
+    "plan": { "$ref": "#/$defs/Plan" },
+    "brand": {
+      "description": "The brand kit the edit is rendered in; without it, the house look. Applied at render time alone: the plan and the graphics' markup do not depend on it.",
+      "$ref": "#/$defs/Brand"
+    }
   },
   "$defs": {
+    "Brand": {
+      "description": "A brand kit: its colours replace the house amber in the graphics, the templates and the caption highlight, its fonts set the graphics' and the captions' type, its logo is a corner watermark, and its custom captions replace the caption style's look. A kit folder's kit.json has this shape, its paths relative to it.",
+      "type": "object",
+      "required": ["name", "colors"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 60, "pattern": "\\S" },
+        "colors": {
+          "description": "Primary replaces the amber accent; secondary and accent replace its deeper and lighter tones, which are made from the primary when left out.",
+          "type": "object",
+          "required": ["primary"],
+          "additionalProperties": false,
+          "properties": {
+            "primary": { "$ref": "#/$defs/Colour" },
+            "secondary": { "$ref": "#/$defs/Colour" },
+            "accent": { "$ref": "#/$defs/Colour" }
+          }
+        },
+        "fonts": {
+          "description": "The face of the graphics and titles, and of the captions; each left out keeps the house face. A character a face lacks is drawn in Noto Sans TC.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "graphics": { "$ref": "#/$defs/BrandFont" },
+            "captions": { "$ref": "#/$defs/BrandFont" }
+          }
+        },
+        "logo": {
+          "description": "The logo, a PNG or an SVG, and the watermark it is drawn as through the whole video when `show` is true: in a corner, as large as a square whose side is `size` of the frame's shorter side, at `opacity`.",
+          "type": "object",
+          "required": ["file", "show", "corner", "size", "opacity"],
+          "additionalProperties": false,
+          "properties": {
+            "file": { "$ref": "#/$defs/BrandFile" },
+            "show": { "type": "boolean" },
+            "corner": { "enum": ["top-left", "top-right", "bottom-left", "bottom-right"] },
+            "size": { "type": "number", "minimum": 0.05, "maximum": 0.3 },
+            "opacity": { "type": "number", "minimum": 0.2, "maximum": 1 }
+          }
+        },
+        "captions": {
+          "description": "Custom captions: a drawn caption style with its size, colours, outline or box, place and rows changed. They replace captions.preset's look unless that is none.",
+          "$ref": "#/$defs/BrandCaptions"
+        }
+      }
+    },
+    "Colour": { "description": "`#rrggbb`.", "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+    "BrandFile": {
+      "type": "object",
+      "required": ["path"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/RelativePath" },
+        "sha256": {
+          "description": "SHA-256 of the file, lowercase hex; a render from a changed file fails. An edit fills it in when it copies the kit.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "BrandFont": {
+      "description": "One of the bundled faces by its id, or a TrueType or OpenType file.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["id"],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "enum": [
+                "noto-sans-tc",
+                "noto-serif-tc",
+                "lxgw-wenkai-tc",
+                "jf-openhuninn",
+                "iansui",
+                "chocolate-classical-sans",
+                "cactus-classical-serif",
+                "lxgw-marker-gothic"
+              ]
+            }
+          }
+        },
+        { "$ref": "#/$defs/BrandFile" }
+      ]
+    },
+    "BrandCaptions": {
+      "type": "object",
+      "required": ["style", "size", "text", "highlight", "frame", "position", "lines"],
+      "additionalProperties": false,
+      "properties": {
+        "style": {
+          "description": "The caption style it starts from.",
+          "enum": ["bold", "creator", "minimal", "pop"]
+        },
+        "size": {
+          "description": "Small, medium (the style's own) or large.",
+          "enum": ["S", "M", "L"]
+        },
+        "text": { "$ref": "#/$defs/Colour" },
+        "highlight": {
+          "description": "The word being spoken, and with creator the numbers and English words in a Chinese line.",
+          "$ref": "#/$defs/Colour"
+        },
+        "frame": {
+          "description": "A dark outline around the letters, or a dark box behind the caption.",
+          "enum": ["outline", "box"]
+        },
+        "position": { "enum": ["bottom", "middle", "top"] },
+        "lines": {
+          "description": "The most rows a caption holds.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2
+        }
+      }
+    },
     "Ticks": {
       "description": "A time or length in ticks: 120 000 per second, so every common frame rate has a whole number of ticks per frame.",
       "type": "integer",

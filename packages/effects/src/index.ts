@@ -1,3 +1,4 @@
+export { type BrandLook, Rebrand } from "./brand.ts";
 export {
   type CalloutParams,
   type ChapterParams,
@@ -28,8 +29,10 @@ export {
   SLIDE,
 } from "./graphics.ts";
 export { type IconName, iconNames, LOGOS, type LogoName, logoNames, marksIn } from "./icons.ts";
-export { type Aspect, COLORS, layoutFor } from "./layout.ts";
+export { type Aspect, COLORS, layoutFor, watermarkPlacement } from "./layout.ts";
+export { MAX_SVG_BYTES, svgProblem } from "./logo.ts";
 export type { Box } from "./page.ts";
+export { rasterizeSvg } from "./raster.ts";
 export {
   type Binaries,
   cacheDir,
@@ -38,6 +41,7 @@ export {
   renderGraphics,
   renderOverlays,
 } from "./render.ts";
+export { templateRegion } from "./templates.ts";
 export {
   graphicProblems,
   overlayProblems,

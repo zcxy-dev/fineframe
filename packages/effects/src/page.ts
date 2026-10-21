@@ -25,6 +25,10 @@ export interface PageSpec {
   /** The effect's markup and its own styles. */
   html: string;
   css: string;
+  /** The house stylesheet in a brand kit's look, in place of house.css, and the script that
+   * keeps its text readable (brand.ts). */
+  house?: string;
+  script?: string;
 }
 
 /** No request leaves the page but for its stylesheets, fonts and the bundled icons and logos, all
@@ -42,7 +46,7 @@ export function page(spec: PageSpec): string {
   return `<!doctype html>
 <html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${POLICY}">
-<link rel="stylesheet" href="fonts.css"><link rel="stylesheet" href="house.css">
+<link rel="stylesheet" href="fonts.css">${spec.house === undefined ? '<link rel="stylesheet" href="house.css">' : `<style>${spec.house}</style>`}
 <style>
 html, body { width: ${box.width}px; height: ${box.height}px; }
 /* Held at their start until the renderer seeks them: HyperFrames measures each animation from the
@@ -53,6 +57,6 @@ html, body { width: ${box.width}px; height: ${box.height}px; }
 ${spec.css}
 </style></head><body>
 <div id="root" data-composition-id="effect" data-no-timeline data-start="0" data-duration="${seconds}" data-width="${box.width}" data-height="${box.height}"><div id="frame" class="ff">${spec.html}</div></div>
-</body></html>
+${spec.script === undefined ? "" : `<script>${spec.script}</script>\n`}</body></html>
 `;
 }

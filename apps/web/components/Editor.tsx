@@ -28,6 +28,7 @@ import {
 import type { SetupState } from "../lib/setup.ts";
 import { jobApi, shortView } from "../lib/shorts.ts";
 import { dollarsOf, summaryRows } from "../lib/summary.ts";
+import { BrandKits, useKits } from "./BrandKits.tsx";
 import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
 import { Footage, type Item, type LinkItem } from "./Footage.tsx";
@@ -90,8 +91,30 @@ export function Editor() {
     quality: "best",
     correct: false,
     captions: DEFAULT_CAPTIONS,
+    brand: null,
     instructions: "",
   });
+  // The Brand kit page, over the rest while it shows.
+  const [kitsOpen, setKitsOpen] = useState(false);
+  const { list: kits, reload: reloadKits } = useKits();
+  // The default kit until the owner chooses, its custom captions with it; a chosen kit deleted
+  // since is none.
+  const [brandChosen, setBrandChosen] = useState(false);
+  useEffect(() => {
+    if (!kits) return;
+    setChoices((current) => {
+      const kept = kits.kits.find((each) => each.id === current.brand) ?? null;
+      const kit = brandChosen ? kept : (kits.kits.find((each) => each.id === kits.default) ?? null);
+      const captions = kit?.brand.captions
+        ? brandChosen
+          ? current.captions
+          : "brand"
+        : current.captions === "brand"
+          ? DEFAULT_CAPTIONS
+          : current.captions;
+      return { ...current, brand: kit?.id ?? null, captions };
+    });
+  }, [kits, brandChosen]);
   const [phase, setPhase] = useState<Phase>({ kind: "compose" });
   const upload = useRef<XMLHttpRequest | null>(null);
   // The finished edit's player, which the re-edit's shortcuts play and step.
@@ -330,6 +353,7 @@ export function Editor() {
             quality: choices.quality,
             correct: choices.correct,
             captions: choices.captions,
+            ...(choices.brand ? { brand: choices.brand } : {}),
             // Nothing asked, nothing sent: the request is the same as without the box.
             ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
             ...(several ? { shorts: { count: choices.count, min: range[0], max: range[1] } } : {}),
@@ -419,6 +443,17 @@ export function Editor() {
           <span className={styles.wordmark}>Fineframe</span>
         </span>
         <div className={styles.headerTools}>
+          <button
+            type="button"
+            className={styles.keyButton}
+            aria-pressed={kitsOpen}
+            onClick={() => {
+              if (kitsOpen) reloadKits();
+              setKitsOpen(!kitsOpen);
+            }}
+          >
+            {t.kits.menu}
+          </button>
           {LOCALES.filter((each) => each !== locale).map((other) => (
             <button
               key={other}
@@ -467,7 +502,14 @@ export function Editor() {
         }}
       />
 
-      {phase.kind === "compose" || phase.kind === "uploading" ? (
+      {kitsOpen ? (
+        <BrandKits
+          onClose={() => {
+            reloadKits();
+            setKitsOpen(false);
+          }}
+        />
+      ) : phase.kind === "compose" || phase.kind === "uploading" ? (
         <main className={styles.layout}>
           <div className={styles.main}>
             <div className={styles.hero}>
@@ -517,6 +559,9 @@ export function Editor() {
               onAddOpenRouter={() => setAsking("openrouter")}
               stock={keys}
               onAddStock={setAsking}
+              kits={kits?.kits ?? null}
+              onBrand={() => setBrandChosen(true)}
+              onEditKits={() => setKitsOpen(true)}
             />
             {phase.kind === "compose" && phase.error && (
               <ErrorNote message={phase.error} fallback={t.compose.startFallback} />

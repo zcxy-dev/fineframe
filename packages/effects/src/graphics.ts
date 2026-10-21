@@ -2,6 +2,7 @@
 // move, and the page each renders as.
 
 import type { Project } from "@video-editor/schema";
+import { type BrandLook, Rebrand } from "./brand.ts";
 import { iconNames, LOGOS, logoNames } from "./icons.ts";
 import { type Aspect, layoutFor } from "./layout.ts";
 import { cleanMarkup, markupProblem } from "./markup.ts";
@@ -68,21 +69,26 @@ export interface GraphicJob {
   box?: Box;
   output: Pick<Project["output"], "aspect" | "width" | "height" | "fps">;
   frames: number;
+  /** The brand kit it is drawn in; the house look without one. */
+  brand?: BrandLook;
 }
 
-/** A graphic's page and the size it renders at, its markup rebuilt from its parse. Markup that
- * markupProblem refuses never reaches a page: the renderer would fetch what it names. */
+/** A graphic's page and the size it renders at, its markup rebuilt from its parse, and the files
+ * a brand kit's look loads besides the render's own. Markup that markupProblem refuses never
+ * reaches a page: the renderer would fetch what it names. */
 export function graphicPage(job: GraphicJob): {
   page: string;
   width: number;
   height: number;
   transparent: boolean;
+  files?: ReturnType<Rebrand["files"]>;
 } {
   const unsafe = markupProblem(job.html, job.css);
   if (unsafe) throw new Error(`A graphic cannot be drawn: ${unsafe}.`);
   const frame = graphicFrame(job.layout, job.output);
   const u = Math.min(job.output.width, job.output.height) / 100;
   const box = isOverlayLayout(job.layout) ? job.box : undefined;
+  const brand = job.brand ? new Rebrand(job.brand) : null;
   return {
     page: page({
       ...frame,
@@ -90,12 +96,14 @@ export function graphicPage(job: GraphicJob): {
       u,
       fps: job.output.fps,
       frames: job.frames,
-      html: cleanMarkup(job.html),
-      css: job.css,
+      html: cleanMarkup(job.html, brand ?? undefined),
+      css: brand ? brand.css(job.css) : job.css,
+      ...(brand ? { house: brand.house(), script: brand.script() } : {}),
     }),
     width: box?.width ?? frame.width,
     height: box?.height ?? frame.height,
     transparent: isOverlayLayout(job.layout),
+    ...(brand ? { files: brand.files() } : {}),
   };
 }
 

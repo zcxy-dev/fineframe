@@ -102,3 +102,40 @@ export function layoutFor(aspect: Aspect, width: number, height: number): Layout
     safeWidth: width - safe.left - safe.right,
   };
 }
+
+/** How far a watermark sits from the frame's bottom edge: clear of a player's controls at 16:9
+ * and 1:1, and at 9:16 of the description short-form apps lay over the bottom of the frame. Its
+ * other edges keep to the overlays' safe area. */
+const WATERMARK_BOTTOM: Record<Aspect, number> = {
+  "16:9": 0.08,
+  "1:1": 0.07,
+  "9:16": 0.22,
+};
+
+/** Where the watermark goes, in output pixels, in its corner: as large as a square whose side is
+ * `size` of the frame's shorter side, so a wide logo and a square one weigh alike, in even
+ * pixels. */
+export function watermarkPlacement(
+  watermark: {
+    width: number;
+    height: number;
+    corner: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+    size: number;
+  },
+  output: Pick<Project["output"], "width" | "height" | "aspect">,
+): { x: number; y: number; width: number; height: number } {
+  const side = watermark.size * Math.min(output.width, output.height);
+  const scale = side / Math.sqrt(watermark.width * watermark.height);
+  const even = (value: number) => Math.max(2, Math.round(value / 2) * 2);
+  const width = even(watermark.width * scale);
+  const height = even(watermark.height * scale);
+  const { safe } = layoutFor(output.aspect, output.width, output.height);
+  const left = watermark.corner.endsWith("left");
+  const top = watermark.corner.startsWith("top");
+  return {
+    x: Math.round(left ? safe.left : output.width - safe.right - width),
+    y: Math.round(top ? safe.top : output.height * (1 - WATERMARK_BOTTOM[output.aspect]) - height),
+    width,
+    height,
+  };
+}

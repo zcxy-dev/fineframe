@@ -81,6 +81,7 @@ export function serverEnvironment(
     VIDEO_EDITOR_HOST: "127.0.0.1",
     PORT: String(port),
     VIDEO_EDITOR_ENV_FILE: join(places.data, "keys.env"),
+    VIDEO_EDITOR_BRAND_KITS: join(places.data, "brand-kits"),
     VIDEO_EDITOR_SETUP: "1",
     VIDEO_EDITOR_STOP_WITH_STDIN: "1",
     [path]: [places.bin, inherited[path]].filter(Boolean).join(delimiter),

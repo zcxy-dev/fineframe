@@ -5,7 +5,7 @@
 // Generated once from the npm packages: add an icon by copying its nodes or path from the same
 // versions.
 
-import { PALETTE } from "./style.ts";
+import { PALETTE } from "./colour.ts";
 
 /** A Lucide icon: SVG elements on a 24-unit grid, stroked in currentColor. */
 type IconNode = [tag: string, attrs: Record<string, string>][];

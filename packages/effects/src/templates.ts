@@ -11,8 +11,9 @@ import type {
   TitleParams,
   WipeParams,
 } from "./catalog.ts";
+import { PALETTE } from "./colour.ts";
 import { type Aspect, type Layout, layoutFor, MOTION } from "./layout.ts";
-import { PALETTE } from "./style.ts";
+import type { Box } from "./page.ts";
 
 /** An effect's markup and its own styles, for `page()`. */
 export interface Markup {
@@ -59,6 +60,56 @@ export function templateMarkup<Id extends TemplateId>(
       return wipe(params as WipeParams, layout, seconds);
   }
   throw new Error(`No template ${template}`);
+}
+
+/** Where a template draws its text, in output pixels, for what keeps clear of it (a brand kit's
+ * custom captions, its watermark): the title's band at the frame's middle, the name's and the
+ * chapter's band across the safe area at the top (the name at the bottom outside 9:16), the
+ * callout's region with its label; none for the wipe. Generous, not exact: the plates size to
+ * their text. */
+export function templateRegion(
+  template: string,
+  params: Record<string, unknown>,
+  aspect: Aspect,
+  width: number,
+  height: number,
+): Box | null {
+  const { safe, u, type } = layoutFor(aspect, width, height);
+  const left = safe.left;
+  const across = width - safe.right - left;
+  const top = safe.top;
+  const bottom = height - safe.bottom;
+  switch (template) {
+    case "title": {
+      const middle = (top + bottom) / 2 - 3 * u;
+      const half = type("title") * 1.2 + type("subtitle") * 1.4;
+      return { x: left, y: middle - half, width: across, height: 2 * half };
+    }
+    case "lower-third": {
+      const tall = type("name") * 1.25 + type("role") * 1.35 + 3.7 * u;
+      return { x: left, y: aspect === "9:16" ? top : bottom - tall, width: across, height: tall };
+    }
+    case "chapter":
+      return {
+        x: left,
+        y: top,
+        width: across,
+        height: type("count") * 1.2 + type("chapter") * 1.25 + 6.4 * u,
+      };
+    case "callout": {
+      const rect = params.rect as { x: number; y: number; w: number; h: number } | undefined;
+      if (!rect) return null;
+      const label = type("label") * 1.3 + 2 * u;
+      return {
+        x: rect.x * width,
+        y: rect.y * height - label,
+        width: rect.w * width,
+        height: rect.h * height + 2 * label,
+      };
+    }
+    default:
+      return null;
+  }
 }
 
 /** A rule draws across, the title rises behind it, and a soft pool of shade gathers behind the

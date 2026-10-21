@@ -95,3 +95,32 @@ It also cuts away to web captures or stock footage: `broll` entries whose source
   ```
 
 - **Caption style:** `captions.preset` is `bold` (word by word, the word being said in amber), `creator` (a few words at a time, big, in a dark box, numbers and English words in amber), `minimal` (small white type), `pop` (each word pops in as it is said) or `none` (nothing on the picture; `edit-v2.srt` is still written, broken as `bold` breaks it). Only the render changes: no new plan. `pnpm edit --captions` picks it for a new edit.
+- With a brand kit's custom captions, `brand.captions` draws in place of the preset's look: delete it to show `captions.preset` as it is.
+
+## Apply, change or remove a brand kit
+
+A kit is a folder holding `kit.json` and the files it names, its paths relative to the folder:
+
+```json
+{
+  "name": "My channel",
+  "colors": { "primary": "#2f6bff" },
+  "fonts": { "graphics": { "id": "lxgw-wenkai-tc" }, "captions": { "path": "fonts/Brand.ttf" } },
+  "logo": { "file": { "path": "logo.svg" }, "show": true, "corner": "top-right", "size": 0.12, "opacity": 0.85 },
+  "captions": { "style": "bold", "size": "L", "text": "#ffffff", "highlight": "#4dd0ff", "frame": "outline", "position": "bottom", "lines": 2 }
+}
+```
+
+- `brand.colors.primary` replaces the amber in the motion graphics, the templates and the caption highlight; `brand.colors.secondary` and `brand.colors.accent` replace its deeper and lighter tones, made from the primary when left out. Text that would not read on a colour turns black or white.
+- `brand.fonts.graphics` and `brand.fonts.captions` are a bundled face by `id` (`noto-sans-tc`, `noto-serif-tc`, `lxgw-wenkai-tc`, `jf-openhuninn`, `iansui`, `chocolate-classical-sans`, `cactus-classical-serif`, `lxgw-marker-gothic`) or a TrueType or OpenType file by `path`. Ask before using a font file the user has not said they have the right to use. A character a face lacks is drawn in Noto Sans TC.
+- `brand.logo.file` is a PNG or an SVG; with `brand.logo.show`, it is a watermark in its `brand.logo.corner` through the video, under the captions, away while a graphic, a title, a name, a chapter or a callout it would cover shows. `brand.logo.size` (0.05 to 0.3) is the side of a square of its area, as a share of the frame's shorter side; `brand.logo.opacity` is 0.2 to 1.
+- `brand.captions` are custom captions: a drawn style (`bold`, `creator`, `minimal`, `pop`) with `size` `S`, `M` or `L`, `text` and `highlight` colours, `frame` `outline` or `box`, `position` `bottom`, `middle` or `top`, and `lines` 1 or 2. They move off faces, graphics and titles.
+
+Apply or change a kit with a render alone; `none` takes the kit out:
+
+```bash
+pnpm -s render out/edit.project.json --brand path/to/kit -o out/edit-v2.mp4
+```
+
+It checks the kit, copies its files into `out/brand/` by their content, and writes `out/edit-v2.project.json` with them in `brand`. To change one setting of the kit an edit carries, edit `brand` in the copy and render it; a file it names has to stay the one copied, whose SHA-256 the render checks.
+

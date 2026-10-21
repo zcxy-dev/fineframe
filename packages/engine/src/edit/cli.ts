@@ -2,12 +2,7 @@
 import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { type ClaudeCost, type Progress, validateProgress } from "@video-editor/schema";
-import {
-  CAPTION_STYLES,
-  type CaptionStyle,
-  DEFAULT_CAPTIONS,
-  isCaptionStyle,
-} from "../captions/presets.ts";
+import { CAPTION_STYLES, type CaptionStyle, isCaptionStyle } from "../captions/presets.ts";
 import { LinkError } from "../link.ts";
 import { isLookId, type LookId, lookIds } from "../looks.ts";
 import { ClaudeError, QUALITIES, type Quality } from "../plan/claude.ts";
@@ -25,7 +20,7 @@ const usage = `Usage: pnpm edit <footage folder, file or link>... --length <leng
     [--shorts <count>] [--names <names.txt>] [--terms <terms.txt>] \\
     [--correct] [--instructions <text>] [--asr <local | cloud>] \\
     [--look <${[...lookIds, "none"].join(" | ")}>] \\
-    [--captions <${CAPTION_STYLES.join(" | ")}>] \\
+    [--captions <${CAPTION_STYLES.join(" | ")}>] [--brand <kit folder>] \\
     [--quality <best | economy>] [--visuals <rich | minimal>] \\
     [--music <track or folder>]... [--music-license <licence>]
 
@@ -73,7 +68,13 @@ SHA2-256SUMS, and updated before each link is fetched.
       --captions the caption style: bold (word by word, the word said in amber) unless
                  another is named: creator (a few words at a time, big, in a box),
                  minimal (small white type), pop (each word pops in as it is said) or
-                 none (no captions on the picture; the .srt is still written)
+                 none (no captions on the picture; the .srt is still written). With a
+                 --brand kit that has custom captions, those unless a style is named
+      --brand    a brand kit's folder: kit.json with its logo and fonts beside it. Its colours
+                 replace the amber in the graphics, titles and caption highlight, its fonts
+                 set their type, its logo is a corner watermark when the kit shows it, and its
+                 custom captions are drawn; nothing it holds is sent to Claude. Its files are
+                 copied into brand/ beside the video (with --shorts, in the folder)
       --quality  best plans with Claude Opus; economy with Claude Sonnet, for about half
                  the cost. best unless given
       --visuals  rich (the default) adds motion graphics Claude writes for the video
@@ -116,6 +117,7 @@ const parsed = (() => {
         names: { type: "string" },
         terms: { type: "string" },
         captions: { type: "string" },
+        brand: { type: "string" },
         instructions: { type: "string" },
         correct: { type: "boolean" },
         asr: { type: "string" },
@@ -165,8 +167,8 @@ if (look !== "none" && !isLookId(look)) {
   fail(`the look is ${[...lookIds, "none"].join(", ")}, not ${look}`);
 }
 
-const captions = values.captions ?? DEFAULT_CAPTIONS;
-if (!isCaptionStyle(captions)) {
+const captions = values.captions;
+if (captions !== undefined && !isCaptionStyle(captions)) {
   fail(`--captions is ${CAPTION_STYLES.join(", ")}, not ${captions}`);
 }
 
@@ -200,7 +202,8 @@ const options = {
   out: values.output as string,
   ...(values.names ? { names: values.names } : {}),
   ...(values.terms ? { terms: values.terms } : {}),
-  captions: captions as CaptionStyle,
+  ...(captions ? { captions: captions as CaptionStyle } : {}),
+  ...(values.brand ? { brand: values.brand } : {}),
   ...(instructions ? { instructions } : {}),
   correct: values.correct ?? false,
   asr: asr as "local" | "cloud",

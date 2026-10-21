@@ -29,7 +29,8 @@ const MAX_FACE_PAD_BOTTOM = 40;
 const FACE_GAP = 12;
 
 /**
- * The bottom edge of each caption. A caption sits at `bottom` unless that covers a face on screen
+ * The bottom edge of each caption. A caption sits at `bottom`, or where `bottom` puts a caption of
+ * its height, unless that covers a face on screen
  * while it shows; then it moves just below or above the faces, whichever is nearer, inside
  * `band` (top and bottom edges in pixels). A caption keeps the bottom edge of the one before it
  * in the same shot while that stays clear, so captions do not hop between phrases. If no spot is
@@ -37,14 +38,14 @@ const FACE_GAP = 12;
  */
 export function placeBlocks(
   blocks: Block[],
-  bottom: number,
+  bottom: number | ((height: number) => number),
   band: [number, number],
   faces: FaceZone[],
 ): number[] {
   let last: { shot: number; bottom: number } | null = null;
   return blocks.map((block) => {
     const half = block.height / 2;
-    const anchor = bottom - half;
+    const anchor = (typeof bottom === "number" ? bottom : bottom(block.height)) - half;
     const covered: [number, number][] = [];
     const clear: [number, number][] = [];
     const blocked: [number, number][] = [];

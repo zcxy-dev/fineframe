@@ -36,6 +36,7 @@ export function summaryRows(
   const { length, aspect } = shownPlan(job);
   const look = (shown?.look ?? job.settings.style) as Style;
   const captions = shown?.captions ?? job.settings.captions;
+  const brand = shown?.brand !== undefined ? shown.brand : (job.settings.brand?.name ?? null);
   const videos = job.files.filter((file) => file.use === "video").length;
   const photos = job.files.filter((file) => file.use === "image").length;
   const offered = job.files.filter((file) => file.use === "music").length;
@@ -52,6 +53,7 @@ export function summaryRows(
     [words.style, styleName(look, t)],
     // Edits from before the setting had none.
     ...(captions ? [[words.captions, captionStyleName(captions, t)] as [string, string]] : []),
+    ...(brand ? [[words.brand, brand] as [string, string]] : []),
     [words.speech, job.settings.asr === "cloud" ? "OpenRouter" : words.local],
     ...(job.settings.visuals
       ? [[words.visuals, t.settings.visualsChoices[job.settings.visuals].name] as [string, string]]

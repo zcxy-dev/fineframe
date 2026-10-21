@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { basename, dirname, extname, join, resolve } from "node:path";
+import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import {
+  type Brand,
   type ClaudeCost,
   type DoneProgress,
   type Progress,
@@ -11,6 +12,7 @@ import {
   validateProgress,
   validateShorts,
 } from "@video-editor/schema";
+import { BrandError, loadKit, moveBrand, stageBrand } from "../brand/kit.ts";
 import type { CaptionStyle } from "../captions/presets.ts";
 import { ffmpeg, QUIET, run } from "../ffmpeg.ts";
 import { fetchLink, isLink, ytDlp } from "../link.ts";
@@ -77,8 +79,12 @@ export interface EditOptions {
   /** A UTF-8 file of terms said in the footage, one per line, such as brands and jargon: they
    * only help the speech model and the correction hear them. */
   terms?: string;
-  /** The caption style (../captions/presets.ts): bold unless given. */
+  /** The caption style (../captions/presets.ts): bold unless given, or the brand kit's custom
+   * captions when it has them. */
   captions?: CaptionStyle;
+  /** A brand kit's folder (../brand/kit.ts): its kit.json, logo and fonts. Its files are copied
+   * into `brand/` beside the video, or in the shorts' folder, and the edit renders in its look. */
+  brand?: string;
   /** What the user asks of this edit, in their words, such as "open with the demo" or "keep
    * the part about pricing", passed on to the planner. */
   instructions?: string;
@@ -249,6 +255,8 @@ interface Prepared {
   timed: <T>(stage: Stage, work: () => Promise<T>) => Promise<T>;
   /** The share of the progress bar the analysis took. */
   analyzed: number;
+  /** The brand kit, its files copied into `folder`, its paths relative to it. */
+  brand: { kit: Brand; folder: string } | null;
 }
 
 /**
@@ -261,8 +269,20 @@ async function prepare(
   refuse: (footage: number, videos: MediaFile[], lengths: (number | null)[]) => void,
   report: Reporter,
   spent: Usage[],
+  /** The folder the brand kit's files are copied into. */
+  brandFolder: string,
 ): Promise<Prepared> {
   const log = options.onLog ?? (() => {});
+  // A kit that cannot be used fails before anything is fetched or analysed.
+  const kit = options.brand
+    ? await loadKit(options.brand).catch((error: Error) => {
+        throw error instanceof BrandError
+          ? new EditError(`--brand ${options.brand}: ${error.message}`)
+          : error;
+      })
+    : null;
+  // A caption style asked for by name replaces the kit's custom captions.
+  if (kit?.captions && options.captions) delete kit.captions;
   const timings: Record<Stage, number> = { analyze: 0, plan: 0, render: 0, check: 0 };
   const timed = async <T>(stage: Stage, work: () => Promise<T>): Promise<T> => {
     const start = performance.now();
@@ -338,6 +358,11 @@ async function prepare(
   // The renderer's FFmpeg, downloaded on its first use, before the long analysis rather than
   // after it.
   await ffmpeg((bytes, total) => download("FFmpeg", bytes, total));
+  // The kit's files are copied before the analysis too.
+  const brand =
+    kit && options.brand
+      ? { kit: await stageBrand(kit, options.brand, brandFolder, brandFolder), folder: brandFolder }
+      : null;
   const worker = options.worker ?? (await localWorker());
   const cache = options.cache ?? defaultCache();
   // vework reads one glossary: the names or the terms as given, or both together in a file of
@@ -411,7 +436,14 @@ async function prepare(
     timings,
     timed,
     analyzed,
+    brand,
   };
+}
+
+/** A path of the copied kit, relative to its folder, as one relative to `folder`. */
+function kitPath(prepared: Prepared, folder: string, path: string): string {
+  const from = prepared.brand?.folder as string;
+  return relative(folder, resolve(from, path)).split(sep).join("/");
 }
 
 /** What the planner reads of `files`: each video's index, and each still. */
@@ -484,6 +516,9 @@ async function cutEdit(
         music: prepared.music,
         names: prepared.names,
         ...(options.captions ? { captions: options.captions } : {}),
+        ...(prepared.brand
+          ? { brand: moveBrand(prepared.brand.kit, (path) => kitPath(prepared, work, path)) }
+          : {}),
         ...(options.instructions ? { instructions: options.instructions } : {}),
         ...(cut.within ? { within: cut.within } : {}),
         ...(cut.short ? { short: true } : {}),
@@ -606,6 +641,7 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
     },
     report,
     spent,
+    join(dirname(video), "brand"),
   );
   const { length: _, ...rendered } = await cutEdit(
     prepared,
@@ -747,6 +783,7 @@ async function makeShorts(
     },
     report,
     spent,
+    join(folder, "brand"),
   );
   const findAt = prepared.analyzed;
   const shortsAt = findAt + (1 - findAt) * FIND_SHARE;

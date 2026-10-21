@@ -10,6 +10,26 @@ export type SourceId = string;
  * A time or length in ticks: 120 000 per second, so every common frame rate has a whole number of ticks per frame.
  */
 export type Ticks = number;
+/**
+ * `#rrggbb`.
+ */
+export type Colour = string;
+/**
+ * One of the bundled faces by its id, or a TrueType or OpenType file.
+ */
+export type BrandFont =
+  | {
+      id:
+        | "noto-sans-tc"
+        | "noto-serif-tc"
+        | "lxgw-wenkai-tc"
+        | "jf-openhuninn"
+        | "iansui"
+        | "chocolate-classical-sans"
+        | "cactus-classical-serif"
+        | "lxgw-marker-gothic";
+    }
+  | BrandFile;
 
 /**
  * One edit, complete enough to render the same video again from this file and the source files. Every position or length on a timeline is integer ticks, 120 000 per second; processing parameters carry their unit in their name (attackMs, gainDb). Paths are relative to the project file.
@@ -42,6 +62,7 @@ export interface Project {
   overlays?: Overlay[];
   audio: Audio;
   plan?: Plan;
+  brand?: Brand;
 }
 export interface Output {
   aspect: "9:16" | "1:1" | "16:9";
@@ -599,4 +620,70 @@ export interface Emphasis {
    */
   text: string;
   reason: string;
+}
+/**
+ * The brand kit the edit is rendered in; without it, the house look. Applied at render time alone: the plan and the graphics' markup do not depend on it.
+ */
+export interface Brand {
+  name: string;
+  /**
+   * Primary replaces the amber accent; secondary and accent replace its deeper and lighter tones, which are made from the primary when left out.
+   */
+  colors: {
+    primary: Colour;
+    secondary?: Colour;
+    accent?: Colour;
+  };
+  /**
+   * The face of the graphics and titles, and of the captions; each left out keeps the house face. A character a face lacks is drawn in Noto Sans TC.
+   */
+  fonts?: {
+    graphics?: BrandFont;
+    captions?: BrandFont;
+  };
+  /**
+   * The logo, a PNG or an SVG, and the watermark it is drawn as through the whole video when `show` is true: in a corner, as large as a square whose side is `size` of the frame's shorter side, at `opacity`.
+   */
+  logo?: {
+    file: BrandFile;
+    show: boolean;
+    corner: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+    size: number;
+    opacity: number;
+  };
+  captions?: BrandCaptions;
+}
+export interface BrandFile {
+  path: RelativePath;
+  /**
+   * SHA-256 of the file, lowercase hex; a render from a changed file fails. An edit fills it in when it copies the kit.
+   */
+  sha256?: string;
+}
+/**
+ * Custom captions: a drawn caption style with its size, colours, outline or box, place and rows changed. They replace captions.preset's look unless that is none.
+ */
+export interface BrandCaptions {
+  /**
+   * The caption style it starts from.
+   */
+  style: "bold" | "creator" | "minimal" | "pop";
+  /**
+   * Small, medium (the style's own) or large.
+   */
+  size: "S" | "M" | "L";
+  text: Colour;
+  /**
+   * `#rrggbb`.
+   */
+  highlight: string;
+  /**
+   * A dark outline around the letters, or a dark box behind the caption.
+   */
+  frame: "outline" | "box";
+  position: "bottom" | "middle" | "top";
+  /**
+   * The most rows a caption holds.
+   */
+  lines: number;
 }
