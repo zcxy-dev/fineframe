@@ -378,7 +378,7 @@ def transcribe_chunks(
             wav = np.pad(wav, (0, int(MIN_INPUT * RATE) - len(wav)))
         wavs.append(wav)
     if recognizer is None:
-        recognize, align = _models(asr_model, progress)
+        recognize, align = _models(asr_model)
 
         def hear(wavs, progress):
             heard = []
@@ -416,7 +416,7 @@ def transcribe_chunks(
             chunk["text"] = text
 
     if chunks and align is None:
-        align = _aligner_function(progress, half=True)
+        align = _aligner_function(half=True)
     floor = timing.noise_floor(samples, speech)
     for n, chunk in enumerate(chunks, 1):
         progress(f"aligning {n}/{len(chunks)}")
@@ -433,24 +433,24 @@ def transcribe_chunks(
         yield {"start": start, "end": end, "language": language, "text": text, "words": words}
 
 
-def _models(asr_model: str | None, progress: Callable[[str], None]):
+def _models(asr_model: str | None):
     """The speech model and the aligner, as two functions, each on the Mac's GPU until it fails
-    there (`gpu.Fallback`, which reports to `progress`).
+    there (`gpu.Fallback`).
 
     `recognize(wav, context)` returns the text heard and its language (None when it heard none);
     `align(wav, text)` returns each aligner token with its start and end in `wav`.
     """
-    recognize = gpu.Fallback("speech model", progress, lambda on: _recognizer(asr_model, on))
-    return recognize, _aligner_function(progress)
+    recognize = gpu.Fallback("speech model", lambda on: _recognizer(asr_model, on))
+    return recognize, _aligner_function()
 
 
-def _aligner_function(progress: Callable[[str], None], half: bool = False) -> gpu.Fallback:
+def _aligner_function(half: bool = False) -> gpu.Fallback:
     """The aligner on the Mac's GPU until it fails there or times no token, then on the CPU."""
 
     def timed(items: list[tuple[str, float, float]]) -> bool:
         return gpu.finite([t for _, start, end in items for t in (start, end)])
 
-    return gpu.Fallback("aligner", progress, lambda on: _aligner(half, on), timed)
+    return gpu.Fallback("aligner", lambda on: _aligner(half, on), timed)
 
 
 @cache

@@ -247,9 +247,7 @@ def fake_models(monkeypatch, text, language, item_times=None):
 
     detected = language
     monkeypatch.setattr(
-        transcribe,
-        "_models",
-        lambda model, progress: (lambda wav, context: (text, detected), align),
+        transcribe, "_models", lambda model: (lambda wav, context: (text, detected), align)
     )
     return calls
 
@@ -317,9 +315,7 @@ def test_main_language_is_weighted_by_speaking_time(monkeypatch):
     )
 
     monkeypatch.setattr(
-        transcribe,
-        "_models",
-        lambda model, progress: (lambda wav, context: next(texts), lambda *a: []),
+        transcribe, "_models", lambda model: (lambda wav, context: next(texts), lambda *a: [])
     )
     # 20 s of Chinese against 3 s of fast English.
     result = transcribe.transcribe(np.zeros(16_000 * 30, np.float32), [seg(1, 21), seg(25, 28)])
@@ -335,9 +331,7 @@ def test_transcribe_converts_aligns_and_offsets_each_chunk(monkeypatch):
         return [(c, i * 0.2, (i + 1) * 0.2) for i, c in enumerate(chars)]
 
     monkeypatch.setattr(
-        transcribe,
-        "_models",
-        lambda model, progress: (lambda wav, context: ("处理视频。", "Chinese"), align),
+        transcribe, "_models", lambda model: (lambda wav, context: ("处理视频。", "Chinese"), align)
     )
     result = transcribe.transcribe(np.zeros(16_000 * 300, np.float32), [seg(10, 12), seg(250, 251)])
 
@@ -371,7 +365,7 @@ def test_the_context_prompt_reaches_the_speech_model(monkeypatch):
         contexts.append(context)
         return "", None
 
-    monkeypatch.setattr(transcribe, "_models", lambda model, progress: (recognize, None))
+    monkeypatch.setattr(transcribe, "_models", lambda model: (recognize, None))
     transcribe.transcribe(np.zeros(16_000 * 3, np.float32), [seg(0.5, 2.5)], context="林佳穎")
     assert contexts == ["林佳穎"]
 
@@ -383,7 +377,7 @@ def test_short_speech_is_padded_to_the_model_minimum(monkeypatch):
         lengths.append(len(wav))
         return "", None
 
-    monkeypatch.setattr(transcribe, "_models", lambda model, progress: (recognize, None))
+    monkeypatch.setattr(transcribe, "_models", lambda model: (recognize, None))
     result = transcribe.transcribe(np.zeros(16_000, np.float32), [seg(0.1, 0.3)])
     assert lengths == [8_000]
     assert result == {"language": None, "text": "", "words": []}
@@ -410,9 +404,7 @@ def test_default_model_fits_the_hardware(monkeypatch):
 
 
 def test_a_cloud_recognizer_hears_every_chunk_at_once_and_only_the_aligner_loads(monkeypatch):
-    monkeypatch.setattr(
-        transcribe, "_models", lambda model, progress: pytest.fail("speech model loaded")
-    )
+    monkeypatch.setattr(transcribe, "_models", lambda model: pytest.fail("speech model loaded"))
     aligned = []
 
     def align(wav, text):

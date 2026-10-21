@@ -38,7 +38,7 @@ def fake_asr(monkeypatch, heard):
         tokens = re.findall(r"[\u4e00-\u9fff]|[A-Za-z]+", text)
         return [(c, 0.05 + i * 0.1, 0.15 + i * 0.1) for i, c in enumerate(tokens)]
 
-    def load(model, progress):
+    def load(model):
         models.append(model)
         return (lambda wav, context: (heard[0], "Chinese")), align
 

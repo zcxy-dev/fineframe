@@ -45,7 +45,7 @@ def stub_models(monkeypatch):
     shot = {"start": 0.0, "end": 2.0, "layout": "talking_head",
             "faces": [{"id": 0, "boxes": [box]}], "speakers": [speaking]}  # fmt: skip
     monkeypatch.setattr(framing, "analyze", lambda *args: {"fps": 5.0, "shots": [shot]})
-    monkeypatch.setattr(denoise, "enhance", lambda samples, in_place, progress: samples * 0.5)
+    monkeypatch.setattr(denoise, "enhance", lambda samples, in_place: samples * 0.5)
 
 
 def test_the_shared_example_matches_the_model():
@@ -114,7 +114,7 @@ def test_a_corrected_index_records_its_corrections(talking_video, monkeypatch, t
     monkeypatch.setattr(speech, "segments", lambda samples: [{"start": 0.25, "end": 1.5}])
     monkeypatch.setattr(events, "detect", lambda samples: [])
     monkeypatch.setattr(framing, "analyze", lambda *args: {"fps": 5.0, "shots": []})
-    monkeypatch.setattr(denoise, "enhance", lambda samples, in_place, progress: samples)
+    monkeypatch.setattr(denoise, "enhance", lambda samples, in_place: samples)
     contexts, aligned = [], []
 
     def recognize(wav, context):
@@ -125,7 +125,7 @@ def test_a_corrected_index_records_its_corrections(talking_video, monkeypatch, t
         aligned.append(text)
         return [(c, 0.2 * i, 0.2 * (i + 1)) for i, c in enumerate(text)]
 
-    monkeypatch.setattr(transcribe, "_models", lambda model, progress: (recognize, align))
+    monkeypatch.setattr(transcribe, "_models", lambda model: (recognize, align))
     claude = FakeClaude(lambda text: [("在來", "再來", "在 should be 再.")])
     monkeypatch.setattr(correct, "_client", lambda: claude)
     glossary = tmp_path / "glossary.txt"
@@ -147,10 +147,8 @@ def test_a_cloud_index_records_the_model_and_what_it_cost(talking_video, monkeyp
     monkeypatch.setattr(speech, "segments", lambda samples: [{"start": 0.25, "end": 1.5}])
     monkeypatch.setattr(events, "detect", lambda samples: [])
     monkeypatch.setattr(framing, "analyze", lambda *args: {"fps": 5.0, "shots": []})
-    monkeypatch.setattr(denoise, "enhance", lambda samples, in_place, progress: samples)
-    monkeypatch.setattr(
-        transcribe, "_models", lambda model, progress: pytest.fail("speech model loaded")
-    )
+    monkeypatch.setattr(denoise, "enhance", lambda samples, in_place: samples)
+    monkeypatch.setattr(transcribe, "_models", lambda model: pytest.fail("speech model loaded"))
     align = lambda wav, text: [(c, 0.2 * i, 0.2 * (i + 1)) for i, c in enumerate(text)]  # noqa: E731
     monkeypatch.setattr(transcribe, "_aligner", lambda half, apple_gpu: align)
     monkeypatch.setattr(openrouter.Client, "check", lambda self: None)

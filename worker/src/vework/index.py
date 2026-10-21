@@ -65,11 +65,11 @@ def build(
     faces = None
     if info.video:
         progress("finding faces")
-        faces = framing.analyze(path, info.video, transitions, voiced, progress)
+        faces = framing.analyze(path, info.video, transitions, voiced)
     measured = None
     if voiced and stem is not None:
         progress("removing noise from speech")
-        measured = voice.analyze(path, voiced, stem, progress)
+        measured = voice.analyze(path, voiced, stem)
     if voiced:
         transcript = transcribe.transcribe(
             samples,

@@ -4,6 +4,9 @@ On a Mac whose GPU PyTorch can use (MPS), shot detection, the speech model and t
 there, the denoiser runs through ONNX Runtime's Core ML provider, and shot detection and faces
 decode video with VideoToolbox. A step that fails there, or whose output is NaN or empty, runs
 again on the CPU by itself, and says so. Everywhere else every step runs as it did.
+
+Where each step runs is a `vework:` line on stderr, as downloads are: the engine keeps such lines
+in its log, and they are not steps of the progress the page shows.
 """
 
 import os
@@ -28,6 +31,10 @@ def available() -> bool:
     return torch.backends.mps.is_available()
 
 
+def _say(line: str) -> None:
+    print(f"vework: {line}", file=sys.stderr)
+
+
 def finite(*arrays: Any) -> bool:
     """Whether every array holds numbers, none NaN or infinite, and none is empty."""
     return all(np.size(a) and np.isfinite(a).all() for a in arrays)
@@ -39,18 +46,17 @@ class Fallback:
     `load(gpu)` returns the model's function: on the GPU when `gpu` is true, otherwise where the
     step runs without the Mac's GPU. It is loaded on the first call. When loading it on the GPU,
     calling it there or checking its result with `valid` fails, that call and every later one
-    run on the CPU. Each step says on `progress` where it runs, on a Mac only.
+    run on the CPU. Each step says where it runs, on a Mac only.
     """
 
     def __init__(
         self,
         step: str,
-        progress: Callable[[str], None],
         load: Callable[[bool], Callable],
         valid: Callable[[Any], bool] = lambda result: True,
         backend: str = "MPS",
     ) -> None:
-        self.step, self.progress, self.load, self.valid = step, progress, load, valid
+        self.step, self.load, self.valid = step, load, valid
         self.backend = backend
         self.on_gpu = available()
         self.run: Callable | None = None
@@ -60,7 +66,7 @@ class Fallback:
             try:
                 if self.run is None:
                     self.run = self.load(True)
-                    self.progress(f"{self.step}: on the GPU ({self.backend})")
+                    _say(f"{self.step}: on the GPU ({self.backend})")
                 result = self.run(*args)
                 if self.valid(result):
                     return result
@@ -74,25 +80,25 @@ class Fallback:
 
     def fail(self, problem: str) -> None:
         """Move this step to the CPU, saying why."""
-        self.progress(f"{self.step}: failed on the GPU ({problem}); running it on the CPU")
+        _say(f"{self.step}: failed on the GPU ({problem}); running it on the CPU")
         self.on_gpu, self.run = False, None
 
 
-def decode[T](step: str, progress: Callable[[str], None], attempt: Callable[[Any], T]) -> T:
+def decode[T](step: str, attempt: Callable[[Any], T]) -> T:
     """Run `attempt(hwaccel)` with VideoToolbox decoding on a Mac whose GPU the analysis uses,
     and again with software decoding (`hwaccel` None) if that fails; elsewhere only the latter.
-    On a Mac, `progress` hears which decoded the video."""
+    On a Mac, it says which decoded the video."""
     import av.codec.hwaccel
 
     if not available() or "videotoolbox" not in av.codec.hwaccel.hwdevices_available():
         return attempt(None)
-    progress(f"{step}: decoding video with VideoToolbox")
+    _say(f"{step}: decoding video with VideoToolbox")
     try:
         # No silent software fallback inside the decoder: a codec VideoToolbox cannot decode
         # fails here and is decoded in software below, so the log says what decoded it.
         return attempt(av.codec.hwaccel.HWAccel("videotoolbox", allow_software_fallback=False))
     except Exception as exc:
-        progress(
+        _say(
             f"{step}: decoding with VideoToolbox failed ({type(exc).__name__}: {exc}); "
             "decoding in software"
         )

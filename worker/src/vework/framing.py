@@ -117,15 +117,8 @@ class Track:
         return median(face.score for _, face in self.samples)
 
 
-def analyze(
-    path: Path,
-    video: VideoInfo,
-    transitions: list[dict],
-    speech: list[dict],
-    progress: Callable[[str], None] = lambda message: None,
-) -> dict:
-    """The `framing` section of a video's media index. On a Mac, `progress` hears how the video
-    was decoded."""
+def analyze(path: Path, video: VideoInfo, transitions: list[dict], speech: list[dict]) -> dict:
+    """The `framing` section of a video's media index."""
     detect = _detector(analysis_size(video))
 
     def attempt(hwaccel: av.codec.hwaccel.HWAccel | None) -> dict:
@@ -152,7 +145,7 @@ def analyze(
             finish(end)
         return {"fps": FPS, "shots": shots}
 
-    return gpu.decode("faces", progress, attempt)
+    return gpu.decode("faces", attempt)
 
 
 def cut_times(transitions: list[dict]) -> list[float]:

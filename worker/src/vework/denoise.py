@@ -74,23 +74,16 @@ BAND_OF_BIN = np.repeat(np.arange(ERB_BANDS), WIDTHS)
 WINDOW = np.sin(0.5 * np.pi * np.sin(np.pi * (np.arange(FFT) + 0.5) / FFT) ** 2)
 
 
-def enhance(
-    samples: np.ndarray,
-    in_place: bool = False,
-    progress: Callable[[str], None] = lambda message: None,
-) -> np.ndarray:
+def enhance(samples: np.ndarray, in_place: bool = False) -> np.ndarray:
     """Remove noise from 48 kHz mono audio with DeepFilterNet3, keeping its length and timing.
 
     Every sample of the result lines up with the input's: the transform's delay is taken out.
     `in_place` writes the result over float32 `samples`, so a long source is not held twice: the
-    result only ever replaces samples that every frame still to come has finished reading. On a
-    Mac, `progress` hears where the model runs.
+    result only ever replaces samples that every frame still to come has finished reading.
     """
     if not len(samples):
         return samples.astype(np.float32)
-    run = gpu.Fallback(
-        "denoising", progress, _model, lambda found: gpu.finite(*found), backend="Core ML"
-    )
+    run = gpu.Fallback("denoising", _model, lambda found: gpu.finite(*found), backend="Core ML")
     # The resynthesis lags the input by HOP samples; the padding lets it finish the last ones.
     frames = (len(samples) + FFT) // HOP
     out = samples if in_place else np.zeros(len(samples), np.float32)

@@ -158,11 +158,11 @@ def transitions(
 def detect(path: Path, progress: Callable[[str], None] = lambda message: None) -> list[dict]:
     """Shot transitions in a video file, in seconds from its time zero, reporting how far it is
     to `progress`."""
-    model = gpu.Fallback("shot detection", progress, scorer, lambda found: gpu.finite(*found))
+    model = gpu.Fallback("shot detection", scorer, lambda found: gpu.finite(*found))
 
     def attempt(hwaccel) -> list[dict]:
         times: list[float] = []
         center, inside = predict(thumbnails(path, times, progress, hwaccel), model)
         return transitions(center, inside, np.array(times))
 
-    return gpu.decode("shot detection", progress, attempt)
+    return gpu.decode("shot detection", attempt)
