@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import {
   type Brand,
@@ -896,7 +896,7 @@ async function makeShorts(
       length: rendered.length,
       seconds: rendered.seconds,
     });
-    await writeFile(list, `${JSON.stringify(validateShorts(shorts), null, 2)}\n`);
+    await writeShorts(list, shorts);
     emit(
       validateProgress({
         stage: "short",
@@ -912,7 +912,7 @@ async function makeShorts(
   if (stopped !== null) {
     if (made === 0) throw new EditError(`Stopped at the cost limit after 0 shorts: ${stopped}`);
     shorts.stopped = "cost";
-    await writeFile(list, `${JSON.stringify(validateShorts(shorts), null, 2)}\n`);
+    await writeShorts(list, shorts);
   } else if (made === 0) {
     throw new EditError(
       `None of the ${tries} moments tried could be cut to a length in the range${failure ? `: ${failure}` : ""}`,
@@ -927,6 +927,13 @@ async function makeShorts(
     usage: totalUsage(spent),
     ...counted(prepared),
   };
+}
+
+/** Writes shorts.json whole, by renaming a finished copy over it, so a reader such as the web
+ * page, which reads it as each short is done, never finds it half written. */
+async function writeShorts(path: string, shorts: Shorts): Promise<void> {
+  await writeFile(`${path}.part`, `${JSON.stringify(validateShorts(shorts), null, 2)}\n`);
+  await rename(`${path}.part`, path);
 }
 
 /** A video's length as its container states it; null when FFmpeg cannot say. */

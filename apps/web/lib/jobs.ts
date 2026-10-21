@@ -950,11 +950,14 @@ export class Jobs {
     job.finished = now;
     for (const stage of Object.values(job.stages)) stage.end ??= now;
     const dir = this.#dir(job);
+    // shorts.json as the run left it: a read while a short's line came may have found it being
+    // written, and why the run made fewer is written after its last short.
+    if (code === 0 && job.settings.shorts && job.status !== "cancelled") {
+      await this.#readShorts(job).catch(() => {});
+    }
     if (job.status === "cancelled") {
       // Nothing of a cancelled edit is worth keeping.
     } else if (code === 0 && job.result && job.settings.shorts && job.shorts?.length) {
-      // The run's last word: why it made fewer, written after its last short.
-      await this.#readShorts(job).catch(() => {});
       job.status = "done";
     } else if (code === 0 && job.result && existsSync(join(dir, VIDEO))) {
       // The result is settled before the job reads as done, so the page never offers what is
