@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 from scipy.signal import lfilter
 
-from vework import download, ml
+from vework import download, gpu, ml
 
 MODEL = "DeepFilterNet3"
 # The model's ONNX export, pinned by commit and checked by hash. Its own Python package cannot be
@@ -74,16 +74,23 @@ BAND_OF_BIN = np.repeat(np.arange(ERB_BANDS), WIDTHS)
 WINDOW = np.sin(0.5 * np.pi * np.sin(np.pi * (np.arange(FFT) + 0.5) / FFT) ** 2)
 
 
-def enhance(samples: np.ndarray, in_place: bool = False) -> np.ndarray:
+def enhance(
+    samples: np.ndarray,
+    in_place: bool = False,
+    progress: Callable[[str], None] = lambda message: None,
+) -> np.ndarray:
     """Remove noise from 48 kHz mono audio with DeepFilterNet3, keeping its length and timing.
 
     Every sample of the result lines up with the input's: the transform's delay is taken out.
     `in_place` writes the result over float32 `samples`, so a long source is not held twice: the
-    result only ever replaces samples that every frame still to come has finished reading.
+    result only ever replaces samples that every frame still to come has finished reading. On a
+    Mac, `progress` hears where the model runs.
     """
     if not len(samples):
         return samples.astype(np.float32)
-    run = _model()
+    run = gpu.Fallback(
+        "denoising", progress, _model, lambda found: gpu.finite(*found), backend="Core ML"
+    )
     # The resynthesis lags the input by HOP samples; the padding lets it finish the last ones.
     frames = (len(samples) + FFT) // HOP
     out = samples if in_place else np.zeros(len(samples), np.float32)
@@ -198,17 +205,23 @@ def _smooth(x: np.ndarray, state: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 
 
 @cache
-def _model() -> Callable[[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]]:
-    """Load the three ONNX parts: features in, ERB gains and deep-filter coefficients out."""
+def _model(
+    apple_gpu: bool = False,
+) -> Callable[[np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray]]:
+    """Load the three ONNX parts: features in, ERB gains and deep-filter coefficients out. With
+    `apple_gpu`, Core ML runs them on the Mac's GPU in 32-bit floats, and ONNX Runtime's CPU
+    provider any node Core ML cannot."""
     ml.require()
     import onnxruntime
 
+    providers = ["CPUExecutionProvider"]
+    if apple_gpu:
+        coreml = {"MLComputeUnits": "CPUAndGPU", "ModelFormat": "MLProgram"}
+        providers.insert(0, ("CoreMLExecutionProvider", coreml))
     folder = _download()
     try:
         enc, erb_dec, df_dec = (
-            onnxruntime.InferenceSession(
-                str(folder / f"{part}.onnx"), providers=["CPUExecutionProvider"]
-            )
+            onnxruntime.InferenceSession(str(folder / f"{part}.onnx"), providers=providers)
             for part in PARTS
         )
     except Exception as exc:

@@ -1,4 +1,5 @@
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
 import av
@@ -241,17 +242,23 @@ def write_stem(path: Path, recorded: np.ndarray, denoised: np.ndarray) -> None:
             container.mux(packet)
 
 
-def analyze(path: Path, speech: list[dict], stem: Path) -> dict:
+def analyze(
+    path: Path,
+    speech: list[dict],
+    stem: Path,
+    progress: Callable[[str], None] = lambda message: None,
+) -> dict:
     """Measure the first audio track's speech, remove its noise, and measure that. `stem` gets
     the recording beside its denoised copy: the renderer mixes the two by the chain's limit, and
-    only one decode lines them up, since decoders differ in the codec priming they drop."""
+    only one decode lines them up, since decoders differ in the codec priming they drop. On a
+    Mac, `progress` hears where the denoiser runs."""
     clipping = Clipping()
     samples = load(path, rate=RATE, each=clipping)
     recorded = measure(samples, speech)
     # The recording waits on disk while it is denoised in place: two hours at 48 kHz are 1.4 GB.
     with tempfile.TemporaryFile(dir=stem.parent) as spill:
         samples.tofile(spill)
-        cleaned = denoise.enhance(samples, in_place=True)
+        cleaned = denoise.enhance(samples, in_place=True, progress=progress)
         write_stem(stem, np.memmap(spill, np.float32, "r", shape=cleaned.shape), cleaned)
     # Denoising does not undo clipping, so the denoised speech carries the recording's.
     clipped = {"clipped_share": clipping.share}

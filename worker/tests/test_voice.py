@@ -71,7 +71,7 @@ def test_clipping_in_one_channel_is_counted_before_the_mix(tmp_path, monkeypatch
     left = "clip(2*sin(2*PI*100*t)\\,-1\\,1)"
     ffmpeg("-f", "lavfi", "-i", f"aevalsrc={left}|0.01*sin(2*PI*300*t):s=48000:d=2",
            "-c:a", codec, str(source))  # fmt: skip
-    monkeypatch.setattr(denoise, "enhance", lambda x, in_place: x)
+    monkeypatch.setattr(denoise, "enhance", lambda x, in_place, progress: x)
     speech = [{"start": 0.0, "end": 2.0}]
     found = voice.analyze(source, speech, stem=tmp_path / "lav.voice.wav")
     assert found["recorded"]["clipped_share"] == pytest.approx(2 / 3, abs=0.01)
@@ -119,7 +119,9 @@ def test_analyze_writes_the_recording_and_its_denoised_copy_and_measures_both(
     samples, speech = bursts([1, 4, 7], noise=1e-3)
     wavfile.write(source, RATE, samples)
     # The denoiser writes over the samples it is given, as the real one does.
-    monkeypatch.setattr(denoise, "enhance", lambda x, in_place: np.multiply(x, 0.5, out=x))
+    monkeypatch.setattr(
+        denoise, "enhance", lambda x, in_place, progress: np.multiply(x, 0.5, out=x)
+    )
     found = voice.analyze(source, speech, stem=tmp_path / "talk.voice.wav")
     assert found["stem"] == "talk.voice.wav" and found["model"] == "DeepFilterNet3"
     # The recording beside its denoised copy, from the one decode the measurements read.

@@ -16,6 +16,16 @@ Loudness is measured from the decode for speech detection, resampled to 48 kHz i
 
 Frames stream through shot detection, so a 2-hour 1080p60 file peaks there at about 1.3 GB.
 
+## Apple silicon
+
+On a Mac whose GPU PyTorch can use (MPS), the analysis runs its models there and decodes video with VideoToolbox ([`gpu.py`](src/vework/gpu.py)). Other systems run as before.
+
+- **On the GPU:** shot detection, the speech model and the aligner, through PyTorch's MPS backend in the precision each runs in on a CPU; the denoiser through ONNX Runtime's Core ML provider in 32-bit floats, with any node Core ML cannot run left to the CPU. Speech detection, audio events and faces stay on the CPU. The speech model is Qwen3-ASR-0.6B, as on a CPU.
+- **VideoToolbox** decodes the video for shot detection and faces; the renderer decodes in software. On CI's Apple M1 runner it decodes the frames software decoding does, at the same times and size, and the models get them in the same RGB; luma is identical, and chroma differs by up to 89 levels at edges, about 1 on average.
+- **Falling back:** a step whose model fails to load or to run on the GPU, or gives NaN or empty output (the speech model hearing nothing in any chunk, the aligner timing no word), runs on the CPU from then on. Video VideoToolbox cannot decode is decoded again in software.
+- **Where each step ran** is in `vework:` lines that only a Mac prints, such as `shot detection: on the GPU (MPS)`, `faces: decoding video with VideoToolbox`, `denoising: on the GPU (Core ML)` or `aligner: failed on the GPU (RuntimeError: …); running it on the CPU`. `pnpm edit` prints them; the app writes them to the edit's `edit.log` when an edit fails.
+- **`VEWORK_DEVICE=cpu`** keeps every step on the CPU on a Mac too.
+
 ## Voice
 
 When the first audio track has speech, vework measures it for the engine's [voice chain](../packages/engine/README.md#voice) and writes it with its noise removed beside the index: `talk.index.json` gets `talk.voice.wav`. The stem holds two channels at 48 kHz in 32-bit float, starting at the source's time zero and as long as the track: the track's mono mix as recorded, and the same with its noise removed in full. Both come from one decode, so they line up sample for sample, where the renderer's own decode need not (see the engine's [How it renders](../packages/engine/README.md#how-it-renders)). The renderer decides how much of the recording to mix back. A 2-hour source's stem takes 2.8 GB, and the analysis needs another 1.4 GB of disk beside it while it runs.
@@ -57,7 +67,7 @@ uv run --env-file ../.env vework analyze talk.mp4 -o talk.index.json --asr cloud
 - **Off by default:** the local model is the default. It needs no key, costs nothing per minute and sends nothing anywhere.
 - **Key:** `OPENROUTER_API_KEY`, from the environment or, with `--env-file ../.env`, from the git-ignored `.env` at the repository root. Before the analysis starts, vework stops with a message if the key is missing, malformed or rejected, or if the model is not a speech-to-text model.
 - **What is sent:** each chunk of speech that would go to the local model: at most 30 s of 16 kHz mono audio, compressed as lossless FLAC. Video, the silence between chunks and everything else in the index stay on this machine. OpenRouter passes the audio to the model's provider (DeepInfra for the default model). Requests ask OpenRouter for providers that do not keep or train on it (`data_collection: deny`), and OpenRouter's and the provider's own policies apply.
-- **Model:** `qwen/qwen3-asr-1.7b` by default, the model the local default runs with a GPU. `--asr-model` names any other [OpenRouter speech-to-text model](https://openrouter.ai/models?output_modalities=transcription).
+- **Model:** `qwen/qwen3-asr-1.7b` by default, the model the local default runs with a CUDA GPU. `--asr-model` names any other [OpenRouter speech-to-text model](https://openrouter.ai/models?output_modalities=transcription).
 - **Same rules as the local model:** the same sentence-sized chunks, each heard in one language, so mixed Mandarin and English is not forced into one. Each chunk takes the language the model names or, when it names none, the language its script shows. Then comes the conversion to Taiwan Traditional Chinese, [correction](#transcript-correction) when asked for, and the aligner. The aligner runs in bfloat16, which more than halves its memory. `--asr-context` needs the local model, since OpenRouter takes no context prompt.
 - **Cost:** progress names the dollars spent so far, and the index's `transcript.cloud` records the model, what OpenRouter charged and the cost per source minute.
 - **Server:** `OPENROUTER_BASE_URL` points vework at another server with OpenRouter's API, such as the stand-in the [desktop app's smoke test](../apps/desktop/README.md#tests) answers with.
@@ -82,7 +92,7 @@ The Latin error rates rest on 71 English words. Once the host was quiet, the who
 | Local Qwen3-ASR-0.6B (the CPU default) | all 4 (2,675) | 9.91 % | 6.55 / 25.3 % | 9.6 GB |
 | Local Qwen3-ASR-0.6B (the CPU default) | s02, s04 (724) | 11.33 % | 6.87 / 32.3 % | 9.6 GB |
 | Local Qwen3-ASR-0.6B with `--correct` | s02, s04 (724) | 11.19 % | 6.70 / 32.3 % | 9.6 GB |
-| Local Qwen3-ASR-1.7B (the GPU default) | s02, s04 (724) | 9.94 % | 6.37 / 26.8 % | 15.2 GB |
+| Local Qwen3-ASR-1.7B (the CUDA GPU default) | s02, s04 (724) | 9.94 % | 6.37 / 26.8 % | 15.2 GB |
 <!-- /results -->
 
 - **The default stays as it is.** On the same clips the 1.7B model makes 1.4 points fewer errors, most of them English words, but peaks at 15.2 GB against 9.6, more than a computer the page already turns to cloud speech on has ([how much](../README.md#install)); it remains the default with a CUDA GPU only.

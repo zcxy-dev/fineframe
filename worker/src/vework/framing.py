@@ -11,7 +11,7 @@ from statistics import median
 import av
 import numpy as np
 
-from vework import ml
+from vework import gpu, ml
 from vework.probe import VideoInfo, start_time, video_stream
 
 # YuNet: small enough for OpenCV to run on a CPU in a few milliseconds per frame. Pinned by
@@ -117,31 +117,42 @@ class Track:
         return median(face.score for _, face in self.samples)
 
 
-def analyze(path: Path, video: VideoInfo, transitions: list[dict], speech: list[dict]) -> dict:
-    """The `framing` section of a video's media index."""
+def analyze(
+    path: Path,
+    video: VideoInfo,
+    transitions: list[dict],
+    speech: list[dict],
+    progress: Callable[[str], None] = lambda message: None,
+) -> dict:
+    """The `framing` section of a video's media index. On a Mac, `progress` hears how the video
+    was decoded."""
     detect = _detector(analysis_size(video))
-    shots: list[dict] = []
-    ids = count()
-    pending: list[Sample] = []
-    bounds = cut_times(transitions)
-    start = 0.0
 
-    def finish(end: float) -> None:
-        nonlocal pending, start
-        if end > start:
-            shots.append(frame_shot(pending, start, end, speech, ids))
-        pending, start = [], max(start, end)
+    def attempt(hwaccel: av.codec.hwaccel.HWAccel | None) -> dict:
+        shots: list[dict] = []
+        ids = count()
+        pending: list[Sample] = []
+        bounds = cut_times(transitions)
+        start = 0.0
 
-    ends: list[float] = []
-    for t, image, later in sampled_frames(path, video, ends):
-        # Shots finish as soon as their last sample is in, so memory follows the longest shot.
-        while bounds and t >= bounds[0]:
-            finish(bounds.pop(0))
-        pending.append(Sample(t, detect(image, later)))
-    picture_end = ends[0] if ends else 0.0
-    for end in [*(b for b in bounds if b < picture_end), picture_end]:
-        finish(end)
-    return {"fps": FPS, "shots": shots}
+        def finish(end: float) -> None:
+            nonlocal pending, start
+            if end > start:
+                shots.append(frame_shot(pending, start, end, speech, ids))
+            pending, start = [], max(start, end)
+
+        ends: list[float] = []
+        for t, image, later in sampled_frames(path, video, ends, hwaccel):
+            # Shots finish as soon as their last sample is in, so memory follows the longest shot.
+            while bounds and t >= bounds[0]:
+                finish(bounds.pop(0))
+            pending.append(Sample(t, detect(image, later)))
+        picture_end = ends[0] if ends else 0.0
+        for end in [*(b for b in bounds if b < picture_end), picture_end]:
+            finish(end)
+        return {"fps": FPS, "shots": shots}
+
+    return gpu.decode("faces", progress, attempt)
 
 
 def cut_times(transitions: list[dict]) -> list[float]:
@@ -351,9 +362,13 @@ def analysis_size(video: VideoInfo) -> tuple[int, int]:
 
 
 def sampled_frames(
-    path: Path, video: VideoInfo, ends: list[float]
+    path: Path,
+    video: VideoInfo,
+    ends: list[float],
+    hwaccel: av.codec.hwaccel.HWAccel | None = None,
 ) -> Iterator[tuple[float, np.ndarray, list[np.ndarray]]]:
-    """The frame on screen at every 1/FPS seconds from time zero, upright, at the analysis size.
+    """The frame on screen at every 1/FPS seconds from time zero, upright, at the analysis size,
+    decoded with `hwaccel` when given.
 
     Yields (time, BGR image, the frames shown in the LATER seconds after it, at most three). When
     the frames run out, where the picture ends is appended to `ends`. Only the frames a sample
@@ -378,7 +393,7 @@ def sampled_frames(
         picked = sorted({round(k * (len(later) - 1) / 2) for k in range(3)}) if later else []
         return sample_t, picture(shown), [picture(later[k]) for k in picked]
 
-    with av.open(str(path)) as container:
+    with av.open(str(path), hwaccel=hwaccel) as container:
         zero = start_time(container)
         stream = video_stream(container)
         if stream is None:

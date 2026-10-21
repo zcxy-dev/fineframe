@@ -88,8 +88,9 @@ jobs:
           pnpm check-gen
 
   # The renderer on macOS (Apple silicon) and on Windows, with each one's pinned
-  # FFmpeg: the engine tests, then a synthetic edit scored by vebench. On Windows also the rest of
-  # the workspace, the worker and the page as `mise run start` starts it.
+  # FFmpeg: the engine tests, then a synthetic edit scored by vebench, and the worker's models: on
+  # the Mac's GPU there. On Windows also the rest of the workspace, the worker and the page as
+  # `mise run start` starts it.
   platforms:
     name: ${{ matrix.check }}
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
@@ -99,7 +100,7 @@ jobs:
         include:
           - check: macos
             runner: macos-latest
-            timeout: 15
+            timeout: 30
           - check: windows
             runner: windows-latest
             timeout: 35
@@ -154,7 +155,6 @@ jobs:
       # The model weights the ml tests download, kept between runs; a change to the worker's code
       # starts from the last cache and adds what changed.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: runner.os == 'Windows'
         with:
           path: |
             ~/.cache/huggingface
@@ -168,6 +168,16 @@ jobs:
         if: runner.os == 'Windows'
         working-directory: worker
         run: uv run pytest -q -m "ml and not big"
+      # The runners' Apple M1 exposes MPS and VideoToolbox, so the models run on the GPU, and one
+      # analysis prints where each of its steps ran (-rP).
+      - name: Test the worker's models on the GPU
+        if: runner.os == 'macOS'
+        working-directory: worker
+        run: |
+          uv sync --locked
+          uv run python -c "import torch; assert torch.backends.mps.is_available(), 'no MPS'"
+          uv run pytest -q -m "ml and not big" -rP tests/test_gpu.py
+          uv run pytest -q -m "ml and not big" --ignore tests/test_gpu.py
       # copy-joined is the `-c copy` join the engine is measured against; every other run must
       # have no clicks and under 10 ms of drift.
       - name: Render a synthetic edit and score it (vebench)
