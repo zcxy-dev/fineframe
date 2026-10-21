@@ -2330,10 +2330,11 @@ legend.label {
   left: 0;
   transform-origin: top left;
   overflow: hidden;
+  /* A neutral stand-in for footage: a soft key light on a grey wall. */
   background:
-    radial-gradient(ellipse 30% 42% at 50% 62%, #8b6f5c 0 60%, transparent 61%),
-    radial-gradient(ellipse 14% 18% at 50% 34%, #c9a48a 0 60%, transparent 61%),
-    linear-gradient(170deg, #5d6a73, #3b4249 55%, #23272c);
+    radial-gradient(ellipse 55% 60% at 38% 40%, rgb(255 255 255 / 0.16), transparent 70%),
+    radial-gradient(ellipse at center, transparent 40%, rgb(0 0 0 / 0.45) 100%),
+    linear-gradient(160deg, #66707a, #3f464e 55%, #2a2e34);
 }
 
 .kitThird {
@@ -2382,6 +2383,9 @@ legend.label {
 }
 
 .kitList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
