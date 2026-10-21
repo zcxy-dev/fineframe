@@ -132,7 +132,9 @@ async function place(
       height: block.height,
     };
   });
-  return { chosen, fonts, face, em, pages, bottoms, boxes };
+  // The width the aspect keeps captions to (70 % of a 9:16 frame), in this style's ems.
+  const fit = (scale.chars / chosen.scale) * (1 + chosen.tracking);
+  return { chosen, fonts, face, em, pages, bottoms, boxes, fit };
 }
 
 /**
@@ -148,7 +150,7 @@ export async function buildCaptions(
   if (!captions) return null;
   // Custom captions draw their own style; none draws nothing, and its SubRip copy is bold's.
   const style = captions.preset === "none" ? null : (brand?.custom?.style ?? captions.preset);
-  const { chosen, fonts, face, em, pages, bottoms } = await place(
+  const { chosen, fonts, face, em, pages, bottoms, fit } = await place(
     project,
     timeline,
     style ?? "bold",
@@ -159,6 +161,9 @@ export async function buildCaptions(
     height: output.height,
     em,
     frameTicks: timeline.frameTicks,
+    // In a kit's look, a page too wide for the frame, as a long word in a large size can be, is
+    // set smaller to fit.
+    ...(brand ? { fit } : {}),
   };
   return {
     ass: style ? writeAss(pages, bottoms, chosen, face, geometry) : null,

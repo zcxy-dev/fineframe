@@ -8,6 +8,7 @@ import { project, SECOND } from "../testing.ts";
 import type { TimelineGraphic } from "../timeline.ts";
 import { readFace } from "./fonts.ts";
 import { buildCaptions, type CaptionBrand } from "./index.ts";
+import { rowText } from "./layout.ts";
 import { brandPreset, PRESETS } from "./presets.ts";
 
 const BLUE = { primary: "#2f6bff" };
@@ -21,16 +22,17 @@ const CUSTOM: BrandCaptions = {
   lines: 2,
 };
 
-/** One caption line of `text`, a character a word, a quarter second each, from 0.5 s. */
+/** One caption line of `text`, a Chinese character or an English word a word, a quarter second
+ * each, from 0.5 s. */
 function line(text: string): CaptionLine {
-  const chars = [...text];
+  const words = [...text.matchAll(/[A-Za-z0-9]+[，,]?|[^\sA-Za-z0-9]/g)].map((m) => m[0]);
   return {
     start: SECOND / 2,
-    end: SECOND / 2 + (chars.length * SECOND) / 4,
+    end: SECOND / 2 + (words.length * SECOND) / 4,
     language: "zh-TW",
     text,
-    words: chars.map((char, i) => ({
-      text: char,
+    words: words.map((word, i) => ({
+      text: word,
       start: SECOND / 2 + (i * SECOND) / 4,
       end: SECOND / 2 + ((i + 0.8) * SECOND) / 4,
     })),
@@ -144,4 +146,47 @@ test("custom captions keep clear of a label the house captions never meet", asyn
     custom.every((y) => y < 1152 || y > 1402),
     `custom: ${custom}`,
   );
+});
+
+/** Each face event's font size override, or the style's size. */
+const sizes = (ass: string) => {
+  const style = Number(/Style: Caption,[^,]*,([\d.]+),/.exec(ass)?.[1]);
+  return [...ass.matchAll(/^Dialogue: 2,.*$/gm)].map((m) =>
+    Number(/\\pos\([^)]*\)\\fs([\d.]+)/.exec(m[0])?.[1] ?? style),
+  );
+};
+
+test("under a kit, a caption too wide for the frame is set smaller, and Latin words keep their spaces", async () => {
+  const path = (await faceFile("jf-openhuninn")) as string;
+  const face = { path, ...readFace(await readFile(path)) };
+  const large = { ...CUSTOM, size: "L" as const };
+  // One word wider than the aspect's 70 % of a 9:16 frame at the large size.
+  const long = await captions("我們要來聊automaticvideoediting，", {
+    colors: BLUE,
+    custom: large,
+    face,
+  });
+  const em = 0.07 * 1080 * brandPreset("bold", BLUE, large).scale;
+  const style = Number(/Style: Caption,[^,]*,([\d.]+),/.exec(long.ass ?? "")?.[1]);
+  const fitted = sizes(long.ass ?? "");
+  for (const page of long.pages) {
+    const widest = Math.max(...page.rows.map((row) => row.width));
+    const drawn = widest * em * (Math.min(...fitted) / style);
+    // The aspect's row width, 70 % of the frame with letter spacing, well inside it.
+    assert.ok(drawn <= 0.75 * 1080, `a row ${Math.round(drawn)} px wide`);
+  }
+  assert.ok(Math.min(...fitted) < style, "the long page is set smaller");
+  // Words said with spaces between them keep them, whatever the face.
+  for (const brand of [
+    { colors: BLUE, custom: large, face },
+    { colors: BLUE, custom: large },
+  ]) {
+    const spaced = await captions("我們要來聊 automatic video editing", brand);
+    const text = spaced.pages.flatMap((page) => page.rows.map(rowText)).join("\n");
+    assert.match(text, /automatic[ \n]video[ \n]editing/);
+    assert.ok(sizes(spaced.ass ?? "").every((fs) => fs === Math.max(...sizes(spaced.ass ?? ""))));
+  }
+  // Without a kit, nothing is set smaller: the house captions are as they were.
+  const house = await captions("我們要來聊automaticvideoediting，");
+  assert.doesNotMatch(house.ass ?? "", /\\pos\([^)]*\)\\fs\d/);
 });

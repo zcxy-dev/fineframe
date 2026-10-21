@@ -22,6 +22,9 @@ export interface Geometry {
   em: number;
   /** Ticks per output frame. */
   frameTicks: number;
+  /** In a brand kit's look, the widest a row may be, in ems: a page with a row wider, such as a
+   * long word in a large size, is set that much smaller, so no caption leaves the frame. */
+  fit?: number;
 }
 
 /** The face a script is drawn in: the family its style selects it by, with Bold or not, and its
@@ -112,27 +115,10 @@ export function writeAss(
   face: CaptionFace,
   geometry: Geometry,
 ): string {
-  const { width, height, em, frameTicks } = geometry;
+  const { width, height, frameTicks } = geometry;
   const { metrics, fallback } = face;
-  const size = round(em * metrics.lineHeight);
   const select = (each: { family: string; bold: boolean }, fs: number) =>
     `\\fn${each.family}\\b${each.bold ? 1 : 0}\\fs${fs}`;
-  /** Text with each run of characters the face lacks drawn in its fallback at the same em. */
-  const drawn = (text: string): string => {
-    if (!fallback) return text;
-    const back = `{${select(fallback, round(em * fallback.metrics.lineHeight))}}`;
-    const home = `{${select(face, size)}}`;
-    let out = "";
-    let away = false;
-    for (const char of text) {
-      const lacks =
-        /\S/u.test(char) && metrics.advance(char.codePointAt(0) as number) === undefined;
-      if (lacks !== away) out += lacks ? back : home;
-      away = lacks;
-      out += char;
-    }
-    return away ? out + home : out;
-  };
   /** Widths as the page was measured: the face's, else its fallback's. */
   const measured: Pick<Metrics, "advance"> = {
     advance: (codePoint) => metrics.advance(codePoint) ?? fallback?.metrics.advance(codePoint),
@@ -143,19 +129,47 @@ export function writeAss(
     events.push(
       `Dialogue: ${layer},${assTime(start, frameTicks)},${assTime(end, frameTicks)},Caption,,0,0,0,,${text}`,
     );
-  const tracking = `\\fsp${round(preset.tracking * em)}`;
-  const stroke = preset.stroke
-    ? `\\bord${round(preset.stroke.width * em)}\\3c${colour(preset.stroke.color)}`
-    : "\\bord0";
-  /** The shadow layer's tags, for text at `opacity`. */
-  const shadow = (opacity: number) => {
-    if (!preset.shadow) return null;
-    const { color, opacity: strength, offset, blur, spread } = preset.shadow;
-    const border = round(((preset.stroke?.width ?? 0) + spread) * em);
-    return `\\1a&HFF&\\3a&HFF&\\4a${alpha(strength * opacity)}\\4c${colour(color)}\\bord${border}\\xshad0\\yshad${round(offset * em)}\\blur${round(blur * em)}`;
+  /** What drawing at `em` pixels to the em takes: the font size, letter spacing, stroke and
+   * shadow, and text with each run of characters the face lacks in its fallback at that em. */
+  const at = (em: number) => {
+    const size = round(em * metrics.lineHeight);
+    const drawn = (text: string): string => {
+      if (!fallback) return text;
+      const back = `{${select(fallback, round(em * fallback.metrics.lineHeight))}}`;
+      const home = `{${select(face, size)}}`;
+      let out = "";
+      let away = false;
+      for (const char of text) {
+        const lacks = metrics.advance(char.codePointAt(0) as number) === undefined;
+        if (lacks !== away) out += lacks ? back : home;
+        away = lacks;
+        out += char;
+      }
+      return away ? out + home : out;
+    };
+    const stroke = preset.stroke
+      ? `\\bord${round(preset.stroke.width * em)}\\3c${colour(preset.stroke.color)}`
+      : "\\bord0";
+    /** The shadow layer's tags, for text at `opacity`. */
+    const shadow = (opacity: number) => {
+      if (!preset.shadow) return null;
+      const { color, opacity: strength, offset, blur, spread } = preset.shadow;
+      const border = round(((preset.stroke?.width ?? 0) + spread) * em);
+      return `\\1a&HFF&\\3a&HFF&\\4a${alpha(strength * opacity)}\\4c${colour(color)}\\bord${border}\\xshad0\\yshad${round(offset * em)}\\blur${round(blur * em)}`;
+    };
+    return { size, drawn, tracking: `\\fsp${round(preset.tracking * em)}`, stroke, shadow };
   };
+  const full = at(geometry.em);
+  const { size } = full;
 
   for (const [p, page] of pages.entries()) {
+    // A page whose widest row is wider than a kit's captions may be is set smaller to fit; every
+    // other page at the style's own size, with no tag for it.
+    const widest = Math.max(...page.rows.map((row) => row.width));
+    const k = geometry.fit !== undefined && widest > geometry.fit ? geometry.fit / widest : 1;
+    const em = geometry.em * k;
+    const { drawn, tracking, stroke, shadow } = k === 1 ? full : at(em);
+    const fs = k === 1 ? "" : `\\fs${at(em).size}`;
     const bottom = bottoms[p] as number;
     const next = pages[p + 1];
     const previous = pages[p - 1];
@@ -238,7 +252,7 @@ export function writeAss(
           const from =
             word.word === null ? page.start : (page.words[word.word]?.start ?? page.start);
           const x = left + (word.x + word.width / 2) * em;
-          const tags = `\\an5\\pos(${round(x)},${round(centre)})${tracking}${motion(from, false)}\\fscx${pop}\\fscy${pop}\\t(0,${POP},${EASE_OUT},\\fscx100\\fscy100)`;
+          const tags = `\\an5\\pos(${round(x)},${round(centre)})${fs}${tracking}${motion(from, false)}\\fscx${pop}\\fscy${pop}\\t(0,${POP},${EASE_OUT},\\fscx100\\fscy100)`;
           const below = shadow(1);
           if (below) event(SHADOW, from, page.end, `{${tags}${below}}${drawn(word.text)}`);
           event(
@@ -263,7 +277,7 @@ export function writeAss(
       const states = pageStates(page, from, active);
       for (const [r, row] of page.rows.entries()) {
         const { centre } = geometryOf(r);
-        const anchor = `\\an5\\pos(${round(width / 2)},${round(centre)})${tracking}`;
+        const anchor = `\\an5\\pos(${round(width / 2)},${round(centre)})${fs}${tracking}`;
         const rowStates = states[r] as State[];
         const visibility = (state: State) => (state === "upcoming" ? preset.upcoming : 1);
         const layer = (index: number, tags: (s: number) => string) => {
