@@ -21,7 +21,7 @@ import type { CutVerdict, Decisions } from "../plan/prompt.ts";
 import { makeTalk } from "../plan/talk.ts";
 import { scratch } from "../testing.ts";
 import type { Worker } from "./analyze.ts";
-import { edit, editShorts, type ShortsOptions } from "./edit.ts";
+import { edit, editShorts, renameOver, type ShortsOptions } from "./edit.ts";
 import { EditError } from "./error.ts";
 
 const vework: Worker = {
@@ -415,4 +415,34 @@ test("finding the moments says how much footage it read, from the analysis", asy
     found.moments.map((moment) => moment.title),
     ["One"],
   );
+});
+
+test("shorts.json replaces the old one even while another program holds it, as on Windows", async () => {
+  const busy = (code: string) => Object.assign(new Error(code), { code });
+  const calls: string[] = [];
+  // Fails once as a reader holding the file makes it fail on Windows, then succeeds.
+  await renameOver("a.part", "a", async (from, to) => {
+    calls.push(`${from}→${to}`);
+    if (calls.length === 1) throw busy("EPERM");
+  });
+  assert.deepEqual(calls, ["a.part→a", "a.part→a"]);
+  // Other failures are not waited out, and a file held for good fails after a few tries.
+  let tries = 0;
+  await assert.rejects(
+    renameOver("b.part", "b", async () => {
+      tries++;
+      throw busy("ENOENT");
+    }),
+    /ENOENT/,
+  );
+  assert.equal(tries, 1);
+  tries = 0;
+  await assert.rejects(
+    renameOver("c.part", "c", async () => {
+      tries++;
+      throw busy("EBUSY");
+    }),
+    /EBUSY/,
+  );
+  assert.equal(tries, 5);
 });

@@ -9,7 +9,8 @@
 // With --shorts it makes two shorts, fewer than asked, from the first file in out/01 and out/02,
 // each playing a stretch of that file, whose media index says it lasts 100 s. After the first it
 // waits while $FAKE_SHORTS_HOLD names a file that exists, and with $FAKE_SHORTS_STOP it stops
-// there at the cost limit.
+// there at the cost limit. $FAKE_SHORTS_TORN leaves shorts.json half written while the first
+// short's line is read, as a reader can find it while it is written.
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
@@ -77,7 +78,9 @@ if (args.includes("--shorts")) {
       source,
       seconds: short.length - 0.5,
     });
-    await writeFile(join(out, "shorts.json"), JSON.stringify(shorts));
+    const listed = JSON.stringify(shorts);
+    const torn = process.env.FAKE_SHORTS_TORN && i === 0;
+    await writeFile(join(out, "shorts.json"), torn ? listed.slice(0, 20) : listed);
     say({
       stage: "short",
       fraction: 0.6 + i * 0.2,
@@ -85,6 +88,10 @@ if (args.includes("--shorts")) {
       short: number,
       claude: cost,
     });
+    if (torn) {
+      await new Promise((done) => setTimeout(done, 300));
+      await writeFile(join(out, "shorts.json"), listed);
+    }
     const held = process.env.FAKE_SHORTS_HOLD;
     while (held && existsSync(held)) await new Promise((done) => setTimeout(done, 20));
     if (process.env.FAKE_SHORTS_STOP) {

@@ -941,6 +941,35 @@ test("a run of shorts stopped at its cost limit ends done with the shorts made, 
   }
 });
 
+test("a run of shorts ends with what shorts.json says at its end, even if a read found it half written", async () => {
+  process.env.FAKE_SHORTS_STOP = "1";
+  process.env.FAKE_SHORTS_TORN = "1";
+  try {
+    const shorts = { count: 3, min: 30, max: 60 };
+    const { body: created } = await create([{ path: "torn.mp4", size: 2 }], {
+      settings: { ...settings, shorts },
+    });
+    const id = created.id;
+    assert.equal((await put(id, 0, new Uint8Array(2))).status, 200);
+    assert.equal((await start(id)).status, 200);
+    let job: Job;
+    for (;;) {
+      job = (await (await jobRoute.GET(new Request(url), ctx({ id }))).json()) as Job;
+      if (job.status !== "running") break;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.equal(job.status, "done", job.error);
+    assert.equal(job.stopped, "cost");
+    assert.deepEqual(
+      job.shorts?.map((short) => short.folder),
+      ["01"],
+    );
+  } finally {
+    delete process.env.FAKE_SHORTS_STOP;
+    delete process.env.FAKE_SHORTS_TORN;
+  }
+});
+
 test("a link: read when pasted, refused saying why, fetched into the footage as the edit starts", async (t) => {
   const video = Buffer.alloc(30_000, 5);
   const server = createServer((_, response) => response.end(video));
