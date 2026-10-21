@@ -151,27 +151,28 @@ cd ../../bench && uv run vebench report <corpus>
 
 ## Filler measurements
 
-How many fillers an edit cuts with `--fillers natural`, the default, before filler modes (ea6906f: hesitations, 那個 and 就是 marked, and a filler cut only with 0.13 s of silence on each side) and after them (4d65c73). Each edit was planned, rendered and reviewed once at 16:9 with `--visuals minimal` and `--quality best`, from indexes the 0.6B speech model wrote without correction; the two real ones are cut from 3 min of their clip with `--within`. `--fillers aggressive` and `off` were not measured.
+How many fillers an edit cuts with `--fillers natural`, the default, before filler modes (ea6906f: hesitations, 那個 and 就是 marked, and a filler cut only with 0.13 s of silence on each side) and after them, where a filler said straight into the next word is also cut where the speech dips 20 dB under both words (`joinAt`). Each edit was planned, rendered and reviewed once at 16:9 with `--visuals minimal` and `--quality best`, from indexes the 0.6B speech model wrote without correction; the two real ones are cut from 3 min of their clip with `--within`. `--fillers aggressive` and `off` were not measured.
 
 - **Truth on real speech:** in 3 min of each of two openly licensed recordings, every filler, stutter and false start was marked against the audio. Each was found from the aligner's timings and a second transcript by ElevenLabs scribe-v2 (on OpenRouter), and each edge was set on a spectrogram crop; where a filler runs straight into the next word, scribe-v2 also heard the two sides cut apart. real-2 holds 21 (11 verbal tics, 5 hesitations, 3 false starts, 2 stutters), real-9 27 (16 verbal tics, 6 stutters, 4 false starts, 1 hesitation). The truth words beside each filler end where it starts; the others keep the aligner's timings. `vebench edit` scores them as it scores synthetic truth.
 - **What the speech model wrote:** all 21 of real-2's as words of their own. In real-9 it left out 5, each merged into the word beside it (3 false starts, a hesitation and a verbal tic), which no plan can cut.
-- **What a cut needs:** a filler is cut where each side holds a pause of 80 ms or more, so no cut falls inside a word. By the aligner's timings, 3 of real-2's 21 fillers and none of real-9's have one on both sides; the rest are said straight into the word beside them, as the synthetic voice says them. No edit here has a pause under 0.13 s beside a filler it cut, so none has a sound edge (`soundIn`, `soundOut`), and `vebench edit` gives the same counts at the sound edges and at the picture edges (`--edges picture`).
+- **What a cut allows:** by the aligner's timings and `joinAt`, 4 of real-2's 21 fillers and 2 of real-9's can be cut on both sides; with only pauses of 80 ms or more, 3 and none. The rest stay, said into the word beside them without a dip.
+- **Sound edges:** the after edits cut at a sound edge (`soundIn`, `soundOut`) at 3 points of the real clips, both real-2 edits at the same 2, and 12 times in the synthetic ones. Each of the 3 real points, looked at on a spectrogram, lies in a pause or in the dip between two words.
 
 <!-- results:engine-fillers -->
-| Footage | Target | Length | Fillers cut | Other words cut inside lines | Cuts inside words | Clicks, drift | Claude |
+| Footage | Target | Length | Fillers cut | Other words cut inside lines | Cuts inside words, strict / heard | Clicks, drift | Claude |
 |---|---|---|---|---|---|---|---|
-| real-2: talk to camera, Mandarin, 3 min of 13.8 min | 120 s | 116.6 → 121.7 s | 2 of 13 → 2 of 13 | 0 → 0 | 0 of 10 → 0 of 10 | 0 of 4 → 0 of 4, 0.0 ms | $0.11 → $0.06 |
-| real-2: talk to camera, Mandarin, 3 min of 13.8 min | 150 s | 150.0 → 150.8 s | 4 of 19 → 2 of 18 | 0 → 0 | 0 of 14 → 0 of 12 | 0 of 6 → 0 of 5, 0.0 ms | $0.09 → $0.09 |
-| real-9: couch conversation, English, 3 min of 16.5 min | 150 s | 155.5 → 150.0 s | 0 of 24 → 1 of 24 | 0 → 0 | 0 of 8 → 0 of 10 | 0 of 3 → 0 of 4, 0.0 ms | $0.06 → $0.07 |
-| talk-a (3 clips, 7.0 min) | 60 s | 61.6 → 61.5 s | 4 of 4 → 2 of 3 | 0 → 0 | 0 of 10 → 0 of 10 | 0 of 4 → 0 of 4, 0.0 ms | $0.08 → $0.10 |
-| chat-b (3 clips, 6.7 min) | 60 s | 60.6 → 60.5 s | 1 of 7 → 1 of 7 | 0 → 0 | 0 of 12 → 0 of 10 | 0 of 5 → 0 of 4, 0.0 ms | $0.09 → $0.09 |
-| talk-a (3 clips, 7.0 min) | 300 s | 300.0 → 300.0 s | 0 of 18 → 1 of 19 | 0 → 0 | 0 of 24 → 1 of 24 (141 ms) | 0 of 11 → 0 of 11, 0.0 ms | $0.16 → $0.28 |
-| chat-b (3 clips, 6.7 min) | 300 s | 300.9 → 300.2 s | 1 of 23 → 2 of 23 | 0 → 0 | 0 of 48 → 0 of 48 | 0 of 23 → 0 of 23, 0.0 ms | $0.14 → $0.24 |
+| real-2: talk to camera, Mandarin, 3 min of 13.8 min | 120 s | 116.6 → 120.1 s | 2 of 13 → 3 of 15 | 0 → 0 | 0 / 0 of 10 → 0 / 0 of 16 | 0 of 4 → 0 of 7, 0.0 ms | $0.11 → $0.10 |
+| real-2: talk to camera, Mandarin, 3 min of 13.8 min | 150 s | 150.0 → 150.0 s | 4 of 19 → 4 of 19 | 0 → 4 | 0 / 0 of 14 → 0 / 0 of 18 | 0 of 6 → 0 of 8, 0.0 ms | $0.09 → $0.09 |
+| real-9: couch conversation, English, 3 min of 16.5 min | 150 s | 155.5 → 155.0 s | 0 of 24 → 1 of 24 | 0 → 0 | 0 / 0 of 8 → 0 / 0 of 10 | 0 of 3 → 0 of 4, 0.0 ms | $0.06 → $0.07 |
+| talk-a (3 clips, 7.0 min) | 60 s | 61.6 → 59.2 s | 4 of 4 → 2 of 2 | 0 → 0 | 0 / 0 of 10 → 0 / 0 of 12 | 0 of 4 → 0 of 5, 0.0 ms | $0.08 → $0.11 |
+| chat-b (3 clips, 6.7 min) | 60 s | 60.6 → 60.0 s | 1 of 7 → 2 of 6 | 0 → 6 | 0 / 0 of 12 → 1 / 0 of 12 | 0 of 5 → 0 of 5, 0.0 ms | $0.09 → $0.09 |
+| talk-a (3 clips, 7.0 min) | 300 s | 300.0 → 300.0 s | 0 of 18 → 6 of 20 | 0 → 0 | 0 / 0 of 24 → 0 / 0 of 32 | 0 of 11 → 0 of 15, 0.0 ms | $0.16 → $0.25 |
+| chat-b (3 clips, 6.7 min) | 300 s | 300.9 → 300.0 s | 1 of 23 → 8 of 23 | 0 → 0 | 0 / 0 of 48 → 2 / 0 of 62 | 0 of 23 → 0 of 30, 0.0 ms | $0.14 → $0.25 |
 <!-- /results -->
 
-- **Mistakes:** no edit cut a word inside a line that is not a filler.
-- **The one cut inside a word:** talk-a at 300 s starts a clip 141 ms into a word whose sound the synthetic voice stretches over a silence the index hears after it. The code before filler modes places that clip start at the same time.
-- **Cost:** a 1-minute edit of real-2's 3 min with the defaults, rich visuals included, cost $0.32 before and $0.35 after, its plan $0.076 and $0.081. The after edits at 300 s were each reviewed twice, as a review moved a cut away from a wipe, so their checks cost $0.15 and $0.11 against $0.02 and $0.03; their plans cost $0.13 and $0.14 against $0.14 and $0.11.
+- **Cuts inside words:** "strict" counts the sound edges strictly inside a truth word (`in_words`), "heard" those where the recording over the 20 ms beside the edge on the side that plays is less than 20 dB under the quieter word (`in_words_heard`). The 3 strict ones are sound edges where two synthetic words meet, 2 to 21 ms off the generator's boundary, each in the dip between them. At the picture's edges (`--edges picture`), which play muted where they pass a sound edge, the after edits have 1 cut inside a word on real-9 (24 ms) and 9 on the synthetic ones (up to 24 ms), 3 of them heard.
+- **Other words cut:** real-2 at 150 s leaves out the last line of a segment to fit the length, and chat-b at 60 s a line Claude did not choose for the story; no edit cut a word inside a line that is not a filler.
+- **Cost:** a 1-minute edit of real-2's 3 min with the defaults, rich visuals included, cost $0.32 before and $0.35 after with the filler instructions, its plan $0.076 and $0.081; cutting where the speech dips changes no request.
 
 ## Music measurements
 
