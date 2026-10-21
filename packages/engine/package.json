@@ -14,6 +14,7 @@
     "./estimate": "./src/plan/estimate.ts",
     "./faces": "./src/brand/faces.ts",
     "./ffmpeg": "./src/ffmpeg.ts",
+    "./fillers": "./src/plan/fillers.ts",
     "./length": "./src/edit/length.ts",
     "./link": "./src/link.ts",
     "./looks": "./src/looks.ts",

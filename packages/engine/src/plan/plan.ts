@@ -39,7 +39,13 @@ import {
   type Usage,
 } from "./claude.ts";
 import { calloutSpan, plannedOverlays } from "./effects.ts";
-import { type FillerCandidate, fillerCandidates, findWords } from "./fillers.ts";
+import {
+  DEFAULT_FILLERS,
+  type FillerCandidate,
+  type FillerMode,
+  fillerCandidates,
+  findWords,
+} from "./fillers.ts";
 import { BREATH_RANGE, fitLength, type Span } from "./fit.ts";
 import { type GraphicWish, withGraphics, writeGraphics } from "./graphics.ts";
 import { calloutRect, LOCATE_MODEL, type Located, locate, wishKey } from "./locate.ts";
@@ -64,6 +70,7 @@ import {
 } from "./pack.ts";
 import {
   cuttableAfter,
+  joinAt,
   lengthOf,
   type PlacedClip,
   type PlaceSource,
@@ -158,6 +165,8 @@ export interface PlanOptions {
   least?: number;
   /** The model that plans, and judges the cut checks a review doubts: best unless given. */
   quality?: Quality;
+  /** Which fillers are cut (./fillers.ts): DEFAULT_FILLERS unless given. */
+  fillers?: FillerMode;
   /** `rich` (the default) adds Claude's motion graphics and shows B-roll on the edit's points,
    * sourced from free web captures and, with a Pexels or Pixabay key, stock footage; `minimal`
    * none. */
@@ -293,9 +302,10 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
   } catch (error) {
     throw new PlanError((error as Error).message, { cause: error });
   }
+  const fillers = options.fillers ?? DEFAULT_FILLERS;
   const candidates: FillerCandidate[] = [];
   for (const source of sources.values()) {
-    candidates.push(...fillerCandidates(source.id, source.words, candidates.length + 1));
+    candidates.push(...fillerCandidates(source.id, source.words, fillers, candidates.length + 1));
   }
   const speech = [...sources.values()].reduce((sum, s) => sum + speechSeconds(s.words, s.lines), 0);
   if (speech === 0) throw new PlanError("None of the files has speech to edit");
@@ -347,6 +357,7 @@ export async function plan(options: PlanOptions): Promise<PlannedEdit> {
       callouts: [...sources.values()].some((s) => s.index && screenSpans(s.index).length > 0),
       visuals: (options.visuals ?? "rich") === "rich",
       stock: (options.visuals ?? "rich") === "rich" && stockAvailable(),
+      fillers,
     },
     fps,
     short,
@@ -518,7 +529,9 @@ function takeDecisions(state: PlanState): void {
       state.cuts.set(`${candidate.source}:${i}`, "filler");
     }
   }
-  for (const cut of decisions.cut_words) {
+  // With fillers off every word plays, whatever the answer holds.
+  const cutWords = state.extras.fillers === "off" ? [] : decisions.cut_words;
+  for (const cut of cutWords) {
     const source = sources.get(cut.source);
     const line = source?.lines.find((l) => l.n === cut.line);
     if (!source || !line) continue;
@@ -612,9 +625,9 @@ async function assemble(state: PlanState): Promise<Assembly> {
 
 /**
  * The words of a segment that play, line by line: every word, less the fillers and false starts
- * cut inside its lines and the words a review took out. A cut needs a pause to fall in, so a
- * filler or false start with no pause beside it stays, and a review's removal grows to the
- * nearest pauses.
+ * cut inside its lines and the words a review took out. A cut needs a pause to fall in, for a
+ * filler or false start one too short for a frame too (joinAt), so one with no pause beside it
+ * stays, and a review's removal grows to the nearest pauses.
  */
 function keptWords(state: PlanState, segment: Segment): number[][] {
   const source = state.sources.get(segment.source) as PlanSource;
@@ -636,11 +649,13 @@ function keptWords(state: PlanState, segment: Segment): number[][] {
       if (kept(a)) continue;
       let b = a;
       while (b < to && !kept(b + 1)) b++;
-      const left = kept(a - 1) && !cuttableAfter(source, a - 1);
-      const right = kept(b + 1) && !cuttableAfter(source, b);
+      let excluded = false;
+      for (let i = a; i <= b; i++) excluded ||= taken(i);
+      const apart = (i: number) =>
+        cuttableAfter(source, i) || (!excluded && joinAt(source, i) !== null);
+      const left = kept(a - 1) && !apart(a - 1);
+      const right = kept(b + 1) && !apart(b);
       if (left || right) {
-        let excluded = false;
-        for (let i = a; i <= b; i++) excluded ||= taken(i);
         if (excluded) {
           for (const i of [left ? a - 1 : -1, right ? b + 1 : -1].filter((i) => i >= 0)) {
             keep.set(i, false);
@@ -815,7 +830,15 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
       index && cropPath(index, clip, { width, height }, CAMERA, windows.get(clip.source));
     return crop ? { ...clip, framing: { crop } } : clip;
   };
-  const main = clips.map((clip) => framed({ source: clip.source, in: clip.in, out: clip.out }));
+  const main = clips.map((clip) =>
+    framed({
+      source: clip.source,
+      in: clip.in,
+      out: clip.out,
+      ...(clip.soundIn === undefined ? {} : { soundIn: clip.soundIn }),
+      ...(clip.soundOut === undefined ? {} : { soundOut: clip.soundOut }),
+    }),
+  );
   // Where each thing found shows in the frame while its callout would play.
   const placed = new Map<string, Rect>();
   for (const wish of state.decisions.callouts ?? []) {

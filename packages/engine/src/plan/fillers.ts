@@ -1,15 +1,17 @@
 import type { Word } from "@video-editor/schema";
 import { bare } from "./text.ts";
 
-/** Words that are often hesitations. 那個 and 就是 are also real words ("那個 click 聲", that
- * click), so code only flags them and the planner decides in context. */
-const FILLERS = [
+/** How much of what is said `--fillers` cuts: clear hesitations and stutters (natural), words
+ * that are often verbal tics too (aggressive), or nothing (off). */
+export const FILLER_MODES = ["natural", "aggressive", "off"] as const;
+export type FillerMode = (typeof FILLER_MODES)[number];
+export const DEFAULT_FILLERS: FillerMode = "natural";
+
+/** Hesitations: sounds that are almost never words. */
+const HESITATIONS = [
   ["嗯"],
   ["呃"],
   ["額"],
-  ["欸"],
-  ["那", "個"],
-  ["就", "是"],
   ["um"],
   ["umm"],
   ["uh"],
@@ -22,6 +24,31 @@ const FILLERS = [
   ["eh"],
 ];
 
+/** Words that are often verbal tics and as often real words ("那個 click 聲", that click; "I
+ * like it"), flagged only in aggressive mode for the planner to decide in context. */
+const TICS = [
+  ["啊"],
+  ["喔"],
+  ["欸"],
+  ["那", "個"],
+  ["這", "個"],
+  ["就", "是"],
+  ["然", "後"],
+  ["對"],
+  ["like"],
+  ["you", "know"],
+  ["i", "mean"],
+  ["basically"],
+  ["so"],
+];
+/** Tics that are one only where a sentence starts. */
+const OPENING = new Set(["so"]);
+/** A word starts a sentence after one that ends in punctuation, or after this long a pause. */
+const OPENING_PAUSE = 0.3;
+/** The longest run of words a stutter repeats: "this one, this one". */
+const REPEAT_MAX = 3;
+const HAN = /\p{Script=Han}/u;
+
 /** A run of words that may be a filler, `first` to `last` inclusive. */
 export interface FillerCandidate {
   id: string;
@@ -31,30 +58,70 @@ export interface FillerCandidate {
 }
 
 /**
- * Every place in `words` that reads as a filler. Punctuation inside a candidate breaks it ("那，
- * 個" is two words), punctuation after it does not ("嗯，"). Ids continue from `next`.
+ * Every place in `words` that reads as a filler in `mode`: a hesitation, the earlier copies of
+ * words said again at once (我我媽, the the), and in aggressive mode a word that is often a tic.
+ * Punctuation inside a candidate breaks it ("那，個" is two words), punctuation after it does not
+ * ("嗯，"). Ids continue from `next`.
  */
 export function fillerCandidates(
   source: string,
   words: readonly Word[],
+  mode: FillerMode,
   next = 1,
 ): FillerCandidate[] {
+  if (mode === "off") return [];
+  const listed = mode === "aggressive" ? [...HESITATIONS, ...TICS] : HESITATIONS;
   const found: FillerCandidate[] = [];
   let id = next;
   for (let i = 0; i < words.length; i++) {
-    const match = FILLERS.find((parts) =>
-      parts.every((part, k) => {
-        const word = words[i + k];
-        if (!word || bare(word.text) !== part) return false;
-        // Only the last part may carry punctuation.
-        return k === parts.length - 1 || word.text.toLowerCase() === part;
-      }),
-    );
-    if (!match) continue;
-    found.push({ id: `f${id++}`, source, first: i, last: i + match.length - 1 });
-    i += match.length - 1;
+    const length = repeated(words, i) || listedAt(words, i, listed);
+    if (!length) continue;
+    found.push({ id: `f${id++}`, source, first: i, last: i + length - 1 });
+    i += length - 1;
   }
   return found;
+}
+
+/** Whether `parts` are said from word `i` on: only the last part may carry punctuation. */
+function says(words: readonly Word[], i: number, parts: readonly string[]): boolean {
+  return parts.every((part, k) => {
+    const word = words[i + k];
+    if (!word || bare(word.text) !== part) return false;
+    return k === parts.length - 1 || word.text.toLowerCase() === part;
+  });
+}
+
+/** How many words of `listed` are said from word `i`, 0 for none. */
+function listedAt(words: readonly Word[], i: number, listed: readonly string[][]): number {
+  const match = listed.find(
+    (parts) => says(words, i, parts) && (!OPENING.has(parts.join(" ")) || opens(words, i)),
+  );
+  return match?.length ?? 0;
+}
+
+function opens(words: readonly Word[], i: number): boolean {
+  const before = words[i - 1];
+  const word = words[i] as Word;
+  return !before || /\p{P}$/u.test(before.text) || word.start - before.end >= OPENING_PAUSE;
+}
+
+/** How many words from word `i` are said again, and again, until their last copy: the copies
+ * before it, 0 when none. The shortest repeated run counts, so 我我我 is two copies of 我. A
+ * Chinese character said again after punctuation is the start of the next phrase (很多，多嘗試),
+ * not a repeat. */
+function repeated(words: readonly Word[], i: number): number {
+  for (let n = 1; n <= REPEAT_MAX; n++) {
+    const run = words.slice(i, i + n).map((w) => bare(w.text));
+    if (run.length < n || run.some((text) => !text)) return 0;
+    const next = (copies: number) => {
+      const end = (words[i + copies * n - 1] as Word).text;
+      return !(n === 1 && HAN.test(end) && /\p{P}$/u.test(end)) && says(words, i + copies * n, run);
+    };
+    let copies = 1;
+    while (next(copies)) copies++;
+    if (copies > 1) return (copies - 1) * n;
+  }
+  return 0;
 }
 
 /** The first run of words in [first, last] that reads `text`, ignoring punctuation and case;

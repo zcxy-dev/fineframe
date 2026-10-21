@@ -81,6 +81,22 @@ def test_cuts_inside_words_and_a_wrong_take_count_against_the_edit(tmp_path):
     assert result["dead_air"] == {"count": 1, "seconds": 2.0}
 
 
+def test_a_clip_is_judged_where_its_sound_starts_and_ends(tmp_path):
+    # 嗯 runs straight into 大: the clip starts on a frame inside 嗯, its sound where 大 starts.
+    words = [word("嗯，", 1.0, 1.2), *WORDS[1:]]
+    path = corpus(tmp_path, [(1.18, 2.0)], target=0.82, words=words)
+    project = json.loads(path.read_text())
+    project["main"][0]["soundIn"] = round(1.2 * T)
+    path.write_text(json.dumps(project))
+    heard = edit.score(path)
+    assert heard["cuts"] == {"checked": 2, "in_words": 0, "deepest_ms": 0.0}
+    assert heard["fillers"]["removed"] == 1
+    seen = edit.score(path, edges="picture")
+    assert seen["cuts"] == {"checked": 2, "in_words": 1, "deepest_ms": 20.0}
+    # Both judge the length by the picture.
+    assert heard["length"] == seen["length"]
+
+
 def test_a_word_cut_out_that_is_no_filler_lowers_precision(tmp_path):
     # Keeps the filler, cuts 家 out from between 大 and 好.
     path = corpus(tmp_path, [(0.9, 1.4), (1.6, 1.9)], target=0.8)

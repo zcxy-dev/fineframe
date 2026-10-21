@@ -50,6 +50,7 @@ import { FOOTAGE_KEPT } from "./retention.ts";
 import { type Run, runEdit } from "./runner.ts";
 import {
   DEFAULT_CAPTIONS,
+  DEFAULT_FILLERS,
   type FileEntry,
   formatDollars,
   formatLength,
@@ -799,6 +800,7 @@ export class Jobs {
       "--look",
       plan.look ?? style,
       `--visuals=${visuals}`,
+      ...["--fillers", job.settings.fillers ?? DEFAULT_FILLERS],
       ...["--quality", job.settings.quality ?? "best"],
       ...(job.settings.correct ? ["--correct"] : []),
       // The brand kit's custom captions go with --brand, and no --captions.

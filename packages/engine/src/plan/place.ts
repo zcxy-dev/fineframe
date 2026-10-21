@@ -63,6 +63,10 @@ export interface PlacedClip {
   /** Source ticks. */
   in: number;
   out: number;
+  /** Where its sound starts and ends, in source ticks, when that is inside its first or last
+   * frame: at a cut in a silence too short for a frame (joinAt). */
+  soundIn?: number;
+  soundOut?: number;
   first: number;
   last: number;
 }
@@ -89,6 +93,10 @@ interface Run {
  *   a cut fits in, and the next one starts in the last such silence before its first, or in the
  *   longest silence there when none fits, each at least MARGIN from the sound on either side. Up to TAIL and LEAD of silence stay with the
  *   sound, less when the silence is shorter.
+ * - Where the silence between a word left out and the word kept beside it is too short for a cut
+ *   on a frame, the cut falls in its middle when joinAt allows it: the clip starts on the source
+ *   frame before that point or ends on the output frame after it, and its sound starts or ends
+ *   at the point itself (`soundIn`, `soundOut`), so the frame's sliver beyond it is silent.
  * - A clip whose opening silence holds a click in its source's sound or a shot change, such as a
  *   splice the source was edited with, starts on the first frame after the last of them, and one
  *   whose closing silence holds one ends on the last output frame before the first, where that
@@ -133,6 +141,8 @@ export function placeClips(
     const fits = (pause: boolean) => (a: number, b: number) =>
       pause ? b - a > PAUSE_MAX : b - a >= gap || a <= 0 || b >= end;
 
+    const joinIn = pauseBefore ? null : joinBefore(source, first);
+    const joinOut = pauseAfter ? null : joinBefore(source, last + 1);
     const [s0, s1] = nearest(silencesAfter(source, first - 1), fits(pauseBefore), true) ?? [
       words[first - 1]?.end ?? 0,
       head.start,
@@ -140,16 +150,20 @@ export function placeClips(
     const bounded = s0 > 0 || first > 0;
     const lead = source.roomy?.has(first) ? ROOM : LEAD * breath;
     const wantIn = s1 - Math.min(lead, bounded ? (s1 - s0) / 2 : s1 - s0);
-    const clipIn = pastSplices(
-      source,
-      startOnFrame(
-        ticks(Math.max(0, wantIn)),
-        ticks(bounded ? s0 + MARGIN : 0),
-        ticks(s1 - MARGIN),
-        source.frameTicks,
-      ),
-      s1,
-    );
+    const soundIn = joinIn === null ? null : ticks(joinIn);
+    const clipIn =
+      soundIn === null
+        ? pastSplices(
+            source,
+            startOnFrame(
+              ticks(Math.max(0, wantIn)),
+              ticks(bounded ? s0 + MARGIN : 0),
+              ticks(s1 - MARGIN),
+              source.frameTicks,
+            ),
+            s1,
+          )
+        : frameBefore(soundIn, source.frameTicks);
 
     const [t0, t1] = nearest(silencesAfter(source, last), fits(pauseAfter), false) ?? [
       tail.end,
@@ -158,20 +172,33 @@ export function placeClips(
     const closed = t1 < end;
     const trail = source.roomy?.has(last) ? ROOM : TAIL * breath;
     const wantOut = t0 + Math.min(trail, closed ? (t1 - t0) / 2 : t1 - t0);
-    const clipOut = beforeSplices(
-      source,
-      clipIn,
-      endOnFrame(
-        clipIn,
-        ticks(Math.min(wantOut, end)),
-        ticks(t0 + MARGIN),
-        closed ? ticks(t1 - MARGIN) : ticks(Math.min(end, 1e9)),
-        outputFrameTicks,
-      ),
-      t0,
-      outputFrameTicks,
-    );
-    return { source: source.id, in: clipIn, out: clipOut, first, last };
+    const soundOut = joinOut === null ? null : ticks(joinOut);
+    const clipOut =
+      soundOut === null
+        ? beforeSplices(
+            source,
+            clipIn,
+            endOnFrame(
+              clipIn,
+              ticks(Math.min(wantOut, end)),
+              ticks(t0 + MARGIN),
+              closed ? ticks(t1 - MARGIN) : ticks(Math.min(end, 1e9)),
+              outputFrameTicks,
+            ),
+            t0,
+            outputFrameTicks,
+          )
+        : clipIn +
+          Math.max(1, Math.ceil((soundOut - clipIn) / outputFrameTicks)) * outputFrameTicks;
+    return {
+      source: source.id,
+      in: clipIn,
+      out: clipOut,
+      ...(soundIn !== null && soundIn > clipIn ? { soundIn } : {}),
+      ...(soundOut !== null && soundOut < clipOut ? { soundOut } : {}),
+      first,
+      last,
+    };
   });
 }
 
@@ -295,6 +322,40 @@ function beforeSplices(
     if (next >= at || next < earliest || next <= clipIn) return clipOut;
     at = next;
   }
+}
+
+/** Where a cut may fall between word `i` - 1 and word `i`, one left out and the other kept, when
+ * no silence a cut on a frame fits in lies between them: joinAt; null where one does, or at the
+ * source's start or end. */
+function joinBefore(source: PlaceSource, i: number): number | null {
+  if (i <= 0 || i >= source.words.length || cuttableAfter(source, i - 1)) return null;
+  return joinAt(source, i - 1);
+}
+
+/**
+ * Where a cut may fall between words `i` and `i` + 1 of a source whose silence between them is
+ * too short for a cut on a frame (cuttableAfter) but holds MARGIN on both sides of a point: the
+ * middle of the longest such silence, in seconds. The clip's picture then cuts on the frame
+ * beyond it and its sound at the point itself. Null where no silence leaves both margins, or
+ * where a shot change lies within a frame of the point. This is the only test of whether two
+ * words with no pause a frame fits in may be cut apart.
+ */
+export function joinAt(source: PlaceSource, i: number): number | null {
+  if (!source.words[i] || !source.words[i + 1]) return null;
+  const silence = silencesAfter(source, i).reduce<[number, number] | null>(
+    (best, s) => (!best || s[1] - s[0] > best[1] - best[0] ? s : best),
+    null,
+  );
+  if (!silence || silence[1] - silence[0] < 2 * MARGIN) return null;
+  const at = (silence[0] + silence[1]) / 2;
+  const frame = (source.frameTicks ?? 0) / TICKS_PER_SECOND;
+  if ((source.shots ?? []).some(([a, b]) => a < at + frame && b > at - frame)) return null;
+  return at;
+}
+
+/** The source frame start at or before `t`, or `t` itself without a grid. */
+function frameBefore(t: number, grid: number | null): number {
+  return grid ? Math.floor(t / grid) * grid : t;
 }
 
 /** The source frame start nearest `want` inside [low, high]; without a grid, or with no frame

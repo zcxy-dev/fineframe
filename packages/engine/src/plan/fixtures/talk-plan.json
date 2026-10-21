@@ -39,7 +39,7 @@
       }
     ],
     "removed": [],
-    "fillers": ["f1", "f3"],
+    "fillers": ["f1", "f2"],
     "cut_words": [
       {
         "source": "talk",

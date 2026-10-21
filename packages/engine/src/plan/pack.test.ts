@@ -88,7 +88,12 @@ test("a packed file lists its facts, then numbered lines with fillers marked", (
     ["好。", 3.7, 3.9],
   );
   const lines = splitLines(placed("talk", list));
-  const packed = packSource("talk", index(list), lines, fillerCandidates("talk", list));
+  const packed = packSource(
+    "talk",
+    index(list),
+    lines,
+    fillerCandidates("talk", list, "aggressive"),
+  );
   assert.equal(
     packed,
     [
@@ -111,7 +116,7 @@ test("a file without speech is packed as B-roll, without lines", () => {
   assert.doesNotMatch(packed, /Lines:/);
 });
 
-test("filler candidates: single words with their punctuation, and 那個 across two words", () => {
+test("aggressive filler candidates: single words with their punctuation, and 那個 across two words", () => {
   const list = words(
     ["嗯，", 0, 0.1],
     ["Um,", 0.2, 0.3],
@@ -123,7 +128,7 @@ test("filler candidates: single words with their punctuation, and 那個 across 
     ["是", 1.1, 1.2],
     ["umbrella", 1.3, 1.6],
   );
-  const found = fillerCandidates("a", list, 4);
+  const found = fillerCandidates("a", list, "aggressive", 4);
   assert.deepEqual(
     found.map((c) => [c.id, c.first, c.last]),
     [
@@ -133,9 +138,71 @@ test("filler candidates: single words with their punctuation, and 那個 across 
       ["f7", 6, 7],
     ],
   );
+  assert.deepEqual(
+    fillerCandidates("a", list, "natural").map((c) => [c.first, c.last]),
+    [
+      [0, 0],
+      [1, 1],
+    ],
+  );
+  assert.deepEqual(fillerCandidates("a", list, "off"), []);
   assert.deepEqual(findWords(list, 0, 8, "那個"), [2, 3]);
   assert.deepEqual(findWords(list, 0, 8, "um"), [1, 1]);
   assert.equal(findWords(list, 0, 8, "不在"), null);
+});
+
+test("a stutter marks every copy but the last, of one word or a few", () => {
+  const list = words(
+    ["我", 0, 0.1],
+    ["我", 0.1, 0.2],
+    ["我", 0.2, 0.3],
+    ["媽", 0.3, 0.4],
+    ["this", 1.0, 1.1],
+    ["one,", 1.1, 1.2],
+    ["this", 1.3, 1.4],
+    ["one", 1.4, 1.5],
+    ["The", 2.0, 2.1],
+    ["the", 2.1, 2.2],
+    ["end.", 2.2, 2.4],
+    // 很多，多嘗試: two words, not a repeat.
+    ["很", 3.0, 3.1],
+    ["多，", 3.1, 3.3],
+    ["多", 3.4, 3.5],
+    ["試", 3.5, 3.6],
+  );
+  assert.deepEqual(
+    fillerCandidates("a", list, "natural").map((c) => [c.first, c.last]),
+    [
+      [0, 1],
+      [4, 5],
+      [8, 8],
+    ],
+  );
+});
+
+test("aggressive tics: so only where a sentence starts, and two-word tics", () => {
+  const list = words(
+    ["So", 0, 0.2],
+    ["I", 0.2, 0.3],
+    ["was", 0.3, 0.5],
+    ["so", 0.5, 0.7],
+    ["tired,", 0.7, 1.0],
+    ["you", 1.0, 1.1],
+    ["know.", 1.1, 1.3],
+    ["然", 2.0, 2.1],
+    ["後", 2.1, 2.2],
+    ["對", 2.2, 2.3],
+  );
+  assert.deepEqual(
+    fillerCandidates("a", list, "aggressive").map((c) => [c.first, c.last]),
+    [
+      [0, 0],
+      [5, 6],
+      [7, 8],
+      [9, 9],
+    ],
+  );
+  assert.deepEqual(fillerCandidates("a", list, "natural"), []);
 });
 
 test("words join as subtitles write them, and carry their language", () => {

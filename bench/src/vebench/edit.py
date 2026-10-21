@@ -2,7 +2,9 @@
 
 The project names each source by its path; a source at `<clip>/source.<ext>` is scored against
 `<clip>/truth/edit.json` and the timed words of `<clip>/truth/transcript.*`. Times in a project
-are ticks, 120 000 per second, on its sources' own clocks.
+are ticks, 120 000 per second, on its sources' own clocks. A clip plays from where its sound
+starts (`soundIn`, else `in`) to where it ends (`soundOut`, else `out`); `edges="picture"`
+judges it at `in` and `out` instead, as vebench did before sound edges.
 """
 
 import json
@@ -39,12 +41,21 @@ class Clip:
     end: float
 
 
-def score(project_path: Path) -> dict:
+def score(project_path: Path, edges: str = "sound") -> dict:
     """Length against the target, cuts inside words, filler removal, retake choice and dead air
-    of one project. Sources without truth are left out of the counts that need it."""
+    of one project, judging each clip by its sound's edges or, with `edges="picture"`, by its
+    picture's. Sources without truth are left out of the counts that need it."""
     project = json.loads(project_path.read_text(encoding="utf-8"))
     base = project_path.parent
     clips = [Clip(c["source"], c["in"] / TICKS, c["out"] / TICKS) for c in project["main"]]
+    heard = clips
+    if edges == "sound":
+        heard = [
+            Clip(
+                c["source"], c.get("soundIn", c["in"]) / TICKS, c.get("soundOut", c["out"]) / TICKS
+            )
+            for c in project["main"]
+        ]
     length = sum(c.end - c.start for c in clips)
     for clip in project["main"][1:]:
         if clip.get("transition", {}).get("type") == "dissolve":
@@ -75,7 +86,7 @@ def score(project_path: Path) -> dict:
         edit = json.loads(edit_path.read_text(encoding="utf-8"))
         units = _units(truth)
         words = [u for u in units if u.start is not None and u.end is not None]
-        mine = sorted((c for c in clips if c.source == source["id"]), key=lambda c: c.start)
+        mine = sorted((c for c in heard if c.source == source["id"]), key=lambda c: c.start)
         _cuts(result["cuts"], mine, words, _duration(base, source))
         _fillers(result["fillers"], mine, edit, words)
         _retakes(result["retakes"], mine, edit)
@@ -286,18 +297,24 @@ def _covered(clips: list[Clip], start: float, end: float) -> float:
 
 
 def _cuts(out: dict, clips: list[Clip], words: list, duration: float | None) -> None:
-    """Every clip edge strictly inside a timed truth word. The start and end of the file are not
-    cuts."""
+    """Every clip edge inside a timed truth word (_inside). The start and end of the file are
+    not cuts."""
     for clip in clips:
         for edge in (clip.start, clip.end):
             if edge <= 0 or (duration is not None and edge >= duration - 1e-3):
                 continue
             out["checked"] += 1
-            inside = [w for w in words if w.start < edge < w.end]
-            if inside:
+            depth = _inside(edge, words)
+            if depth is not None:
                 out["in_words"] += 1
-                depth = max(min(edge - w.start, w.end - edge) for w in inside) * 1000
-                out["deepest_ms"] = max(out["deepest_ms"], round(depth, 1))
+                out["deepest_ms"] = max(out["deepest_ms"], round(depth * 1000, 1))
+
+
+def _inside(edge: float, words: list) -> float | None:
+    """How far an edge lies inside the timed truth words it is strictly inside, in seconds, the
+    deepest of them; None when it is inside none."""
+    inside = [w for w in words if w.start < edge < w.end]
+    return max(min(edge - w.start, w.end - edge) for w in inside) if inside else None
 
 
 def _regions(clips: list[Clip]) -> list[tuple[float, float, list[tuple[float, float]]]]:

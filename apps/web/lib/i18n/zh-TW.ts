@@ -171,6 +171,15 @@ export const zhTW: Messages = {
       minimal: { name: "精簡", help: "只用你放入的素材，剪輯並加上字幕。" },
     },
     stock: "圖庫影片需要免費的 Pexels 或 Pixabay 金鑰（選填）。",
+    fillers: "贅詞移除",
+    fillersChoices: {
+      natural: { name: "自然", help: "剪掉嗯、呃、um 這類遲疑聲，以及重複說的字。" },
+      aggressive: {
+        name: "積極",
+        help: "也剪掉常成為口頭禪的詞，例如然後、就是、like、you know，由 Claude 判斷哪些沒有意義。",
+      },
+      off: { name: "關閉", help: "保留說出的每一個字。" },
+    },
     stockKey: (name, saved) => (saved ? `${name} 金鑰已儲存 · 更換` : `${name} 金鑰`),
     advanced: "進階設定",
     quality: "品質",

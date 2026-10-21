@@ -165,6 +165,18 @@ export const en = {
       minimal: { name: "Minimal", help: "Only the footage you dropped in, cut and captioned." },
     },
     stock: "Stock footage needs a free Pexels or Pixabay key; optional.",
+    fillers: "Filler removal",
+    fillersChoices: {
+      natural: {
+        name: "Natural",
+        help: "Cuts hesitations such as um, uh and 嗯, and words stuttered twice.",
+      },
+      aggressive: {
+        name: "Aggressive",
+        help: "Also cuts words that are often verbal tics, such as like, you know, 然後 and 就是, where Claude finds they add nothing.",
+      },
+      off: { name: "Off", help: "Keeps every word said." },
+    },
     stockKey: (name: string, saved: boolean) =>
       saved ? `${name} key saved · Replace` : `${name} key`,
     advanced: "Advanced settings",

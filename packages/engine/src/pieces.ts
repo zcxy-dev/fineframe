@@ -11,6 +11,9 @@ import {
 /** 5 ms fades on the sound at a hard cut: twice what the click measurement needed, far too short
  * to hear (packages/engine/README.md). */
 export const EDGE_FADE_SAMPLES = 240;
+/** 20 ms fades on the sound where a clip's sound starts after its first sample or ends before
+ * its last (`soundIn`, `soundOut`): the edge of a word said straight into the one cut. */
+const SOUND_EDGE_FADE_SAMPLES = 960;
 
 /** A range of one clip: `frames` output frames and `samples` output samples, starting
  * `fromFrame` frames and `fromSample` samples after the clip's own start. */
@@ -29,6 +32,10 @@ interface MainLayer extends Span {
   /** Sound fades in and out, in samples, where the span meets a cut or a dip. */
   fadeIn: number;
   fadeOut: number;
+  /** Samples of silence before the fade in and after the fade out: the part of the clip's first
+   * or last frame outside its sound (`soundIn`, `soundOut`). */
+  muteIn: number;
+  muteOut: number;
 }
 
 export interface BrollLayer extends Span {
@@ -110,13 +117,34 @@ export function cutPieces(timeline: Timeline): Piece[] {
 
   /** A span's dips and sound fades: at its start when it opens on a cut or a dip, and at its
    * end when it closes on one. */
-  const edges = (layer: Span & Pick<MainLayer, "clip">, opens: boolean, closes: boolean) => ({
-    ...layer,
-    dipIn: opens ? layer.clip.dipIn : null,
-    dipOut: closes ? layer.clip.dipOut : null,
-    fadeIn: opens ? soundFade(layer.clip.dipIn, timeline, layer.samples) : 0,
-    fadeOut: closes ? soundFade(layer.clip.dipOut, timeline, layer.samples) : 0,
-  });
+  const edges = (layer: Span & Pick<MainLayer, "clip">, opens: boolean, closes: boolean) => {
+    const { clip, samples, fromSample } = layer;
+    // Where the clip's sound starts and ends, in samples into the span.
+    const sound = (ticks: number | undefined) =>
+      ticks === undefined ? null : ticksToSamples(ticks - clip.in) - fromSample;
+    const start = opens ? sound(clip.clip.soundIn) : null;
+    const end = closes ? sound(clip.clip.soundOut) : null;
+    const muteIn = start === null ? 0 : Math.min(Math.max(0, start), samples);
+    const muteOut = end === null ? 0 : Math.min(Math.max(0, samples - end), samples - muteIn);
+    const heard = samples - muteIn - muteOut;
+    return {
+      ...layer,
+      dipIn: opens ? clip.dipIn : null,
+      dipOut: closes ? clip.dipOut : null,
+      fadeIn: !opens
+        ? 0
+        : start === null
+          ? soundFade(clip.dipIn, timeline, samples)
+          : Math.min(SOUND_EDGE_FADE_SAMPLES, Math.floor(heard / 2)),
+      fadeOut: !closes
+        ? 0
+        : end === null
+          ? soundFade(clip.dipOut, timeline, samples)
+          : Math.min(SOUND_EDGE_FADE_SAMPLES, Math.floor(heard / 2)),
+      muteIn,
+      muteOut,
+    };
+  };
   const bodiless = (clip: TimelineClip) =>
     clip.dissolveIn + clip.dissolveOut === clip.end - clip.start;
 

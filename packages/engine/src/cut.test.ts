@@ -161,6 +161,24 @@ test("an edge with no pause moves inward, keeping a word asked for rather than t
   assert.match(cutEdit(edit(), [[s(0.6), s(0.9)]], joinedSources(false)).notes[0] ?? "", /: w1$/);
 });
 
+test("a word with too little silence beside it for a cut on a frame goes alone", () => {
+  // 0.1 s between w3 and w4: both margins fit, a frame does not. w4 alone goes, and the clip
+  // before it ends its sound in the middle of that silence, on the first frame after it.
+  const spaced = new Map(
+    [...joinedSources(false)].map(([id, source]) => [
+      id,
+      { ...source, words: source.words.map((w, k) => (k === 4 ? { ...w, start: 2.0 } : w)) },
+    ]),
+  );
+  const { project, notes } = cutEdit(edit(), [[s(2.1), s(2.3)]], spaced);
+  assert.match(notes[0] ?? "", /: w4$/);
+  const before = project.main[0] as Project["main"][number];
+  assert.equal(before.soundOut, s(1.95));
+  assert.ok(before.out > s(1.95) && before.out - s(1.95) < FRAME);
+  assert.equal((project.main[1] as Project["main"][number]).soundIn, undefined);
+  validateProject(project);
+});
+
 test("a stretch with no pause inside grows out to the nearest ones, and says what it took", () => {
   // Only w4 asked for, said without a pause on either side: w3 and w5 go with it.
   const { notes, removed, outside } = cutEdit(edit(), [[s(2.1), s(2.2)]], joinedSources(true));

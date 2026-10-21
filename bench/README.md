@@ -202,6 +202,7 @@ uv run vebench render --media output.mp4 --cuts edit_cuts.json
 uv run vebench mix --voice voice.wav --music music.wav --project project.json
 uv run vebench beats --ref synthetic/music/beat-112.json --hyp beat-112.music.json
 uv run vebench edit --project runs/video-editor-60s/project.json
+uv run vebench edit --project runs/video-editor-60s/project.json --edges picture
 ```
 
 ## Results tables
@@ -254,7 +255,11 @@ Run times and memory in this repository's docs were measured on 8 cores of an EP
   matches within ±70 ms as mir_eval counts them, the matched beats' mean and largest offset,
   and the tempo's error.
 - **`edit`:** a `project.json` against the edit truth of each clip its sources come from: a
-  source at `<clip>/source.<ext>` is scored with `<clip>/truth/`.
+  source at `<clip>/source.<ext>` is scored with `<clip>/truth/`. A clip is judged where its
+  sound starts and ends: at `soundIn` and `soundOut` when it has them, the sound edges a cut
+  in a pause too short for a frame sets inside the clip's first or last frame, and at
+  `in` and `out` otherwise. `--edges picture` judges every clip at `in` and `out`, as `edit`
+  did before sound edges.
   - `length`: the edit's length against its target, and whether it lands within the tolerance.
   - `cuts`: clip edges strictly inside a timed truth word, and the deepest, in milliseconds.
     The start and end of a source file are not cuts.

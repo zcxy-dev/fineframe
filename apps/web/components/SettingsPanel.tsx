@@ -9,6 +9,8 @@ import {
   type Asr,
   CAPTION_STYLES,
   DEFAULT_CAPTIONS,
+  FILLER_MODES,
+  type FillerMode,
   formatLength,
   formatRange,
   INSTRUCTIONS_MAX,
@@ -54,6 +56,8 @@ export interface Choices {
   /** Where the speech is heard. */
   asr: Asr;
   visuals: Visuals;
+  /** Which fillers are cut. */
+  fillers: FillerMode;
   quality: Quality;
   /** Whether Claude corrects each transcript. */
   correct: boolean;
@@ -496,6 +500,24 @@ export function SettingsPanel({
             ))}
           </p>
         )}
+      </fieldset>
+
+      <fieldset className={styles.field}>
+        <legend className={styles.label}>{words.fillers}</legend>
+        <div className={styles.chips}>
+          {FILLER_MODES.map((fillers) => (
+            <button
+              key={fillers}
+              type="button"
+              className={styles.chip}
+              aria-pressed={choices.fillers === fillers}
+              onClick={() => set({ fillers })}
+            >
+              {words.fillersChoices[fillers].name}
+            </button>
+          ))}
+        </div>
+        <p className={styles.help}>{words.fillersChoices[choices.fillers].help}</p>
       </fieldset>
 
       <details className={styles.advanced}>

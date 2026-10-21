@@ -6,6 +6,7 @@ import { buildTimeline } from "../timeline.ts";
 import {
   CUT_GAP,
   cuttableAfter,
+  joinAt,
   LEAD,
   lengthOf,
   MARGIN,
@@ -336,4 +337,42 @@ test("a clip starts after a shot change in the silence it opens with, and ends b
   assert.ok(clip.out <= after, `out at ${s(clip.out)} s, after the shot change at ${s(after)} s`);
   assert.ok(s(clip.in) <= (words[1] as Word).start - MARGIN);
   assert.ok(s(clip.out) >= (words[1] as Word).end + MARGIN);
+});
+
+test("a silence too short for a cut on a frame takes one at its middle, the sound cut there", () => {
+  // w1 is a filler with 0.1 s of silence on each side: room for both margins, not for a frame.
+  const words = [
+    { text: "w0", start: 1, end: 1.3 },
+    { text: "w1", start: 1.4, end: 1.6 },
+    { text: "w2", start: 1.7, end: 1.9 },
+  ];
+  const spaced = source(words, FRAME_30);
+  assert.ok(!cuttableAfter(spaced, 0));
+  assert.equal(joinAt(spaced, 0), 1.35);
+  // Less than both margins, speech the transcript missed in it, or a shot change at it: none.
+  const tight = [words[0] as Word, { text: "w1", start: 1.37, end: 1.6 }];
+  assert.equal(joinAt(source(tight, FRAME_30), 0), null);
+  assert.equal(joinAt({ ...spaced, unheard: [[1.32, 1.36]] }, 0), null);
+  assert.equal(joinAt({ ...spaced, shots: [[1.34, 1.34]] }, 0), null);
+
+  const [before, after] = placeClips([{ source: "a", words: [0, 2] }], map(spaced), FRAME_30) as [
+    PlacedClip,
+    PlacedClip,
+  ];
+  // The clip before ends on the first frame after the cut, silent from it on; the clip after
+  // starts on the source frame before its cut, silent until it.
+  assert.equal(before.soundOut, secondsToTicks(1.35));
+  assert.ok((before.out as number) > before.soundOut && before.out - before.soundOut < FRAME_30);
+  assert.equal((before.out - before.in) % FRAME_30, 0);
+  assert.equal(after.soundIn, secondsToTicks(1.65));
+  assert.ok(after.in < after.soundIn && after.soundIn - after.in < FRAME_30);
+  assert.equal(after.in % FRAME_30, 0);
+  // Without a frame grid the clip starts there, with no silent sliver.
+  const grid = placeClips(
+    [{ source: "a", words: [2] }],
+    map({ ...spaced, frameTicks: null }),
+    FRAME_30,
+  )[0] as PlacedClip;
+  assert.equal(grid.in, secondsToTicks(1.65));
+  assert.equal(grid.soundIn, undefined);
 });

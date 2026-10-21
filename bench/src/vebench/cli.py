@@ -67,7 +67,7 @@ def main(argv: list[str] | None = None) -> None:
         elif args.command == "beats":
             result = beats.score(args.ref, args.hyp)
         elif args.command == "edit":
-            result = edit.score(args.project)
+            result = edit.score(args.project, args.edges)
         elif args.command == "synthetic":
             published.download(args.out)
             result = {"corpus": str(args.out), "sha256": published.SHA256}
@@ -158,6 +158,13 @@ def _parser() -> argparse.ArgumentParser:
         epilog="Each source is scored against <its clip>/truth: bench/README.md#edit-truth",
     )
     p.add_argument("--project", type=Path, required=True, help="the edit's project.json")
+    p.add_argument(
+        "--edges",
+        choices=["sound", "picture"],
+        default="sound",
+        help="judge each clip where its sound starts and ends, or where its picture does "
+        "(default: %(default)s)",
+    )
 
     p = sub.add_parser(
         "synthetic",
