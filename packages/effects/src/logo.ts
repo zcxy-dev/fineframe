@@ -30,8 +30,9 @@ export function svgProblem(svg: string): string | null {
   const parser = new Parser(
     {
       onopentag(name, attributes) {
-        root ??= name;
-        if (!ELEMENTS.has(name)) refuse(`it has a <${name}> element`);
+        // XML keeps a tag's case: linearGradient, foreignObject.
+        root ??= name.toLowerCase();
+        if (!ELEMENTS.has(name.toLowerCase())) refuse(`it has a <${name}> element`);
         for (const [key, value] of Object.entries(attributes)) {
           if (key.startsWith("on")) refuse(`it has a ${key} attribute`);
           const reference = key === "href" || key.endsWith(":href");
