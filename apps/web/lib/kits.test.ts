@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { faceFile } from "@video-editor/engine/brand";
 import { JobError } from "./jobs.ts";
 import {
   createKit,
@@ -111,4 +112,20 @@ test("an edit names its kit by id, and asks for the kit's captions only with a k
   assert.equal(typeof checkSettings({ ...asked, captions: "brand" }), "string");
   assert.equal(typeof checkSettings({ ...asked, brand: 7 }), "string");
   assert.equal((checkSettings(asked) as { brand?: unknown }).brand, undefined);
+});
+
+test("two fonts uploaded under one name are kept apart, each named by what it holds", async (t) => {
+  const root = await kits(t);
+  const { id } = await createKit("Kit");
+  const face = await readFile((await faceFile("jf-openhuninn")) as string);
+  // Bytes after the last table leave a font readable, and make it another file.
+  const other = Buffer.concat([face, Buffer.alloc(4)]);
+  await putFont(id, "graphics", "Brand.ttf", face);
+  const { brand } = await putFont(id, "captions", "Brand.ttf", other);
+  const graphics = brand.fonts?.graphics as { path: string };
+  const captions = brand.fonts?.captions as { path: string };
+  assert.notEqual(graphics.path, captions.path);
+  assert.match(graphics.path, /^fonts\/Brand-[0-9a-f]{12}\.ttf$/);
+  assert.equal((await readFile(join(root, id, graphics.path))).length, face.length);
+  assert.equal((await readFile(join(root, id, captions.path))).length, other.length);
 });

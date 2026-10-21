@@ -590,7 +590,9 @@ function KitFields({
             </option>
           ))}
           {uploaded && (
-            <option value="file">{words.uploaded(uploaded.path.replace(/^fonts\//, ""))}</option>
+            <option value="file">
+              {words.uploaded(uploaded.path.replace(/^fonts\/|-[0-9a-f]{12}(?=\.\w+$)/g, ""))}
+            </option>
           )}
         </select>
         <label className={styles.kitUpload}>

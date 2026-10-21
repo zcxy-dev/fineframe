@@ -2,7 +2,7 @@
 // fonts, as `pnpm edit --brand` takes it, in the app's folder (VIDEO_EDITOR_BRAND_KITS) or, run
 // from a clone, beside the jobs in the engine's cache. One may be the default, which the start
 // settings pick unless another is chosen. Nothing leaves this computer.
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -181,8 +181,7 @@ export async function removeLogo(id: string): Promise<Kit> {
   return { id, brand: rest };
 }
 
-/** Takes an uploaded TrueType or OpenType font as the kit's face for `use`, under its own name
- * made safe as a file name. */
+/** Takes an uploaded TrueType or OpenType font as the kit's face for `use`. */
 export async function putFont(
   id: string,
   use: "graphics" | "captions",
@@ -193,11 +192,19 @@ export async function putFont(
   const problem = fontProblem(data);
   if (problem) throw new JobError((t) => t.server.badFont(problem), 400);
   const extension = data.toString("latin1", 0, 4) === "OTTO" ? "otf" : "ttf";
+  // Named as uploaded and by what it holds, so two fonts of one name never share a file and the
+  // page's preview, which loads a face by its path, never shows the one before.
   const stem = fileTitle(name.replace(/\.(ttf|otf)$/i, ""));
-  const path = `fonts/${stem}.${extension}`;
+  const hash = createHash("sha256").update(data).digest("hex").slice(0, 12);
+  const path = `fonts/${stem}-${hash}.${extension}`;
   await mkdir(join(kitFolder(id), "fonts"), { recursive: true });
   await writeWhole(join(kitFolder(id), path), data);
-  return saveKit(id, { ...brand, fonts: { ...brand.fonts, [use]: { path } } });
+  const saved: Brand = { ...brand, fonts: { ...brand.fonts, [use]: { path } } };
+  await writeChecked(id, saved);
+  for (const old of fontPaths(brand)) {
+    if (!fontPaths(saved).includes(old)) await rm(join(kitFolder(id), old), { force: true });
+  }
+  return { id, brand: saved };
 }
 
 /** Deletes a kit and its files; the default goes with it. */
