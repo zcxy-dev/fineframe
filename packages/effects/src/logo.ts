@@ -3,8 +3,6 @@
 // Chrome the graphics render in, as an image, which runs nothing and loads nothing.
 
 import { Parser } from "htmlparser2";
-import puppeteer from "puppeteer-core";
-import { guardPage } from "./guard.ts";
 
 /** The largest SVG logo read. */
 export const MAX_SVG_BYTES = 2 * 1024 * 1024;
@@ -97,6 +95,9 @@ export async function rasterizeSvg(svg: string, chrome: string, longest = 1024):
   const ratio = Math.min(20, Math.max(1 / 20, aspect(svg)));
   const width = Math.max(1, Math.round(ratio >= 1 ? longest : longest * ratio));
   const height = Math.max(1, Math.round(ratio >= 1 ? longest / ratio : longest));
+  // Loaded only to draw: a server that reads kits never starts a browser to check one.
+  const { default: puppeteer } = await import("puppeteer-core");
+  const { guardPage } = await import("./guard.ts");
   const browser = await puppeteer.launch({
     executablePath: chrome,
     headless: true,

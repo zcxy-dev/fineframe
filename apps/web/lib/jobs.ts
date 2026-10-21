@@ -8,7 +8,6 @@ import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { loadKit, stageBrand, writeKit } from "@video-editor/engine/brand";
-import { chrome } from "@video-editor/engine/chrome";
 import { cacheDir } from "@video-editor/engine/download";
 import { ffmpeg } from "@video-editor/engine/ffmpeg";
 import {
@@ -1154,7 +1153,8 @@ export class Jobs {
       folder,
       join(this.#dir(job), "brand"),
       dirname(path),
-      () => chrome(),
+      // Only an SVG logo is drawn, in Chrome, loaded then: the server starts without it.
+      async () => (await import("@video-editor/engine/chrome")).chrome(),
     );
     return { ...revision, brand };
   }
