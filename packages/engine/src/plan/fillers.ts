@@ -1,5 +1,5 @@
 import type { Word } from "@video-editor/schema";
-import { bare } from "./text.ts";
+import { bare, endsSentence } from "./text.ts";
 
 /** How much of what is said `--fillers` cuts: clear hesitations and stutters (natural), words
  * that are often verbal tics too (aggressive), or nothing (off). */
@@ -106,16 +106,17 @@ function opens(words: readonly Word[], i: number): boolean {
 }
 
 /** How many words from word `i` are said again, and again, until their last copy: the copies
- * before it, 0 when none. The shortest repeated run counts, so 我我我 is two copies of 我. A
- * Chinese character said again after punctuation is the start of the next phrase (很多，多嘗試),
- * not a repeat. */
+ * before it, 0 when none. The shortest repeated run counts, so 我我我 is two copies of 我. Words
+ * said again after the end of a sentence (like that. That was), or a Chinese character said again
+ * after any punctuation (差不多，多一點), start the next sentence or phrase: no repeat. */
 function repeated(words: readonly Word[], i: number): number {
   for (let n = 1; n <= REPEAT_MAX; n++) {
     const run = words.slice(i, i + n).map((w) => bare(w.text));
     if (run.length < n || run.some((text) => !text)) return 0;
     const next = (copies: number) => {
       const end = (words[i + copies * n - 1] as Word).text;
-      return !(n === 1 && HAN.test(end) && /\p{P}$/u.test(end)) && says(words, i + copies * n, run);
+      const apart = endsSentence(end) || (n === 1 && HAN.test(end) && /\p{P}$/u.test(end));
+      return !apart && says(words, i + copies * n, run);
     };
     let copies = 1;
     while (next(copies)) copies++;

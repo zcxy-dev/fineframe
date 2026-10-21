@@ -354,6 +354,11 @@ test("a silence too short for a cut on a frame takes one at its middle, the soun
   assert.equal(joinAt(source(tight, FRAME_30), 0), null);
   assert.equal(joinAt({ ...spaced, unheard: [[1.32, 1.36]] }, 0), null);
   assert.equal(joinAt({ ...spaced, shots: [[1.34, 1.34]] }, 0), null);
+  // A shot change or a click anywhere in that silence, as a splice the source was edited with
+  // leaves, would show the take before or click at the cut: none either.
+  assert.equal(joinAt({ ...spaced, shots: [[1.39, 1.39]] }, 0), null);
+  assert.equal(joinAt({ ...spaced, peaks: peaks(60, [1.38]) }, 0), null);
+  assert.equal(joinAt({ ...spaced, peaks: peaks(60, [5]) }, 0), 1.35);
 
   const [before, after] = placeClips([{ source: "a", words: [0, 2] }], map(spaced), FRAME_30) as [
     PlacedClip,

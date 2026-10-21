@@ -38,7 +38,7 @@ const MARKS: Record<FillerMode, string> = {
 const CLEAR_FILLERS = `- fillers: ids of marked words to cut: hesitations, which 嗯, 呃 and um almost always \
 are, and stutters, the first of words said twice (the first 我 of 我我媽, the first the of the \
 the). Keep a repeat that is one word, said for emphasis or two different words (謝謝, 慢慢, \
-最最最, 對對對 agreeing, 很多，多嘗試).`;
+最最最, 對對對 agreeing, 差不多，多一點).`;
 
 const CUT_WORDS = (missed: string) => `- cut_words: words inside a line to cut. ${missed} the \
 marks missed, such as a hesitation the speech model wrote as another character at the start of \

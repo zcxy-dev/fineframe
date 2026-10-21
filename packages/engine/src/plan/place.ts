@@ -336,9 +336,10 @@ function joinBefore(source: PlaceSource, i: number): number | null {
  * Where a cut may fall between words `i` and `i` + 1 of a source whose silence between them is
  * too short for a cut on a frame (cuttableAfter) but holds MARGIN on both sides of a point: the
  * middle of the longest such silence, in seconds. The clip's picture then cuts on the frame
- * beyond it and its sound at the point itself. Null where no silence leaves both margins, or
- * where a shot change lies within a frame of the point. This is the only test of whether two
- * words with no pause a frame fits in may be cut apart.
+ * beyond it and its sound at the point itself. That silence leaves no room to move past a splice,
+ * so the cut is refused, null, where a click in the source's sound lies in it or a shot change
+ * lies in it or within a frame of it, as it is where no silence leaves both margins. This is the
+ * only test of whether two words with no pause a frame fits in may be cut apart.
  */
 export function joinAt(source: PlaceSource, i: number): number | null {
   if (!source.words[i] || !source.words[i + 1]) return null;
@@ -347,10 +348,11 @@ export function joinAt(source: PlaceSource, i: number): number | null {
     null,
   );
   if (!silence || silence[1] - silence[0] < 2 * MARGIN) return null;
-  const at = (silence[0] + silence[1]) / 2;
+  const [from, to] = silence;
   const frame = (source.frameTicks ?? 0) / TICKS_PER_SECOND;
-  if ((source.shots ?? []).some(([a, b]) => a < at + frame && b > at - frame)) return null;
-  return at;
+  if ((source.shots ?? []).some(([a, b]) => a < to + frame && b > from - frame)) return null;
+  if (clicks(source, from, to).length > 0) return null;
+  return (from + to) / 2;
 }
 
 /** The source frame start at or before `t`, or `t` itself without a grid. */

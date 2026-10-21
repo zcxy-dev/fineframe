@@ -189,7 +189,7 @@ export function cutEdit(
       const closing = tail ? clip : edge(lastIndex);
       // A sound edge in a pause too short for a frame ends the clip on the first frame after it.
       const clipOut =
-        !tail && closing.soundOut !== undefined
+        closing.soundOut !== undefined
           ? clipIn + Math.max(1, Math.ceil((closing.soundOut - clipIn) / frame)) * frame
           : endOnFrame(
               clipIn,

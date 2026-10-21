@@ -164,11 +164,16 @@ test("a stutter marks every copy but the last, of one word or a few", () => {
     ["The", 2.0, 2.1],
     ["the", 2.1, 2.2],
     ["end.", 2.2, 2.4],
-    // 很多，多嘗試: two words, not a repeat.
-    ["很", 3.0, 3.1],
+    // 差不多，多一點: two words, not a repeat.
+    ["不", 3.0, 3.1],
     ["多，", 3.1, 3.3],
     ["多", 3.4, 3.5],
-    ["試", 3.5, 3.6],
+    ["一", 3.5, 3.6],
+    // like that. That was: a sentence ends between them.
+    ["like", 4.0, 4.1],
+    ["that.", 4.1, 4.3],
+    ["That", 4.5, 4.6],
+    ["was", 4.6, 4.7],
   );
   assert.deepEqual(
     fillerCandidates("a", list, "natural").map((c) => [c.first, c.last]),
