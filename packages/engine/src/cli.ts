@@ -1,4 +1,5 @@
-// `pnpm render`: renders a project.json again, as written or with stretches cut out of it.
+// `pnpm render`: renders a project.json again, as written or with stretches cut out of it, or
+// exports it for an editing app.
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -11,15 +12,22 @@ import {
 } from "@video-editor/schema";
 import { loadKit, stageBrand, withBrand } from "./brand/kit.ts";
 import { cutEdit, placeSources } from "./cut.ts";
+import { exportEdit } from "./nle/export.ts";
 import { rebase, render } from "./render.ts";
 
 const usage = `Usage: pnpm render <project.json> -o <out.mp4> [--cut <from>-<to>]... [--retarget] \\
     [--brand <kit folder | none>]
+       pnpm render <project.json> --export <folder>
 
 Renders the edit a project.json describes, without analysing or planning again, and writes
 <name>.project.json, <name>.srt and edit_cuts.json beside the video.
 
   -o, --output   the video
+      --export   instead of rendering, exports the edit for an editing app into the folder,
+                 which must be empty or new: <name>.fcpxml for Final Cut Pro and DaVinci Resolve,
+                 <name>.xml for Premiere Pro, <name>.srt, and in media/ the B-roll, music and
+                 sound effects with overlay.mov, the graphics over transparency. The footage
+                 is not copied: the timelines name where it is
       --cut      takes a stretch of the edit out, as times in the video it describes: seconds
                  or minutes:seconds, such as 12.5-15 or 1:02-1:04.5. The words said in it go,
                  every cut moves to a pause inside it (or, with none, the nearest outside, as
@@ -37,6 +45,7 @@ const parsed = (() => {
       allowPositionals: true,
       options: {
         output: { type: "string", short: "o" },
+        export: { type: "string" },
         cut: { type: "string", multiple: true },
         retarget: { type: "boolean" },
         brand: { type: "string" },
@@ -54,7 +63,15 @@ if (values.help) {
   process.exit(0);
 }
 const [input] = positionals;
-if (!input || !values.output || positionals.length > 1 || (values.retarget && !values.cut)) {
+const exporting = values.export !== undefined;
+const changing = values.cut !== undefined || values.brand !== undefined;
+if (
+  !input ||
+  positionals.length > 1 ||
+  exporting === (values.output !== undefined) ||
+  (exporting && changing) ||
+  (values.retarget && !values.cut)
+) {
   console.error(usage);
   process.exit(2);
 }
@@ -80,8 +97,21 @@ const ranges = (values.cut ?? []).map((text) => {
 // pnpm runs scripts in the root's or the package's folder; paths are the caller's.
 const here = process.env.INIT_CWD ?? process.cwd();
 const projectPath = resolve(here, input);
-const out = resolve(here, values.output);
 const seconds = (ticks: number) => (ticks / TICKS_PER_SECOND).toFixed(2);
+if (values.export !== undefined) {
+  try {
+    const result = await exportEdit(projectPath, resolve(here, values.export), {
+      onProgress: (fraction, message) =>
+        process.stderr.write(`${Math.round(fraction * 100)}% ${message}\n`),
+    });
+    console.log(JSON.stringify(result, null, 2));
+  } catch (error) {
+    console.error(`render: error: ${(error as Error).message}`);
+    process.exit(1);
+  }
+  process.exit(0);
+}
+const out = resolve(here, values.output as string);
 try {
   let path = projectPath;
   if (ranges.length > 0 || values.brand) {

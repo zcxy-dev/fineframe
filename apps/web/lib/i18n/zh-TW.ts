@@ -401,6 +401,11 @@ export const zhTW: Messages = {
     download: "下載 MP4",
     downloadCaptions: "下載字幕（SRT）",
     downloadCredits: "下載 B-roll 版權資訊（TXT）",
+    exportApp: "匯出到剪輯軟體",
+    exporting: "正在準備匯出…",
+    exportFallback: "無法完成匯出。",
+    exportHelp:
+      "給 Final Cut Pro、DaVinci Resolve 或 Premiere Pro 的 ZIP，含 B-roll、音樂和動態圖卡",
     another: "開始新的剪輯",
   },
   shorts: {
@@ -772,6 +777,8 @@ export const zhTW: Messages = {
     noChanges: "沒有要套用的修改",
     noCredits: "這次剪輯沒有 B-roll 版權資訊",
     noCaptions: "這次剪輯沒有字幕",
+    exportTooLarge: "匯出的檔案太大，無法放進一個 ZIP；請改用 pnpm render --export 匯出",
+    exportFailed: (error) => `匯出失敗：${error}`,
     noShort: "沒有這支短影音",
     tooLarge: "短影音太大，無法放進一個 ZIP；請逐支下載",
     emptyFile: "檔案是空的",

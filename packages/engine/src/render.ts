@@ -14,7 +14,7 @@ import {
   validateOverlays,
 } from "@video-editor/effects";
 import { loadJson, type Project, TICKS_PER_SECOND, validateProject } from "@video-editor/schema";
-import { moveBrand, resolveBrand } from "./brand/kit.ts";
+import { moveBrand, type ResolvedBrand, resolveBrand } from "./brand/kit.ts";
 import { type Credit, creditText, markCredits } from "./broll/credits.ts";
 import { buildCaptions, stageFonts } from "./captions/index.ts";
 import { chrome } from "./chrome.ts";
@@ -42,8 +42,8 @@ import { graphicPlacement } from "./graph/overlays.ts";
 import { pieceAudio, pieceVideo } from "./graph/piece.ts";
 import { cube, isLookId, lookIds, lutKey } from "./looks.ts";
 import { cutPieces } from "./pieces.ts";
-import { loadSources } from "./sources.ts";
-import { buildTimeline } from "./timeline.ts";
+import { loadSources, type SourceFacts } from "./sources.ts";
+import { buildTimeline, type Timeline } from "./timeline.ts";
 
 export interface RenderOptions {
   /** Called as the render advances, with the fraction done (0 to 1) and a line to show. */
@@ -159,98 +159,19 @@ export async function render(
   out: string,
   options: RenderOptions = {},
 ): Promise<RenderResult> {
-  const project = await loadJson(projectPath, validateProject);
-  validateOverlays(project.overlays ?? []);
-  validateGraphics(project.graphics ?? [], project.output.aspect);
-  const problems = unrendered(project);
-  if (problems.length > 0) {
-    throw new Error(`The renderer does not draw these yet:\n${problems.join("\n")}`);
-  }
-  const looks = unknownLooks(project);
-  if (looks.length > 0) throw new Error(looks.join("\n"));
   const report = options.onProgress ?? (() => {});
   report(0, "Checking sources");
-  const sources = await loadSources(project, projectPath);
-  const brand = project.brand
-    ? await resolveBrand(
-        project.brand,
-        dirname(resolve(projectPath)),
-        async (svg) => rasterizeSvg(svg, await chrome()),
-        options.onDownload,
-      )
-    : null;
-  const timeline = buildTimeline(project, sources);
+  const { project, timeline, brand } = await loadEdit(projectPath, options.onDownload);
   const pieces = cutPieces(timeline);
   // Before anything renders, so a line the caption font cannot draw fails at once.
-  const captions = await buildCaptions(
-    project,
-    timeline,
-    brand
-      ? {
-          colors: brand.brand.colors,
-          ...(brand.brand.captions ? { custom: brand.brand.captions } : {}),
-          face: brand.captions,
-        }
-      : undefined,
-  );
+  const captions = await captionsFor(project, timeline, brand);
   const bin = await ffmpeg();
 
-  const effects = timeline.overlays.length + timeline.graphics.length;
-  const share = effects > 0 ? OVERLAY_SHARE : 0;
-  const { aspect, width, height, fps } = project.output;
-  // Shared between the overlays and the graphics by how many each has.
-  const part = timeline.overlays.length / Math.max(1, effects);
-  // Chrome Headless Shell and ffprobe are fetched only for the renderer that runs them.
-  let binaries: Promise<Binaries> | undefined;
-  const programs = () => {
-    binaries ??= effectBinaries(bin, options.onDownload);
-    return binaries;
-  };
-  const overlays =
-    timeline.overlays.length === 0
-      ? []
-      : await (
-          options.renderOverlays ??
-          (async (jobs, effectOptions) => renderOverlays(jobs, await programs(), effectOptions))
-        )(
-          timeline.overlays.map(
-            ({ overlay, start, end }): OverlayJob => ({
-              template: overlay.template as TemplateId,
-              params: overlay.params as unknown as OverlayJob["params"],
-              aspect,
-              width,
-              height,
-              fps,
-              frames: end - start,
-              ...(brand ? { brand: brand.look } : {}),
-            }),
-          ),
-          { onProgress: (fraction, message) => report(fraction * share * part, message) },
-        );
-  const graphics =
-    timeline.graphics.length === 0
-      ? []
-      : await (
-          options.renderGraphics ??
-          (async (jobs, effectOptions) => renderGraphics(jobs, await programs(), effectOptions))
-        )(
-          timeline.graphics.map(({ graphic, start, end }): GraphicJob => {
-            const at = graphicPlacement(graphic, project.output);
-            return {
-              layout: graphic.layout,
-              html: graphic.html,
-              css: graphic.css,
-              ...(graphic.box ? { box: at } : {}),
-              output: project.output,
-              frames: end - start,
-              ...(brand ? { brand: brand.look } : {}),
-            };
-          }),
-          {
-            onProgress: (fraction, message) =>
-              report(share * (part + fraction * (1 - part)), message),
-          },
-        );
+  const share = timeline.overlays.length + timeline.graphics.length > 0 ? OVERLAY_SHARE : 0;
+  const { overlays, graphics } = await renderEffects(project, timeline, brand, bin, {
+    ...options,
+    onProgress: (fraction, message) => report(fraction * share, message),
+  });
   const progress = (fraction: number, message: string) =>
     report(share + fraction * (1 - share), message);
 
@@ -429,6 +350,118 @@ export async function render(
   }
 }
 
+/** The project at `projectPath`, checked as the renderer draws it, with its sources' facts, its
+ * brand kit and its timeline. */
+export async function loadEdit(
+  projectPath: string,
+  onDownload?: RenderOptions["onDownload"],
+): Promise<{
+  project: Project;
+  sources: Map<string, SourceFacts>;
+  brand: ResolvedBrand | null;
+  timeline: Timeline;
+}> {
+  const project = await loadJson(projectPath, validateProject);
+  validateOverlays(project.overlays ?? []);
+  validateGraphics(project.graphics ?? [], project.output.aspect);
+  const problems = unrendered(project);
+  if (problems.length > 0) {
+    throw new Error(`The renderer does not draw these yet:\n${problems.join("\n")}`);
+  }
+  const looks = unknownLooks(project);
+  if (looks.length > 0) throw new Error(looks.join("\n"));
+  const sources = await loadSources(project, projectPath);
+  const brand = project.brand
+    ? await resolveBrand(
+        project.brand,
+        dirname(resolve(projectPath)),
+        async (svg) => rasterizeSvg(svg, await chrome()),
+        onDownload,
+      )
+    : null;
+  return { project, sources, brand, timeline: buildTimeline(project, sources) };
+}
+
+/** The edit's captions as its brand kit draws them, if it has one. */
+export function captionsFor(project: Project, timeline: Timeline, brand: ResolvedBrand | null) {
+  return buildCaptions(
+    project,
+    timeline,
+    brand
+      ? {
+          colors: brand.brand.colors,
+          ...(brand.brand.captions ? { custom: brand.brand.captions } : {}),
+          face: brand.captions,
+        }
+      : undefined,
+  );
+}
+
+/** Renders the timeline's effect overlays and graphics, or takes them from the effects' cache:
+ * the files of `timeline.overlays` and of `timeline.graphics`, in their orders. */
+export async function renderEffects(
+  project: Project,
+  timeline: Timeline,
+  brand: ResolvedBrand | null,
+  bin: string,
+  options: RenderOptions,
+): Promise<{ overlays: string[]; graphics: string[] }> {
+  const report = options.onProgress ?? (() => {});
+  const { aspect, width, height, fps } = project.output;
+  // Shared between the overlays and the graphics by how many each has.
+  const part =
+    timeline.overlays.length / Math.max(1, timeline.overlays.length + timeline.graphics.length);
+  // Chrome Headless Shell and ffprobe are fetched only for the renderer that runs them.
+  let binaries: Promise<Binaries> | undefined;
+  const programs = () => {
+    binaries ??= effectBinaries(bin, options.onDownload);
+    return binaries;
+  };
+  const overlays =
+    timeline.overlays.length === 0
+      ? []
+      : await (
+          options.renderOverlays ??
+          (async (jobs, effectOptions) => renderOverlays(jobs, await programs(), effectOptions))
+        )(
+          timeline.overlays.map(
+            ({ overlay, start, end }): OverlayJob => ({
+              template: overlay.template as TemplateId,
+              params: overlay.params as unknown as OverlayJob["params"],
+              aspect,
+              width,
+              height,
+              fps,
+              frames: end - start,
+              ...(brand ? { brand: brand.look } : {}),
+            }),
+          ),
+          { onProgress: (fraction, message) => report(fraction * part, message) },
+        );
+  const graphics =
+    timeline.graphics.length === 0
+      ? []
+      : await (
+          options.renderGraphics ??
+          (async (jobs, effectOptions) => renderGraphics(jobs, await programs(), effectOptions))
+        )(
+          timeline.graphics.map(({ graphic, start, end }): GraphicJob => {
+            const at = graphicPlacement(graphic, project.output);
+            return {
+              layout: graphic.layout,
+              html: graphic.html,
+              css: graphic.css,
+              ...(graphic.box ? { box: at } : {}),
+              output: project.output,
+              frames: end - start,
+              ...(brand ? { brand: brand.look } : {}),
+            };
+          }),
+          { onProgress: (fraction, message) => report(part + fraction * (1 - part), message) },
+        );
+  return { overlays, graphics };
+}
+
 /**
  * Masters the sound until its encoded true peak is at most `target` dBTP and within
  * `PEAK_NEAR_DB` of it: `attempt(ceiling, n)` writes try `n` with the limiter at `ceiling` (none
@@ -577,7 +610,7 @@ function brollCredits(project: Project, timeline: ReturnType<typeof buildTimelin
 
 /** Runs the encoder, in the folder and environment given, while `feed` writes frames into its
  * stdin, waits for it to finish, and returns how many frames it encoded. */
-async function encode(
+export async function encode(
   bin: string,
   args: string[],
   { cwd, env }: { cwd: string; env: NodeJS.ProcessEnv },

@@ -238,6 +238,27 @@ pnpm render out/edit.project.json --cut 29-33 -o out/edit-v2.mp4
 
 The edit as cut is written to `<name>.project.json` beside the video, which may not be the project it was cut from.
 
+### Exporting to an editing app
+
+```bash
+pnpm render out/edit.project.json --export out/edit-export
+```
+
+`--export` writes, instead of a video, what Final Cut Pro, DaVinci Resolve and Premiere Pro open to finish the edit there ([`src/nle/`](src/nle/)), into a folder that must be empty or new:
+
+- **`<name>.fcpxml`** (FCPXML 1.8, for Final Cut Pro and Resolve) and **`<name>.xml`** (Final Cut Pro 7 XML, for Premiere Pro): the same timeline, every clip on exactly the frames the render shows it, at every frame rate, NTSC included.
+- **`<name>.srt`:** the captions, as the render writes them.
+- **`media/`:** copies of the B-roll, music and sound effects, which the timelines name by paths relative to themselves, and `overlay.mov`, when the edit has graphics, effect overlays or a watermark: those alone, drawn as the render draws them over transparency, in ProRes 4444 with its alpha, the length of the edit. The footage on the main track, and the owner's own images and videos shown as B-roll (sources without a `credit`), are not copied: the timelines name their absolute paths as file URLs.
+- **`README.txt`:** the same, in English and Traditional Chinese.
+
+What the timelines hold:
+
+- **Main track:** each clip with its sound. A dissolve becomes a cross dissolve whose cut falls `floor(d / 2)` frames into it, on the clips' own frames either side, so every frame outside it is the render's; a dip is a cut at the same frames, without its fade.
+- **Framing:** one fixed position and scale per clip, the mean of what its crop and punch-in show over its frames, since a pan or push-in has no one place. A clip whose framing cuts (keyframes a tick apart, as from one speaker to the other) is split there, so the mean never falls between two people. The halves of a split screen are two clips, cropped, the lower one on the track above.
+- **B-roll** on the tracks above, each at its rect, cropped to it, its sound at its gain or muted; then `overlay.mov` on top.
+- **Music and sound effects** on tracks of their own at their gains, each range starting on the frame nearest its start and its in point moved by as much, so every moment of it plays when the render plays it: to the sample in FCPXML, to the nearest frame in Final Cut Pro 7 XML, which counts in frames. The music's fades and its ducking under speech are level keyframes, straight where the render's ramps are curves; the render's further ducking under speech quieter than the edit's is measured from the rendered sound and left out.
+- **Left out:** the grade, the voice chain, loudness normalisation, the blurred fill where a crop reaches past the picture, B-roll fades and the 5 ms fades at cuts. The footage plays as recorded.
+
 ## What it renders
 
 | `project.json` | |
@@ -465,4 +486,4 @@ The effects also need ffprobe, which [HyperFrames](../effects/README.md#renderin
 
 ## Tests
 
-`pnpm --filter @video-editor/engine test` runs every test here except the one that asks Claude, which needs your own key; with `CI` set it skips the ones that need Chrome too ([CONTRIBUTING](../../CONTRIBUTING.md#setup)). The first run downloads the pinned FFmpeg and the caption fonts. Planning tests replay `src/plan/fixtures/talk-plan.json`.
+`pnpm --filter @video-editor/engine test` runs every test here except the one that asks Claude, which needs your own key; with `CI` set it skips the ones that need Chrome too ([CONTRIBUTING](../../CONTRIBUTING.md#setup)). The first run downloads the pinned FFmpeg and ffprobe and the caption fonts. Planning tests replay `src/plan/fixtures/talk-plan.json`.

@@ -1,6 +1,6 @@
 ---
 name: video-editor
-description: Edits footage into a finished, captioned video with Fineframe (zcxy-dev/fineframe), or into several shorts, then changes the finished edit by conversation. Use when asked to edit, cut down or caption footage with it, to make shorts from a long video, or to change one of its edits (an edit.project.json): drop or trim a part, fix a caption, change the title, a lower third, a chapter, a motion graphic or B-roll, the music, the look or the brand kit.
+description: Edits footage into a finished, captioned video with Fineframe (zcxy-dev/fineframe), or into several shorts, then changes the finished edit by conversation. Use when asked to edit, cut down or caption footage with it, to make shorts from a long video, or to change one of its edits (an edit.project.json): drop or trim a part, fix a caption, change the title, a lower third, a chapter, a motion graphic or B-roll, the music, the look or the brand kit; or to export an edit to Final Cut Pro, DaVinci Resolve or Premiere Pro.
 ---
 
 # video-editor
@@ -62,3 +62,15 @@ These change what the planner chose, so say so to the user and run `pnpm edit` a
 - More or fewer fillers cut throughout: `--fillers aggressive` also cuts words that are often verbal tics (然後, 就是, like, you know) where Claude finds they add nothing, and `--fillers off` keeps every word; `natural`, the default, cuts hesitations (嗯, 呃, um) and stutters. One filler is cut with `--cut` (recipes).
 
 A short is planned again from its own file and stretch, with up to 30 s on each side inside the file, into its folder, as a short about its moment: `pnpm -s edit <its file> --within <start − 30>-<end + 30> --short "<title>. <description>" --length 45s --aspect 9:16 -o out/shorts/01/edit-45s.mp4`, the stretch, title and description from `shorts.json`.
+
+## 4. Export to an editing app
+
+When the user wants to finish an edit in Final Cut Pro, DaVinci Resolve or Premiere Pro:
+
+```bash
+pnpm -s render out/edit.project.json --export out/edit-export
+```
+
+- The folder must be empty or new. It gets `edit.fcpxml` (Final Cut Pro and DaVinci Resolve), `edit.xml` (Premiere Pro), `edit.srt`, `README.txt` and `media/`: the B-roll, music and sound effects, and `overlay.mov`, the graphics, titles and watermark over transparency (ProRes 4444) for the top track. The footage is not copied: the timelines name where it is on this computer, so keep `media/` beside them and the footage where it is.
+- The timelines carry the cuts, each clip's framing as one position and scale, the B-roll, and the music with its fades and ducking as level keyframes. They leave out the grade, the voice processing, the loudness normalisation, the blurred fill past the picture and a dip's fade (a cut there); tell the user so.
+- Done when the JSON it prints lists the files.

@@ -84,6 +84,15 @@ export const DownloadIcon = (props: SVGProps<SVGSVGElement>) => (
   </Icon>
 );
 
+/** An arrow leaving a box: the edit sent on to another app. */
+export const ExportIcon = (props: SVGProps<SVGSVGElement>) => (
+  <Icon {...props}>
+    <path d="M14 4h6v6" />
+    <path d="m20 4-9 9" />
+    <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+  </Icon>
+);
+
 export const CaptionsIcon = (props: SVGProps<SVGSVGElement>) => (
   <Icon {...props}>
     <rect x="3" y="5" width="18" height="14" rx="2" />

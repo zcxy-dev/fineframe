@@ -419,6 +419,11 @@ export const en = {
     download: "Download MP4",
     downloadCaptions: "Download captions (SRT)",
     downloadCredits: "Download B-roll credits (TXT)",
+    exportApp: "Export to an editing app",
+    exporting: "Preparing the export…",
+    exportFallback: "The export could not be made.",
+    exportHelp:
+      "A zip for Final Cut Pro, DaVinci Resolve or Premiere Pro, with the B-roll, music and graphics",
     another: "Make another edit",
   },
   shorts: {
@@ -830,6 +835,9 @@ export const en = {
     noChanges: "No changes to apply",
     noCredits: "This edit has no B-roll credits",
     noCaptions: "This edit has no captions",
+    exportTooLarge:
+      "The export is too large for one zip; export it with pnpm render --export instead",
+    exportFailed: (error: string) => `The export failed: ${error}`,
     noShort: "No such short",
     tooLarge: "The shorts are too large for one zip; download them one by one",
     emptyFile: "The file is empty",

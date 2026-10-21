@@ -86,6 +86,75 @@ export function pieceVideo(
     );
     base = `[o${j}]`;
   }
+  base = effectLayers(piece, timeline, opened, graph, base, overlays, graphics, watermark);
+  graph.push(`${base}format=yuv420p[v]`);
+  return [
+    ...QUIET,
+    ...opened.args,
+    "-filter_complex",
+    graph.join(";"),
+    "-map",
+    "[v]",
+    ...RAW_VIDEO,
+    "pipe:1",
+  ];
+}
+
+/** Raw frames as pieceOverlay writes them: with their alpha, at full chroma. */
+export const RAW_OVERLAY = ["-f", "rawvideo", "-pix_fmt", "yuva444p"];
+
+/** The piece's graphics, effect overlays and watermark alone, over transparency, written to
+ * stdout as raw frames (RAW_OVERLAY): what an editing app lays over the footage. */
+export function pieceOverlay(
+  piece: Piece,
+  timeline: Timeline,
+  overlays: string[],
+  graphics: string[],
+  watermark: Watermark | null,
+): string[] {
+  const { width, height, fps } = timeline.output;
+  const opened = inputs(timeline);
+  const graph = [
+    `color=c=black@0:s=${width}x${height}:r=${fps.num}/${fps.den},format=yuva444p,` +
+      `trim=end_frame=${piece.end - piece.start}[clear]`,
+  ];
+  const base = effectLayers(
+    piece,
+    timeline,
+    opened,
+    graph,
+    "[clear]",
+    overlays,
+    graphics,
+    watermark,
+  );
+  graph.push(`${base}format=yuva444p[v]`);
+  return [
+    ...QUIET,
+    ...opened.args,
+    "-filter_complex",
+    graph.join(";"),
+    "-map",
+    "[v]",
+    ...RAW_OVERLAY,
+    "pipe:1",
+  ];
+}
+
+/** Lays the piece's graphics, then its effect overlays, then the watermark over `base`, adding
+ * their inputs and graph lines; returns the link the result ends in. */
+function effectLayers(
+  piece: Piece,
+  timeline: Timeline,
+  opened: ReturnType<typeof inputs>,
+  graph: string[],
+  base: string,
+  overlays: string[],
+  graphics: string[],
+  watermark: Watermark | null,
+): string {
+  const { output } = timeline;
+  const { fps } = output;
   for (const [k, layer] of piece.graphics.entries()) {
     const file = graphics[layer.clip.index];
     if (!file) throw new Error(`/graphics/${layer.clip.index}: has no rendered file`);
@@ -134,19 +203,9 @@ export function pieceVideo(
       }),
     ].map((layer): [number, number] => [layer.atFrame, layer.atFrame + layer.frames - 1]);
     graph.push(...watermarkLines(index, watermark, at, hidden, base, "[wm]"));
-    base = "[wm]";
+    return "[wm]";
   }
-  graph.push(`${base}format=yuv420p[v]`);
-  return [
-    ...QUIET,
-    ...opened.args,
-    "-filter_complex",
-    graph.join(";"),
-    "-map",
-    "[v]",
-    ...RAW_VIDEO,
-    "pipe:1",
-  ];
+  return base;
 }
 
 /**
