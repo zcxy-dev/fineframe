@@ -1,12 +1,18 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { Brand } from "@video-editor/schema";
 import { fontFile } from "../captions/fonts.ts";
+import { buildCaptions } from "../captions/index.ts";
 import { ffmpeg, QUIET, run } from "../ffmpeg.ts";
+import { pieceVideo } from "../graph/piece.ts";
+import { cutPieces } from "../pieces.ts";
+import { rebase } from "../render.ts";
 import { revise } from "../revise.ts";
-import { project, SECOND, scratch } from "../testing.ts";
+import { facts, project, SECOND, scratch, sources } from "../testing.ts";
+import { buildTimeline } from "../timeline.ts";
 import { BrandError, loadKit, resolveBrand, stageBrand, withBrand } from "./kit.ts";
 
 const KIT: Brand = {
@@ -121,4 +127,98 @@ test("a kit's custom captions become the edit's style, unless it shows none; a s
   assert.equal(restyled.captions?.preset, "minimal");
   assert.equal(restyled.brand?.captions, undefined);
   assert.equal(restyled.brand?.name, "Test kit");
+});
+
+test("without a kit, the captions, each piece's FFmpeg run and the project copy are as before kits", async () => {
+  // Hashes of what a render runs FFmpeg and libass with, recorded with the renderer before brand
+  // kits: an edit made then renders byte for byte as it did. A deliberate change to the captions
+  // or the graph changes this too; packages/effects checks the effect pages the same way.
+  const hash = (value: unknown) =>
+    createHash("sha256")
+      .update(typeof value === "string" ? value : JSON.stringify(value))
+      .digest("hex")
+      .slice(0, 16);
+  const words = (text: string, start: number) =>
+    [...text].map((c, i) => ({
+      text: c,
+      start: start + (i * SECOND) / 4,
+      end: start + ((i + 0.8) * SECOND) / 4,
+    }));
+  const lines = [
+    {
+      start: SECOND / 2,
+      end: SECOND / 2 + (12 * SECOND) / 4,
+      language: "zh-TW",
+      text: "大家好今天要來聊一下怎麼用AI",
+      words: words("大家好今天要來聊一下怎麼用", SECOND / 2),
+    },
+    {
+      start: 4 * SECOND,
+      end: 5.5 * SECOND,
+      language: "zh-TW",
+      text: "自動剪片7分鐘",
+      words: words("自動剪片7分鐘", 4 * SECOND),
+    },
+  ];
+  const out: Record<string, string> = {};
+  for (const aspect of ["16:9", "9:16"] as const) {
+    const size = aspect === "16:9" ? { width: 1280, height: 720 } : { width: 1080, height: 1920 };
+    for (const preset of ["bold", "creator", "minimal", "pop", "none"] as const) {
+      const edit = project([{ source: "a", in: 0, out: 6 * SECOND }], {
+        captions: { preset, srt: true, lines },
+      });
+      edit.output = { ...edit.output, aspect, ...size };
+      const files = await buildCaptions(edit, {
+        main: [],
+        broll: [],
+        frames: 180,
+        frameTicks: 4000,
+      });
+      out[`captions ${aspect} ${preset}`] = hash([files?.ass, files?.srt]);
+    }
+  }
+  const edit = project(
+    [
+      { source: "a", in: 0, out: 3 * SECOND },
+      {
+        source: "b",
+        in: SECOND,
+        out: 4 * SECOND,
+        transition: { type: "dissolve", duration: SECOND / 2 },
+      },
+    ],
+    {
+      graphics: [
+        {
+          layout: "label",
+          html: "<b>27</b>",
+          css: "",
+          box: { x: 0.1, y: 0.1, w: 0.4, h: 0.1 },
+          start: SECOND / 2,
+          duration: SECOND,
+        },
+        { layout: "full", html: "<b>27</b>", css: "", start: 3 * SECOND, duration: 2 * SECOND },
+      ],
+      overlays: [
+        {
+          template: "lower-third",
+          params: { name: "林語安" },
+          start: SECOND,
+          duration: 2 * SECOND,
+        },
+      ],
+    },
+  );
+  const timeline = buildTimeline(edit, sources(facts("a"), facts("b")));
+  for (const [i, piece] of cutPieces(timeline).entries()) {
+    out[`piece ${i}`] = hash(
+      pieceVideo(piece, timeline, ["overlay-0.webm"], new Map(), [
+        "graphic-0.webm",
+        "graphic-1.mp4",
+      ]),
+    );
+  }
+  out["project copy"] = hash(rebase(edit, "/edits/one/project.json", "/edits/one/out"));
+  assert.equal(Object.keys(out).length, 14);
+  assert.equal(hash(out), "48c412f7a723ec4c");
 });

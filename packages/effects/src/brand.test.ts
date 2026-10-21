@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { test } from "node:test";
 import { Rebrand } from "./brand.ts";
 import { catalog, templateIds } from "./catalog.ts";
 import { brandTones, contrast, hex, isAmber, PALETTE, readable } from "./colour.ts";
-import { graphicPage } from "./graphics.ts";
+import { type GraphicLayout, graphicPage } from "./graphics.ts";
 import { page } from "./page.ts";
 import { HOUSE_CSS } from "./style.ts";
 import { templateMarkup } from "./templates.ts";
@@ -106,4 +107,47 @@ test("without a kit, a page is the one the house look always drew", () => {
     assert.equal(page({ ...spec, ...markup }), page({ ...spec, ...markup, house: undefined }));
     assert.deepEqual(ambers(new Rebrand({ colors: BLUE }).css(markup.css)), []);
   }
+});
+
+test("without a kit, every graphic and template page is the one drawn before kits", () => {
+  // Hashes of the pages, recorded with the effects before brand kits: an edit made then renders
+  // its effects byte for byte as it did. A deliberate change to a page changes this too.
+  const hash = (value: unknown) =>
+    createHash("sha256")
+      .update(typeof value === "string" ? value : JSON.stringify(value))
+      .digest("hex")
+      .slice(0, 16);
+  const out: Record<string, string> = {};
+  for (const aspect of ["16:9", "9:16"] as const) {
+    const size = aspect === "16:9" ? { width: 1280, height: 720 } : { width: 1080, height: 1920 };
+    const output = { aspect, ...size, fps: { num: 30, den: 1 } };
+    const layouts =
+      aspect === "9:16" ? ["label", "panel", "full"] : ["label", "lower-third", "full"];
+    for (const layout of layouts as GraphicLayout[]) {
+      const made = graphicPage({
+        layout,
+        html: '<div class="ff-stage"></div><b class="ff-accent" style="color: #ffb547">27</b><img src="icons/accent/rocket.svg" width="20" height="20">',
+        css: ".x { color: rgba(255, 181, 71, 0.5); }",
+        box: { x: 10, y: 20, width: 300, height: 80 },
+        output,
+        frames: 45,
+      });
+      out[`graphic ${aspect} ${layout}`] = hash([
+        made.page,
+        made.width,
+        made.height,
+        made.transparent,
+        made.files ?? null,
+      ]);
+    }
+    for (const id of templateIds) {
+      const markup = templateMarkup(id, catalog[id].example, aspect, size.width, size.height, 2.9);
+      const u = Math.min(size.width, size.height) / 100;
+      out[`template ${aspect} ${id}`] = hash(
+        page({ ...size, u, fps: output.fps, frames: 90, ...markup }),
+      );
+    }
+  }
+  assert.equal(Object.keys(out).length, 16);
+  assert.equal(hash(out), "cb122141f132b56a");
 });
