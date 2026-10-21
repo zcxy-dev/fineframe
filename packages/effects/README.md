@@ -23,6 +23,17 @@ Motion follows the same numbers everywhere:
 - **Entrances:** every part enters with a CSS animation of 0.3 to 0.8 s, from a fast start that settles, and stays. Nothing animates out; an effect is cut away at its end. The wipe is the exception: its bands cross the frame and leave it.
 - **Pushes:** a full-frame graphic is pushed in from the right, and a panel down from the top, over its first 0.35 s ([`SLIDE`](src/graphics.ts)). The renderer moves the rendered graphic, so the graphic itself stays opaque.
 
+## Brand kits
+
+A [brand kit](../engine/README.md#brand-kits) changes the look as the effects render, never the markup Claude wrote, so a kit changes with a render alone ([`src/brand.ts`](src/brand.ts)):
+
+- **Colours:** every colour a page's CSS or style attributes name outright (hex, `rgb()`, `hsl()` or a name) whose hue is 20 to 55°, saturation at least 45 % and lightness 30 to 92 % is in the house amber's family, whether the house stylesheet's, a template's or a near amber Claude wrote. It becomes the kit's tone nearest it in lightness, primary, secondary or accent, with its alpha kept. The page loads the house stylesheet so recoloured, inline, in place of `house.css`.
+- **Text:** text in an amber or an accent variable is in the kit's primary, or white where that falls under 3:1 contrast on the dark stage; text in a box filled with an amber or an accent variable is black or white, whichever reads better on it.
+- **Icons and logos** drawn in the accent come from a copy in the kit's primary, in `brand/marks-<colour>/` of the render's folder.
+- **Face:** with a kit's face, every font family is `"Fineframe Brand", "Noto Sans TC"`, the face loaded from `brand/<hash>.<ext>` of the render's folder, at every weight as drawn. Text may run wider or narrower than the checks measured it in the house faces.
+
+[`colour.ts`](src/colour.ts) holds the arithmetic, with no Node module, so the web page's previews use the same tones. Without a kit, a page is the one the house look draws.
+
 ## Graphics
 
 Claude writes each edit's graphics for that video, as markup and its own CSS on the house stylesheet's classes. [`graphicsGuide`](src/graphics.ts) is what it is told: the look, the layouts, the safe area, the type sizes and the motion.
@@ -116,7 +127,7 @@ The timings, curves, type sizes and margins live in [`src/layout.ts`](src/layout
 - **Format:**
   - A transparent page (a template, a label or a lower third) is VP9 with alpha in WebM. Reading its alpha needs FFmpeg's libvpx decoder ([FFmpeg requirements](../engine/README.md#ffmpeg)).
   - An opaque page (a panel or a full-frame graphic) is H.264 in MP4. HyperFrames captures opaque pages faster on Linux, where Chrome's BeginFrame capture leaves out alpha.
-- **Cache:** renders are kept in `~/.cache/video-editor/effects/` (or under `XDG_CACHE_HOME`). A page is keyed by its whole document, size, frame rate, frame count and alpha, and by the house stylesheet, the fonts and the pinned HyperFrames version, so an unchanged page renders once. The folder the pages load the stylesheet and the fonts from, about 7 MB, is made once per version beside them; delete the folder to reclaim the space.
+- **Cache:** renders are kept in `~/.cache/video-editor/effects/` (or under `XDG_CACHE_HOME`). A page is keyed by its whole document, which names a brand kit's face and marks by their contents, size, frame rate, frame count and alpha, and by the house stylesheet, the fonts and the pinned HyperFrames version, so an unchanged page renders once. The folder the pages load the stylesheet and the fonts from, about 7 MB, is made once per version beside them; delete the folder to reclaim the space.
 - **Speed:** measured in [MEASUREMENTS.md](../engine/MEASUREMENTS.md#effect-measurements).
 
 ## Preview

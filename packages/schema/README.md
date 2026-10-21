@@ -57,7 +57,9 @@ A project renders the same video every time from the file and the sources it nam
 
 **The main track** plays its clips back to back. A clip starts where the one before it ends, except after a dissolve, which overlaps the two clips by its duration. So the edit lasts the sum of `out - in` over the clips, minus the dissolves' durations.
 
-**Layers**, bottom to top: the main track, B-roll in array order, graphics in array order, overlays in array order, then captions, which are never covered.
+**Layers**, bottom to top: the main track, B-roll in array order, graphics in array order, overlays in array order, a brand kit's watermark, then captions, which are never covered.
+
+**Brand kits.** `brand` is a brand kit as its folder's `kit.json` holds it, with its file paths relative to the project and each file's SHA-256, which the renderer checks. `validateBrand` checks a `kit.json`. It is applied at render time alone; a project without it renders in the house look as projects before kits did.
 
 **Frames.** Output frame *n* shows what is on the timeline at its start, `frameToTicks(n, fps)`. Something on screen from `start` to `end` is in frame *n* when `start <= frameToTicks(n, fps) < end`.
 
