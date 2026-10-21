@@ -35,6 +35,12 @@ def _say(line: str) -> None:
     print(f"vework: {line}", file=sys.stderr)
 
 
+def _first_line(exc: Exception) -> str:
+    """An error as one log line: Metal's compiler errors run to dozens."""
+    lines = str(exc).splitlines()
+    return f"{type(exc).__name__}: {lines[0] if lines else ''}"
+
+
 def finite(*arrays: Any) -> bool:
     """Whether every array holds numbers, none NaN or infinite, and none is empty."""
     return all(np.size(a) and np.isfinite(a).all() for a in arrays)
@@ -72,7 +78,7 @@ class Fallback:
                     return result
                 problem = "its output was NaN or empty"
             except Exception as exc:
-                problem = f"{type(exc).__name__}: {exc}"
+                problem = _first_line(exc)
             self.fail(problem)
         if self.run is None:
             self.run = self.load(False)
@@ -99,7 +105,6 @@ def decode[T](step: str, attempt: Callable[[Any], T]) -> T:
         return attempt(av.codec.hwaccel.HWAccel("videotoolbox", allow_software_fallback=False))
     except Exception as exc:
         _say(
-            f"{step}: decoding with VideoToolbox failed ({type(exc).__name__}: {exc}); "
-            "decoding in software"
+            f"{step}: decoding with VideoToolbox failed ({_first_line(exc)}); decoding in software"
         )
     return attempt(None)
