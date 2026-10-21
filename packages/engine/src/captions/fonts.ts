@@ -131,7 +131,7 @@ function familyName(font: Buffer, name: number): string {
     if (id !== 1) continue;
     const start = strings + offset;
     const bytes = font.subarray(start, start + length);
-    if (bytes.length !== length) throw new RangeError("name");
+    if (bytes.length !== length) throw new FaceError("its family name runs past the file");
     const windows = platform === 3 && (encoding === 1 || encoding === 0 || encoding === 10);
     const rank = windows ? (language === 0x409 ? 0 : 1) : platform === 1 && encoding === 0 ? 2 : -1;
     if (rank < 0 || (found && found.rank <= rank)) continue;
@@ -145,17 +145,33 @@ function familyName(font: Buffer, name: number): string {
 }
 
 /** Reads head, hhea, hmtx, OS/2 and a format 12 or 4 Unicode cmap of an OpenType font. */
-function parseMetrics(font: Buffer, tables: Map<string, { offset: number }>): Metrics {
+function parseMetrics(
+  font: Buffer,
+  tables: Map<string, { offset: number; length: number }>,
+): Metrics {
   const table = (tag: string) => tables.get(tag)?.offset as number;
+  const glyphs = font.readUInt16BE(table("maxp") + 4);
   const units = font.readUInt16BE(table("head") + 18);
   if (units < 16 || units > 16384) throw new FaceError("its units per em are out of range");
   const hmetrics = font.readUInt16BE(table("hhea") + 34);
   if (hmetrics === 0) throw new FaceError("it has no glyph widths");
+  if (4 * hmetrics > (tables.get("hmtx")?.length as number)) {
+    throw new FaceError("its glyph widths run past their table");
+  }
   const hmtx = table("hmtx");
   const os2 = table("OS/2");
   const winAscent = font.readUInt16BE(os2 + 74);
   const winDescent = font.readUInt16BE(os2 + 76);
-  const glyph = cmapLookup(font, table("cmap"));
+  const lookup = cmapLookup(
+    font,
+    table("cmap"),
+    tables.get("cmap") as { offset: number; length: number },
+  );
+  // A glyph the face does not have counts as missing.
+  const glyph = (codePoint: number) => {
+    const id = lookup(codePoint);
+    return id !== undefined && id < glyphs ? id : undefined;
+  };
   return {
     advance(codePoint) {
       const id = glyph(codePoint);
@@ -173,7 +189,12 @@ function parseMetrics(font: Buffer, tables: Map<string, { offset: number }>): Me
 
 /** A code point's glyph by the cmap's Unicode subtable: format 12, which maps every plane, or
  * else format 4, the Basic Multilingual Plane's. */
-function cmapLookup(font: Buffer, cmap: number): (codePoint: number) => number | undefined {
+function cmapLookup(
+  font: Buffer,
+  cmap: number,
+  bounds: { offset: number; length: number },
+): (codePoint: number) => number | undefined {
+  const end = bounds.offset + bounds.length;
   const subtables: number[] = [];
   for (let i = 0; i < font.readUInt16BE(cmap + 2); i++) {
     const record = cmap + 4 + 8 * i;
@@ -186,7 +207,8 @@ function cmapLookup(font: Buffer, cmap: number): (codePoint: number) => number |
   const twelve = subtables.find((at) => font.readUInt16BE(at) === 12);
   if (twelve !== undefined) {
     const count = font.readUInt32BE(twelve + 12);
-    if (twelve + 16 + 12 * count > font.length) throw new RangeError("cmap");
+    if (twelve + 16 + 12 * count > end)
+      throw new FaceError("its character map runs past its table");
     return (codePoint) => {
       let low = 0;
       let high = count - 1;
@@ -207,7 +229,9 @@ function cmapLookup(font: Buffer, cmap: number): (codePoint: number) => number |
   const starts = ends + 2 * segments + 2;
   const deltas = starts + 2 * segments;
   const ranges = deltas + 2 * segments;
-  if (ranges + 2 * segments > font.length) throw new RangeError("cmap");
+  // The glyph ids a range offset points at lie inside the subtable, or the code point is missing.
+  const tail = Math.min(end, four + font.readUInt16BE(four + 2));
+  if (ranges + 2 * segments > tail) throw new FaceError("its character map runs past its table");
   return (codePoint) => {
     if (codePoint > 0xffff) return undefined;
     let low = 0;
@@ -223,7 +247,9 @@ function cmapLookup(font: Buffer, cmap: number): (codePoint: number) => number |
         const delta = font.readUInt16BE(deltas + 2 * middle);
         const range = font.readUInt16BE(ranges + 2 * middle);
         if (range === 0) return (codePoint + delta) & 0xffff;
-        const id = font.readUInt16BE(ranges + 2 * middle + range + 2 * (codePoint - start));
+        const at = ranges + 2 * middle + range + 2 * (codePoint - start);
+        if (at + 2 > tail) return undefined;
+        const id = font.readUInt16BE(at);
         return id === 0 ? 0 : (id + delta) & 0xffff;
       }
     }

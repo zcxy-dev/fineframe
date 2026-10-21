@@ -105,12 +105,6 @@ export function readable(colour: string, backdrop: string): string {
   return contrast(BLACK, b) > contrast(WHITE, b) ? "#000000" : "#ffffff";
 }
 
-/** Black or white, whichever reads better on `colour`. */
-export function textOn(colour: string): string {
-  const c = hex(colour);
-  return contrast(BLACK, c) > contrast(WHITE, c) ? "#000000" : "#ffffff";
-}
-
 /** The house's three ambers, by lightness, and the kit's colour that replaces each. */
 const ROLES = [
   { house: PALETTE.accentDeep, role: "secondary" },

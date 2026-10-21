@@ -14,7 +14,6 @@ export {
   type WipeParams,
 } from "./catalog.ts";
 export { checkGraphics, type GraphicCheck, type GraphicCheckJob } from "./check.ts";
-export { type BrandColors, brandTones, readable, textOn } from "./colour.ts";
 export {
   ENTRANCE,
   FULL_SHARE,

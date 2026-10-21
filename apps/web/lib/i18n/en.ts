@@ -266,7 +266,7 @@ export const en = {
     size: "Size",
     opacity: "Opacity",
     logoHelp:
-      "The watermark stays in its corner through the whole video, under the captions, and steps aside while a full-frame graphic or a top panel shows.",
+      "The watermark stays in its corner through the whole video, under the captions, and steps aside while a graphic, a title, a name or a chapter it would cover shows.",
     captions: "Custom captions",
     useCaptions: "Use custom captions",
     startsFrom: "Starts from",

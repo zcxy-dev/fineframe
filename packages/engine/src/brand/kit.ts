@@ -190,16 +190,11 @@ export async function writeKit(brand: Brand, base: string, folder: string): Prom
   await writeFile(join(folder, KIT_FILE), `${JSON.stringify(kit, null, 2)}\n`);
 }
 
-/** The project in `brand`'s look, or the house look with null: its custom captions, when it has
- * them, become the edit's captions unless it has none on the picture. */
+/** The project in `brand`'s look, or the house look with null. The edit keeps its own caption
+ * style, which the kit's custom captions draw over and which taking the kit off brings back. */
 export function withBrand(project: Project, brand: Brand | null): Project {
   const { brand: _, ...rest } = project;
-  if (!brand) return rest;
-  const captions =
-    brand.captions && project.captions && project.captions.preset !== "none"
-      ? { captions: { ...project.captions, preset: brand.captions.style } }
-      : {};
-  return { ...rest, ...captions, brand };
+  return brand ? { ...rest, brand } : rest;
 }
 
 /** The kit with each of its files' paths changed by `move`, as when its project moves. */

@@ -521,11 +521,7 @@ async function cutEdit(
           : {}),
         music: prepared.music,
         names: prepared.names,
-        ...(options.captions
-          ? { captions: options.captions }
-          : prepared.brand?.kit.captions
-            ? { captions: prepared.brand.kit.captions.style }
-            : {}),
+        ...(options.captions ? { captions: options.captions } : {}),
         ...(prepared.brand
           ? { brand: moveBrand(prepared.brand.kit, (path) => kitPath(prepared, work, path)) }
           : {}),

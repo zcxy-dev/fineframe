@@ -113,18 +113,16 @@ test("an edit copies the kit's files by their content and a render refuses one c
   await assert.rejects(resolveBrand(staged, edit), /has changed since the edit was made/);
 });
 
-test("a kit's custom captions become the edit's style, unless it shows none; a style picked after turns them off", () => {
+test("a kit's custom captions draw over the edit's style, which taking the kit off brings back", () => {
   const edit = project([{ source: "a", in: 0, out: 5 * SECOND }], {
-    captions: { preset: "bold", srt: true, lines: [] },
+    captions: { preset: "minimal", srt: true, lines: [] },
   });
   const branded = withBrand(edit, KIT);
-  assert.equal(branded.captions?.preset, "creator");
+  assert.equal(branded.captions?.preset, "minimal");
   assert.deepEqual(branded.brand, KIT);
-  const none = withBrand({ ...edit, captions: { preset: "none", srt: true, lines: [] } }, KIT);
-  assert.equal(none.captions?.preset, "none");
-  assert.equal(withBrand(branded, null).brand, undefined);
-  const restyled = revise(branded, { captions: "minimal" }, new Map()).project;
-  assert.equal(restyled.captions?.preset, "minimal");
+  assert.deepEqual(withBrand(branded, null), edit);
+  const restyled = revise(branded, { captions: "pop" }, new Map()).project;
+  assert.equal(restyled.captions?.preset, "pop");
   assert.equal(restyled.brand?.captions, undefined);
   assert.equal(restyled.brand?.name, "Test kit");
 });
