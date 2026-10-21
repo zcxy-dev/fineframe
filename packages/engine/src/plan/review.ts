@@ -266,7 +266,9 @@ function describe(edit: PlannedEdit, words: readonly TimedWord[], k: number, at:
   ].join("\n");
 }
 
-/** Runs `task` over `items`, at most `limit` at a time, keeping their order. */
+/** Runs `task` over `items`, at most `limit` at a time, keeping their order. When one fails, none
+ * more starts, and it fails only once the ones running have ended: they read the video and write
+ * strips that the caller deletes next. */
 async function pool<T, R>(
   items: readonly T[],
   limit: number,
@@ -274,12 +276,20 @@ async function pool<T, R>(
 ) {
   const results: R[] = new Array(items.length);
   let next = 0;
+  let failed = false;
   const worker = async () => {
-    while (next < items.length) {
+    while (!failed && next < items.length) {
       const i = next++;
-      results[i] = await task(items[i] as T, i);
+      try {
+        results[i] = await task(items[i] as T, i);
+      } catch (error) {
+        failed = true;
+        throw error;
+      }
     }
   };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  const workers = Array.from({ length: Math.min(limit, items.length) }, worker);
+  const failure = (await Promise.allSettled(workers)).find((each) => each.status === "rejected");
+  if (failure) throw failure.reason;
   return results;
 }
