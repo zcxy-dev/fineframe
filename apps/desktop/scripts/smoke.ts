@@ -346,15 +346,18 @@ function descendants(root: number): number[] {
     const [child, parent] = line.trim().split(/\s+/).map(Number) as [number, number];
     children.set(parent, [...(children.get(parent) ?? []), child]);
   }
-  const found: number[] = [];
+  // Windows reuses ids: a process whose parent has ended can name, as its parent, an id a process
+  // below it now has, so each id is followed once.
+  const found = new Set<number>();
   const queue = [root];
   while (queue.length > 0) {
     for (const child of children.get(queue.shift() as number) ?? []) {
-      found.push(child);
+      if (child === root || found.has(child)) continue;
+      found.add(child);
       queue.push(child);
     }
   }
-  return found;
+  return [...found];
 }
 
 const alive = (pid: number) => {

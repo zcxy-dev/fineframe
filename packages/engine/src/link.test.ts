@@ -173,11 +173,12 @@ test("a link's video is read, then fetched into the folder with its progress", a
 
   // A file already there is never written over, even one whose name differs only in case, as
   // macOS and Windows do not tell those apart.
-  await writeFile(join(dir, "on AIR.mp4"), "a file of the user's");
-  const beside = await fetchLink(url, dir, { program: FAKE, stem: () => "On air" });
-  assert.equal(beside.path, join(dir, "On air (2).mp4"));
-  assert.equal(await readFile(join(dir, "on AIR.mp4"), "utf8"), "a file of the user's");
-  assert.deepEqual(await readFile(join(dir, "On air.mp4")), body);
+  const own = await scratch(t, "link-own-");
+  await writeFile(join(own, "on AIR.mp4"), "a file of the user's");
+  const beside = await fetchLink(url, own, { program: FAKE, stem: () => "On air" });
+  assert.equal(beside.path, join(own, "On air (2).mp4"));
+  assert.equal(await readFile(join(own, "on AIR.mp4"), "utf8"), "a file of the user's");
+  assert.deepEqual(await readFile(beside.path), body);
 
   // Never a configuration file or cookies, and the link only after "--".
   const runs = (await readFile(log, "utf8"))
@@ -239,7 +240,12 @@ for (const [how, signal] of [
   ["is interrupted (Ctrl+C)", "SIGINT"],
   ["is stopped", "SIGTERM"],
 ] as const) {
-  test(`a program that ${how} while fetching leaves nothing running or behind`, async (t) => {
+  // Windows has no signals: a process sent one there ends at once, with nothing of its own run.
+  const skip =
+    signal && process.platform === "win32" ? "Windows sends no signal a program can handle" : false;
+  test(`a program that ${how} while fetching leaves nothing running or behind`, {
+    skip,
+  }, async (t) => {
     const server = await serve(() => ({ body: Buffer.alloc(200_000) }));
     t.after(server.close);
     const dir = await scratch(t, "link-");
