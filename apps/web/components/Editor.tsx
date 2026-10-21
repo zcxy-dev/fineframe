@@ -97,20 +97,23 @@ export function Editor() {
   // The Brand kit page, over the rest while it shows.
   const [kitsOpen, setKitsOpen] = useState(false);
   const { list: kits, reload: reloadKits } = useKits();
-  // The default kit until the owner chooses, its custom captions with it.
+  // The default kit until the owner chooses, its custom captions with it; a chosen kit deleted
+  // since is none.
   const [brandChosen, setBrandChosen] = useState(false);
   useEffect(() => {
-    if (!kits || brandChosen) return;
-    const kit = kits.kits.find((each) => each.id === kits.default) ?? null;
-    setChoices((current) => ({
-      ...current,
-      brand: kit?.id ?? null,
-      captions: kit?.brand.captions
-        ? "brand"
+    if (!kits) return;
+    setChoices((current) => {
+      const kept = kits.kits.find((each) => each.id === current.brand) ?? null;
+      const kit = brandChosen ? kept : (kits.kits.find((each) => each.id === kits.default) ?? null);
+      const captions = kit?.brand.captions
+        ? brandChosen
+          ? current.captions
+          : "brand"
         : current.captions === "brand"
           ? DEFAULT_CAPTIONS
-          : current.captions,
-    }));
+          : current.captions;
+      return { ...current, brand: kit?.id ?? null, captions };
+    });
   }, [kits, brandChosen]);
   const [phase, setPhase] = useState<Phase>({ kind: "compose" });
   const upload = useRef<XMLHttpRequest | null>(null);
