@@ -1,16 +1,18 @@
-// The desktop app's account: signing in through the website in the browser (Supabase's PKCE flow,
-// redirected to a port on this computer's loopback address), the session kept in a file only its
-// owner can read beside the API keys, and whether it has a subscription. That is checked with
-// Supabase before each edit, and trusted offline for 7 days after the last check that reached it.
-// Only Node's own modules: the page's server, the desktop app and its `fineframe` command all run
-// it.
+// The desktop app's account, as the website's entitlement contract (ENTITLEMENT.md in
+// zcxy-dev/fineframe-site) describes it: signing in through the website in the browser (Supabase
+// Auth's OAuth 2.1 server, a public client with PKCE, redirected to a port on this computer's
+// loopback address), the session kept in a file only its owner can read beside the API keys, and
+// whether it may edit: always during the free beta, while Supabase's `billing_enabled` switch is
+// off, and otherwise with a subscription. That is checked with Supabase before each edit, and
+// trusted offline for 7 days after the last check that reached it. Only Node's own modules: the
+// page's server, the desktop app and its `fineframe` command all run it.
 import { createHash, randomBytes } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
-import { createServer } from "node:http";
+import { createServer, type Server } from "node:http";
 import { join } from "node:path";
 import { writePrivate } from "./private.ts";
 
-/** The website: the sign-in, the pricing and the account. */
+/** The website: the pricing and the account. */
 export const SITE = "https://fineframe.app";
 
 /** How long the app keeps working without reaching Supabase after a check said it may. */
@@ -19,16 +21,21 @@ export const OFFLINE_GRACE = 7 * 24 * 60 * 60 * 1000;
 /** How long the browser has to come back from the sign-in. */
 const SIGN_IN_WAIT = 10 * 60 * 1000;
 
-/** The Supabase project the app signs in with; both values are public. */
+/** The loopback ports the OAuth client's redirect URIs name, the first free one used. */
+const PORTS = [47821, 47822, 47823];
+
+/** The Supabase project the app signs in with, and its OAuth client; all public. */
 export interface Supabase {
   url: string;
-  anonKey: string;
+  publishableKey: string;
+  clientId: string;
 }
 
 /**
  * The project of this build: `supabase.json` at the editor's root, which the installer's stage
- * writes, or else FINEFRAME_SUPABASE_URL and FINEFRAME_SUPABASE_ANON_KEY, as when the app runs
- * from a clone. Null with neither: this build cannot sign in.
+ * writes, or else FINEFRAME_SUPABASE_URL, FINEFRAME_SUPABASE_PUBLISHABLE_KEY and
+ * FINEFRAME_OAUTH_CLIENT_ID, as when the app runs from a clone. Null without them: this build
+ * cannot sign in.
  */
 export async function readSupabase(
   editor: string,
@@ -37,8 +44,11 @@ export async function readSupabase(
   const text = await readFile(join(editor, "supabase.json"), "utf8").catch(() => null);
   if (text) return JSON.parse(text) as Supabase;
   const url = env.FINEFRAME_SUPABASE_URL;
-  const anonKey = env.FINEFRAME_SUPABASE_ANON_KEY;
-  return url && anonKey ? { url: url.replace(/\/$/, ""), anonKey } : null;
+  const publishableKey = env.FINEFRAME_SUPABASE_PUBLISHABLE_KEY;
+  const clientId = env.FINEFRAME_OAUTH_CLIENT_ID;
+  return url && publishableKey && clientId
+    ? { url: url.replace(/\/$/, ""), publishableKey, clientId }
+    : null;
 }
 
 interface Session {
@@ -46,10 +56,10 @@ interface Session {
   refreshToken: string;
   /** When the access token expires, in ms since the epoch. */
   expiresAt: number;
-  user: { id: string; email: string };
+  email: string;
 }
 
-/** The last check that reached Supabase: when, and whether it found a subscription. */
+/** The last check that reached Supabase: when, and whether the user could edit. */
 interface Check {
   at: number;
   entitled: boolean;
@@ -67,8 +77,8 @@ export interface Subscription {
   current_period_end: string | null;
 }
 
-/** Signed out, or signed in as `email` with a subscription or not. `offline`: Supabase could not
- * be reached, so `entitled` is the last check's, while it is less than 7 days old. */
+/** Signed out, or signed in as `email`, entitled to edit or not. `offline`: Supabase could not be
+ * reached, so `entitled` is the last check's, while it is less than 7 days old. */
 export type Status =
   | { signedIn: false }
   | { signedIn: true; email: string; entitled: boolean; offline: boolean };
@@ -110,41 +120,52 @@ class Refused extends Error {
   }
 }
 
-/** Supabase's answer to `path`, as JSON; Refused when it refuses the request. */
+/** Supabase's answer to `path`, as JSON: a GET with the user's `token`, or a POST of the `form`.
+ * Refused when it refuses the request. */
 async function call(
   supabase: Supabase,
   path: string,
-  init: { method?: string; body?: unknown; token?: string } = {},
+  init: { form?: Record<string, string>; token?: string },
 ): Promise<unknown> {
   const response = await fetch(`${supabase.url}${path}`, {
-    method: init.method ?? (init.body ? "POST" : "GET"),
+    method: init.form ? "POST" : "GET",
     headers: {
-      apikey: supabase.anonKey,
-      "Content-Type": "application/json",
+      apikey: supabase.publishableKey,
       ...(init.token ? { Authorization: `Bearer ${init.token}` } : {}),
     },
-    ...(init.body ? { body: JSON.stringify(init.body) } : {}),
+    ...(init.form ? { body: new URLSearchParams(init.form) } : {}),
     signal: AbortSignal.timeout(15_000),
   });
   if (response.status >= 400 && response.status < 500) throw new Refused(response.status);
   if (!response.ok) throw new Error(`Supabase answered HTTP ${response.status}`);
-  return response.status === 204 ? null : response.json();
+  return response.json();
 }
 
-/** A session from Supabase's token answer. */
+/** A session from the OAuth server's token answer; the email is the access token's own claim. */
 function sessionOf(answer: unknown, now: number): Session {
-  const token = answer as {
-    access_token: string;
-    refresh_token: string;
-    expires_in: number;
-    user: { id: string; email: string };
-  };
+  const token = answer as { access_token: string; refresh_token: string; expires_in: number };
+  const claims = JSON.parse(
+    Buffer.from(token.access_token.split(".")[1] ?? "", "base64url").toString(),
+  ) as { email?: string };
   return {
     accessToken: token.access_token,
     refreshToken: token.refresh_token,
     expiresAt: now + token.expires_in * 1000,
-    user: { id: token.user.id, email: token.user.email },
+    email: claims.email ?? "",
   };
+}
+
+/** Whether the user of `token` may edit: anyone while billing is off, a subscriber once it is on. */
+async function entitledNow(supabase: Supabase, token: string, now: number): Promise<boolean> {
+  const config = (await call(supabase, "/rest/v1/app_config?select=billing_enabled", {
+    token,
+  })) as { billing_enabled: boolean }[];
+  if (config[0]?.billing_enabled !== true) return true;
+  // Row-level security returns the user's own row alone.
+  const rows = (await call(supabase, "/rest/v1/subscriptions?select=status,current_period_end", {
+    token,
+  })) as Subscription[];
+  return entitledBy(rows, now);
 }
 
 async function read(file: string): Promise<Saved | null> {
@@ -157,8 +178,8 @@ const save = (file: string, saved: Saved) =>
 
 /**
  * Whether the user saved in `file` may edit: the session refreshed when it is about to expire,
- * then the subscription read and the check saved. Without Supabase, the last check holds for 7
- * days; a session Supabase refuses is signed out.
+ * then the billing switch and the subscription read and the check saved. Without Supabase, the
+ * last check holds for 7 days; a session Supabase refuses is signed out.
  */
 export async function accountStatus(
   file: string,
@@ -167,7 +188,7 @@ export async function accountStatus(
 ): Promise<Status> {
   const saved = await read(file);
   if (!saved || !supabase) return { signedIn: false };
-  const { email } = saved.session.user;
+  const { email } = saved.session;
   // Supabase refuses a refresh token that was revoked or whose user was deleted, and an access
   // token that is not its own.
   let refreshing = false;
@@ -175,20 +196,19 @@ export async function accountStatus(
     let session = saved.session;
     if (session.expiresAt - now < 60_000) {
       refreshing = true;
-      const answer = await call(supabase, "/auth/v1/token?grant_type=refresh_token", {
-        body: { refresh_token: session.refreshToken },
+      const answer = await call(supabase, "/auth/v1/oauth/token", {
+        form: {
+          grant_type: "refresh_token",
+          refresh_token: session.refreshToken,
+          client_id: supabase.clientId,
+        },
       });
       refreshing = false;
       session = sessionOf(answer, now);
       // Saved at once: the refresh token used is spent.
       await save(file, { ...saved, session });
     }
-    const rows = (await call(
-      supabase,
-      `/rest/v1/subscriptions?select=status,current_period_end&user_id=eq.${encodeURIComponent(session.user.id)}`,
-      { token: session.accessToken },
-    )) as Subscription[];
-    const entitled = entitledBy(rows, now);
+    const entitled = await entitledNow(supabase, session.accessToken, now);
     await save(file, { session, checked: { at: now, entitled } });
     return { signedIn: true, email, entitled, offline: false };
   } catch (error) {
@@ -224,7 +244,7 @@ export interface Landing {
   failed: string;
 }
 
-/** A sign-in under way: the page to open in the browser, and its end. */
+/** A sign-in under way: the address to open in the browser, and its end. */
 export interface SignIn {
   url: string;
   /** Settles once the browser came back and the session is saved, or rejects. */
@@ -233,17 +253,19 @@ export interface SignIn {
 }
 
 /**
- * Starts a sign-in: the website's sign-in page, given a PKCE challenge and a loopback address of
- * this app's to send the browser back to with Supabase's code, which only this app's verifier
- * turns into a session. The session is saved in `file`.
+ * Starts a sign-in: Supabase's authorization address, which sends the browser to the website to
+ * sign in, given a PKCE challenge, a state and a loopback address of this app's to send the
+ * browser back to with a code, which only this app's verifier turns into a session. The session
+ * is saved in `file`.
  */
-export function startSignIn(
+export async function startSignIn(
   file: string,
   supabase: Supabase,
-  locale: string,
   landing: Landing,
 ): Promise<SignIn> {
   const { verifier, challenge } = pkce();
+  const state = randomBytes(16).toString("base64url");
+  let redirect = "";
   let settle: { resolve: () => void; reject: (error: Error) => void } | undefined;
   const done = new Promise<void>((resolve, reject) => {
     settle = { resolve, reject };
@@ -257,6 +279,11 @@ export function startSignIn(
       return;
     }
     const code = url.searchParams.get("code");
+    // Another page sending the browser here is answered, but never signs anyone in.
+    if (url.searchParams.get("state") !== state) {
+      response.writeHead(400).end();
+      return;
+    }
     const answer = (ok: boolean) => {
       const text = ok ? landing.done : landing.failed;
       response
@@ -267,8 +294,14 @@ export function startSignIn(
     };
     const finish = async () => {
       if (!code) throw new Error(url.searchParams.get("error") ?? "No code came back");
-      const answer = await call(supabase, "/auth/v1/token?grant_type=pkce", {
-        body: { auth_code: code, code_verifier: verifier },
+      const answer = await call(supabase, "/auth/v1/oauth/token", {
+        form: {
+          grant_type: "authorization_code",
+          code,
+          client_id: supabase.clientId,
+          redirect_uri: redirect,
+          code_verifier: verifier,
+        },
       });
       await save(file, { session: sessionOf(answer, Date.now()) });
     };
@@ -293,36 +326,46 @@ export function startSignIn(
     clearTimeout(timer);
     server.close();
   };
-  return new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      const port = typeof address === "object" && address ? address.port : 0;
-      const query = new URLSearchParams({
-        redirect_to: `http://127.0.0.1:${port}/callback`,
-        code_challenge: challenge,
-        code_challenge_method: "s256",
-      });
-      resolve({
-        url: `${SITE}/${siteLocale(locale)}/app-sign-in/?${query}`,
-        done,
-        cancel: () => {
-          settle?.reject(new Error("The sign-in was cancelled"));
-          close();
-        },
-      });
-    });
+  const port = await listenOnFirstFree(server);
+  if (port === null) {
+    clearTimeout(timer);
+    throw new Error(`Ports ${PORTS.join(", ")} are all in use: close what uses them, then sign in`);
+  }
+  redirect = `http://127.0.0.1:${port}/callback`;
+  const query = new URLSearchParams({
+    response_type: "code",
+    client_id: supabase.clientId,
+    redirect_uri: redirect,
+    state,
+    code_challenge: challenge,
+    code_challenge_method: "S256",
   });
+  return {
+    url: `${supabase.url}/auth/v1/oauth/authorize?${query}`,
+    done,
+    cancel: () => {
+      settle?.reject(new Error("The sign-in was cancelled"));
+      close();
+    },
+  };
 }
 
-/** Signs out: Supabase revokes the session if it can be reached, and the file goes. */
-export async function signOut(file: string, supabase: Supabase | null): Promise<void> {
-  const saved = await read(file);
-  if (saved && supabase) {
-    await call(supabase, "/auth/v1/logout?scope=local", {
-      method: "POST",
-      token: saved.session.accessToken,
-    }).catch(() => {});
+/** Listens on the first of PORTS that is free; null when none is. */
+async function listenOnFirstFree(server: Server): Promise<number | null> {
+  for (const port of PORTS) {
+    const listening = await new Promise<boolean>((resolve) => {
+      server.once("error", () => resolve(false));
+      server.listen(port, "127.0.0.1", () => {
+        server.removeAllListeners("error");
+        resolve(true);
+      });
+    });
+    if (listening) return port;
   }
+  return null;
+}
+
+/** Signs out: the stored tokens are deleted. */
+export async function signOut(file: string): Promise<void> {
   await rm(file, { force: true });
 }

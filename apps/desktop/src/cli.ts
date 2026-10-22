@@ -2,7 +2,7 @@
 // parts, for people and agents without a clone. The launcher the app's menu installs (install.ts)
 // runs this with the app's binary as Node, the app's folder in VIDEO_EDITOR_DATA. The editor runs
 // as the page's server runs it: from the app's resources, with its Python, uv and keys. An edit
-// needs the account signed in in the app to have a subscription, as one from the page does.
+// needs the account signed in in the app to be entitled, as one from the page does.
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { constants } from "node:os";

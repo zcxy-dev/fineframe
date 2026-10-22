@@ -36,8 +36,8 @@ export async function GET(request: Request): Promise<Response> {
   });
 }
 
-/** Starts a sign-in: the page opens the address it answers in the browser, then asks GET until
- * the browser has come back. */
+/** Starts a sign-in: the page opens the address it answers in the browser, Supabase's, which
+ * sends it to the website to sign in; then the page asks GET until the browser has come back. */
 export async function POST(request: Request): Promise<Response> {
   try {
     checkOrigin(request);
@@ -46,7 +46,7 @@ export async function POST(request: Request): Promise<Response> {
     if (!path || !project) throw new JobError((t) => t.server.noSignIn, 400);
     const t = messagesOf(request);
     pending.videoEditorSignIn?.cancel();
-    const signIn = await startSignIn(path, project, localeOf(request), {
+    const signIn = await startSignIn(path, project, {
       done: t.account.landingDone,
       failed: t.account.landingFailed,
     });
@@ -62,7 +62,7 @@ export async function DELETE(request: Request): Promise<Response> {
   try {
     checkOrigin(request);
     const path = file();
-    if (path) await signOut(path, await supabase());
+    if (path) await signOut(path);
     return GET(request);
   } catch (error) {
     return errorResponse(error, request);

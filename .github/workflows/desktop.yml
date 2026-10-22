@@ -63,15 +63,16 @@ jobs:
       - name: Install espeak-ng
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y espeak-ng
-      # The Supabase project the app signs in with: public values, kept as repository variables.
-      # A release cannot be built without them.
+      # The Supabase project and OAuth client the app signs in with: public values, kept as
+      # repository variables. A release cannot be built without them.
       - name: Build the installer
         env:
           FINEFRAME_SUPABASE_URL: ${{ vars.FINEFRAME_SUPABASE_URL }}
-          FINEFRAME_SUPABASE_ANON_KEY: ${{ vars.FINEFRAME_SUPABASE_ANON_KEY }}
+          FINEFRAME_SUPABASE_PUBLISHABLE_KEY: ${{ vars.FINEFRAME_SUPABASE_PUBLISHABLE_KEY }}
+          FINEFRAME_OAUTH_CLIENT_ID: ${{ vars.FINEFRAME_OAUTH_CLIENT_ID }}
         run: |
-          if [ "$GITHUB_REF_TYPE" = tag ] && { [ -z "$FINEFRAME_SUPABASE_URL" ] || [ -z "$FINEFRAME_SUPABASE_ANON_KEY" ]; }; then
-            echo "A release needs the FINEFRAME_SUPABASE_URL and FINEFRAME_SUPABASE_ANON_KEY repository variables"
+          if [ "$GITHUB_REF_TYPE" = tag ] && { [ -z "$FINEFRAME_SUPABASE_URL" ] || [ -z "$FINEFRAME_SUPABASE_PUBLISHABLE_KEY" ] || [ -z "$FINEFRAME_OAUTH_CLIENT_ID" ]; }; then
+            echo "A release needs the FINEFRAME_SUPABASE_URL, FINEFRAME_SUPABASE_PUBLISHABLE_KEY and FINEFRAME_OAUTH_CLIENT_ID repository variables"
             exit 1
           fi
           pnpm install --frozen-lockfile

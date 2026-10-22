@@ -362,7 +362,7 @@ export const en = {
   account: {
     signInTitle: "Sign in to Fineframe",
     signInAbout:
-      "Making an edit needs a Fineframe account with a subscription. Sign in on fineframe.app in your browser, then come back here.",
+      "Making an edit needs a Fineframe account. Sign in on fineframe.app in your browser, then come back here.",
     signIn: "Sign in with your browser",
     waiting: "Finish signing in in your browser…",
     notStarted: "The sign-in could not start",
@@ -377,8 +377,8 @@ export const en = {
     offlineAbout:
       "Fineframe could not reach its server, and the last check was more than 7 days ago. Connect to the internet, then check again.",
     offline: "Offline: Fineframe works for 7 days after its last check.",
-    active: "Your subscription is active.",
-    manage: "Manage subscription",
+    entitled: "This account can make edits.",
+    manage: "Your account",
     signOut: "Sign out",
     close: "Close",
     later: "Later",

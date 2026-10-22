@@ -51,9 +51,7 @@ const { DESKTOP }: typeof import("../../web/lib/i18n/desktop.ts") = await import
 );
 const { LOCALE_COOKIE, resolveLocale }: typeof import("../../web/lib/i18n/locale.ts") =
   await import(web("i18n/locale.ts"));
-const { readSupabase, signOut }: typeof import("../../web/lib/account.ts") = await import(
-  web("account.ts")
-);
+const { signOut }: typeof import("../../web/lib/account.ts") = await import(web("account.ts"));
 
 /** The app's words in the page's language: the one chosen on the page, whose cookie the page's
  * server shares on any port, or else the system's, which the page is told as well. */
@@ -140,8 +138,7 @@ async function installSkillFromMenu(t: Words): Promise<void> {
 
 /** Signs out of the account, then shows the page again, which asks to sign in. */
 async function signOutFromMenu(): Promise<void> {
-  const where = places();
-  await signOut(accountFile(where), await readSupabase(where.editor));
+  await signOut(accountFile(places()));
   if (window && !window.webContents.getURL().startsWith("data:")) window.webContents.reload();
 }
 

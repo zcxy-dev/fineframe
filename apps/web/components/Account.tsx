@@ -62,6 +62,11 @@ export function AccountDialog({ account, open, onClose, onChange, reload }: Prop
     if (!open && element.open) element.close();
   }, [open]);
 
+  // Says what holds now, as the billing switch or the subscription may have changed.
+  useEffect(() => {
+    if (open) void reload().catch(() => {});
+  }, [open, reload]);
+
   // Asks until the browser has come back signed in.
   useEffect(() => {
     if (!waiting) return;
@@ -153,7 +158,7 @@ export function AccountDialog({ account, open, onClose, onChange, reload }: Prop
                 {signedIn.entitled
                   ? signedIn.offline
                     ? words.offline
-                    : words.active
+                    : words.entitled
                   : signedIn.offline
                     ? words.offlineAbout
                     : words.subscribeAbout}
