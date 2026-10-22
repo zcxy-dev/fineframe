@@ -15,7 +15,9 @@ import { cutEdit, placeSources } from "./cut.ts";
 import { exportEdit } from "./nle/export.ts";
 import { rebase, render } from "./render.ts";
 
-const usage = `Usage: pnpm render <project.json> -o <out.mp4> [--cut <from>-<to>]... [--retarget] \\
+/** What runs this: pnpm in a clone, or the desktop app's `fineframe` command (apps/desktop). */
+const command = process.env.VIDEO_EDITOR_COMMAND ?? "pnpm";
+const usage = `Usage: ${command} render <project.json> -o <out.mp4> [--cut <from>-<to>]... [--retarget] \\
     [--brand <kit folder | none>]
        pnpm render <project.json> --export <folder>
 

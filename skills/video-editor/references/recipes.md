@@ -12,7 +12,7 @@ const fs = require("node:fs");
 const p = JSON.parse(fs.readFileSync("out/edit.project.json", "utf8"));
 // … change p …
 fs.writeFileSync("out/edit-v2.project.json", JSON.stringify(p, null, 2) + "\n");'
-pnpm -s render out/edit-v2.project.json -o out/edit-v2.mp4
+fineframe render out/edit-v2.project.json -o out/edit-v2.mp4
 ```
 
 Several changes can go into one version and one render.
@@ -20,7 +20,7 @@ Several changes can go into one version and one render.
 ## Cut a part: drop a segment, trim one, remove a sentence
 
 ```bash
-pnpm -s render out/edit.project.json --cut 12.4-17.9 -o out/edit-v2.mp4
+fineframe render out/edit.project.json --cut 12.4-17.9 -o out/edit-v2.mp4
 ```
 
 - The range is in seconds (or `m:ss`) of the video the project renders, from the start of the first words to drop to the end of the last: take them from the `start` of the first and the `end` of the last of their `captions.lines[].words`, ÷ 120 000. An `edit.srt` caption stays up after its last word, so its end can reach into the next segment. A whole segment of the main track runs between two neighbouring times of `edit_cuts.json` (from 0 for the first). Trimming a segment is cutting its first or last sentences. Give `--cut` once per range; all of them are times in the input video.
@@ -39,7 +39,7 @@ Find the line in `captions.lines` whose `text` holds the word. Change it in `tex
 
 becomes `"text": "嗯　比如說　把一句話…"` with the first entry's `text` `"嗯"`. Each entry keeps at least one character: a fix with more characters than the entries it replaces puts the extra ones in its last entry, and one with fewer deletes the entries left over. Chinese lines show a pause as a full-width space (`　`) where a comma or full stop was, and keep `？`, `！` and quotes; English lines keep their punctuation, set half-width. The SubRip file is written again from the lines. A character the caption font cannot draw fails the render with the line's path.
 
-A word the speech model misheard throughout is better fixed at the source next time: list a person's name in the `--names` file of the next `pnpm edit`, and any other word, such as a brand or a term, in its `--terms` file, which never shows in a lower third.
+A word the speech model misheard throughout is better fixed at the source next time: list a person's name in the `--names` file of the next `fineframe edit`, and any other word, such as a brand or a term, in its `--terms` file, which never shows in a lower third.
 
 ## Change the title or a lower third
 
@@ -62,7 +62,7 @@ Any overlay can take `params.accent`, a `#rrggbb` colour for its accent instead 
 
 ## Change a motion graphic or B-roll
 
-A rich edit (`pnpm edit --visuals rich`, the default) adds motion graphics Claude wrote for this video, in `graphics`. Each is HTML and CSS on the house stylesheet (`packages/effects/src/style.ts`), with a `layout`:
+A rich edit (`fineframe edit --visuals rich`, the default) adds motion graphics Claude wrote for this video, in `graphics`. Each is HTML and CSS on the house stylesheet (`packages/effects/src/style.ts`), with a `layout`:
 
 | `layout` | What it is | Length |
 |---|---|---|
@@ -94,9 +94,9 @@ It also cuts away to web captures or stock footage: `broll` entries whose source
   for (const clip of [...p.main, ...(p.broll ?? []).filter((b) => b.grade)]) clip.grade = { ...clip.grade, look: { id: "warm", intensity: 1 } };
   ```
 
-- **Caption style:** `captions.preset` is `bold` (word by word, the word being said in amber), `creator` (a few words at a time, big, in a dark box, numbers and English words in amber), `minimal` (small white type), `pop` (each word pops in as it is said) or `none` (nothing on the picture; `edit-v2.srt` is still written, broken as `bold` breaks it). Only the render changes: no new plan. `pnpm edit --captions` picks it for a new edit.
+- **Caption style:** `captions.preset` is `bold` (word by word, the word being said in amber), `creator` (a few words at a time, big, in a dark box, numbers and English words in amber), `minimal` (small white type), `pop` (each word pops in as it is said) or `none` (nothing on the picture; `edit-v2.srt` is still written, broken as `bold` breaks it). Only the render changes: no new plan. `fineframe edit --captions` picks it for a new edit.
 - With a brand kit's custom captions, `brand.captions` draws in place of the preset's look: delete it to show `captions.preset` as it is.
-- **Caption emoji:** Claude picks an emoji for some lines while planning, kept in `captions.lines[].emoji` (one emoji character). Set `captions.emoji` to `true` to draw each at the end of its line and write it in `edit-v2.srt`; delete it to hide them. Only the render changes: no new plan. Change or delete a line's `emoji` to swap or drop it; a skin tone, a flag or an emoji joined from several is refused. `pnpm edit --emoji` turns them on for a new edit.
+- **Caption emoji:** Claude picks an emoji for some lines while planning, kept in `captions.lines[].emoji` (one emoji character). Set `captions.emoji` to `true` to draw each at the end of its line and write it in `edit-v2.srt`; delete it to hide them. Only the render changes: no new plan. Change or delete a line's `emoji` to swap or drop it; a skin tone, a flag or an emoji joined from several is refused. `fineframe edit --emoji` turns them on for a new edit.
 
 ## Apply, change or remove a brand kit
 
@@ -120,7 +120,7 @@ A kit is a folder holding `kit.json` and the files it names, its paths relative 
 Apply or change a kit with a render alone; `none` takes the kit out:
 
 ```bash
-pnpm -s render out/edit.project.json --brand path/to/kit -o out/edit-v2.mp4
+fineframe render out/edit.project.json --brand path/to/kit -o out/edit-v2.mp4
 ```
 
 It checks the kit, copies its files into `out/brand/` by their content, and writes `out/edit-v2.project.json` with them in `brand`. To change one setting of the kit an edit carries, edit `brand` in the copy and render it; a file it names has to stay the one copied, whose SHA-256 the render checks.

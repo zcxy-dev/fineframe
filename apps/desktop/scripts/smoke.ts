@@ -4,7 +4,9 @@
 //
 // It opens the app's window, saves a key, waits while the analysis's Python installs, chooses
 // cloud speech and its key, adds a synthetic spoken clip, makes a 15 s edit and checks the video,
-// then quits the app and checks nothing it started is left running. Claude and OpenRouter are
+// installs the `fineframe` command and the agent skill from the app's menu, checks the skill's
+// files and makes an edit of the clip with the command, then quits the app and checks nothing it
+// started is left running. Claude and OpenRouter are
 // local stand-ins that answer as they would, so it costs nothing: the plan keeps the lines in
 // order, the graphics are one label on the first word said, every cut passes
 // its check, and each speech chunk is heard as one of the clip's sentences. Everything else is
@@ -14,15 +16,16 @@
 //
 // On Linux, run it under a display, such as `xvfb-run -a`. The clip's speech comes from the
 // system's voice: `say` on macOS, the speech synthesizer .NET ships on Windows, espeak-ng on Linux.
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { delimiter, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { _electron as electron, type Page } from "playwright-core";
+import { launcherPath, skillFolders } from "../src/install.ts";
 import { descendantsOf, type ProcessRow } from "./processes.ts";
 
 const { values, positionals } = parseArgs({
@@ -50,8 +53,12 @@ const SENTENCES = [
 ];
 
 const work = await mkdtemp(join(tmpdir(), "video-editor-smoke-"));
-// The app's own folders and caches start empty, so every first-use download happens.
+// The app's own folders and caches start empty, so every first-use download happens. On macOS
+// and Linux its home folder, where the command and the skill install, is the smoke's own too; on
+// Windows the app does not start with another USERPROFILE, so the skill goes in the runner's.
 const home = { XDG_CONFIG_HOME: join(work, "config"), XDG_CACHE_HOME: join(work, "cache") };
+const windows = process.platform === "win32";
+const homeDir = windows ? homedir() : join(work, "home");
 /** The files under `dir`, three levels deep, to say what a cache holds when a check fails. */
 const contents = (dir: string, depth = 3): string => {
   if (!existsSync(dir)) return `${dir} does not exist`;
@@ -370,13 +377,18 @@ say(`made ${clip}`);
 const inherited = Object.entries(process.env).filter(
   (entry): entry is [string, string] => entry[1] !== undefined && !entry[0].endsWith("_API_KEY"),
 );
+await mkdir(homeDir, { recursive: true });
 const env: Record<string, string> = {
   ...Object.fromEntries(inherited),
   ...home,
+  ...(windows ? {} : { HOME: homeDir }),
   ANTHROPIC_BASE_URL: await listen(anthropic),
   OPENROUTER_BASE_URL: `${await listen(openrouter)}/api/v1`,
   APPIMAGE_EXTRACT_AND_RUN: "1",
 };
+// Where the command installs on Linux, and on macOS when it is on PATH, as it is here, so that
+// macOS's /usr/local/bin stays as it was; on Windows, the launcher's folder joins the user's Path.
+if (!windows) env.PATH = `${join(homeDir, ".local", "bin")}${delimiter}${env.PATH}`;
 
 const app = await electron.launch({ executablePath: resolve(executable), env, timeout: 120_000 });
 const pid = app.process().pid as number;
@@ -466,6 +478,17 @@ async function playInPage(page: Page) {
   });
 }
 
+/** The length of the video `file`, in seconds, by the repository's own FFmpeg. */
+async function duration(file: string): Promise<number> {
+  const { ffmpeg, run } = await import("../../../packages/engine/src/ffmpeg.ts");
+  process.env.XDG_CACHE_HOME = join(work, "smoke-cache");
+  const probe = await run(await ffmpeg(), [
+    ...["-hide_banner", "-i", file, "-map", "0", "-c", "copy", "-f", "null", "-"],
+  ]);
+  const [, h, m, s] = probe.stderr.match(/Duration: (\d+):(\d+):([\d.]+)/) ?? [];
+  return Number(h) * 3600 + Number(m) * 60 + Number(s);
+}
+
 /** Makes the edit through the window; what went wrong, if anything. */
 async function makeEdit(): Promise<string[]> {
   // First run: the page asks for the Anthropic key while the analysis sets itself up.
@@ -530,22 +553,7 @@ async function makeEdit(): Promise<string[]> {
     video,
     Buffer.from(await (await fetch(`${origin}/api/jobs/${job.id}/video`)).arrayBuffer()),
   );
-  const { ffmpeg, run } = await import("../../../packages/engine/src/ffmpeg.ts");
-  process.env.XDG_CACHE_HOME = join(work, "smoke-cache");
-  const probe = await run(await ffmpeg(), [
-    "-hide_banner",
-    "-i",
-    video,
-    "-map",
-    "0",
-    "-c",
-    "copy",
-    "-f",
-    "null",
-    "-",
-  ]);
-  const [, h, m, s] = probe.stderr.match(/Duration: (\d+):(\d+):([\d.]+)/) ?? [];
-  const seconds = Number(h) * 3600 + Number(m) * 60 + Number(s);
+  const seconds = await duration(video);
   say(
     `the edit is ${seconds.toFixed(2)} s, captions ${job.result?.captions ? "written" : "missing"}`,
   );
@@ -605,10 +613,93 @@ async function makeEdit(): Promise<string[]> {
   ].filter((problem): problem is string => typeof problem === "string");
 }
 
-const problems = await makeEdit().catch(async (error: Error) => {
-  await shot(page, "failed").catch(() => {});
-  return [error.message];
-});
+/**
+ * Chooses both install items in the app's menu, with each dialog's words printed in place of the
+ * dialog and nothing already there replaced, then checks the skill's files and runs the installed command as its owner would in a
+ * terminal: its help, then a 15 s edit of the clip, with only the keys saved in the app.
+ */
+async function useCommandLine(): Promise<string[]> {
+  await app.evaluate(({ dialog }) => {
+    const shown: string[] = [];
+    (globalThis as { shown?: string[] }).shown = shown;
+    dialog.showMessageBox = (async (...args: unknown[]) => {
+      const options = args.at(-1) as Electron.MessageBoxOptions;
+      // Asked to replace something the app did not install: kept.
+      if (options.cancelId !== undefined) {
+        console.log(`declined: ${options.message}`);
+        return { response: options.cancelId, checkboxChecked: false };
+      }
+      shown.push(`${options.message}: ${options.detail}`);
+      return { response: 0, checkboxChecked: false };
+    }) as typeof dialog.showMessageBox;
+    dialog.showErrorBox = (title, content) => {
+      shown.push(`${title}: ${content}`);
+    };
+  });
+  const shown = () => app.evaluate(() => (globalThis as { shown?: string[] }).shown ?? []);
+  for (const [n, id] of ["install-command", "install-skill"].entries()) {
+    await app.evaluate(
+      ({ Menu }, id) => Menu.getApplicationMenu()?.getMenuItemById(id)?.click(),
+      id,
+    );
+    for (let waited = 0; (await shown()).length <= n && waited < 60_000; waited += 250) {
+      await new Promise((done) => setTimeout(done, 250));
+    }
+  }
+  const dialogs = await shown();
+  for (const line of dialogs) say(`dialog: ${line.replaceAll("\n", " ")}`);
+  const skills = skillFolders(homeDir).flatMap((folder) =>
+    ["SKILL.md", join("references", "recipes.md")].map((file) => join(folder, file)),
+  );
+  const missing = skills.filter((file) => !existsSync(file));
+
+  // Where the menu put the command: a link on PATH, or on Windows the launcher in the app's folder,
+  // which a .cmd needs a shell to run.
+  const command = windows
+    ? launcherPath(join(process.env.APPDATA as string, "Fineframe"))
+    : join(homeDir, ".local", "bin", "fineframe");
+  // Run without waiting on it, so the stand-ins in this process answer it.
+  const fineframe = (args: string[], timeout: number) => {
+    say(`fineframe ${args.join(" ")}`);
+    // Without FUSE, the AppImage lists every file it unpacks before it runs, into the folder the
+    // app runs from too, which it would delete when it ends.
+    const options = { env: { ...env, NO_CLEANUP: "1" }, shell: windows, timeout };
+    return new Promise<{ status: number | null; stdout: string; stderr: string }>((done) => {
+      execFile(command, args, { ...options, maxBuffer: 1024 ** 3 }, (error, stdout, stderr) =>
+        done({ status: error ? ((error.code as number | undefined) ?? null) : 0, stdout, stderr }),
+      );
+    });
+  };
+  const help = await fineframe(["--help"], 120_000);
+  const video = join(work, "command", "edit.mp4");
+  const edit = await fineframe(
+    ["edit", clip, "--length", `${LENGTH}s`, "--aspect", "16:9", "--asr", "cloud", "-o", video],
+    1_800_000,
+  );
+  const seconds = existsSync(video) ? await duration(video) : 0;
+  say(`the command's edit is ${seconds.toFixed(2)} s`);
+  return [
+    !dialogs.some((line) => line.startsWith("The fineframe command is installed")) &&
+      `the menu did not install the command: ${dialogs.join("; ")}`,
+    !dialogs.some((line) => line.startsWith("The agent skill is installed")) &&
+      `the menu did not install the skill: ${dialogs.join("; ")}`,
+    missing.length > 0 && `the skill's files did not land: ${missing.join(", ")}`,
+    !help.stdout.includes("Usage: fineframe edit") &&
+      `fineframe --help exited ${help.status}: ${help.stdout}${help.stderr}`,
+    edit.status !== 0 &&
+      `fineframe edit exited ${edit.status}: ${edit.stderr.split("\n").slice(-20).join("\n")}`,
+    edit.status === 0 &&
+      Math.abs(seconds - LENGTH) > LENGTH * 0.05 &&
+      `the command's edit is ${seconds} s, not ${LENGTH} s ± 5 %`,
+  ].filter((problem): problem is string => typeof problem === "string");
+}
+
+const problems = await makeEdit()
+  .then(async (problems) => [...problems, ...(await useCommandLine())])
+  .catch(async (error: Error) => {
+    await shot(page, "failed").catch(() => {});
+    return [error.message];
+  });
 
 // Quitting stops everything the app started.
 clearInterval(tracking);

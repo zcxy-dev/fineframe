@@ -4,8 +4,9 @@
 //
 // - build/editor/: the repository's layout as the page's server and `pnpm edit` expect it, with
 //   the page built and only the packages they run (installed without symlinks between
-//   dependencies, as an installer copies files), and the worker's code and lockfile, from which
-//   the app installs the analysis's Python on its first start. No FFmpeg, ffprobe or Chrome: the
+//   dependencies, as an installer copies files), the worker's code and lockfile, from which
+//   the app installs the analysis's Python on its first start, and the agent skill its menu
+//   installs. No FFmpeg, ffprobe or Chrome: the
 //   renderer downloads them on first use.
 // - build/bin/: uv, pinned by version and SHA-256 for the platform this runs on.
 //
@@ -71,6 +72,7 @@ const PARTS = [
   "apps/web",
   "apps/desktop/package.json",
   "packages",
+  "skills",
   "worker",
 ];
 const listed = run(
