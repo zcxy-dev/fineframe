@@ -140,6 +140,8 @@ export interface EditResult {
   analyzed: number;
   cached: number;
   reviews: number;
+  /** Why the video plays no music although Claude chose a library track. */
+  musicSkipped?: string;
 }
 
 /** The progress bar's share for analysis when every file needs it: on a CPU, the speech model
@@ -171,10 +173,18 @@ export async function edit(options: EditOptions): Promise<EditResult> {
     const result = await steps(options, report, spent);
     const { video, captions } = result.outputs;
     const { music, broll } = result.outputs;
-    const message = `Finished: ${result.seconds.toFixed(1)} s at ${options.aspect} in ${basename(video)}${captions ? `, captions in ${basename(captions)}` : ""}${music ? `, the music's licences in ${basename(music)}` : ""}${broll ? `, the B-roll's credits in ${basename(broll)}` : ""}`;
+    const { musicSkipped } = result;
+    const message = `Finished: ${result.seconds.toFixed(1)} s at ${options.aspect} in ${basename(video)}${captions ? `, captions in ${basename(captions)}` : ""}${music ? `, the music's licences in ${basename(music)}` : ""}${broll ? `, the B-roll's credits in ${basename(broll)}` : ""}${musicSkipped ? `. No music: ${musicSkipped}` : ""}`;
     const claude = costByStage(spent);
     emit(
-      validateProgress({ stage: "done", fraction: 1, message, claude, outputs: result.outputs }),
+      validateProgress({
+        stage: "done",
+        fraction: 1,
+        message,
+        claude,
+        ...(musicSkipped ? { musicSkipped } : {}),
+        outputs: result.outputs,
+      }),
     );
     return result;
   } catch (error) {
@@ -485,6 +495,7 @@ interface Rendered {
   length: number;
   seconds: number;
   reviews: number;
+  musicSkipped?: string;
 }
 
 /**
@@ -543,6 +554,7 @@ async function cutEdit(
         onProgress: (message) => planProgress(message),
       }),
     );
+    if (edit.state.musicSkipped) log(`No music: ${edit.state.musicSkipped}`);
     let rendered = await timed("render", () =>
       render(edit.path, video, {
         onProgress: (fraction, message) =>
@@ -590,6 +602,7 @@ async function cutEdit(
       length: edit.state.length,
       seconds: rendered.seconds,
       reviews,
+      ...(edit.state.musicSkipped ? { musicSkipped: edit.state.musicSkipped } : {}),
     };
   } catch (error) {
     // The analysis took most of the run; whoever reads this should know it is not lost.

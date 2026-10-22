@@ -419,6 +419,8 @@ export const en = {
     player: "Your edit",
     ready: "Your edit is ready",
     captions: " · captions",
+    musicSkipped:
+      "The music track Claude chose could not be downloaded, so this edit has no music. Pick one from the music library below to add it.",
     download: "Download MP4",
     downloadCaptions: "Download captions (SRT)",
     downloadCredits: "Download B-roll credits (TXT)",

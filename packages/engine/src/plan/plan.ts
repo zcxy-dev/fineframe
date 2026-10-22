@@ -227,6 +227,9 @@ export interface PlanState {
   /** The music offered, by id, and how the request lists it; empty without music. */
   music: Map<string, MusicSource>;
   musicListing: string;
+  /** Why the edit plays no music although Claude chose a track: its audio could not be
+   * downloaded, or was not the file it should be. */
+  musicSkipped?: string;
   /** Names a lower third may show. */
   names: string[];
   /** What the user asks of this edit, in their words; empty when nothing. */
@@ -733,9 +736,17 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
   const path = (file: string) => relative(folder, file).split(sep).join("/");
   const used = new Set(clips.map((clip) => clip.source));
   const words = outputWords(clips, state.sources);
+  // A library track's audio, which what follows reads, downloads once it is chosen. Music is
+  // offered by default, so a track that cannot be had leaves the edit without music rather than
+  // failing it.
+  const chosen = state.decisions.music && state.music.get(state.decisions.music.track);
+  try {
+    await chosen?.fetch?.();
+  } catch (error) {
+    state.musicSkipped = `${chosen?.about ?? chosen?.id} could not be downloaded: ${(error as Error).message}`;
+    delete state.decisions.music;
+  }
   const { music, track } = musicFor(state, clips);
-  // A library track's audio, which what follows reads, downloads once it is chosen.
-  await track?.fetch?.();
   const broll = brollClips(
     state,
     words,

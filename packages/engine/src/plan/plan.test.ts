@@ -877,6 +877,41 @@ test("a library track's audio arrives once Claude picks it, and only then", asyn
   }
 });
 
+test("a library track that cannot be downloaded leaves the edit without music, saying why", async (t) => {
+  const dir = await scratch(t, "plan-unplayed-");
+  const index = await makeTalk(dir);
+  const song = await withMusic(dir, index);
+  const input = {
+    index: song,
+    source: join(dir, "library", "song.wav"),
+    fingerprint: await fingerprintOf(join(dir, "song.wav")),
+    about: '"Song" by Someone, upbeat',
+    fetch: async () => {
+      throw new Error("Could not download it: HTTP 503");
+    },
+  };
+  const decisions = {
+    ...(await recorded()),
+    music: { track: "music-song", section: 1, reason: "An upbeat talk." },
+  };
+  const { claude } = recordedClaude({ plan: [decisions] });
+  const out = join(dir, "edit.json");
+  const edit = await plan({
+    inputs: [index],
+    music: [input],
+    length: 15,
+    aspect: "16:9",
+    out,
+    claude,
+  });
+  assert.equal(edit.project.audio.music, undefined);
+  assert.ok(edit.project.sources.every((s) => s.kind === "video"));
+  assert.equal(
+    edit.state.musicSkipped,
+    '"Song" by Someone, upbeat could not be downloaded: Could not download it: HTTP 503',
+  );
+});
+
 test("a track Claude names that was not offered, or none, plays no music", async (t) => {
   const dir = await scratch(t, "plan-nomusic-");
   const index = await makeTalk(dir);

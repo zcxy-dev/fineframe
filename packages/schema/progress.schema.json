@@ -99,6 +99,11 @@
         "fraction": { "const": 1 },
         "message": { "type": "string" },
         "claude": { "$ref": "#/$defs/ClaudeCost" },
+        "musicSkipped": {
+          "description": "Why the video plays no music although Claude chose a library track: its audio could not be downloaded or did not match its SHA-256. The edit is otherwise whole.",
+          "type": "string",
+          "minLength": 1
+        },
         "outputs": {
           "description": "Absolute paths of what the run wrote.",
           "type": "object",

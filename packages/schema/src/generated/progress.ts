@@ -94,6 +94,10 @@ export interface DoneProgress {
   message: string;
   claude?: ClaudeCost;
   /**
+   * Why the video plays no music although Claude chose a library track: its audio could not be downloaded or did not match its SHA-256. The edit is otherwise whole.
+   */
+  musicSkipped?: string;
+  /**
    * Absolute paths of what the run wrote.
    */
   outputs: {

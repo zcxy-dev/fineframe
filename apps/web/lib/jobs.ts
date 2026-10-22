@@ -148,6 +148,9 @@ export interface Job {
     music?: string[];
     /** Whether the edit wrote the credits of the B-roll it shows. */
     broll?: boolean;
+    /** Whether the library track Claude chose could not be downloaded, so the edit has no
+     * music. */
+    musicSkipped?: boolean;
   };
   error?: string;
   /** Each rendered version of a finished edit, oldest first; absent until the first Apply, when
@@ -902,6 +905,7 @@ export class Jobs {
         message: line.message,
         captions: "captions" in outputs && outputs.captions !== undefined,
         broll: "broll" in outputs && outputs.broll !== undefined,
+        ...("musicSkipped" in line && line.musicSkipped ? { musicSkipped: true } : {}),
       };
     } else if (line.stage === "short") {
       // Read from shorts.json, which lists it by now; the run's end waits for it.
