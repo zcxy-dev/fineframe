@@ -318,15 +318,19 @@ test("speech heard on OpenRouter needs its key, which the edit gets with --asr c
   const { body: job } = await create([{ path: "c.mp4", size: 2 }], cloud);
   assert.equal(job.settings.asr, "cloud");
   assert.equal((await put(job.id, 0, new Uint8Array(2))).status, 200);
-  // The library track Claude chose cannot be downloaded: the edit is done without music.
+  // The library track Claude chose cannot be downloaded: the edit is done without music. Nor can
+  // the beat model, which a given track needs.
   process.env.FAKE_EDIT_SKIP_MUSIC = "1";
+  process.env.FAKE_EDIT_NO_BEATS = "1";
   assert.equal((await start(job.id)).status, 200);
   const latest = async () =>
     (await (await jobRoute.GET(new Request(url), ctx({ id: job.id }))).json()) as Job;
   while ((await latest()).status === "running") await new Promise((done) => setTimeout(done, 20));
   delete process.env.FAKE_EDIT_SKIP_MUSIC;
+  delete process.env.FAKE_EDIT_NO_BEATS;
   assert.equal((await latest()).status, "done");
   assert.equal((await latest()).result?.musicSkipped, true);
+  assert.equal((await latest()).result?.beatsSkipped, true);
   const dir = join(root, job.id);
   const args = JSON.parse(await readFile(join(dir, "args.json"), "utf8")) as string[];
   assert.deepEqual(args.slice(args.indexOf("--asr"), args.indexOf("--asr") + 2), [

@@ -6,7 +6,9 @@ and its peak picking: it decodes the track itself and computes the model's input
 """
 
 import hashlib
+import http.client
 import inspect
+import urllib.parse
 from pathlib import Path
 
 import numpy as np
@@ -15,7 +17,11 @@ from vework import download
 
 # The authors' main model, trained on every dataset but GTZAN; MIT, like the code.
 MODEL = "final0"
-URL = f"https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/{MODEL}.ckpt"
+# The authors' file server, then a copy of the same file on the music library's release (#155).
+URLS = (
+    f"https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/{MODEL}.ckpt",
+    f"https://github.com/zcxy-dev/fineframe-music/releases/download/v1/beat_this-{MODEL}.ckpt",
+)
 SHA256 = "8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331"
 # The input the model was trained on: 22.05 kHz, 1024-sample frames every 20 ms, 128 mel bands
 # from 30 Hz to 11 kHz.
@@ -30,6 +36,10 @@ WINDOW = 1500
 # Frames at either end of a window whose predictions are thrown away: next to a window's edge
 # the model hears too little of the music around them.
 EDGE = 6
+
+
+class Unavailable(RuntimeError):
+    """No source gave the checkpoint: each one failed or served another file."""
 
 
 def mel_filters() -> np.ndarray:
@@ -129,15 +139,31 @@ def checkpoint_path() -> Path:
 
 
 def _checkpoint() -> Path:
-    """The checkpoint, downloaded once into torch's hub folder and checked against its SHA-256,
-    so an index is reproducible."""
+    """The checkpoint, downloaded once into torch's hub folder from the first of URLS that gives
+    it, and checked against its SHA-256, so an index is reproducible."""
     path = checkpoint_path()
     if not path.exists():
+        data = _download()
         path.parent.mkdir(parents=True, exist_ok=True)
         part = path.with_suffix(".part")
-        part.write_bytes(download.url(URL, f"Beat This! {MODEL}"))
+        part.write_bytes(data)
         part.rename(path)
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     if digest != SHA256:
         raise RuntimeError(f"{path}: SHA-256 {digest} is not the pinned {MODEL} checkpoint")
     return path
+
+
+def _download() -> bytes:
+    problems = []
+    for address in URLS:
+        host = urllib.parse.urlparse(address).netloc
+        try:
+            data = download.url(address, f"Beat This! {MODEL}")
+        except (OSError, http.client.HTTPException) as error:
+            problems.append(f"{host}: {error}")
+            continue
+        if hashlib.sha256(data).hexdigest() == SHA256:
+            return data
+        problems.append(f"{host}: not the pinned {MODEL} checkpoint")
+    raise Unavailable("; ".join(problems))

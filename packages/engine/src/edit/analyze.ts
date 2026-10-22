@@ -204,6 +204,12 @@ export function analyzeMusic(
   return vework(worker, "analyze-music", file, index, extra, report, log);
 }
 
+/** Whether the music index at `path` was made without the beat model: vework writes one with
+ * the tracker "none" and no beats when the model's checkpoint cannot be downloaded. */
+export async function withoutBeats(path: string): Promise<boolean> {
+  return (JSON.parse(await readFile(path, "utf8")) as MusicIndex).tracker === "none";
+}
+
 /** The cached music index's file name: the track's SHA-256, then a hash of the worker and the
  * licence, which the index records. */
 export function musicIndexName(

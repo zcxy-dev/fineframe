@@ -276,6 +276,44 @@ test("music with its licence is analysed once, chosen by Claude, and credited be
   assert.equal((await analyses()).filter((args) => args[0] === "analyze-music").length, 1);
 });
 
+test("a track analysed without the beat model plays unaligned, says so, and is analysed again", async (t) => {
+  const dir = await scratch(t, "edit-beatless-");
+  const { folder, options, lines, analyses } = await footage(dir);
+  const talk = join(folder, "talk.index.json");
+  const media = JSON.parse(await readFile(talk, "utf8"));
+  media.loudness = { momentary: [], short_term: Array.from({ length: 30 }, () => -20) };
+  await writeFile(talk, JSON.stringify(media));
+  const music = join(dir, "music");
+  await mkdir(music);
+  const index = join(music, "song.music.json");
+  await makeSong(music);
+  // What vework writes when neither of the checkpoint's sources gives it (#155).
+  const song = JSON.parse(await readFile(index, "utf8"));
+  const unaligned = { tracker: "none", beats: [], downbeats: [] };
+  await writeFile(index, JSON.stringify({ ...song, ...unaligned, sections: [song.sections[0]] }));
+  const choice = { track: "music-song", section: 1, reason: "A calm talk." };
+  const { claude } = await recordedClaude({ music: choice });
+  const license = "CC0 1.0";
+  const result = await edit({ ...options, claude, music: [music], musicLicense: license });
+
+  const project = await loadJson(result.outputs.project, validateProject);
+  assert.ok((project.audio.music ?? []).length > 0, "the music plays");
+  assert.equal(result.beatsSkipped, "song.wav: the beat model could not be downloaded");
+  const done = lines.at(-1);
+  assert.equal(done && "beatsSkipped" in done && done.beatsSkipped, result.beatsSkipped);
+  assert.match(done?.message ?? "", /\. Music not on its beats: song\.wav: the beat model/);
+
+  // The next edit tries the beat model again rather than keep the index without beats.
+  await edit({
+    ...options,
+    claude,
+    music: [music],
+    musicLicense: license,
+    out: join(dir, "again.mp4"),
+  });
+  assert.equal((await analyses()).filter((args) => args[0] === "analyze-music").length, 2);
+});
+
 test("each track needs a licence: its own <name>.txt, or one given for all", async (t) => {
   const dir = await scratch(t, "edit-licence-");
   await writeFile(join(dir, "a.mp3"), "");

@@ -80,7 +80,7 @@ A project renders the same video every time from the file and the sources it nam
 {"stage": "done", "fraction": 1, "message": "Finished", "claude": {"plan": {"dollars": 0.07, "requests": 1}, "check": {"dollars": 0.012, "requests": 9}}, "outputs": {"video": "/work/out/edit.mp4", "project": "/work/out/edit.project.json", "captions": "/work/out/edit.srt"}}
 ```
 
-When the library track Claude chose cannot be downloaded, or does not match its SHA-256, the edit is made without music and the `done` line says why as `musicSkipped`.
+When the library track Claude chose cannot be downloaded, or does not match its SHA-256, the edit is made without music and the `done` line says why as `musicSkipped`. When the beat model cannot be downloaded, a track the person gave is analysed without beats, its music plays from its start, and the `done` line says which as `beatsSkipped`.
 
 With `--shorts`, the lines while a short is made name it, a `short` line says each one is done once `shorts.json` lists it, with what it cost, and the `done` line names `shorts.json` and adds what finding the moments cost as `claude.find`:
 

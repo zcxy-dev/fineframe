@@ -44,7 +44,7 @@ export interface MusicIndex {
     attribution?: string;
   };
   /**
-   * The beat tracker and model that found the beats, e.g. beat_this final0.
+   * The beat tracker and model that found the beats, e.g. beat_this final0; none when the beat model could not be downloaded, which leaves the beats, the downbeats and the tempo empty and the whole track one section.
    */
   tracker: string;
   tempo: {

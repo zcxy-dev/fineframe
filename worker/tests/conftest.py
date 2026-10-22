@@ -29,24 +29,26 @@ def pytest_collection_modifyitems(items):
 
 
 def _beats_unreachable() -> str | None:
-    """Why the Beat This! checkpoint cannot be had: not cached, and its only host not answering
-    or failing on its side (#155). Asked once per run; any other answer lets the tests run, and
-    fail if the download or its checksum is wrong."""
+    """Why the Beat This! checkpoint cannot be had: not cached, and none of its hosts answering
+    or each failing on its side (#155). Asked once per run; any other answer lets the tests run,
+    and fail if the download or its checksum is wrong."""
     from vework import beats
 
     if beats.checkpoint_path().exists():
         return None
-    request = urllib.request.Request(beats.URL, headers={"Range": "bytes=0-0"})
-    try:
-        with urllib.request.urlopen(request, timeout=30):
-            return None
-    except urllib.error.HTTPError as error:
-        if error.code < 500:
-            return None
-        problem = f"HTTP {error.code}"
-    except OSError as error:
-        problem = str(getattr(error, "reason", error))
-    return f"the Beat This! checkpoint is not cached and its host failed ({problem}); see #155"
+    problems = []
+    for address in beats.URLS:
+        request = urllib.request.Request(address, headers={"Range": "bytes=0-0"})
+        try:
+            with urllib.request.urlopen(request, timeout=30):
+                return None
+        except urllib.error.HTTPError as error:
+            if error.code < 500:
+                return None
+            problems.append(f"HTTP {error.code}")
+        except OSError as error:
+            problems.append(str(getattr(error, "reason", error)))
+    return f"the Beat This! checkpoint is not cached and its hosts failed ({'; '.join(problems)})"
 
 
 def ffmpeg(*args):

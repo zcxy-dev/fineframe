@@ -152,6 +152,9 @@ export interface Job {
     /** Whether the library track Claude chose could not be downloaded, so the edit has no
      * music. */
     musicSkipped?: boolean;
+    /** Whether a given track was analysed without the beat model, so its music is not fitted to
+     * its beats. */
+    beatsSkipped?: boolean;
   };
   error?: string;
   /** Each rendered version of a finished edit, oldest first; absent until the first Apply, when
@@ -919,6 +922,7 @@ export class Jobs {
         captions: "captions" in outputs && outputs.captions !== undefined,
         broll: "broll" in outputs && outputs.broll !== undefined,
         ...("musicSkipped" in line && line.musicSkipped ? { musicSkipped: true } : {}),
+        ...("beatsSkipped" in line && line.beatsSkipped ? { beatsSkipped: true } : {}),
       };
     } else if (line.stage === "short") {
       // Read from shorts.json, which lists it by now; the run's end waits for it.

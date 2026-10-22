@@ -99,7 +99,7 @@ class MusicIndex(BaseModel):
     tracker: Annotated[
         str,
         Field(
-            description="The beat tracker and model that found the beats, e.g. beat_this final0.",
+            description="The beat tracker and model that found the beats, e.g. beat_this final0; none when the beat model could not be downloaded, which leaves the beats, the downbeats and the tempo empty and the whole track one section.",
             min_length=1,
         ),
     ]

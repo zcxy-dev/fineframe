@@ -1,7 +1,10 @@
+import hashlib
+import urllib.error
+
 import numpy as np
 import pytest
 
-from vework import beats
+from vework import beats, download
 
 
 def test_mel_bands_are_the_models_slaney_filters():
@@ -43,3 +46,36 @@ def test_every_frame_is_predicted_away_from_a_windows_edges(frames):
     assert torch.equal(downbeat, -beat)
     assert max(lengths) <= beats.WINDOW
     assert len(lengths) == -(-frames // 1488)
+
+
+def failing_host(monkeypatch, tmp_path, down: str):
+    """Downloads that fail on every address containing `down`, and give a stand-in checkpoint
+    elsewhere, pinned in its place and kept in tmp_path; returns the addresses asked."""
+    body = b"a stand-in checkpoint"
+    asked = []
+
+    def fetch(address, name, timeout=60):
+        asked.append(address)
+        if down in address:
+            raise urllib.error.HTTPError(address, 503, "Service Unavailable", None, None)
+        return body
+
+    monkeypatch.setattr(download, "url", fetch)
+    monkeypatch.setattr(beats, "SHA256", hashlib.sha256(body).hexdigest())
+    monkeypatch.setattr(beats, "checkpoint_path", lambda: tmp_path / "beat_this-final0.ckpt")
+    return asked
+
+
+def test_the_checkpoint_comes_from_the_second_source_when_the_first_fails(tmp_path, monkeypatch):
+    # The authors' host answered 503 for days (#155).
+    asked = failing_host(monkeypatch, tmp_path, "cloud.cp.jku.at")
+    path = beats._checkpoint()
+    assert path.read_bytes() == b"a stand-in checkpoint"
+    assert len(asked) == 2 and "zcxy-dev/fineframe-music" in asked[1]
+
+
+def test_a_checkpoint_no_source_gives_is_unavailable(tmp_path, monkeypatch):
+    failing_host(monkeypatch, tmp_path, "https://")
+    with pytest.raises(beats.Unavailable, match="503"):
+        beats._checkpoint()
+    assert list(tmp_path.iterdir()) == []
