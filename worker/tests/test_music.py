@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from conftest import ffmpeg
 
-from vework import cli, music
+from vework import beats, cli, music
 from vework.music_index import MusicIndex
 
 FPS = 50
@@ -136,3 +136,25 @@ def test_a_synthetic_track_is_indexed_with_its_beats_and_sections(tmp_path):
     assert starts == pytest.approx([s["start"] for s in truth["sections"]], abs=0.07)
     # The last bar's hits ring for under a second.
     assert truth["beats"][-1] < index["end"] < truth["duration"]
+
+
+@pytest.mark.ml
+def test_a_track_is_indexed_without_beats_when_the_beat_model_cannot_be_downloaded(
+    tmp_path, monkeypatch, capsys
+):
+    def unavailable(mono):
+        raise beats.Unavailable("cloud.cp.jku.at: HTTP Error 503: Service Unavailable")
+
+    monkeypatch.setattr(beats, "track", unavailable)
+    song, out = tmp_path / "song.wav", tmp_path / "song.music.json"
+    ffmpeg("-f", "lavfi", "-i", "sine=f=330:d=12", "-ac", "2", str(song))
+    cli.main(["analyze-music", str(song), "-o", str(out), "--license", "CC0 1.0"])
+    index = json.loads(out.read_text(encoding="utf-8"))
+    MusicIndex.model_validate(index, strict=True)
+    # The planner fits a track without a bar grid from its start; the engine analyses it again
+    # on the next edit.
+    assert index["tracker"] == "none"
+    assert (index["beats"], index["downbeats"]) == ([], [])
+    assert index["tempo"] == {"bpm": None, "beats_per_bar": None}
+    assert [(s["start"], s["end"]) for s in index["sections"]] == [(0.0, index["end"])]
+    assert "no beats: the beat model could not be downloaded" in capsys.readouterr().err

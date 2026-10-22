@@ -436,6 +436,7 @@ export const zhTW: Messages = {
     ready: "剪輯完成",
     captions: " · 字幕",
     musicSkipped: "Claude 選的配樂下載失敗，所以這支影片沒有配樂。可以在下方的配樂庫選一首加上。",
+    beatsSkipped: "節拍模型下載失敗，所以你的配樂從頭播放，沒有對齊節拍。下次剪輯會再試一次。",
     download: "下載 MP4",
     downloadCaptions: "下載字幕（SRT）",
     downloadCredits: "下載 B-roll 版權資訊（TXT）",

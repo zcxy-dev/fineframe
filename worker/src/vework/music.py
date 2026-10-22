@@ -1,5 +1,6 @@
 """Music analysis: beats, downbeats, tempo, sections, loudness and where the sound ends."""
 
+import sys
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
@@ -24,6 +25,8 @@ END_RANGE_DB = 50.0
 END_WINDOW = 0.05
 # Beats the tempo is read over at a time.
 SPAN = 8
+# The tracker of an index made without the beat model, which could not be downloaded.
+NO_TRACKER = "none"
 
 
 def analyze(path: Path, license: dict, progress: Callable[[str], None]) -> dict:
@@ -42,7 +45,15 @@ def analyze(path: Path, license: dict, progress: Callable[[str], None]) -> dict:
     # The model was trained on the mean of the channels; a mono downmix by the decoder would be
     # 3 dB louder.
     mono = audio.load(path, rate=beats.RATE, channels=2).mean(axis=1)
-    beat_times, downbeat_times, spect = beats.track(mono)
+    tracker = f"beat_this {beats.MODEL}"
+    try:
+        beat_times, downbeat_times, spect = beats.track(mono)
+    except beats.Unavailable as error:
+        # The planner fits a track without beats from its start, so the edit goes on (#155).
+        print(f"vework: no beats: the beat model could not be downloaded: {error}", file=sys.stderr)
+        tracker = NO_TRACKER
+        beat_times = downbeat_times = np.zeros(0)
+        spect = np.zeros((0, beats.BANDS))
     beat_times = heard(beat_times, stereo, RATE)
     downbeat_times = heard(downbeat_times, stereo, RATE)
     progress("measuring loudness and sections")
@@ -56,7 +67,7 @@ def analyze(path: Path, license: dict, progress: Callable[[str], None]) -> dict:
             "channels": streams[0].channels,
         },
         "license": license,
-        "tracker": f"beat_this {beats.MODEL}",
+        "tracker": tracker,
         "tempo": tempo(beat_times, downbeat_times),
         "beats": _rounded(beat_times),
         "downbeats": _rounded(downbeat_times),

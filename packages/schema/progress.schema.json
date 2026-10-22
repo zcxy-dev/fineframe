@@ -104,6 +104,11 @@
           "type": "string",
           "minLength": 1
         },
+        "beatsSkipped": {
+          "description": "Which music tracks the person gave were analysed without beats, and why: the beat model could not be downloaded. Their music plays from the track's start, not fitted to its bars, and B-roll is not cut on its beats. The edit is otherwise whole.",
+          "type": "string",
+          "minLength": 1
+        },
         "outputs": {
           "description": "Absolute paths of what the run wrote.",
           "type": "object",

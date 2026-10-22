@@ -459,6 +459,8 @@ export const en = {
     captions: " · captions",
     musicSkipped:
       "The music track Claude chose could not be downloaded, so this edit has no music. Pick one from the music library below to add it.",
+    beatsSkipped:
+      "The beat model could not be downloaded, so your music plays from its start without following its beats. The next edit tries again.",
     download: "Download MP4",
     downloadCaptions: "Download captions (SRT)",
     downloadCredits: "Download B-roll credits (TXT)",

@@ -98,6 +98,10 @@ export interface DoneProgress {
    */
   musicSkipped?: string;
   /**
+   * Which music tracks the person gave were analysed without beats, and why: the beat model could not be downloaded. Their music plays from the track's start, not fitted to its bars, and B-roll is not cut on its beats. The edit is otherwise whole.
+   */
+  beatsSkipped?: string;
+  /**
    * Absolute paths of what the run wrote.
    */
   outputs: {

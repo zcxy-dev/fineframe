@@ -55,6 +55,7 @@ import {
   localWorker,
   musicIndexName,
   type Worker,
+  withoutBeats,
 } from "./analyze.ts";
 import { EditError } from "./error.ts";
 import { collectInputs, type MediaFile } from "./inputs.ts";
@@ -142,6 +143,8 @@ export interface EditResult {
   reviews: number;
   /** Why the video plays no music although Claude chose a library track. */
   musicSkipped?: string;
+  /** Which of the given tracks were analysed without beats, and why. */
+  beatsSkipped?: string;
 }
 
 /** The progress bar's share for analysis when every file needs it: on a CPU, the speech model
@@ -173,8 +176,8 @@ export async function edit(options: EditOptions): Promise<EditResult> {
     const result = await steps(options, report, spent);
     const { video, captions } = result.outputs;
     const { music, broll } = result.outputs;
-    const { musicSkipped } = result;
-    const message = `Finished: ${result.seconds.toFixed(1)} s at ${options.aspect} in ${basename(video)}${captions ? `, captions in ${basename(captions)}` : ""}${music ? `, the music's licences in ${basename(music)}` : ""}${broll ? `, the B-roll's credits in ${basename(broll)}` : ""}${musicSkipped ? `. No music: ${musicSkipped}` : ""}`;
+    const { musicSkipped, beatsSkipped } = result;
+    const message = `Finished: ${result.seconds.toFixed(1)} s at ${options.aspect} in ${basename(video)}${captions ? `, captions in ${basename(captions)}` : ""}${music ? `, the music's licences in ${basename(music)}` : ""}${broll ? `, the B-roll's credits in ${basename(broll)}` : ""}${musicSkipped ? `. No music: ${musicSkipped}` : ""}${beatsSkipped ? `. Music not on its beats: ${beatsSkipped}` : ""}`;
     const claude = costByStage(spent);
     emit(
       validateProgress({
@@ -183,6 +186,7 @@ export async function edit(options: EditOptions): Promise<EditResult> {
         message,
         claude,
         ...(musicSkipped ? { musicSkipped } : {}),
+        ...(beatsSkipped ? { beatsSkipped } : {}),
         outputs: result.outputs,
       }),
     );
@@ -277,6 +281,8 @@ interface Prepared {
   analyzed: number;
   /** The brand kit, its files copied into `folder`, its paths relative to it. */
   brand: { kit: Brand; folder: string } | null;
+  /** Which of the given tracks were analysed without beats, and why. */
+  beatsSkipped?: string;
 }
 
 /**
@@ -402,18 +408,22 @@ async function prepare(
   report("analyze", 0, `Reading ${files.length === 1 ? "the file" : `${files.length} files`}`);
   const indexes = new Map<MediaFile, { path: string; bytes: number; cached: boolean }>();
   const music: MusicInput[] = [];
+  const beatless: string[] = [];
   const analyzed = await timed("analyze", async () => {
     await mkdir(cache, { recursive: true });
     // Music first: it takes seconds, so a track vework cannot read fails before the footage's
     // minutes. Its share of the progress is too small to count.
     for (const { file, license } of tracks) {
       const path = join(cache, musicIndexName(worker, await fingerprintOf(file.path), license));
-      if (existsSync(path)) report("analyze", 0, "Analysed before", file.given);
-      else {
+      // One made without the beat model is made again, as the model may download now.
+      if (existsSync(path) && !(await withoutBeats(path))) {
+        report("analyze", 0, "Analysed before", file.given);
+      } else {
         const step = (_: number, message: string, download?: Download) =>
           report("analyze", 0, message, file.given, download, "music");
         await analyzeMusic(worker, file, path, license, step, log);
       }
+      if (await withoutBeats(path)) beatless.push(basename(file.given));
       music.push({ index: path, source: file.path });
     }
     if (options.library) music.push(...libraryMusic(downloading(report, "plan")));
@@ -458,6 +468,9 @@ async function prepare(
     timed,
     analyzed,
     brand,
+    ...(beatless.length > 0
+      ? { beatsSkipped: `${beatless.join(", ")}: the beat model could not be downloaded` }
+      : {}),
   };
 }
 
@@ -687,6 +700,7 @@ async function steps(options: EditOptions, report: Reporter, spent: Usage[]): Pr
     timings: prepared.timings,
     usage: totalUsage(spent),
     ...counted(prepared),
+    ...(prepared.beatsSkipped ? { beatsSkipped: prepared.beatsSkipped } : {}),
   };
 }
 

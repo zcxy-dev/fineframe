@@ -59,6 +59,9 @@ export function ResultSummary({ job, seconds }: { job: Job; seconds: number | nu
       {job.result?.musicSkipped && (job.current ?? 1) === 1 && (
         <p className={styles.help}>{t.done.musicSkipped}</p>
       )}
+      {job.result?.beatsSkipped && (job.current ?? 1) === 1 && (
+        <p className={styles.help}>{t.done.beatsSkipped}</p>
+      )}
     </>
   );
 }
