@@ -78,7 +78,6 @@ A single web page drives it: drop the files or paste a video's link, pick the le
 - **Brand kits:** a logo watermark, up to three colours, fonts and custom captions, kept as [named kits](packages/engine/README.md#brand-kits) on the page or passed as `pnpm edit --brand`, and changed on a finished edit with a render alone.
 - **Studio voice:** each source's speech [denoised and processed](packages/engine/README.md#voice) by a chain chosen from its measurements ([measurements](packages/engine/MEASUREMENTS.md#voice-measurements)).
 - **Benchmark:** [`vebench`](bench/README.md#metrics) scores transcripts, shots, speakers, renders, music and edits across a corpus.
-- **Blind review:** a [local page](bench/README.md#blind-review) records people's ratings of edits and which of two versions they prefer.
 - **File formats:** [JSON Schemas](packages/schema/) for the media index, `project.json` and progress lines, with generated types and validators.
 - **Ground truth drafts:** `vework draft-truth` drafts a corpus clip's transcript for a person to correct ([workflow](bench/README.md#ground-truth)).
 - **Platforms:** macOS on Apple silicon, Windows x64 and Linux x64, tested by CI on every change. Intel Macs are not supported.

@@ -1,7 +1,7 @@
 [project]
 name = "vebench"
 version = "0.4.0"
-description = "Benchmark for automatic video editing: caption accuracy, word timing, shot detection, clicks, A/V drift and blind review"
+description = "Benchmark for automatic video editing: caption accuracy, word timing, shot detection, clicks and A/V drift"
 readme = "README.md"
 license = "LicenseRef-Proprietary"
 keywords = ["benchmark", "asr", "subtitles", "shot-detection", "video-editing"]

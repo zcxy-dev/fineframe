@@ -1,7 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
-    ".": { "entry": ["bench/src/vebench/review_page/review.js"] },
     "packages/*": { "entry": ["scripts/*.ts"] }
   },
   "ignore": ["packages/schema/src/generated/**"],

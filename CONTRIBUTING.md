@@ -21,7 +21,7 @@ A change passes the steps in [`.github/workflows/ci.yml`](.github/workflows/ci.y
 ## Where code goes
 
 - **Python:** model analysis (`worker/`) and the benchmark (`bench/`). Qwen3-ASR, TransNetV2, Silero and PyTorch have no TypeScript equivalents.
-- **TypeScript:** everything else, in the pnpm workspace: the web page (`apps/web`), the desktop app around it (`apps/desktop`), the planner, the renderer and captions (`packages/engine`) and the effects (`packages/effects`). The one exception is the benchmark's [blind-review page](bench/README.md#blind-review): its script is JavaScript that the Python server serves as is, with no build step, and `pnpm lint` and `pnpm typecheck` check it.
+- **TypeScript:** everything else, in the pnpm workspace: the web page (`apps/web`), the desktop app around it (`apps/desktop`), the planner, the renderer and captions (`packages/engine`) and the effects (`packages/effects`).
 - **JSON Schemas:** [`packages/schema`](packages/schema/) defines the files passed between the two. Types and the worker's model are generated from it.
 
 ## Rules

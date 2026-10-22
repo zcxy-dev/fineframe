@@ -46,9 +46,6 @@ bench/corpus/ascend-*/
 # Real footage kept out of the repository, truth included: no real-footage content is committed.
 bench/corpus/real-*/
 
-# Blind-review rounds: the edits and the raters' ratings.
-bench/review/
-
 # Credentials never enter git; commit an .example copy instead.
 .env
 .env.*

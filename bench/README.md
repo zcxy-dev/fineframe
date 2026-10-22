@@ -3,7 +3,6 @@
 Scores the editor's output against ground truth (the synthetic corpus's exact truth, or
 hand-checked truth for real footage), so every pipeline change is measured on the same clips
 with the same numbers.
-A [blind review](#blind-review) covers what numbers cannot: people rate the finished edits.
 
 ## Corpus layout
 
@@ -292,56 +291,3 @@ Run times and memory in this repository's docs were measured on 8 cores of an EP
 - **`errors`:** outputs that failed to score.
 
 A run's pooled numbers cover only the clips it was scored on.
-
-## Blind review
-
-People rate the editor's finished edits without knowing which version of the pipeline made them. A round
-is a folder with one subfolder per footage and target length:
-
-```text
-bench/review/<round>/             git-ignored
-  <item>/<version>.mp4            e.g. talk-60s/main.mp4, or talk-60s/before.mp4 and after.mp4
-  ratings.jsonl                   written by vebench review
-```
-
-```bash
-uv run vebench review review/round-1 --rater alex   # prints the local address to open
-uv run vebench review-report review/round-1          # prints the results as Markdown
-```
-
-- **Alone or A/B:** an item with one edit is rated alone. An item with two or more versions of
-  its edit, such as before and after a pipeline change or two presets, is rated in pairs: every
-  two versions side by side as Edit A and Edit B, then the one the rater would rather post, or
-  no preference.
-- **Shuffled:** each session shuffles the order, and which version sits on which side, with a
-  seed (`--seed`, random by default) and saves the seed with every rating.
-- **Blind:** the page shows neutral labels only; version names, items and file paths stay in the
-  server. Check that no edit carries a title or watermark naming its version.
-- **Ratings:** each edit gets 1–5 for story and pacing, cut quality, caption accuracy and look,
-  framing, audio, effects, and overall "would post this".
-- **Local:** the server listens on 127.0.0.1 only, so the footage stays on this machine. Edits
-  must play in a browser; H.264 MP4 is the safe choice.
-- **Captions:** the page shows the picture and sound only, not subtitle tracks, so an edit's
-  captions must be burned into the picture. An edit whose captions exist only as a subtitle
-  track would be scored as if it had none.
-- **Resuming:** each rating is appended to `ratings.jsonl` when it is saved. Starting again with
-  the same `--rater` continues with what that rater has not rated.
-
-Two lines of `ratings.jsonl`, an edit rated alone and a pair, with the scores shortened:
-
-```json
-{"time": "2026-10-15T08:00:00+00:00", "rater": "alex", "seed": 2026, "item": "talk-60s",
- "versions": ["main"], "scores": {"main": {"story": 4, "…": 4}}}
-{"time": "2026-10-15T08:04:00+00:00", "rater": "alex", "seed": 2026, "item": "talk-5min",
- "versions": ["after", "before"],
- "scores": {"after": {"story": 4, "…": 4}, "before": {"story": 3, "…": 3}}, "preferred": "after"}
-```
-
-`versions` lists the edits in the order shown: Edit A (left, or on top on a phone), then Edit B.
-The scale keys are `story`, `cuts`, `captions`, `framing`, `audio`, `effects` and `overall`.
-`preferred` is `null` for no preference.
-
-`review-report` gives, for each version rated alone, the mean of each scale and the number of
-ratings. Means pool by version name across items, so give every item's edit the same name (e.g.
-`main.mp4`) to get the round's mean per category. For each two versions rated together, it gives the means on the ratings where they met
-and the preference rate, which counts no preference as half for each.
