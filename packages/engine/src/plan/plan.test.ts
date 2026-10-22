@@ -3,7 +3,7 @@
 // with CLAUDE_TESTS=1 and a key (CONTRIBUTING.md).
 
 import assert from "node:assert/strict";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
@@ -17,6 +17,7 @@ import { ffmpeg, run } from "../ffmpeg.ts";
 import { makeSource } from "../fixtures.ts";
 import { scaleAt } from "../framing.ts";
 import { render } from "../render.ts";
+import { fingerprintOf } from "../sources.ts";
 import { scratch } from "../testing.ts";
 import { anthropicClaude, type ClaudeRequest, recordedClaude } from "./claude.ts";
 import { MARGIN } from "./place.ts";
@@ -833,6 +834,82 @@ test("music Claude picks for the content plays under the whole edit, with its li
   const end = clip.start + clip.out - clip.in;
   assert.ok(fromBeat(end) <= 0.02, `end ${end / T} s is ${fromBeat(end)} s from a beat`);
   for (const edge of [clip.start, end]) assert.equal(edge % (T / 25), 0, "on a frame");
+});
+
+test("a library track's audio arrives once Claude picks it, and only then", async (t) => {
+  const dir = await scratch(t, "plan-library-");
+  const index = await makeTalk(dir);
+  const song = await withMusic(dir, index);
+  // The audio waits outside, as a library track's waits to download.
+  const away = join(dir, "away.wav");
+  await rename(join(dir, "song.wav"), away);
+  const fingerprint = await fingerprintOf(away);
+  for (const track of ["music-song", ""]) {
+    let fetched = 0;
+    const source = join(dir, "library", "song.wav");
+    const input = {
+      index: song,
+      source,
+      fingerprint,
+      about: '"Song" by Someone, upbeat',
+      fetch: async () => {
+        fetched++;
+        await mkdir(join(dir, "library"), { recursive: true });
+        await copyFile(away, source);
+      },
+    };
+    const decisions = { ...(await recorded()), music: { track, section: 1, reason: "-" } };
+    const { claude, requests } = recordedClaude({ plan: [decisions] });
+    const out = join(dir, `${track || "none"}.json`);
+    const edit = await plan({
+      inputs: [index],
+      music: [input],
+      length: 15,
+      aspect: "16:9",
+      out,
+      claude,
+    });
+    assert.match(textOf(requests[0], 1), /^Music from the built-in library/m);
+    assert.match(textOf(requests[0], 1), /^music-song: "Song" by Someone, upbeat, 38\.5 s/m);
+    assert.equal(fetched, track ? 1 : 0, track || "none");
+    assert.equal((edit.project.audio.music?.length ?? 0) > 0, Boolean(track));
+    await rm(join(dir, "library"), { recursive: true, force: true });
+  }
+});
+
+test("a library track that cannot be downloaded leaves the edit without music, saying why", async (t) => {
+  const dir = await scratch(t, "plan-unplayed-");
+  const index = await makeTalk(dir);
+  const song = await withMusic(dir, index);
+  const input = {
+    index: song,
+    source: join(dir, "library", "song.wav"),
+    fingerprint: await fingerprintOf(join(dir, "song.wav")),
+    about: '"Song" by Someone, upbeat',
+    fetch: async () => {
+      throw new Error("Could not download it: HTTP 503");
+    },
+  };
+  const decisions = {
+    ...(await recorded()),
+    music: { track: "music-song", section: 1, reason: "An upbeat talk." },
+  };
+  const { claude } = recordedClaude({ plan: [decisions] });
+  const out = join(dir, "edit.json");
+  const edit = await plan({
+    inputs: [index],
+    music: [input],
+    length: 15,
+    aspect: "16:9",
+    out,
+    claude,
+  });
+  assert.equal(edit.project.audio.music, undefined);
+  assert.ok(edit.project.sources.every((s) => s.kind === "video"));
+  assert.equal(
+    edit.state.musicSkipped,
+    '"Song" by Someone, upbeat could not be downloaded: Could not download it: HTTP 503',
+  );
 });
 
 test("a track Claude names that was not offered, or none, plays no music", async (t) => {

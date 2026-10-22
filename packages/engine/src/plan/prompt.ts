@@ -206,7 +206,8 @@ Never guess a name.${effects}
 ## Music
 
 When the request lists music tracks, choose the one whose mood fits what is said and how: \
-judge by its name, tempo and how loud its sections are. Give the section the edit should open \
+judge by its name or the mood it is tagged with, its tempo and how loud its sections are: a \
+slow, quiet track under a calm or serious talk, a quick one under a lively one. Give the section the edit should open \
 on, counted from 1: a quiet one under a calm or serious talk, a full one under an energetic \
 one. Code places it under the speech, ducks it while anyone speaks, loops or shortens it on \
 its phrases to the length, and ends it on its own ending. Answer an empty track when none \

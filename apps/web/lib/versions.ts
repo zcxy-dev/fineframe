@@ -66,8 +66,12 @@ export function videosToPrune(versions: readonly Version[], shown: number): numb
 }
 
 /** A revision as the page sends it: a brand kit by its id, or null for none, in place of the kit
- * itself, which the server copies in. */
-export type PageRevision = Omit<Revision, "brand"> & { kit?: string | null };
+ * itself, which the server copies in; and the music may be swapped for a library track, by its
+ * id. */
+export type PageRevision = Omit<Revision, "brand" | "music"> & {
+  kit?: string | null;
+  music?: Revision["music"] | { track: string };
+};
 
 /** A revision as the page sends it, or what is wrong with it. The engine checks what each change
  * names; this checks only its shape. */
@@ -124,12 +128,14 @@ export function checkRevision(value: unknown): PageRevision | string {
   ) {
     return "Each removal names an overlay, a graphic or B-roll";
   }
+  const music = revision.music as Record<string, unknown> | "remove" | undefined;
   if (
-    revision.music !== undefined &&
-    revision.music !== "remove" &&
-    typeof revision.music?.gainDb !== "number"
+    music !== undefined &&
+    music !== "remove" &&
+    typeof music?.gainDb !== "number" &&
+    typeof music?.track !== "string"
   ) {
-    return "The music is removed or given a level";
+    return "The music is removed, given a level or swapped for a library track";
   }
   if (revision.look !== undefined && typeof revision.look !== "string") return "No such look";
   if (revision.captions !== undefined && typeof revision.captions !== "string") {
@@ -141,7 +147,7 @@ export function checkRevision(value: unknown): PageRevision | string {
   if (revision.kit !== undefined && revision.kit !== null && typeof revision.kit !== "string") {
     return "The brand kit is named by its id";
   }
-  const { cuts, words, overlays, remove, music, look, captions, emoji, kit } = revision;
+  const { cuts, words, overlays, remove, look, captions, emoji, kit } = revision;
   return Object.fromEntries(
     Object.entries({ cuts, words, overlays, remove, music, look, captions, emoji, kit }).filter(
       ([, change]) => change !== undefined,

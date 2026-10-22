@@ -86,6 +86,9 @@ export interface Settings {
   terms?: string[];
   /** The licence the music is used under, such as "CC0 1.0"; needed when there is music. */
   musicLicense?: string;
+  /** Claude picks music from the built-in library when no track is given. Edits from before
+   * the library had none. */
+  library?: boolean;
   asr: Asr;
   visuals: Visuals;
   /** Edits from before the setting had none: natural. */
@@ -211,6 +214,7 @@ export function checkSettings(
     names: lists.names,
     terms: lists.terms,
     ...(license.trim() ? { musicLicense: license.trim() } : {}),
+    library: true,
     asr: heard as Asr,
     visuals: shown as Visuals,
     fillers: cut as FillerMode,

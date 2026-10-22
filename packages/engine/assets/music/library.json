@@ -1,0 +1,369 @@
+{
+  "license": {
+    "name": "CC0 1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "download": "https://github.com/zcxy-dev/fineframe-music/releases/download/v1/",
+  "tracks": [
+    {
+      "id": "connecting-rainbows",
+      "title": "Connecting Rainbows",
+      "artist": "Kevin MacLeod",
+      "mood": "calm",
+      "bytes": 4646578,
+      "sha256": "85f77462ba2ff846ed5bfa911a267f8a8ea0b2c579b58278a2bcef1e26efb81a",
+      "source": "https://web.archive.org/web/20251124004140/https://freepd.com/music/Connecting%20Rainbows.mp3"
+    },
+    {
+      "id": "energizing",
+      "title": "Energizing",
+      "artist": "Kevin MacLeod",
+      "mood": "calm",
+      "bytes": 3040798,
+      "sha256": "6b6f002c9721debbdb4a870fd7a084ec920761a064ca0333ad603e6348a538a4",
+      "source": "https://web.archive.org/web/20251122233525/https://freepd.com/music/Energizing.mp3"
+    },
+    {
+      "id": "infinite-wonder",
+      "title": "Infinite Wonder",
+      "artist": "Kevin MacLeod",
+      "mood": "calm",
+      "bytes": 7606774,
+      "sha256": "490f745de87525dd6da563da266c8823804a3f787573ff317b4788d6d5566e54",
+      "source": "https://web.archive.org/web/20251006151845/https://freepd.com/music/Infinite%20Wonder.mp3"
+    },
+    {
+      "id": "meditating-beat",
+      "title": "Meditating Beat",
+      "artist": "Kevin MacLeod",
+      "mood": "calm",
+      "bytes": 6291368,
+      "sha256": "e498c2015a413e6cba5ab8dbef2a60cdebf7c4d4a97f9edd84851752ff49d3b6",
+      "source": "https://web.archive.org/web/20251202215358/https://freepd.com/music/Meditating%20Beat.mp3"
+    },
+    {
+      "id": "night-in-venice",
+      "title": "Night in Venice",
+      "artist": "Kevin MacLeod",
+      "mood": "calm",
+      "bytes": 8860758,
+      "sha256": "c61435f6f86853b5aefcf4479f3a1266f8887da97d8022c8f1137798076129e4",
+      "source": "https://web.archive.org/web/20251118154443/https://freepd.com/music/Night%20in%20Venice.mp3"
+    },
+    {
+      "id": "pond",
+      "title": "Pond",
+      "artist": "Rafael Krux",
+      "mood": "calm",
+      "bytes": 6090696,
+      "sha256": "68bf0d67ca7c3304bfecad346547dda5a5d95c7d2f5631d6e4e8bd3d3b87fb8c",
+      "source": "https://web.archive.org/web/20250911140703/https://freepd.com/music/Pond.mp3"
+    },
+    {
+      "id": "soundtrack-from-the-starcourt-mall",
+      "title": "Soundtrack From the Starcourt Mall",
+      "artist": "Bryan Teoh",
+      "mood": "calm",
+      "bytes": 4352052,
+      "sha256": "9199da36aefbe7974a75ad22084768ec77c1a98e14ac14ce36f193ece668b867",
+      "source": "https://web.archive.org/web/20251006152053/https://freepd.com/music/Soundtrack%20From%20the%20Starcourt%20Mall.mp3"
+    },
+    {
+      "id": "study-and-relax",
+      "title": "Study and Relax",
+      "artist": "Kevin MacLeod",
+      "mood": "calm",
+      "bytes": 9070686,
+      "sha256": "9cba2a3c2d1c9d364220db1691f618a0f25b8d9cf6f2a857fe389ef614fd18a4",
+      "source": "https://web.archive.org/web/20251122233540/https://freepd.com/music/Study%20and%20Relax.mp3"
+    },
+    {
+      "id": "and-just-like-that",
+      "title": "And Just Like That",
+      "artist": "Bryan Teoh",
+      "mood": "upbeat",
+      "bytes": 2287556,
+      "sha256": "75e6438a8d6d1dcb54dd42cc02f4944b484e73dac48502eb78514c438cada914",
+      "source": "https://web.archive.org/web/20251118002951/https://freepd.com/music/And%20Just%20Like%20That.mp3"
+    },
+    {
+      "id": "funkeriffic",
+      "title": "Funkeriffic",
+      "artist": "Kevin MacLeod",
+      "mood": "upbeat",
+      "bytes": 5045938,
+      "sha256": "e30cdab0e7e3c0d9fd7169f51c187356bed5d48b69ddd68a0ce5847e3929b235",
+      "source": "https://web.archive.org/web/20251122233423/https://freepd.com/music/Funkeriffic.mp3"
+    },
+    {
+      "id": "funky-energy-loop",
+      "title": "Funky Energy Loop",
+      "artist": "Kevin MacLeod",
+      "mood": "upbeat",
+      "bytes": 8102178,
+      "sha256": "b7990b4287cc345b2f42af743c96e26e126b2b03adfad661961a28640fb94c55",
+      "source": "https://web.archive.org/web/20250723181812/https://freepd.com/music/Funky%20Energy%20Loop.mp3"
+    },
+    {
+      "id": "funshine",
+      "title": "Funshine",
+      "artist": "Kevin MacLeod",
+      "mood": "upbeat",
+      "bytes": 6756665,
+      "sha256": "b98b226927367a977377fe4f75d1cf59e4366ca2f444c2c7d23d13e7f506f532",
+      "source": "https://web.archive.org/web/20251118004331/https://freepd.com/music/Funshine.mp3"
+    },
+    {
+      "id": "gotta-keep-on-movin",
+      "title": "Gotta Keep On Movin",
+      "artist": "Bryan Teoh",
+      "mood": "upbeat",
+      "bytes": 2883238,
+      "sha256": "0844e8cb7f10adcff4258eca87dd1aa7a1069617ff8397f0b3980a9d40e71e25",
+      "source": "https://web.archive.org/web/20251122233149/https://freepd.com/music/Gotta%20Keep%20On%20Movin.mp3"
+    },
+    {
+      "id": "happy-whistling-ukulele",
+      "title": "Happy Whistling Ukulele",
+      "artist": "Rafael Krux",
+      "mood": "upbeat",
+      "bytes": 4932877,
+      "sha256": "ed4059c8fba8673d657e85175ff54eaa32cef9e43f688f164bef585e6e65cf15",
+      "source": "https://web.archive.org/web/20251117234159/https://freepd.com/music/Happy%20Whistling%20Ukulele.mp3"
+    },
+    {
+      "id": "hold-on-a-sec",
+      "title": "Hold on a Sec",
+      "artist": "Bryan Teoh",
+      "mood": "upbeat",
+      "bytes": 2512598,
+      "sha256": "c87d50579aa12c8c2f44f0129bf8ec9cb4b5cc856a8afdf2620ef57bf96fc53c",
+      "source": "https://web.archive.org/web/20251122233401/https://freepd.com/music/Hold%20on%20a%20Sec.mp3"
+    },
+    {
+      "id": "ukulele-song",
+      "title": "Ukulele Song",
+      "artist": "Rafael Krux",
+      "mood": "upbeat",
+      "bytes": 5547793,
+      "sha256": "ad54684b7dffd48dcc09c12a0093d375ea1edcaa418bad714d4f54b16a95c81d",
+      "source": "https://web.archive.org/web/20251118171800/https://freepd.com/music/Ukulele%20Song.mp3"
+    },
+    {
+      "id": "brothers-unite",
+      "title": "Brothers Unite",
+      "artist": "Alexander Nakarada",
+      "mood": "emotional",
+      "bytes": 5420578,
+      "sha256": "0afd0218da77c5752b47c0c236b31aa2655790f2a6ae03bcad62b54fd7869c87",
+      "source": "https://web.archive.org/web/20240211063827/https://freepd.com/music/Brothers%20Unite.mp3"
+    },
+    {
+      "id": "horizon-flare",
+      "title": "Horizon Flare",
+      "artist": "Alexander Nakarada",
+      "mood": "emotional",
+      "bytes": 2735200,
+      "sha256": "3f7fbacc5cb6417034945be4067dcfc66d5386619734bf8dad29f6db399c092e",
+      "source": "https://web.archive.org/web/20241001151104/https://freepd.com/music/Horizon%20Flare.mp3"
+    },
+    {
+      "id": "ice-and-snow",
+      "title": "Ice and Snow",
+      "artist": "Rafael Krux",
+      "mood": "emotional",
+      "bytes": 5660213,
+      "sha256": "61e8c88cff9d24eb03ffa8ab55adfefcaaf3f4e2dabf3dec6816d315f49aa99a",
+      "source": "https://web.archive.org/web/20251118020712/https://freepd.com/music/Ice%20and%20Snow.mp3"
+    },
+    {
+      "id": "isolation-waltz",
+      "title": "Isolation Waltz",
+      "artist": "Bryan Teoh",
+      "mood": "emotional",
+      "bytes": 4108673,
+      "sha256": "4fb04327dfa8d98c142c4427a05516b525d38740a815f9230d07e9daf8211369",
+      "source": "https://web.archive.org/web/20251118154443/https://freepd.com/music/Isolation%20Waltz.mp3"
+    },
+    {
+      "id": "nostalgic-piano",
+      "title": "Nostalgic Piano",
+      "artist": "Rafael Krux",
+      "mood": "emotional",
+      "bytes": 7853453,
+      "sha256": "5d932737a07dc1f0fadc713d188a059964bc156371e1569f5a6267dc39547865",
+      "source": "https://web.archive.org/web/20250911140713/https://freepd.com/music/Nostalgic%20Piano.mp3"
+    },
+    {
+      "id": "relaxing-ballad",
+      "title": "Relaxing Ballad",
+      "artist": "Alexander Nakarada",
+      "mood": "emotional",
+      "bytes": 8486879,
+      "sha256": "b3be475ce26a71b61c0282f955bb53335ff146cf9712d8fab77f3c7a8defd6d3",
+      "source": "https://web.archive.org/web/20240211063246/https://freepd.com/music/Relaxing%20Ballad.mp3"
+    },
+    {
+      "id": "romantic-inspiration",
+      "title": "Romantic Inspiration",
+      "artist": "Rafael Krux",
+      "mood": "emotional",
+      "bytes": 5989355,
+      "sha256": "5d96bd468d1edde0370c2a1d18e9fc5f6b8f208668a772537b7f145ddff8c445",
+      "source": "https://web.archive.org/web/20250911140707/https://freepd.com/music/Romantic%20Inspiration.mp3"
+    },
+    {
+      "id": "shining-stars",
+      "title": "Shining Stars",
+      "artist": "Rafael Krux",
+      "mood": "emotional",
+      "bytes": 5603148,
+      "sha256": "751697ea7b30ae698b9dfcf2540d777e2acd01cf4480a98fa3366f246da24d38",
+      "source": "https://web.archive.org/web/20251118154444/https://freepd.com/music/Shining%20Stars.mp3"
+    },
+    {
+      "id": "adding-the-sun",
+      "title": "Adding the Sun",
+      "artist": "Kevin MacLeod",
+      "mood": "corporate",
+      "bytes": 2951782,
+      "sha256": "00180cd2ffd21eb397449e9a96081502f16e4e7c82cc9a98570e6ea7256594ed",
+      "source": "https://web.archive.org/web/20251107152247/https://freepd.com/music/Adding%20the%20Sun.mp3"
+    },
+    {
+      "id": "advertime",
+      "title": "Advertime",
+      "artist": "Rafael Krux",
+      "mood": "corporate",
+      "bytes": 5360940,
+      "sha256": "6f0d4433cf788304d60add551cc460dd877865e6d84a2ab3fa7d15ba3f55d6ce",
+      "source": "https://web.archive.org/web/20251011155222/https://freepd.com/music/Advertime.mp3"
+    },
+    {
+      "id": "arpent",
+      "title": "Arpent",
+      "artist": "Kevin MacLeod",
+      "mood": "corporate",
+      "bytes": 6486643,
+      "sha256": "ef06d8b524c196a31954dfb1f3261e7d37459e43f4afd9df31ee2965c6094a56",
+      "source": "https://web.archive.org/web/20251202215400/https://freepd.com/music/Arpent.mp3"
+    },
+    {
+      "id": "city-sunshine",
+      "title": "City Sunshine",
+      "artist": "Kevin MacLeod",
+      "mood": "corporate",
+      "bytes": 7402093,
+      "sha256": "e05c1bd683174cff77d492b7ac77262ff4617f99f69d82564b66831cf48352d6",
+      "source": "https://web.archive.org/web/20251123132355/https://freepd.com/music/City%20Sunshine.mp3"
+    },
+    {
+      "id": "from-page-to-practice",
+      "title": "From Page to Practice",
+      "artist": "Bryan Teoh",
+      "mood": "corporate",
+      "bytes": 2733479,
+      "sha256": "dd20cb51c948a14e45d71b9a03b9d6afc48a4b7fd7b5020da623fbd86390b519",
+      "source": "https://web.archive.org/web/20251011155222/https://freepd.com/music/From%20Page%20to%20Practice.mp3"
+    },
+    {
+      "id": "inspiration",
+      "title": "Inspiration",
+      "artist": "Rafael Krux",
+      "mood": "corporate",
+      "bytes": 5530068,
+      "sha256": "a254227da398809c79a0c753073a3a92c7341672abc92bb0166b6326e126f0b4",
+      "source": "https://web.archive.org/web/20251118195204/https://freepd.com/music/Inspiration.mp3"
+    },
+    {
+      "id": "inventing-flight",
+      "title": "Inventing Flight",
+      "artist": "Bryan Teoh",
+      "mood": "corporate",
+      "bytes": 2840034,
+      "sha256": "916e736efa3caed4ea8534e727670dbac41af0fb44f00fa667aebaab9b2b6407",
+      "source": "https://web.archive.org/web/20251121104137/https://freepd.com/music/Inventing%20Flight.mp3"
+    },
+    {
+      "id": "motions",
+      "title": "Motions",
+      "artist": "Rafael Krux",
+      "mood": "corporate",
+      "bytes": 4677248,
+      "sha256": "af6380fde14f41dc4762a0a69c558bfd03a8a88c10cb5c8f578a6d0bcb4750be",
+      "source": "https://web.archive.org/web/20251119204459/https://freepd.com/music/Motions.mp3"
+    },
+    {
+      "id": "be-chillin",
+      "title": "Be Chillin",
+      "artist": "Alexander Nakarada",
+      "mood": "energetic",
+      "bytes": 8104261,
+      "sha256": "1abaa9455ced505f10306b34d1fe569a43be28809ae39e62f422c69f312a74cb",
+      "source": "https://web.archive.org/web/20240211063429/https://freepd.com/music/Be%20Chillin.mp3"
+    },
+    {
+      "id": "chronos",
+      "title": "Chronos",
+      "artist": "Alexander Nakarada",
+      "mood": "energetic",
+      "bytes": 4387205,
+      "sha256": "ba90826638bc43f8449a7417c6b64e5329891dd5414c980f78b32cbe10276ddd",
+      "source": "https://web.archive.org/web/20240927005202/https://freepd.com/music/Chronos.mp3"
+    },
+    {
+      "id": "favorite",
+      "title": "Favorite",
+      "artist": "Alexander Nakarada",
+      "mood": "energetic",
+      "bytes": 5541087,
+      "sha256": "d5b2badc7156c4227aad28876d6bf4855886e6325ac255277073d6395eaf6381",
+      "source": "https://web.archive.org/web/20240211063921/https://freepd.com/music/Favorite.mp3"
+    },
+    {
+      "id": "fireworks",
+      "title": "Fireworks",
+      "artist": "Alexander Nakarada",
+      "mood": "energetic",
+      "bytes": 6201834,
+      "sha256": "11d41ba19aca852014844bc9108799c01126d11dcf35e17b7f66a221279bc78e",
+      "source": "https://web.archive.org/web/20240211063930/https://freepd.com/music/Fireworks.mp3"
+    },
+    {
+      "id": "goodnightmare",
+      "title": "Goodnightmare",
+      "artist": "Kevin MacLeod",
+      "mood": "energetic",
+      "bytes": 7684215,
+      "sha256": "b3793f15317a70bbbd857fa4a77872a42bcdc27445f25bce397bb7a442f91b9c",
+      "source": "https://web.archive.org/web/20251202215403/https://freepd.com/music/Goodnightmare.mp3"
+    },
+    {
+      "id": "heroic-adventure",
+      "title": "Heroic Adventure",
+      "artist": "Rafael Krux",
+      "mood": "energetic",
+      "bytes": 5721778,
+      "sha256": "41355a9625e8ee15d678c1c8c512636b6610a750f61b79820b53286a0dc3836a",
+      "source": "https://web.archive.org/web/20251123161444/https://freepd.com/music/Heroic%20Adventure.mp3"
+    },
+    {
+      "id": "hit-n-smash",
+      "title": "Hit n Smash",
+      "artist": "Rafael Krux",
+      "mood": "energetic",
+      "bytes": 5320621,
+      "sha256": "222b2220958c1525d6c85ec12b7ce13380a4f432dd3cf48eaefa7a44d8006756",
+      "source": "https://web.archive.org/web/20251123161443/https://freepd.com/music/Hit%20n%20Smash.mp3"
+    },
+    {
+      "id": "kings-trailer",
+      "title": "Kings Trailer",
+      "artist": "Rafael Krux",
+      "mood": "energetic",
+      "bytes": 6523298,
+      "sha256": "872747c75bd9dcb12134e7d6b4870238eb72c5557753a77232ee22fa1d2fd21a",
+      "source": "https://web.archive.org/web/20251123161509/https://freepd.com/music/Kings%20Trailer.mp3"
+    }
+  ]
+}

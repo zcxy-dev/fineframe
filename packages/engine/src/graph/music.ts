@@ -2,6 +2,7 @@
 // bed. The finished mix adds the bed to the main sound before loudness is measured (see
 // ./master.ts), so normalisation covers both and keeps the voice's lead over the music.
 import { QUIET } from "../ffmpeg.ts";
+import { gatedMean } from "../loudness.ts";
 import { EDGE_FADE_SAMPLES } from "../pieces.ts";
 import { SAMPLE_RATE, type Timeline, type TimelineMusic, ticksToSamples } from "../timeline.ts";
 import { soundClock } from "./audio.ts";
@@ -17,10 +18,6 @@ export const ENVELOPE_RATE = 1000;
 export const MIN_RISE = 0.5;
 /** Speech quieter than the edit's own takes the music down at most this much further. */
 export const MAX_RIDE_DB = 12;
-/** BS.1770's gates: blocks under the absolute one are silence; the relative one, under a
- * stretch's own mean, drops the dips between words. */
-const ABSOLUTE = -70;
-const RELATIVE = 10;
 /** FFmpeg's momentary loudness: a 400 ms window every 100 ms, value k ending 0.1 s after k's
  * frame starts. */
 const STEP = 0.1;
@@ -116,17 +113,6 @@ export function rides(speech: readonly [number, number][], momentary: readonly n
   });
   const edit = gatedMean(windows.flat());
   return windows.map((values) => Math.min(MAX_RIDE_DB, Math.max(0, edit - gatedMean(values))));
-}
-
-/** BS.1770's gated mean of loudness values: the power mean of those above ABSOLUTE and within
- * RELATIVE of their own mean; ABSOLUTE for silence. */
-export function gatedMean(values: readonly number[]): number {
-  const heard = values.filter((v) => v > ABSOLUTE);
-  const mean = (list: readonly number[]) =>
-    10 * Math.log10(list.reduce((sum, v) => sum + 10 ** (v / 10), 0) / list.length);
-  if (heard.length === 0) return ABSOLUTE;
-  const level = mean(heard);
-  return mean(heard.filter((v) => v >= level - RELATIVE));
 }
 
 /** The gain envelope of a music range, as ENVELOPE_RATE samples from its start, or null when it

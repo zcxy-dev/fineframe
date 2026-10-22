@@ -6,6 +6,7 @@
 // ANTHROPIC_API_KEY is $FAKE_EDIT_KEY, and records the OpenRouter key it was given in
 // openrouter.txt and the Pexels and Pixabay ones in stock.txt.
 // $FAKE_EDIT_NO_CAPTIONS leaves the captions file empty, as the engine does when no speech is kept.
+// $FAKE_EDIT_SKIP_MUSIC says the library track Claude chose could not be downloaded.
 // With --shorts it makes two shorts, fewer than asked, from the first file in out/01 and out/02,
 // each playing a stretch of that file, whose media index says it lasts 100 s. After the first it
 // waits while $FAKE_SHORTS_HOLD names a file that exists, and with $FAKE_SHORTS_STOP it stops
@@ -147,5 +148,8 @@ say({
   fraction: 1,
   message: "Finished",
   claude: cost,
+  ...(process.env.FAKE_EDIT_SKIP_MUSIC
+    ? { musicSkipped: '"Song" by Someone, calm could not be downloaded: HTTP 503' }
+    : {}),
   outputs: { video: out, project, captions, ...(broll ? { broll } : {}) },
 });

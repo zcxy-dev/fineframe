@@ -50,9 +50,15 @@ export function useVideoLength(job: Job): number | null {
 export function ResultSummary({ job, seconds }: { job: Job; seconds: number | null }) {
   const t = useT();
   return (
-    <p className={styles.resultMeta}>
-      {seconds ? formatClock(seconds) : "…"} · {shownPlan(job).aspect}
-      {job.result?.captions ? t.done.captions : ""}
-    </p>
+    <>
+      <p className={styles.resultMeta}>
+        {seconds ? formatClock(seconds) : "…"} · {shownPlan(job).aspect}
+        {job.result?.captions ? t.done.captions : ""}
+      </p>
+      {/* Only the first version went without; a later one may have music from the panel. */}
+      {job.result?.musicSkipped && (job.current ?? 1) === 1 && (
+        <p className={styles.help}>{t.done.musicSkipped}</p>
+      )}
+    </>
   );
 }

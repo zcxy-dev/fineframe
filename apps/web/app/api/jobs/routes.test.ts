@@ -318,15 +318,25 @@ test("speech heard on OpenRouter needs its key, which the edit gets with --asr c
   const { body: job } = await create([{ path: "c.mp4", size: 2 }], cloud);
   assert.equal(job.settings.asr, "cloud");
   assert.equal((await put(job.id, 0, new Uint8Array(2))).status, 200);
+  // The library track Claude chose cannot be downloaded: the edit is done without music.
+  process.env.FAKE_EDIT_SKIP_MUSIC = "1";
   assert.equal((await start(job.id)).status, 200);
   const latest = async () =>
     (await (await jobRoute.GET(new Request(url), ctx({ id: job.id }))).json()) as Job;
   while ((await latest()).status === "running") await new Promise((done) => setTimeout(done, 20));
+  delete process.env.FAKE_EDIT_SKIP_MUSIC;
+  assert.equal((await latest()).status, "done");
+  assert.equal((await latest()).result?.musicSkipped, true);
   const dir = join(root, job.id);
   const args = JSON.parse(await readFile(join(dir, "args.json"), "utf8")) as string[];
   assert.deepEqual(args.slice(args.indexOf("--asr"), args.indexOf("--asr") + 2), [
     "--asr",
     "cloud",
+  ]);
+  // Given no track, a new edit takes the library's music.
+  assert.deepEqual(args.slice(args.indexOf("--music"), args.indexOf("--music") + 2), [
+    "--music",
+    "library",
   ]);
   assert.equal(await readFile(join(dir, "openrouter.txt"), "utf8"), "sk-or-saved");
   // Minimal visuals: no B-roll, so no credits to download.

@@ -2,7 +2,13 @@
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
-    "includes": ["**", "!bench/corpus", "!worker", "!**/generated"]
+    "includes": [
+      "**",
+      "!bench/corpus",
+      "!worker",
+      "!**/generated",
+      "!packages/engine/assets/music/*.music.json"
+    ]
   },
   "formatter": { "indentStyle": "space", "lineWidth": 100 }
 }

@@ -1,6 +1,6 @@
 # Third-party notices
 
-The project's own code is proprietary, all rights reserved ([LICENSE](LICENSE)). It uses the components below, each under its own licence. Nothing in this repository bundles a model weight, a font or a binary, and its only third-party media are [a few CC0 sound effects](#sound-effects) and [a subset of icons and logos](#icons-copied-into-the-source): the tools download the rest on first use, from their publishers, or the package managers install them. The desktop app's installers do carry programs: Electron, uv and the npm packages the editor runs, but no FFmpeg, model or Python package ([what they carry](#desktop-installers)). Licences were checked against each component's own licence file or model card at the version or revision the project pins.
+The project's own code is proprietary, all rights reserved ([LICENSE](LICENSE)). It uses the components below, each under its own licence. Nothing in this repository bundles a model weight, a font or a binary, and its only third-party media are [a few CC0 sound effects](#sound-effects), [a subset of icons and logos](#icons-copied-into-the-source) and the [music library's](#music-library) tags and analysis, without its audio: the tools download the rest on first use, from their publishers, or the package managers install them. The desktop app's installers do carry programs: Electron, uv and the npm packages the editor runs, but no FFmpeg, model or Python package ([what they carry](#desktop-installers)). Licences were checked against each component's own licence file or model card at the version or revision the project pins.
 
 ## Components
 
@@ -27,6 +27,7 @@ The project's own code is proprietary, all rights reserved ([LICENSE](LICENSE)).
 | ffprobe static builds from [@ffprobe-installer](https://github.com/SavageCore/node-ffprobe-installer)'s npm packages: 5.2.0 on Linux, 5.0.1 on Apple silicon, 5.1.0 on Windows | GPL-3.0 (Linux, Windows), LGPL-2.1 (macOS), as each package states | npm registry tarball, SHA-256 checked; renderer, on the first effect render, run as a separate program by HyperFrames (see [notes](#ffmpeg)) |
 | [CPython](https://www.python.org) builds from [python-build-standalone](https://github.com/astral-sh/python-build-standalone) | PSF-2.0, with the licences of the libraries each build includes | Desktop app only: installed by uv into the app's folder on its first start |
 | Chrome Headless Shell ([Chromium](https://www.chromium.org)) | Chromium's BSD-3-Clause licence and the third-party licences it lists; Google's build also refers to the Chrome terms of service | Google's [Chrome for Testing](https://github.com/GoogleChromeLabs/chrome-for-testing), pinned build, its archive SHA-256 checked per platform, through @puppeteer/browsers; renderer, on the first effect render or web capture. There is no build for Linux on arm64 |
+| [Music library](#music-library), 40 tracks | CC0 1.0 | The [fineframe-music](https://github.com/zcxy-dev/fineframe-music) repository's release, SHA-256 checked; engine, each track when an edit plays it or the page previews it |
 | [Lucide](https://lucide.dev) icons (`lucide-static` 1.50.0) | ISC; the icons drawn from Feather MIT, as its licence file lists them | npm registry tarball, SHA-256 checked; engine, on the first icon lookup |
 | [Tabler Icons](https://tabler.io/icons) (`@tabler/icons` 3.48.0), outline style | MIT | npm registry tarball, SHA-256 checked; engine, on the first icon lookup |
 | [Simple Icons](https://simpleicons.org) (`simple-icons` 16.33.0) | CC0-1.0, except the logos its data gives another licence (see [notes](#icons-and-logos)) | npm registry tarball, SHA-256 checked; engine, on the first logo lookup |
@@ -136,11 +137,59 @@ Each of the [desktop app](apps/desktop/README.md)'s installers carries:
 Left out on purpose, and downloaded on first use instead, from their publishers, as when the editor runs from a clone:
 
 - **FFmpeg.** The renderer's pinned build downloads on the first edit, as [above](#ffmpeg).
+- **The music library's audio**, each track when an edit plays it or the page previews it, as [above](#models-and-data-downloaded-on-first-use).
 - **ffprobe and Chrome Headless Shell**, which download on the first effect render, as [above](#models-and-data-downloaded-on-first-use).
 - **The analysis's Python**, its packages (PyAV's GPL FFmpeg among them) and the models, which uv and vework download into the user's folders.
 - **sharp** and its libvips, which neither the page nor a render uses.
 
 The installers are not signed with an Apple Developer ID or a Windows code-signing certificate yet; the macOS app is signed ad hoc, which Apple silicon requires to run it.
+
+### Music library
+
+The built-in music library's 40 tracks, each dedicated to the public domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) by its author on [FreePD](https://freepd.com), whose site said: "This music is all licensed CC0 1.0 Universal Public Domain Dedication" ([archived](https://web.archive.org/web/20251207054520/https://freepd.com/)). FreePD closed in 2025; each file is byte for byte the one freepd.com served, from the Internet Archive's capture below, and is published unchanged in the [fineframe-music](https://github.com/zcxy-dev/fineframe-music) repository. `packages/engine/assets/music/` holds each track's tags and its music index, not its audio.
+
+| Title | Author | Mood | Source |
+|---|---|---|---|
+| Connecting Rainbows | Kevin MacLeod | calm | [capture](https://web.archive.org/web/20251124004140/https://freepd.com/music/Connecting%20Rainbows.mp3) |
+| Energizing | Kevin MacLeod | calm | [capture](https://web.archive.org/web/20251122233525/https://freepd.com/music/Energizing.mp3) |
+| Infinite Wonder | Kevin MacLeod | calm | [capture](https://web.archive.org/web/20251006151845/https://freepd.com/music/Infinite%20Wonder.mp3) |
+| Meditating Beat | Kevin MacLeod | calm | [capture](https://web.archive.org/web/20251202215358/https://freepd.com/music/Meditating%20Beat.mp3) |
+| Night in Venice | Kevin MacLeod | calm | [capture](https://web.archive.org/web/20251118154443/https://freepd.com/music/Night%20in%20Venice.mp3) |
+| Pond | Rafael Krux | calm | [capture](https://web.archive.org/web/20250911140703/https://freepd.com/music/Pond.mp3) |
+| Soundtrack From the Starcourt Mall | Bryan Teoh | calm | [capture](https://web.archive.org/web/20251006152053/https://freepd.com/music/Soundtrack%20From%20the%20Starcourt%20Mall.mp3) |
+| Study and Relax | Kevin MacLeod | calm | [capture](https://web.archive.org/web/20251122233540/https://freepd.com/music/Study%20and%20Relax.mp3) |
+| And Just Like That | Bryan Teoh | upbeat | [capture](https://web.archive.org/web/20251118002951/https://freepd.com/music/And%20Just%20Like%20That.mp3) |
+| Funkeriffic | Kevin MacLeod | upbeat | [capture](https://web.archive.org/web/20251122233423/https://freepd.com/music/Funkeriffic.mp3) |
+| Funky Energy Loop | Kevin MacLeod | upbeat | [capture](https://web.archive.org/web/20250723181812/https://freepd.com/music/Funky%20Energy%20Loop.mp3) |
+| Funshine | Kevin MacLeod | upbeat | [capture](https://web.archive.org/web/20251118004331/https://freepd.com/music/Funshine.mp3) |
+| Gotta Keep On Movin | Bryan Teoh | upbeat | [capture](https://web.archive.org/web/20251122233149/https://freepd.com/music/Gotta%20Keep%20On%20Movin.mp3) |
+| Happy Whistling Ukulele | Rafael Krux | upbeat | [capture](https://web.archive.org/web/20251117234159/https://freepd.com/music/Happy%20Whistling%20Ukulele.mp3) |
+| Hold on a Sec | Bryan Teoh | upbeat | [capture](https://web.archive.org/web/20251122233401/https://freepd.com/music/Hold%20on%20a%20Sec.mp3) |
+| Ukulele Song | Rafael Krux | upbeat | [capture](https://web.archive.org/web/20251118171800/https://freepd.com/music/Ukulele%20Song.mp3) |
+| Brothers Unite | Alexander Nakarada | emotional | [capture](https://web.archive.org/web/20240211063827/https://freepd.com/music/Brothers%20Unite.mp3) |
+| Horizon Flare | Alexander Nakarada | emotional | [capture](https://web.archive.org/web/20241001151104/https://freepd.com/music/Horizon%20Flare.mp3) |
+| Ice and Snow | Rafael Krux | emotional | [capture](https://web.archive.org/web/20251118020712/https://freepd.com/music/Ice%20and%20Snow.mp3) |
+| Isolation Waltz | Bryan Teoh | emotional | [capture](https://web.archive.org/web/20251118154443/https://freepd.com/music/Isolation%20Waltz.mp3) |
+| Nostalgic Piano | Rafael Krux | emotional | [capture](https://web.archive.org/web/20250911140713/https://freepd.com/music/Nostalgic%20Piano.mp3) |
+| Relaxing Ballad | Alexander Nakarada | emotional | [capture](https://web.archive.org/web/20240211063246/https://freepd.com/music/Relaxing%20Ballad.mp3) |
+| Romantic Inspiration | Rafael Krux | emotional | [capture](https://web.archive.org/web/20250911140707/https://freepd.com/music/Romantic%20Inspiration.mp3) |
+| Shining Stars | Rafael Krux | emotional | [capture](https://web.archive.org/web/20251118154444/https://freepd.com/music/Shining%20Stars.mp3) |
+| Adding the Sun | Kevin MacLeod | corporate | [capture](https://web.archive.org/web/20251107152247/https://freepd.com/music/Adding%20the%20Sun.mp3) |
+| Advertime | Rafael Krux | corporate | [capture](https://web.archive.org/web/20251011155222/https://freepd.com/music/Advertime.mp3) |
+| Arpent | Kevin MacLeod | corporate | [capture](https://web.archive.org/web/20251202215400/https://freepd.com/music/Arpent.mp3) |
+| City Sunshine | Kevin MacLeod | corporate | [capture](https://web.archive.org/web/20251123132355/https://freepd.com/music/City%20Sunshine.mp3) |
+| From Page to Practice | Bryan Teoh | corporate | [capture](https://web.archive.org/web/20251011155222/https://freepd.com/music/From%20Page%20to%20Practice.mp3) |
+| Inspiration | Rafael Krux | corporate | [capture](https://web.archive.org/web/20251118195204/https://freepd.com/music/Inspiration.mp3) |
+| Inventing Flight | Bryan Teoh | corporate | [capture](https://web.archive.org/web/20251121104137/https://freepd.com/music/Inventing%20Flight.mp3) |
+| Motions | Rafael Krux | corporate | [capture](https://web.archive.org/web/20251119204459/https://freepd.com/music/Motions.mp3) |
+| Be Chillin | Alexander Nakarada | energetic | [capture](https://web.archive.org/web/20240211063429/https://freepd.com/music/Be%20Chillin.mp3) |
+| Chronos | Alexander Nakarada | energetic | [capture](https://web.archive.org/web/20240927005202/https://freepd.com/music/Chronos.mp3) |
+| Favorite | Alexander Nakarada | energetic | [capture](https://web.archive.org/web/20240211063921/https://freepd.com/music/Favorite.mp3) |
+| Fireworks | Alexander Nakarada | energetic | [capture](https://web.archive.org/web/20240211063930/https://freepd.com/music/Fireworks.mp3) |
+| Goodnightmare | Kevin MacLeod | energetic | [capture](https://web.archive.org/web/20251202215403/https://freepd.com/music/Goodnightmare.mp3) |
+| Heroic Adventure | Rafael Krux | energetic | [capture](https://web.archive.org/web/20251123161444/https://freepd.com/music/Heroic%20Adventure.mp3) |
+| Hit n Smash | Rafael Krux | energetic | [capture](https://web.archive.org/web/20251123161443/https://freepd.com/music/Hit%20n%20Smash.mp3) |
+| Kings Trailer | Rafael Krux | energetic | [capture](https://web.archive.org/web/20251123161509/https://freepd.com/music/Kings%20Trailer.mp3) |
 
 ### Icons and logos
 

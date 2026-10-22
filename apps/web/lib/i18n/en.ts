@@ -419,6 +419,8 @@ export const en = {
     player: "Your edit",
     ready: "Your edit is ready",
     captions: " · captions",
+    musicSkipped:
+      "The music track Claude chose could not be downloaded, so this edit has no music. Pick one from the music library below to add it.",
     download: "Download MP4",
     downloadCaptions: "Download captions (SRT)",
     downloadCredits: "Download B-roll credits (TXT)",
@@ -567,6 +569,24 @@ export const en = {
     volume: "Volume",
     removeMusic: "Remove the music",
     noMusic: "This edit has no music.",
+    playing: (name: string) => `Playing ${name}.`,
+    library: {
+      title: "Music library",
+      moods: {
+        calm: "Calm",
+        upbeat: "Upbeat",
+        emotional: "Emotional",
+        corporate: "Corporate",
+        energetic: "Energetic",
+      },
+      play: (title: string) => `Preview ${title}`,
+      stop: (title: string) => `Stop ${title}`,
+      use: "Use",
+      using: "In use",
+      help: "Another track is fitted to this cut and only renders again: no new plan, no Claude cost.",
+      claim:
+        "If a platform claims a library track, it is CC0 public domain; dispute the claim with that licence.",
+    },
     look: "Look",
     captionStyle: "Caption style",
     emoji: "Emoji at the end of caption lines",
@@ -578,7 +598,7 @@ export const en = {
     remove: "Remove",
     replanTitle: "Needs a re-plan",
     replanHelp:
-      "Reordering, putting removed parts back, a length more than 5 % off, another aspect or another music track cannot be changed here: Claude plans the edit again from the same footage, whose analysis is kept, so it takes a minute or two and one more plan.",
+      "Reordering, putting removed parts back, a length more than 5 % off, another aspect or another of your own music tracks cannot be changed here: Claude plans the edit again from the same footage, whose analysis is kept, so it takes a minute or two and one more plan.",
     replan: "Re-plan…",
     older:
       "This edit was made with an earlier version: its motion-graphics cards and keyword pops are left out when it renders again. Re-plan it for the new motion graphics.",
@@ -600,6 +620,7 @@ export const en = {
       removed: (n: number) => `removed ${plural(n, "overlay", "overlays")}`,
       noMusic: "removed the music",
       music: (gain: string) => `music ${gain} dB`,
+      track: (title: string) => `music ${title}`,
       look: (id: string, _name: string) => `look ${id}`,
       captions: (id: string, _name: string) => `captions ${id}`,
       emoji: (on: boolean) => `emoji ${on ? "on" : "off"}`,
@@ -835,6 +856,7 @@ export const en = {
     rendering: "A version is rendering; wait for it to finish or stop it",
     noVersion: "No such version",
     notOffered: "That music track is not one this edit was offered",
+    noTrack: "The music library has no such track",
     notFinished: "Only a finished edit can change",
     footageDeleted: (kept: number) =>
       `This project's footage was deleted, as only the newest ${kept} keep theirs; make a new edit from the footage instead`,

@@ -12,13 +12,14 @@ import {
 } from "@video-editor/schema";
 import { loadKit, stageBrand, withBrand } from "./brand/kit.ts";
 import { cutEdit, placeSources } from "./cut.ts";
+import { catalogTracks, MOODS, swapMusic } from "./library.ts";
 import { exportEdit } from "./nle/export.ts";
 import { rebase, render } from "./render.ts";
 
 /** What runs this: pnpm in a clone, or the desktop app's `fineframe` command (apps/desktop). */
 const command = process.env.VIDEO_EDITOR_COMMAND ?? "pnpm";
 const usage = `Usage: ${command} render <project.json> -o <out.mp4> [--cut <from>-<to>]... [--retarget] \\
-    [--brand <kit folder | none>]
+    [--brand <kit folder | none>] [--music <library track id | none>]
        pnpm render <project.json> --export <folder>
 
 Renders the edit a project.json describes, without analysing or planning again, and writes
@@ -39,7 +40,18 @@ Renders the edit a project.json describes, without analysing or planning again, 
                  it outside 5 % of that, which otherwise fails
       --brand    renders the edit in a brand kit's look, its files copied into brand/ beside
                  the video, or with none in the house look; its custom captions replace the
-                 caption style. The edit as changed is <name>.project.json`;
+                 caption style. The edit as changed is <name>.project.json
+      --music    plays this track of the built-in music library under the edit instead of
+                 its music, fitted to the edit as a plan fits it, or none for no music. The
+                 track downloads on its first use. The edit as changed is <name>.project.json.
+                 The library's tracks, all CC0, by mood:
+${MOODS.map(
+  (mood) =>
+    `                 ${mood}: ${catalogTracks()
+      .filter((track) => track.mood === mood)
+      .map((track) => track.id)
+      .join(", ")}`,
+).join("\n")}`;
 
 const parsed = (() => {
   try {
@@ -51,6 +63,7 @@ const parsed = (() => {
         cut: { type: "string", multiple: true },
         retarget: { type: "boolean" },
         brand: { type: "string" },
+        music: { type: "string" },
         help: { type: "boolean", short: "h" },
       },
     });
@@ -116,7 +129,7 @@ if (values.export !== undefined) {
 const out = resolve(here, values.output as string);
 try {
   let path = projectPath;
-  if (ranges.length > 0 || values.brand) {
+  if (ranges.length > 0 || values.brand || values.music) {
     let project = await loadJson(projectPath, validateProject);
     const folder = dirname(out);
     path = join(folder, `${basename(out, extname(out))}.project.json`);
@@ -136,6 +149,13 @@ try {
       project = withBrand(project, kit);
     }
     if (ranges.length > 0) project = await cut(project);
+    if (values.music) {
+      project = await swapMusic(
+        project,
+        projectPath,
+        values.music === "none" ? null : values.music,
+      );
+    }
     await mkdir(folder, { recursive: true });
     await writeFile(path, `${JSON.stringify(rebase(project, projectPath, folder), null, 2)}\n`);
   }
