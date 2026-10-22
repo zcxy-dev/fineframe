@@ -40,4 +40,4 @@ Especially welcome:
 
 ## Supported versions
 
-Fixes land on `main` and ship in the next release; only the latest release is supported. The desktop app does not update itself: install the newest release.
+Fixes land on `main` and ship in the next release; only the latest release is supported. On Windows and Linux the desktop app updates itself; on a Mac, install the newest version from the [download page](https://fineframe.app/en/download/).
