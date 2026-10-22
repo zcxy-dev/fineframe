@@ -15,7 +15,7 @@ import {
   TICKS_PER_SECOND,
   validateMusicIndex,
 } from "@video-editor/schema";
-import { gatedMean } from "../graph/music.ts";
+import { gatedMean } from "../loudness.ts";
 import { fingerprintOf } from "../sources.ts";
 import { SPEECH_LUFS } from "../voice.ts";
 import { formatDuration } from "./pack.ts";
@@ -55,11 +55,25 @@ export interface MusicSource {
   indexPath: string;
   index: MusicIndex;
   fingerprint: Project["sources"][number]["fingerprint"];
+  /** What the library says of it: its title, artist and mood. */
+  about?: string;
+  /** Puts the audio at `path`, for a library track whose audio downloads once it is chosen. */
+  fetch?: () => Promise<unknown>;
 }
 
 /** A music index file, whose track is the one it names next to it, or a folder of
- * `*.music.json`; or an index with its track, wherever each is kept. */
-export type MusicInput = string | { index: string; source: string };
+ * `*.music.json`; or an index with its track, wherever each is kept. A library track gives its
+ * fingerprint and tags, and how to download its audio, which the planner does only once it is
+ * chosen (../library.ts). */
+export type MusicInput =
+  | string
+  | {
+      index: string;
+      source: string;
+      fingerprint?: Project["sources"][number]["fingerprint"];
+      about?: string;
+      fetch?: () => Promise<unknown>;
+    };
 
 /** Reads music indexes (`vework analyze-music`), or folders of `*.music.json`, and checks each
  * names a track that is there. */
@@ -67,10 +81,17 @@ export async function loadMusic(
   inputs: readonly MusicInput[],
   taken: ReadonlySet<string>,
 ): Promise<Map<string, MusicSource>> {
-  const files: { indexPath: string; source?: string }[] = [];
+  const files: {
+    indexPath: string;
+    source?: string;
+    fingerprint?: MusicSource["fingerprint"];
+    about?: string;
+    fetch?: () => Promise<unknown>;
+  }[] = [];
   for (const input of inputs) {
     if (typeof input !== "string") {
-      files.push({ indexPath: resolve(input.index), source: resolve(input.source) });
+      const { index, source, ...rest } = input;
+      files.push({ indexPath: resolve(index), source: resolve(source), ...rest });
       continue;
     }
     const path = resolve(input);
@@ -83,10 +104,10 @@ export async function loadMusic(
     files.push(...names.map((name) => ({ indexPath: join(path, name) })));
   }
   const tracks = new Map<string, MusicSource>();
-  for (const { indexPath, source } of files) {
+  for (const { indexPath, source, fingerprint, about, fetch } of files) {
     const index = await loadJson(indexPath, validateMusicIndex);
     const path = source ?? join(dirname(indexPath), index.source.name);
-    if (!existsSync(path)) {
+    if (!fingerprint && !existsSync(path)) {
       throw new Error(
         source
           ? `${path}: no such file, which ${indexPath} describes`
@@ -97,24 +118,37 @@ export async function loadMusic(
     const base = `music-${stem}`;
     let id = base;
     for (let n = 2; taken.has(id) || tracks.has(id); n++) id = `${base}-${n}`;
-    tracks.set(id, { id, path, indexPath, index, fingerprint: await fingerprintOf(path) });
+    tracks.set(id, {
+      id,
+      path,
+      indexPath,
+      index,
+      fingerprint: fingerprint ?? (await fingerprintOf(path)),
+      ...(about ? { about } : {}),
+      ...(fetch ? { fetch } : {}),
+    });
   }
   return tracks;
 }
 
 /** The tracks as the planning request lists them: tempo, length and how loud each section is. */
 export function describeMusic(tracks: Iterable<MusicSource>): string {
+  const all = [...tracks];
   const lines = [
-    "Music tracks the user supplied, each with its licence. Choose the one whose mood fits the " +
-      "content, and the section the edit opens on, or none.",
+    all.every((track) => track.about)
+      ? "Music from the built-in library, each with its mood. Choose the one whose mood and " +
+        "pace fit the content, and the section the edit opens on; answer no track only when " +
+        "the user's instructions ask for no music."
+      : "Music tracks the user supplied, each with its licence. Choose the one whose mood fits " +
+        "the content, and the section the edit opens on, or none.",
   ];
-  for (const { id, index } of tracks) {
+  for (const { id, index, about } of all) {
     const bpm = index.tempo.bpm ? `${Math.round(index.tempo.bpm)} BPM` : "no steady beat";
     const sections = index.sections
       .map((s, i) => `${i + 1}) ${s.start.toFixed(1)}-${s.end.toFixed(1)} s, ${s.loudness} LUFS`)
       .join("; ");
     lines.push(
-      `${id}: ${index.source.name}, ${formatDuration(index.end)}, ${bpm}, licence ` +
+      `${id}: ${about ?? index.source.name}, ${formatDuration(index.end)}, ${bpm}, licence ` +
         `${index.license.name}. Sections: ${sections}`,
     );
   }

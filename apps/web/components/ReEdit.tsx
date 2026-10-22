@@ -25,6 +25,7 @@ import { CaptionPreview } from "./CaptionPreview.tsx";
 import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
 import { useLocale, useT } from "./I18n.tsx";
+import { MusicPicker } from "./MusicPicker.tsx";
 import { Replan } from "./Replan.tsx";
 
 /** Ticks in a second, as project.json counts time. */
@@ -37,7 +38,8 @@ interface Draft {
   words: Record<string, string>;
   titles: Record<number, Record<string, string>>;
   remove: string[];
-  music?: { gainDb: number } | "remove";
+  /** Another level, no music, or a library track swapped in, by its id and title. */
+  music?: { gainDb: number } | "remove" | { track: string; title: string };
   look?: string;
   captions?: CaptionStyle;
   /** The captions' emoji shown or hidden, when not as the version has them. */
@@ -544,21 +546,22 @@ export function ReEdit({
 
       <div className={styles.section}>
         <h3 className={styles.sectionTitle}>{words.music}</h3>
+        {view.music && <p className={styles.help}>{words.playing(view.music.name)}</p>}
         {view.music ? (
           <div className={styles.musicRow}>
             <label className={styles.field}>
               <span className={styles.label}>
                 {words.volume}{" "}
-                {draft.music !== "remove" &&
-                  `${(draft.music?.gainDb ?? 0) > 0 ? "+" : ""}${draft.music?.gainDb ?? 0} dB`}
+                {gainOf(draft) !== null &&
+                  `${(gainOf(draft) ?? 0) > 0 ? "+" : ""}${gainOf(draft) ?? 0} dB`}
               </span>
               <input
                 type="range"
                 min={-12}
                 max={6}
                 step={1}
-                disabled={draft.music === "remove"}
-                value={draft.music === "remove" ? 0 : (draft.music?.gainDb ?? 0)}
+                disabled={gainOf(draft) === null}
+                value={gainOf(draft) ?? 0}
                 onChange={(event) => {
                   const gainDb = Number(event.target.value);
                   const { music: _, ...rest } = draft;
@@ -581,6 +584,20 @@ export function ReEdit({
         ) : (
           <p className={styles.help}>{words.noMusic}</p>
         )}
+        <MusicPicker
+          current={view.music}
+          chosen={
+            draft.music === "remove"
+              ? null
+              : draft.music && "track" in draft.music
+                ? draft.music.track
+                : undefined
+          }
+          onChoose={(track) => {
+            const { music: _, ...rest } = draft;
+            change(track ? { ...draft, music: { track: track.id, title: track.title } } : rest);
+          }}
+        />
       </div>
 
       <div className={styles.section}>
@@ -932,12 +949,24 @@ function toRevision(draft: Draft, words: readonly Word[]): PageRevision {
       return { kind, index: Number(index) };
     });
   }
-  if (draft.music) revision.music = draft.music;
+  if (draft.music) {
+    revision.music =
+      typeof draft.music === "object" && "track" in draft.music
+        ? { track: draft.music.track }
+        : draft.music;
+  }
   if (draft.look) revision.look = draft.look as PageRevision["look"];
   if (draft.captions) revision.captions = draft.captions;
   if (draft.emoji !== undefined) revision.emoji = draft.emoji;
   if (draft.kit !== undefined) revision.kit = draft.kit?.id ?? null;
   return revision;
+}
+
+/** The music level the draft gives, in dB; null when it takes the music out or swaps the track,
+ * which plays at the level the speech calls for. */
+function gainOf(draft: Draft): number | null {
+  if (draft.music === "remove" || (draft.music && "track" in draft.music)) return null;
+  return draft.music?.gainDb ?? 0;
 }
 
 function changes(draft: Draft): number {
@@ -964,7 +993,9 @@ function describe(draft: Draft, t: Messages): string {
     draft.remove.length > 0 && words.removed(draft.remove.length),
     draft.music === "remove"
       ? words.noMusic
-      : draft.music && words.music(`${draft.music.gainDb > 0 ? "+" : ""}${draft.music.gainDb}`),
+      : draft.music && "track" in draft.music
+        ? words.track(draft.music.title)
+        : draft.music && words.music(`${draft.music.gainDb > 0 ? "+" : ""}${draft.music.gainDb}`),
     draft.look &&
       words.look(draft.look, t.looks[draft.look as keyof Messages["looks"]]?.name ?? draft.look),
     draft.captions && words.captions(draft.captions, t.captions[draft.captions].name),

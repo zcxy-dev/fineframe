@@ -1926,6 +1926,16 @@ legend.label {
   font-variant-numeric: tabular-nums;
 }
 
+.library {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2-5);
+}
+
+.trackMeta {
+  color: var(--muted);
+}
+
 .check {
   display: inline-flex;
   align-items: center;
@@ -1968,6 +1978,10 @@ legend.label {
 .overlayItem[data-removed="true"] .overlayLabel {
   color: var(--muted);
   text-decoration: line-through;
+}
+
+.overlayItem[data-chosen="true"] .overlayLabel {
+  font-weight: 600;
 }
 
 .versions {

@@ -16,6 +16,7 @@ import {
 import { BrandError, loadKit, moveBrand, stageBrand } from "../brand/kit.ts";
 import type { CaptionStyle } from "../captions/presets.ts";
 import { ffmpeg, QUIET, run } from "../ffmpeg.ts";
+import { libraryMusic } from "../library.ts";
 import { fetchLink, isLink, ytDlp } from "../link.ts";
 import type { LookId } from "../looks.ts";
 import {
@@ -101,10 +102,13 @@ export interface EditOptions {
   look?: LookId | "none";
   /** Music tracks and folders of them that the edit may play, each with its licence in
    * `<name>.txt` beside it (see ./music.ts) or else `musicLicense`. Claude picks the one that
-   * fits, or none. Without music the edit has none. */
+   * fits, or none. Without music or `library` the edit has none. */
   music?: string[];
   /** The licence of every track without its own `<name>.txt`, such as "CC0 1.0". */
   musicLicense?: string;
+  /** Offers the built-in music library (../library.ts) too: its tracks need no analysis, and
+   * the one Claude picks downloads once it is picked. */
+  library?: boolean;
   /** `rich` (the default) adds motion graphics and shows B-roll on the edit's points: web
    * captures and, with PEXELS_API_KEY or PIXABAY_API_KEY, stock footage; `minimal` none. */
   visuals?: Visuals;
@@ -402,6 +406,7 @@ async function prepare(
       }
       music.push({ index: path, source: file.path });
     }
+    if (options.library) music.push(...libraryMusic(downloading(report, "plan")));
     for (const file of videos) {
       const fingerprint = await fingerprintOf(file.path);
       const path = join(cache, indexName(worker, fingerprint, analysis));

@@ -10,6 +10,7 @@ import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { loadKit, stageBrand, writeKit } from "@video-editor/engine/brand";
 import { cacheDir } from "@video-editor/engine/download";
 import { ffmpeg } from "@video-editor/engine/ffmpeg";
+import { libraryTrackOf, swapMusic } from "@video-editor/engine/library";
 import {
   fetchLink,
   isLink,
@@ -179,7 +180,7 @@ export interface ReplanChoice {
   length: number;
   aspect: Settings["aspect"];
   /** A track the edit was offered, by its path, "auto" for Claude to choose among them again,
-   * or "none". */
+   * or from the music library when none was offered, or "none". */
   music: string;
   /** What the user asks of the new plan, in their words. */
   instructions?: string;
@@ -242,6 +243,8 @@ interface EditPlan {
   length: number;
   aspect: Settings["aspect"];
   music: JobFile[];
+  /** Claude picks from the built-in music library; without it or `music`, the edit has none. */
+  library: boolean;
   instructions?: string;
   /** Several shorts instead of one edit. */
   shorts?: NonNullable<Settings["shorts"]>;
@@ -280,8 +283,9 @@ export interface EditView {
     /** The longest each text param may be. */
     limits: Record<string, number>;
   }[];
-  /** The music's level, by its first track; null without music. */
-  music: { gainDb: number } | null;
+  /** The music's level, by its first track, and that track: its library id, or null for one the
+   * user gave, and its title or file name; null without music. */
+  music: { gainDb: number; track: string | null; name: string } | null;
   look: string;
   captions: string | null;
   /** Whether its captions show their emoji. */
@@ -677,6 +681,7 @@ export class Jobs {
           length,
           aspect,
           music,
+          library: music.length === 0 && Boolean(job.settings.library),
           ...(instructions ? { instructions } : {}),
           ...(shorts ? { shorts } : {}),
         },
@@ -817,6 +822,11 @@ export class Jobs {
       "-o",
       output,
       ...plan.music.flatMap((file) => ["--music", footage(file)]),
+      ...(plan.library
+        ? ["--music", "library"]
+        : plan.music.length === 0
+          ? ["--music", "none"]
+          : []),
       // Joined, so a licence or instructions starting with "-" are not read as options.
       ...(plan.music.length > 0 && musicLicense ? [`--music-license=${musicLicense}`] : []),
       ...(plan.instructions ? [`--instructions=${plan.instructions}`] : []),
@@ -1069,7 +1079,7 @@ export class Jobs {
             ]
           : [],
       ),
-      music: project.audio.music?.[0] ? { gainDb: project.audio.music[0].gainDb ?? 0 } : null,
+      music: musicOf(project),
       look: lookOf(project),
       captions: project.captions?.preset ?? null,
       emoji: project.captions?.emoji ?? false,
@@ -1086,8 +1096,8 @@ export class Jobs {
     const job = await this.#finished(id);
     const slot = this.#slot(job, short);
     const { project, path } = await this.#project(job, slot.current ?? 1, slot);
-    // A kit changes no cut or length.
-    const { kit: _, ...revision } = asked;
+    // A kit or another track changes no cut or length.
+    const { kit: _, ...revision } = swapOf(asked).rest;
     try {
       const { length, removed, notes, outside } = revise(
         project,
@@ -1127,9 +1137,12 @@ export class Jobs {
     let revised: Project;
     try {
       const { project, path } = await this.#project(job, from, slot);
-      const revision = await this.#revision(job, asked, path);
+      const { swap, rest } = swapOf(asked);
+      const revision = await this.#revision(job, rest, path);
       try {
-        revised = revise(project, revision, await wordsFor(revision, project, path)).project;
+        // The swap first: the level and the cuts then apply to the new track.
+        const swapped = swap === undefined ? project : await swapMusic(project, path, swap);
+        revised = revise(swapped, revision, await wordsFor(revision, swapped, path)).project;
       } catch (error) {
         throw new JobError((error as Error).message, 400);
       }
@@ -1157,7 +1170,11 @@ export class Jobs {
 
   /** The engine's revision for what the page asked: a brand kit, by its id, copied into the job's
    * `brand` folder with its paths relative to the version's record at `path`. */
-  async #revision(job: Job, asked: PageRevision, path: string): Promise<Revision> {
+  async #revision(
+    job: Job,
+    asked: Omit<PageRevision, "music"> & Pick<Revision, "music">,
+    path: string,
+  ): Promise<Revision> {
     const { kit, ...revision } = asked;
     if (kit === undefined) return revision;
     if (kit === null) return { ...revision, brand: null };
@@ -1222,6 +1239,7 @@ export class Jobs {
           length: choice.length,
           aspect: choice.aspect,
           music,
+          library: choice.music === "auto" && music.length === 0 && Boolean(job.settings.library),
           ...(choice.instructions ? { instructions: choice.instructions } : {}),
           look: kept.look,
           ...(kept.captions ? { captions: kept.captions } : {}),
@@ -1631,8 +1649,32 @@ async function playedMusic(dir: string, file: string): Promise<string[]> {
 }
 
 /** The words of the sources a revision's cuts need, read only when it has cuts. */
+/** A page's revision split into the library track it swaps the music for, by its id, and the
+ * rest, which the engine's revise applies. */
+function swapOf(asked: PageRevision): {
+  swap: string | undefined;
+  rest: Omit<PageRevision, "music"> & Pick<Revision, "music">;
+} {
+  const { music, ...rest } = asked;
+  if (music && typeof music === "object" && "track" in music) return { swap: music.track, rest };
+  return { swap: undefined, rest: { ...rest, ...(music ? { music } : {}) } };
+}
+
 async function wordsFor(revision: Revision, project: Project, path: string) {
   return revision.cuts?.length ? placeSources(project, path) : new Map();
+}
+
+/** The music `project` plays, as the re-edit panel shows it. */
+function musicOf(project: Project): EditView["music"] {
+  const first = project.audio.music?.[0];
+  const source = first && project.sources.find((each) => each.id === first.source);
+  if (!first || !source) return null;
+  const track = libraryTrackOf(source.fingerprint.sha256);
+  return {
+    gainDb: first.gainDb ?? 0,
+    track: track?.id ?? null,
+    name: track?.title ?? (source.path.split("/").at(-1) as string),
+  };
 }
 
 /** An overlay's text params, the ones the panel edits. */

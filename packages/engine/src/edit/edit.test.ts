@@ -675,6 +675,10 @@ test("the command reports arguments it cannot use as an error line too", async (
       [".", "--length", "60", "--aspect", "9:16", "-o", "x.mp4", "--captions", "comic"],
       /bold, creator, minimal, pop, none, not comic/,
     ],
+    [
+      [".", "--length", "60", "--aspect", "9:16", "-o", "x.mp4", "--music", "none", "-m", "x"],
+      /--music none goes alone/,
+    ],
   ] as const) {
     const { code, stdout } = await runCli([...args]);
     assert.equal(code, 2, args.join(" "));

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { MediaIndex, MusicIndex, MusicTrack } from "@video-editor/schema";
-import { gatedMean } from "../graph/music.ts";
+import { gatedMean } from "../loudness.ts";
 import { SECOND } from "../testing.ts";
 import { SPEECH_LUFS } from "../voice.ts";
 import {

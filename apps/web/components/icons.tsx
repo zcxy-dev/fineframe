@@ -119,3 +119,15 @@ export const PlusIcon = (props: SVGProps<SVGSVGElement>) => (
     <path d="M12 5v14M5 12h14" />
   </Icon>
 );
+
+export const PlayIcon = (props: SVGProps<SVGSVGElement>) => (
+  <Icon {...props}>
+    <path d="M7 4.5v15l12-7.5Z" />
+  </Icon>
+);
+
+export const PauseIcon = (props: SVGProps<SVGSVGElement>) => (
+  <Icon {...props}>
+    <path d="M8 5v14M16 5v14" />
+  </Icon>
+);

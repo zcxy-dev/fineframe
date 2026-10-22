@@ -16,6 +16,7 @@
     "./ffmpeg": "./src/ffmpeg.ts",
     "./fillers": "./src/plan/fillers.ts",
     "./length": "./src/edit/length.ts",
+    "./library": "./src/library.ts",
     "./link": "./src/link.ts",
     "./looks": "./src/looks.ts",
     "./media": "./src/edit/media.ts",

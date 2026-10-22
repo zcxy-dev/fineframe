@@ -538,6 +538,23 @@ export const zhTW: Messages = {
     volume: "音量",
     removeMusic: "移除配樂",
     noMusic: "這次剪輯沒有配樂。",
+    playing: (name) => `目前播放：${name}。`,
+    library: {
+      title: "配樂庫",
+      moods: {
+        calm: "平靜",
+        upbeat: "輕快",
+        emotional: "感性",
+        corporate: "企業",
+        energetic: "活力",
+      },
+      play: (title) => `試聽 ${title}`,
+      stop: (title) => `停止 ${title}`,
+      use: "使用",
+      using: "使用中",
+      help: "換成另一首會配合現在的剪接重新對拍，只需重新輸出：不必重新規劃，也沒有 Claude 費用。",
+      claim: "若平台對配樂庫的曲子提出版權主張：它是 CC0 公眾領域作品，請以這個授權提出申訴。",
+    },
     look: "風格",
     captionStyle: "字幕樣式",
     emoji: "字幕行尾的 emoji",
@@ -549,7 +566,7 @@ export const zhTW: Messages = {
     remove: "移除",
     replanTitle: "需要重新規劃",
     replanHelp:
-      "調整順序、放回已刪除的段落、長度差距超過 5 %、更換畫面比例或配樂，都無法在這裡修改：Claude 會用同樣的素材重新規劃剪輯，分析結果會保留，所以只需一兩分鐘，外加一次規劃費用。",
+      "調整順序、放回已刪除的段落、長度差距超過 5 %、更換畫面比例或改用你自己提供的其他配樂，都無法在這裡修改：Claude 會用同樣的素材重新規劃剪輯，分析結果會保留，所以只需一兩分鐘，外加一次規劃費用。",
     replan: "重新規劃…",
     older:
       "這支影片是用舊版剪的：重新輸出時會拿掉原本的動態圖卡和關鍵字特效。重新規劃就會換上新的動態圖卡。",
@@ -570,6 +587,7 @@ export const zhTW: Messages = {
       removed: (n) => `移除 ${n} 個疊加元素`,
       noMusic: "移除配樂",
       music: (gain) => `配樂 ${gain} dB`,
+      track: (title) => `配樂換成 ${title}`,
       look: (_id, name) => `風格改為${name}`,
       captions: (_id, name) => `字幕改為${name}`,
       emoji: (on) => (on ? "顯示 emoji" : "隱藏 emoji"),
@@ -777,6 +795,7 @@ export const zhTW: Messages = {
     rendering: "有版本正在輸出；請等它完成，或停止它",
     noVersion: "找不到這個版本",
     notOffered: "這首配樂不在這次剪輯提供的清單中",
+    noTrack: "配樂庫裡沒有這首曲子",
     notFinished: "只有完成的剪輯才能修改",
     footageDeleted: (kept) =>
       `這個專案的素材已刪除（只有最新的 ${kept} 個專案會保留素材）；請改用素材重新剪輯`,

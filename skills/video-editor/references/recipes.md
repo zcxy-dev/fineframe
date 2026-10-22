@@ -80,8 +80,15 @@ It also cuts away to web captures or stock footage: `broll` entries whose source
 - **Add a graphic:** `{ "layout": "label", "html": "…", "css": "…", "box": { "x": …, "y": …, "w": …, "h": … }, "start": …, "duration": 360000 }`, written as `graphicsGuide` in `packages/effects/src/graphics.ts` says: the house classes, sizes in `var(--u)`, inside the safe area and clear of the captions and the speaker's face; `box` only for a label or a lower third, as fractions of the frame. The render checks only its markup and length, so look at a frame of it in the rendered video before handing it over.
 - **Credits:** the render writes `edit-v2.broll.txt` again from what the new version shows: each source's `credit`, the sound effects, and each icon and logo a graphic draws (Lucide icons under ISC, Simple Icons logos under CC0 with a note that the logo is its owner's trademark). An icon or logo added by hand is credited the same way.
 
-## Change the music level, or remove the music
+## Change the music: another library track, its level, or none
 
+- **Another library track:** `fineframe render --help` lists the built-in library's tracks by their ids, under their moods (calm, upbeat, emotional, corporate and energetic). Swap the music for one with a render alone; `none` takes the music out:
+
+  ```bash
+  fineframe render out/edit.project.json --music funky-energy-loop -o out/edit-v2.mp4
+  ```
+
+  It fits the track to the edit as a plan does, from its first section, at the level the speech calls for, ducked under it, and writes `out/edit-v2.project.json`; the track downloads on its first use. B-roll keeps the beats of the track it was planned on. `edit-v2.music.txt` names the track; library tracks are CC0, and if a platform claims one, the claim is disputed with that licence.
 - **Level:** `audio.music[i].gainDb` is the music's level in dB; −3 more is about a third quieter. The music still ducks under speech by `ducking.depthDb`. The finished mix is normalised to `audio.loudness`, so the voice stays at the same loudness.
 - **Remove:** delete `audio.music`. The video then has no `edit-v2.music.txt`.
 - **Sound effects** are `audio.sfx`, each `{ "source", "start", "gainDb" }`: lower `gainDb` to make one quieter, or delete the entry.

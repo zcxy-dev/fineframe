@@ -734,6 +734,8 @@ export async function write(state: PlanState, assembly: Assembly): Promise<Plann
   const used = new Set(clips.map((clip) => clip.source));
   const words = outputWords(clips, state.sources);
   const { music, track } = musicFor(state, clips);
+  // A library track's audio, which what follows reads, downloads once it is chosen.
+  await track?.fetch?.();
   const broll = brollClips(
     state,
     words,

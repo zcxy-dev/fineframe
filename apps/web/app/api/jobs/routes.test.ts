@@ -328,6 +328,11 @@ test("speech heard on OpenRouter needs its key, which the edit gets with --asr c
     "--asr",
     "cloud",
   ]);
+  // Given no track, a new edit takes the library's music.
+  assert.deepEqual(args.slice(args.indexOf("--music"), args.indexOf("--music") + 2), [
+    "--music",
+    "library",
+  ]);
   assert.equal(await readFile(join(dir, "openrouter.txt"), "utf8"), "sk-or-saved");
   // Minimal visuals: no B-roll, so no credits to download.
   assert.ok(args.includes("--visuals=minimal"));

@@ -47,6 +47,7 @@ import {
 } from "./graph/music.ts";
 import { graphicPlacement } from "./graph/overlays.ts";
 import { pieceAudio, pieceVideo } from "./graph/piece.ts";
+import { CLAIM_NOTE, fetchLibraryMusic, libraryTrackOf } from "./library.ts";
 import { cube, isLookId, lookIds, lutKey } from "./looks.ts";
 import { cutPieces } from "./pieces.ts";
 import { loadSources, type SourceFacts } from "./sources.ts";
@@ -55,8 +56,9 @@ import { buildTimeline, type Timeline } from "./timeline.ts";
 export interface RenderOptions {
   /** Called as the render advances, with the fraction done (0 to 1) and a line to show. */
   onProgress?: (fraction: number, message: string) => void;
-  /** Called while what renders the effects downloads on its first use, Chrome Headless Shell and
-   * ffprobe: its name, and the bytes so far of `total`. */
+  /** Called while something downloads on its first use: a library music track the edit plays,
+   * or what renders the effects, Chrome Headless Shell and ffprobe: its name, and the bytes so
+   * far of `total`. */
   onDownload?: (name: string, bytes: number, total: number) => void;
   /** Renders the effect overlays; @video-editor/effects' HyperFrames renderer unless replaced,
    * as the tests replace it with files FFmpeg draws. */
@@ -383,6 +385,7 @@ export async function loadEdit(
   }
   const looks = unknownLooks(project);
   if (looks.length > 0) throw new Error(looks.join("\n"));
+  await fetchLibraryMusic(project, projectPath, onDownload);
   const sources = await loadSources(project, projectPath);
   const brand = project.brand
     ? await resolveBrand(
@@ -598,10 +601,19 @@ function credits(project: Project, video: string): string {
   for (const track of ordered) {
     if (seen.has(track.source)) continue;
     seen.add(track.source);
-    const file = project.sources.find((source) => source.id === track.source)?.path ?? "";
+    const source = project.sources.find((each) => each.id === track.source);
     const { name, url, attribution } = track.license;
-    lines.push("", basename(file), `  Licence: ${name}${url ? ` (${url})` : ""}`);
+    const library = source && libraryTrackOf(source.fingerprint.sha256);
+    lines.push(
+      "",
+      library
+        ? `"${library.title}" by ${library.artist}, from the built-in music library`
+        : basename(source?.path ?? ""),
+      `  Licence: ${name}${url ? ` (${url})` : ""}`,
+    );
     if (attribution) lines.push(`  Credit: ${attribution}`);
+    if (library)
+      lines.push(`  Source: ${library.source}`, ...CLAIM_NOTE.map((note) => `  ${note}`));
   }
   return `${lines.join("\n")}\n`;
 }
