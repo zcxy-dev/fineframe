@@ -30,3 +30,20 @@ export function descendantsOf(rows: readonly ProcessRow[], root: number): number
   }
   return [...found];
 }
+
+/** Of the processes `started`, those running in the listing `now`. Windows reuses ids, so where
+ * the listings say when each started, a process with the same id counts only when it started at
+ * the same time. */
+export function stillRunning(
+  started: readonly ProcessRow[],
+  now: readonly ProcessRow[],
+): ProcessRow[] {
+  const running = new Map(now.map((row) => [row.pid, row.created]));
+  return started.filter(
+    (row) =>
+      running.has(row.pid) &&
+      (row.created === undefined ||
+        running.get(row.pid) === undefined ||
+        running.get(row.pid) === row.created),
+  );
+}
