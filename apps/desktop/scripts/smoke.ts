@@ -2,8 +2,9 @@
 //
 //   node scripts/smoke.ts <the app's executable> [--shots <folder>]
 //
-// It opens the app's window, saves a key, waits while the analysis's Python installs, chooses
-// cloud speech and its key, adds a synthetic spoken clip, makes a 15 s edit and checks the video,
+// It opens the app's window, with the subscription's check off, saves a key, waits while the
+// analysis's Python installs, chooses cloud speech and its key, adds a synthetic spoken clip,
+// makes a 15 s edit and checks the video,
 // installs the `fineframe` command and the agent skill from the app's menu, checks the skill's
 // files and makes an edit of the clip with the command, then quits the app and checks nothing it
 // started is left running. Claude and OpenRouter are
@@ -385,6 +386,8 @@ const env: Record<string, string> = {
   ANTHROPIC_BASE_URL: await listen(anthropic),
   OPENROUTER_BASE_URL: `${await listen(openrouter)}/api/v1`,
   APPIMAGE_EXTRACT_AND_RUN: "1",
+  // No account: the subscription's check is for people (apps/web/lib/account.ts).
+  FINEFRAME_DEV_ENTITLED: "1",
 };
 // Where the command installs on Linux, and on macOS when it is on PATH, as it is here, so that
 // macOS's /usr/local/bin stays as it was; on Windows, the launcher's folder joins the user's Path.

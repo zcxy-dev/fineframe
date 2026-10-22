@@ -84,6 +84,7 @@ Models that come inside a package: the TransNetV2 weights in transnetv2-pytorch,
 | [json-schema-to-typescript](https://github.com/bcherny/json-schema-to-typescript), @types/node, @types/react, @types/react-dom | MIT | development |
 | [electron](https://www.electronjs.org) | MIT; the Chromium and Node.js it is built from keep their licences, listed in `LICENSES.chromium.html` inside the app | desktop app, in its installers |
 | [electron-builder](https://www.electron.build) | MIT | desktop app, building the installers |
+| [electron-updater](https://www.electron.build/auto-update) | MIT | desktop app, its updates |
 | [playwright-core](https://playwright.dev) | Apache-2.0 | engine, web capture; desktop app, its smoke test |
 
 ### Sound effects

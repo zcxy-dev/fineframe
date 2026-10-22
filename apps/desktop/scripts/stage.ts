@@ -7,7 +7,10 @@
 //   dependencies, as an installer copies files), the worker's code and lockfile, from which
 //   the app installs the analysis's Python on its first start, and the agent skill its menu
 //   installs. No FFmpeg, ffprobe or Chrome: the
-//   renderer downloads them on first use.
+//   renderer downloads them on first use. With FINEFRAME_SUPABASE_URL,
+//   FINEFRAME_SUPABASE_PUBLISHABLE_KEY and FINEFRAME_OAUTH_CLIENT_ID, all public, also
+//   supabase.json, the project and OAuth client the app signs in with (apps/web/lib/account.ts);
+//   a build without them cannot sign in.
 // - build/bin/: uv, pinned by version and SHA-256 for the platform this runs on.
 //
 // It builds for the platform it runs on: each installer is built on its own system.
@@ -101,6 +104,19 @@ await cp(join(root, "apps", "web", ".next"), join(editor, "apps", "web", ".next"
   recursive: true,
   filter: (path) => !path.includes(`${join(".next", "cache")}`),
 });
+
+const supabase = {
+  url: process.env.FINEFRAME_SUPABASE_URL,
+  publishableKey: process.env.FINEFRAME_SUPABASE_PUBLISHABLE_KEY,
+  clientId: process.env.FINEFRAME_OAUTH_CLIENT_ID,
+};
+if (supabase.url && supabase.publishableKey && supabase.clientId) {
+  await writeFile(join(editor, "supabase.json"), `${JSON.stringify(supabase, null, 2)}\n`);
+} else {
+  say(
+    "no FINEFRAME_SUPABASE_URL, FINEFRAME_SUPABASE_PUBLISHABLE_KEY and FINEFRAME_OAUTH_CLIENT_ID: this build cannot sign in",
+  );
+}
 
 say("installing the packages the editor runs");
 run(

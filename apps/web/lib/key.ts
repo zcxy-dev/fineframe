@@ -3,15 +3,13 @@
 // repository root, where `pnpm edit` reads them too, or the one VIDEO_EDITOR_ENV_FILE names, such
 // as the desktop app's in its own folder. A key goes to its service and to the edit's process,
 // and nowhere else: never to a log, never back to the page.
-import { execFile } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
-import { userInfo } from "node:os";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { parseEnv, promisify } from "node:util";
+import { parseEnv } from "node:util";
 import Anthropic from "@anthropic-ai/sdk";
 import { PLAN_MODELS } from "@video-editor/engine/claude";
 import { en, type Messages } from "./i18n/en.ts";
+import { writePrivate } from "./private.ts";
 
 export type Service = "anthropic" | "openrouter" | "pexels" | "pixabay";
 export const SERVICES: readonly Service[] = ["anthropic", "openrouter", "pexels", "pixabay"];
@@ -155,21 +153,5 @@ export async function saveKey(key: string, service: Service = "anthropic"): Prom
     .split(/\r?\n/)
     .filter((line) => !new RegExp(`^\\s*(export\\s+)?${name}\\s*=`).test(line));
   while (kept.at(-1) === "") kept.pop();
-  const next = `${[...kept, `${name}=${key}`].join("\n")}\n`;
-  // Written whole beside it and renamed over it, so a half-written key is never read.
-  const partial = `${file}.${randomUUID()}.partial`;
-  try {
-    await writeFile(partial, next, { mode: 0o600 });
-    // Windows ignores the mode: the access list drops what it takes from the folder, which may
-    // let every user of the machine read. The rename keeps the list.
-    if (process.platform === "win32") {
-      const domain = process.env.USERDOMAIN;
-      const owner = `${domain ? `${domain}\\` : ""}${userInfo().username}`;
-      const args = [partial, "/inheritance:r", "/grant:r", `${owner}:F`];
-      await promisify(execFile)("icacls", args, { windowsHide: true });
-    }
-    await rename(partial, file);
-  } finally {
-    await rm(partial, { force: true });
-  }
+  await writePrivate(file, `${[...kept, `${name}=${key}`].join("\n")}\n`);
 }

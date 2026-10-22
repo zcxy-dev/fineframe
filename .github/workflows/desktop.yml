@@ -4,7 +4,8 @@ name: desktop
 # a person would the first time (apps/desktop/scripts/smoke.ts): it installs the analysis, makes
 # an edit of a synthetic clip with stand-ins for Claude and OpenRouter, and quits, leaving nothing
 # running. A pull request that changes the app or the page builds and checks them; a tag v<version>
-# also attaches them to a draft release of that tag, which is published manually.
+# also attaches them to a draft release of that tag, which is published manually, and uploads them
+# with the update feed to Cloudflare R2, which downloads.fineframe.app serves.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -62,8 +63,18 @@ jobs:
       - name: Install espeak-ng
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y espeak-ng
+      # The Supabase project and OAuth client the app signs in with: public values, kept as
+      # repository variables. A release cannot be built without them.
       - name: Build the installer
+        env:
+          FINEFRAME_SUPABASE_URL: ${{ vars.FINEFRAME_SUPABASE_URL }}
+          FINEFRAME_SUPABASE_PUBLISHABLE_KEY: ${{ vars.FINEFRAME_SUPABASE_PUBLISHABLE_KEY }}
+          FINEFRAME_OAUTH_CLIENT_ID: ${{ vars.FINEFRAME_OAUTH_CLIENT_ID }}
         run: |
+          if [ "$GITHUB_REF_TYPE" = tag ] && { [ -z "$FINEFRAME_SUPABASE_URL" ] || [ -z "$FINEFRAME_SUPABASE_PUBLISHABLE_KEY" ] || [ -z "$FINEFRAME_OAUTH_CLIENT_ID" ]; }; then
+            echo "A release needs the FINEFRAME_SUPABASE_URL, FINEFRAME_SUPABASE_PUBLISHABLE_KEY and FINEFRAME_OAUTH_CLIENT_ID repository variables"
+            exit 1
+          fi
           pnpm install --frozen-lockfile
           pnpm --filter @video-editor/desktop dist
       - name: Run the built app (macOS)
@@ -103,6 +114,16 @@ jobs:
           path: apps/desktop/dist/*.${{ matrix.installer }}
           if-no-files-found: error
           retention-days: 14
+      # What electron-updater reads beside the installer: latest*.yml, and the blockmap that
+      # lets a later update download only what changed.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: feed-${{ matrix.name }}
+          path: |
+            apps/desktop/dist/latest*.yml
+            apps/desktop/dist/*.blockmap
+          if-no-files-found: error
+          retention-days: 14
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -129,6 +150,11 @@ jobs:
           pattern: installer-*
           path: installers
           merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: feed-*
+          path: feed
+          merge-multiple: true
       # Signed build provenance for each installer, which `gh attestation verify` checks.
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
@@ -150,3 +176,25 @@ jobs:
           gh release upload "$GITHUB_REF_NAME" installers/* --repo "$GITHUB_REPOSITORY" --clobber
         env:
           GH_TOKEN: ${{ github.token }}
+      # The installers first, then the latest*.yml that point the apps at them (apps/desktop/src/
+      # updates.ts), with R2's S3 API. The checksums the AWS CLI adds by default are left out, as
+      # R2 asks.
+      - name: Upload the installers and the update feed to Cloudflare R2
+        run: |
+          if [ -z "$R2_ACCOUNT_ID" ] || [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$R2_BUCKET" ]; then
+            echo "::warning::Not uploaded to R2: the R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET secrets are not all set"
+            exit 0
+          fi
+          r2=(--endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com")
+          aws s3 cp installers/ "s3://$R2_BUCKET/" --recursive "${r2[@]}"
+          aws s3 cp feed/ "s3://$R2_BUCKET/" --recursive --exclude "latest*.yml" "${r2[@]}"
+          aws s3 cp feed/ "s3://$R2_BUCKET/" --recursive --exclude "*" --include "latest*.yml" \
+            --cache-control no-cache "${r2[@]}"
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required

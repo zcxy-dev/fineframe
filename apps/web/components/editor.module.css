@@ -1717,6 +1717,31 @@ legend.label {
   width: auto;
 }
 
+/* The desktop app's update, in a corner until dismissed */
+
+.updateNotice {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: calc(100vw - 2 * var(--space-4));
+  padding: var(--space-2-5) var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--inspector);
+  box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.5);
+  font-size: var(--text-sm);
+}
+
+.updateNotice .primary {
+  width: auto;
+  height: 30px;
+  font-size: var(--text-sm);
+}
+
 /* The analysis's setup, on the desktop app's first start */
 
 .setup {

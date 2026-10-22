@@ -40,6 +40,7 @@ import {
   validateProject,
   validateShorts,
 } from "@video-editor/schema";
+import { type Blocker, editBlocker } from "./account.ts";
 import { Finish } from "./eta.ts";
 import type { FixKind } from "./fixes.ts";
 import { LOCALES } from "./i18n/locale.ts";
@@ -306,12 +307,12 @@ export interface EditView {
  * owner can fix. */
 export class JobError extends Error {
   readonly status: 400 | 403 | 404 | 409 | 507;
-  readonly code: FixKind | undefined;
+  readonly code: FixKind | "account" | undefined;
   readonly say: (t: Messages) => string;
   constructor(
     message: string | ((t: Messages) => string),
     status: 400 | 403 | 404 | 409 | 507,
-    code?: FixKind,
+    code?: FixKind | "account",
   ) {
     const say = typeof message === "string" ? () => message : message;
     super(say(en));
@@ -332,6 +333,9 @@ export interface JobsOptions {
   key: (service: Service) => Promise<string | undefined>;
   /** yt-dlp and its first arguments; the latest yt-dlp unless a test gives a stand-in. */
   ytDlp?: readonly string[];
+  /** What keeps the desktop app's user from a new edit or plan (lib/account.ts); nothing unless
+   * given. */
+  account?: () => Promise<Blocker | null>;
 }
 
 /** A download's bytes a second since it started, and the seconds it has left at that rate;
@@ -409,6 +413,7 @@ export class Jobs {
   readonly #renderCommand: readonly string[];
   readonly #key: (service: Service) => Promise<string | undefined>;
   readonly #ytDlp: readonly string[] | undefined;
+  readonly #account: () => Promise<Blocker | null>;
   /** Each job fetching its links, until they are fetched: what stops it, and when it ended. */
   readonly #fetches = new Map<string, { stop: AbortController; done: Promise<void> }>();
   /** Where each running job's current download started, for its time left. */
@@ -434,6 +439,7 @@ export class Jobs {
     this.#renderCommand = options.renderCommand;
     this.#key = options.key;
     this.#ytDlp = options.ytDlp;
+    this.#account = options.account ?? (async () => null);
     this.#loaded = this.#load();
   }
 
@@ -469,6 +475,7 @@ export class Jobs {
     await this.#loaded;
     // Refused now rather than at start, before the page sends any footage.
     this.#refuseWhileRunning();
+    await this.#requireAccount();
     await this.#requireKeys(settings);
     if (settings.brand) {
       const kit = await readKit(settings.brand.id);
@@ -868,6 +875,12 @@ export class Jobs {
     return keys;
   }
 
+  /** Refuses a new edit or plan to a desktop app signed out or without a subscription. */
+  async #requireAccount(): Promise<void> {
+    const blocker = await this.#account();
+    if (blocker) throw new JobError((t) => t.server.account[blocker], 403, "account");
+  }
+
   #refuseWhileRunning(): void {
     if ([...this.#jobs.values()].some((other) => other.status === "running")) {
       throw new JobError((t) => t.server.busy, 409);
@@ -1198,6 +1211,7 @@ export class Jobs {
   async replan(id: string, choice: ReplanChoice, short?: string): Promise<Job> {
     const job = await this.#finished(id);
     const slot = this.#slot(job, short);
+    await this.#requireAccount();
     const keys = await this.#requireKeys(job.settings);
     this.#refuseWhileRunning();
     this.#requireFootage(job);
@@ -1719,6 +1733,9 @@ export function jobs(): Jobs {
   global.videoEditorJobs ??= new Jobs({
     root: defaultRoot(),
     key: readKey,
+    // The desktop app gives the account's file; the editor's root holds the build's Supabase.
+    account: () =>
+      editBlocker(process.env.VIDEO_EDITOR_ACCOUNT_FILE, resolve(process.cwd(), "../..")),
     // A stand-in for yt-dlp, run by Node, only in tests.
     ...(process.env.VIDEO_EDITOR_YT_DLP
       ? { ytDlp: [process.execPath, process.env.VIDEO_EDITOR_YT_DLP] }

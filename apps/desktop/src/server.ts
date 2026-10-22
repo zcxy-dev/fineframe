@@ -91,9 +91,13 @@ export function runtimeEnvironment(
 /** The keys' file in the app's folder, which the page saves and the `fineframe` command reads. */
 export const keysFile = (places: Pick<Places, "data">) => join(places.data, "keys.env");
 
+/** The account's file beside it: the session the page signs in, and its last subscription check
+ * (apps/web/lib/account.ts). */
+export const accountFile = (places: Pick<Places, "data">) => join(places.data, "account.json");
+
 /**
- * The server's environment: the editor's runtime, with the keys in the app's folder rather than a
- * repository's .env, and the Python environment installed on the first start.
+ * The server's environment: the editor's runtime, with the keys and the account in the app's
+ * folder rather than a repository's .env, and the Python environment installed on the first start.
  */
 export function serverEnvironment(
   places: Places,
@@ -107,6 +111,7 @@ export function serverEnvironment(
     VIDEO_EDITOR_HOST: "127.0.0.1",
     PORT: String(port),
     VIDEO_EDITOR_ENV_FILE: keysFile(places),
+    VIDEO_EDITOR_ACCOUNT_FILE: accountFile(places),
     VIDEO_EDITOR_BRAND_KITS: join(places.data, "brand-kits"),
     VIDEO_EDITOR_SETUP: "1",
     VIDEO_EDITOR_STOP_WITH_STDIN: "1",

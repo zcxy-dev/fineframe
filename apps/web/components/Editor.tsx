@@ -29,6 +29,7 @@ import {
 import type { SetupState } from "../lib/setup.ts";
 import { jobApi, shortView } from "../lib/shorts.ts";
 import { dollarsOf, summaryRows } from "../lib/summary.ts";
+import { AccountDialog, mayEdit, useAccount } from "./Account.tsx";
 import { BrandKits, useKits } from "./BrandKits.tsx";
 import { ErrorNote } from "./ErrorNote.tsx";
 import styles from "./editor.module.css";
@@ -42,6 +43,7 @@ import { Player, ResultSummary, useVideoLength } from "./ResultView.tsx";
 import { DownloadView, RunView } from "./RunView.tsx";
 import { type Choices, chosenLength, type Machine, SettingsPanel } from "./SettingsPanel.tsx";
 import { ShortsDone, ShortsGrid, ShortsKept, ShortText } from "./Shorts.tsx";
+import { UpdateNotice } from "./UpdateNotice.tsx";
 
 /** What /api/key says: which keys the server has, never the keys. */
 type Keys = { set: boolean; openrouter: boolean; pexels: boolean; pixabay: boolean };
@@ -128,6 +130,17 @@ export function Editor() {
   const keySet = keys?.set ?? null;
   const [asking, setAsking] = useState<Service | null>(null);
   const [setup, setSetup] = useState<Setup | null>(null);
+  // In the desktop app, the account a new edit needs; its dialog opens by itself the first time
+  // it cannot edit.
+  const { account, setAccount, reload: reloadAccount } = useAccount();
+  const [accountOpen, setAccountOpen] = useState(false);
+  useEffect(() => {
+    void reloadAccount()
+      .then((found) => {
+        if (mayEdit(found) === false) setAccountOpen(true);
+      })
+      .catch(() => {});
+  }, [reloadAccount]);
 
   // The first time, with no key yet, the page asks for one.
   useEffect(() => {
@@ -331,6 +344,10 @@ export function Editor() {
    * retry gives the failed edit's own. */
   const start = async (instructions = choices.instructions) => {
     if (blocked || !("seconds" in length)) return;
+    if (mayEdit(account) === false) {
+      setAccountOpen(true);
+      return;
+    }
     if (keySet === false) {
       setAsking("anthropic");
       return;
@@ -369,6 +386,10 @@ export function Editor() {
       });
       const created = (await response.json()) as Job & { error?: string; code?: string };
       if (!response.ok) {
+        if (created.code === "account") {
+          void reloadAccount().catch(() => {});
+          setAccountOpen(true);
+        }
         if (created.code === "key" || created.code === "openrouter") {
           const service = created.code === "key" ? "anthropic" : "openrouter";
           setKeys(
@@ -471,6 +492,11 @@ export function Editor() {
               {LOCALE_NAMES[other]}
             </button>
           ))}
+          {account?.gated && (
+            <button type="button" className={styles.keyButton} onClick={() => setAccountOpen(true)}>
+              {account.signedIn ? account.email : t.header.signIn}
+            </button>
+          )}
           {keySet !== null && (
             <button
               type="button"
@@ -489,9 +515,17 @@ export function Editor() {
           )}
         </div>
       </header>
+      <AccountDialog
+        account={account}
+        open={accountOpen}
+        onClose={() => setAccountOpen(false)}
+        onChange={setAccount}
+        reload={reloadAccount}
+      />
+      <UpdateNotice />
       <KeyDialog
         service={asking ?? "anthropic"}
-        open={asking !== null}
+        open={asking !== null && !accountOpen}
         replacing={keys?.[asking === "anthropic" || asking === null ? "set" : asking] === true}
         onClose={() => setAsking(null)}
         onSaved={() => {
@@ -612,6 +646,10 @@ export function Editor() {
                 </button>
                 {blocked ? (
                   <p className={styles.help}>{blocked}</p>
+                ) : account?.gated && mayEdit(account) === false ? (
+                  <p className={styles.help}>
+                    {account.signedIn ? t.compose.needSubscription : t.compose.needAccount}
+                  </p>
                 ) : keySet === false ? (
                   <p className={styles.help}>{t.compose.needAnthropic}</p>
                 ) : choices.asr === "cloud" && keys?.openrouter === false ? (
