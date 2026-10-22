@@ -150,7 +150,7 @@ def test_a_cloud_index_records_the_model_and_what_it_cost(talking_video, monkeyp
     monkeypatch.setattr(denoise, "enhance", lambda samples, in_place: samples)
     monkeypatch.setattr(transcribe, "_models", lambda model: pytest.fail("speech model loaded"))
     align = lambda wav, text: [(c, 0.2 * i, 0.2 * (i + 1)) for i, c in enumerate(text)]  # noqa: E731
-    monkeypatch.setattr(transcribe, "_aligner", lambda half: align)
+    monkeypatch.setattr(transcribe, "_aligner", lambda half, apple_gpu: align)
     monkeypatch.setattr(openrouter.Client, "check", lambda self: None)
 
     def recognize(self, wavs, progress):
@@ -193,7 +193,7 @@ def test_a_transition_on_the_first_frame_starts_at_time_zero(monkeypatch, tmp_pa
     ffmpeg("-f", "lavfi", "-i", "testsrc2=s=160x90:r=30:d=1", "-c:v", "libx264",
            "-preset", "ultrafast", "-output_ts_offset", "0.0333667", str(source))  # fmt: skip
 
-    def predict(frames):
+    def predict(frames, model):
         # A fade in from black over the first eight frames.
         flags = np.zeros(len(list(frames)))
         flags[:8] = 0.9

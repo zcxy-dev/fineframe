@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from conftest import ffmpeg
 
-from vework import shots
+from vework import gpu, shots
 
 TIMES = np.arange(20) / 10
 
@@ -92,8 +92,11 @@ def test_windows_match_the_padded_clip_transnetv2_slides_over(count):
 
 
 @pytest.mark.ml
-def test_streamed_windows_score_exactly_like_the_whole_clip(shots_video):
+def test_streamed_windows_score_exactly_like_the_whole_clip(shots_video, monkeypatch):
     import torch
+
+    # The library's own path on the same device; test_gpu compares the Mac's GPU with its CPU.
+    monkeypatch.setenv(gpu.ENV, "cpu")
     from transnetv2_pytorch import TransNetV2
 
     times = []

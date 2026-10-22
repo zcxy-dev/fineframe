@@ -121,12 +121,17 @@ def _model():
     return model.eval()
 
 
+def checkpoint_path() -> Path:
+    """Where the checkpoint is kept once downloaded: torch's hub folder."""
+    import torch
+
+    return Path(torch.hub.get_dir()) / "checkpoints" / f"beat_this-{MODEL}.ckpt"
+
+
 def _checkpoint() -> Path:
     """The checkpoint, downloaded once into torch's hub folder and checked against its SHA-256,
     so an index is reproducible."""
-    import torch
-
-    path = Path(torch.hub.get_dir()) / "checkpoints" / f"beat_this-{MODEL}.ckpt"
+    path = checkpoint_path()
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
         part = path.with_suffix(".part")

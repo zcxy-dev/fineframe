@@ -48,7 +48,7 @@ def test_missing_source_is_one_line_not_a_traceback(capsys, tmp_path):
     [
         lambda: shots.predict(np.zeros((1, 27, 48, 3), np.uint8)),
         lambda: speech.segments(np.zeros(16_000, np.float32)),
-        lambda: transcribe._models("Qwen/Qwen3-ASR-0.6B-hf"),
+        lambda: transcribe._recognizer("Qwen/Qwen3-ASR-0.6B-hf"),
         transcribe._aligner,
         events._classifier,
         lambda: framing._detector((64, 36)),

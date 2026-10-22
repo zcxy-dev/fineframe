@@ -1,10 +1,12 @@
+import contextlib
+import io
 from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 
 import av
 import numpy as np
 
-from vework import ml
+from vework import gpu, ml
 from vework.probe import start_time, video_stream
 
 THRESHOLD = 0.5
@@ -14,15 +16,19 @@ WINDOW, STEP, CONTEXT = 100, 50, 25
 
 
 def thumbnails(
-    path: Path, times: list[float], progress: Callable[[str], None] = lambda message: None
+    path: Path,
+    times: list[float],
+    progress: Callable[[str], None] = lambda message: None,
+    hwaccel: av.codec.hwaccel.HWAccel | None = None,
 ) -> Iterator[np.ndarray]:
-    """Every frame as 48x27 RGB, the input TransNetV2 was trained on, one at a time.
+    """Every frame as 48x27 RGB, the input TransNetV2 was trained on, one at a time, decoded with
+    `hwaccel` when given.
 
     A two-hour 60 fps source is 1.7 GB of thumbnails, so they are never held together. Each
     frame's time is appended to `times`, which is sorted once the frames run out. Every 5 % of
     the frames the stream states, or its duration implies, is reported to `progress`.
     """
-    with av.open(str(path)) as container:
+    with av.open(str(path), hwaccel=hwaccel) as container:
         zero = start_time(container)
         stream = video_stream(container)
         if stream is None:
@@ -74,20 +80,41 @@ def windows(frames: Iterable[np.ndarray]) -> Iterator[tuple[np.ndarray, int]]:
         scored += STEP
 
 
-def predict(frames: Iterable[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
-    """Per-frame probabilities: a transition's center, and any frame inside a transition."""
+def predict(
+    frames: Iterable[np.ndarray], model: Callable | None = None
+) -> tuple[np.ndarray, np.ndarray]:
+    """Per-frame probabilities: a transition's center, and any frame inside a transition.
+
+    `model` scores one window, as `scorer` returns it; by default where the step runs without the
+    Mac's GPU."""
+    model = model or scorer(False)
+    center, inside = [], []
+    for window, scored in windows(frames):
+        one, many = model(window)
+        center.append(one[CONTEXT : CONTEXT + scored])
+        inside.append(many[CONTEXT : CONTEXT + scored])
+    return np.concatenate(center), np.concatenate(inside)
+
+
+def scorer(apple_gpu: bool) -> Callable[[np.ndarray], tuple[np.ndarray, np.ndarray]]:
+    """TransNetV2 as a function from one window to its two probabilities per frame: on the Mac's
+    GPU, or else on a CUDA GPU when there is one and the CPU otherwise."""
     ml.require()
     import torch
     from transnetv2_pytorch import TransNetV2
 
-    model = TransNetV2(device="cpu" if not torch.cuda.is_available() else "cuda")
-    center, inside = [], []
-    with torch.no_grad():
-        for window, scored in windows(frames):
+    device = "mps" if apple_gpu else "cuda" if torch.cuda.is_available() else "cpu"
+    # On MPS the package prints a warning to stdout, which is not the analysis's to show; vework
+    # checks the GPU's output itself.
+    with contextlib.redirect_stdout(io.StringIO()):
+        model = TransNetV2(device=device)
+
+    def score(window: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        with torch.no_grad():
             one, many = model.predict_raw(torch.from_numpy(window)[None].to(model.device))
-            center.append(one[0, CONTEXT : CONTEXT + scored, 0].cpu().numpy())
-            inside.append(many[0, CONTEXT : CONTEXT + scored, 0].cpu().numpy())
-    return np.concatenate(center), np.concatenate(inside)
+        return one[0, :, 0].cpu().numpy(), many[0, :, 0].cpu().numpy()
+
+    return score
 
 
 def transitions(
@@ -131,6 +158,11 @@ def transitions(
 def detect(path: Path, progress: Callable[[str], None] = lambda message: None) -> list[dict]:
     """Shot transitions in a video file, in seconds from its time zero, reporting how far it is
     to `progress`."""
-    times: list[float] = []
-    center, inside = predict(thumbnails(path, times, progress))
-    return transitions(center, inside, np.array(times))
+    model = gpu.Fallback("shot detection", scorer, lambda found: gpu.finite(*found))
+
+    def attempt(hwaccel) -> list[dict]:
+        times: list[float] = []
+        center, inside = predict(thumbnails(path, times, progress, hwaccel), model)
+        return transitions(center, inside, np.array(times))
+
+    return gpu.decode("shot detection", attempt)

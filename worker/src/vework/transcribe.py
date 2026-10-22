@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
-from vework import download, ml, timing
+from vework import download, gpu, ml, timing
 from vework.audio import RATE
 
 # The larger model is more accurate but too slow for a CPU (timings in the README).
@@ -380,11 +380,20 @@ def transcribe_chunks(
     if recognizer is None:
         recognize, align = _models(asr_model)
 
-        def recognizer(wavs, progress):
+        def hear(wavs, progress):
             heard = []
             for n, wav in enumerate(wavs, 1):
                 progress(f"transcribing {n}/{len(wavs)}")
                 heard.append(recognize(wav, context))
+            return heard
+
+        def recognizer(wavs, progress):
+            heard = hear(wavs, progress)
+            # Nothing heard in any chunk of speech is taken for the GPU failing: hear it again.
+            on_gpu = isinstance(recognize, gpu.Fallback) and recognize.on_gpu
+            if on_gpu and not any(text.strip() for text, _ in heard):
+                recognize.fail("it heard nothing in any chunk")
+                heard = hear(wavs, progress)
             return heard
     else:
         align = None  # loaded only once there is text to align, and in half precision
@@ -407,7 +416,7 @@ def transcribe_chunks(
             chunk["text"] = text
 
     if chunks and align is None:
-        align = _aligner(half=True)
+        align = _aligner_function(half=True)
     floor = timing.noise_floor(samples, speech)
     for n, chunk in enumerate(chunks, 1):
         progress(f"aligning {n}/{len(chunks)}")
@@ -425,17 +434,29 @@ def transcribe_chunks(
 
 
 def _models(asr_model: str | None):
-    """The speech model and the aligner, as two functions.
+    """The speech model and the aligner, as two functions, each on the Mac's GPU until it fails
+    there (`gpu.Fallback`).
 
     `recognize(wav, context)` returns the text heard and its language (None when it heard none);
     `align(wav, text)` returns each aligner token with its start and end in `wav`.
     """
-    return _recognizer(asr_model), _aligner()
+    recognize = gpu.Fallback("speech model", lambda on: _recognizer(asr_model, on))
+    return recognize, _aligner_function()
+
+
+def _aligner_function(half: bool = False) -> gpu.Fallback:
+    """The aligner on the Mac's GPU until it fails there or times no token, then on the CPU."""
+
+    def timed(items: list[tuple[str, float, float]]) -> bool:
+        return gpu.finite([t for _, start, end in items for t in (start, end)])
+
+    return gpu.Fallback("aligner", lambda on: _aligner(half, on), timed)
 
 
 @cache
-def _device():
-    """Where the models run, in which precision, after quieting transformers' notices."""
+def _device(apple_gpu: bool = False):
+    """Where the models run, in which precision, after quieting transformers' notices: with
+    `apple_gpu`, the Mac's GPU in 32-bit floats, as on a CPU."""
     ml.require()
     import torch
     from transformers.utils import logging as transformers_logging
@@ -444,15 +465,17 @@ def _device():
     # to someone editing a video.
     transformers_logging.set_verbosity_error()
     transformers_logging.disable_progress_bar()
-    gpu = torch.cuda.is_available()
-    return ("cuda:0", torch.bfloat16) if gpu else ("cpu", torch.float32)
+    if apple_gpu:
+        return "mps", torch.float32
+    cuda = torch.cuda.is_available()
+    return ("cuda:0", torch.bfloat16) if cuda else ("cpu", torch.float32)
 
 
-def _load(auto, name: str, half: bool = False):
+def _load(auto, name: str, half: bool = False, apple_gpu: bool = False):
     import torch
     from transformers import AutoProcessor
 
-    device, dtype = _device()
+    device, dtype = _device(apple_gpu)
     dtype = torch.bfloat16 if half else dtype
     # Another model named with --asr-model runs at whatever its repository holds now.
     revision = REVISIONS.get(name)
@@ -467,12 +490,13 @@ def _audio(wav: np.ndarray) -> np.ndarray:
 
 
 @cache
-def _recognizer(asr_model: str | None):
-    device, dtype = _device()
+def _recognizer(asr_model: str | None, apple_gpu: bool = False):
+    device, dtype = _device(apple_gpu)
     import torch
     from transformers import AutoModelForMultimodalLM
 
-    asr, asr_processor = _load(AutoModelForMultimodalLM, asr_model or default_asr_model())
+    name = asr_model or default_asr_model()
+    asr, asr_processor = _load(AutoModelForMultimodalLM, name, apple_gpu=apple_gpu)
 
     @torch.inference_mode()
     def recognize(wav: np.ndarray, context: str) -> tuple[str, str | None]:
@@ -486,15 +510,18 @@ def _recognizer(asr_model: str | None):
 
 
 @cache
-def _aligner(half: bool = False):
-    """The aligner as a function. `half` runs it in bfloat16 on a CPU too, which more than halves
-    its memory and times words as well on the synthetic corpus ("Cloud speech" in the worker
-    README); runs with the local speech model keep it in float32, as they were measured."""
-    device, dtype = _device()
+def _aligner(half: bool = False, apple_gpu: bool = False):
+    """The aligner as a function, on the Mac's GPU with `apple_gpu`. `half` runs it in bfloat16
+    on a CPU too, which more than halves its memory and times words as well on the synthetic
+    corpus ("Cloud speech" in the worker README); runs with the local speech model keep it in
+    float32, as they were measured."""
+    device, dtype = _device(apple_gpu)
     import torch
     from transformers import AutoModelForTokenClassification
 
-    aligner, aligner_processor = _load(AutoModelForTokenClassification, ALIGNER_MODEL, half)
+    aligner, aligner_processor = _load(
+        AutoModelForTokenClassification, ALIGNER_MODEL, half, apple_gpu
+    )
     dtype = torch.bfloat16 if half else dtype
 
     @torch.inference_mode()

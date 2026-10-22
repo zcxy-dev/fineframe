@@ -411,7 +411,7 @@ def test_a_cloud_recognizer_hears_every_chunk_at_once_and_only_the_aligner_loads
         aligned.append((text, len(wav)))
         return [(c, i * 0.2, (i + 1) * 0.2) for i, c in enumerate(c for c in text if c != "。")]
 
-    monkeypatch.setattr(transcribe, "_aligner", lambda half: half and align)
+    monkeypatch.setattr(transcribe, "_aligner", lambda half, apple_gpu: half and align)
     sent = []
 
     def recognizer(wavs, progress):
@@ -429,7 +429,9 @@ def test_a_cloud_recognizer_hears_every_chunk_at_once_and_only_the_aligner_loads
 
 
 def test_the_aligner_does_not_load_when_the_cloud_heard_nothing(monkeypatch):
-    monkeypatch.setattr(transcribe, "_aligner", lambda half: pytest.fail("aligner loaded"))
+    monkeypatch.setattr(
+        transcribe, "_aligner", lambda half, apple_gpu: pytest.fail("aligner loaded")
+    )
     result = transcribe.transcribe(
         np.zeros(16_000 * 3, np.float32), [seg(0.5, 2.5)], recognizer=lambda w, p: [("", None)]
     )

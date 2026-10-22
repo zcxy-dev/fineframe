@@ -1,6 +1,8 @@
 import importlib.util
 import os
 import subprocess
+import urllib.error
+import urllib.request
 
 import imageio_ffmpeg
 import numpy as np
@@ -13,12 +15,38 @@ def pytest_collection_modifyitems(items):
         for item in items:
             if "ml" in item.keywords:
                 item.add_marker(skip)
+    elif any("beats" in item.keywords for item in items) and (why := _beats_unreachable()):
+        skip = pytest.mark.skip(reason=why)
+        for item in items:
+            if "beats" in item.keywords:
+                item.add_marker(skip)
     # Real API calls cost money and need your own key, so CI never makes them.
     if not os.environ.get("ANTHROPIC_API_KEY"):
         skip = pytest.mark.skip(reason="needs ANTHROPIC_API_KEY (uv run --env-file ../.env)")
         for item in items:
             if "claude" in item.keywords:
                 item.add_marker(skip)
+
+
+def _beats_unreachable() -> str | None:
+    """Why the Beat This! checkpoint cannot be had: not cached, and its only host not answering
+    or failing on its side (#155). Asked once per run; any other answer lets the tests run, and
+    fail if the download or its checksum is wrong."""
+    from vework import beats
+
+    if beats.checkpoint_path().exists():
+        return None
+    request = urllib.request.Request(beats.URL, headers={"Range": "bytes=0-0"})
+    try:
+        with urllib.request.urlopen(request, timeout=30):
+            return None
+    except urllib.error.HTTPError as error:
+        if error.code < 500:
+            return None
+        problem = f"HTTP {error.code}"
+    except OSError as error:
+        problem = str(getattr(error, "reason", error))
+    return f"the Beat This! checkpoint is not cached and its host failed ({problem}); see #155"
 
 
 def ffmpeg(*args):
