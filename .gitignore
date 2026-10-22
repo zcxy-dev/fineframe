@@ -35,7 +35,7 @@ edit_cuts.json
 !apps/**/*.mts
 !packages/**/*.mts
 
-# Corpus footage and run outputs; hand-checked truth files are committed.
+# Corpus footage and run outputs; hand-checked truth files may be committed.
 bench/corpus/*/*
 !bench/corpus/*/truth/
 !bench/corpus/*/truth/*.srt
@@ -43,6 +43,8 @@ bench/corpus/*/*
 bench/synthetic/
 # `vebench ascend` output, truth included: its transcripts stay under ASCEND's licence.
 bench/corpus/ascend-*/
+# Real footage kept out of the repository, truth included: no real-footage content is committed.
+bench/corpus/real-*/
 
 # Blind-review rounds: the edits and the raters' ratings.
 bench/review/
