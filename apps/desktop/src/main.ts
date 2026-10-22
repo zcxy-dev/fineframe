@@ -1,6 +1,7 @@
 // The desktop app: the page's server on a free loopback port, the page in the app's own window,
 // and everything the server started stopped when the app quits. Its menu installs the `fineframe`
-// command and the agent skill.
+// command and the agent skill, and signs out of the account the page signs in. An installed app
+// updates itself (updates.ts).
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -22,7 +23,8 @@ import {
   skillFolders,
   type Target,
 } from "./install.ts";
-import { type Places, type Server, startServer } from "./server.ts";
+import { accountFile, type Places, type Server, startServer } from "./server.ts";
+import { type Notice, watchUpdates } from "./updates.ts";
 
 const NAME = "Fineframe";
 app.setName(NAME);
@@ -49,6 +51,9 @@ const { DESKTOP }: typeof import("../../web/lib/i18n/desktop.ts") = await import
 );
 const { LOCALE_COOKIE, resolveLocale }: typeof import("../../web/lib/i18n/locale.ts") =
   await import(web("i18n/locale.ts"));
+const { readSupabase, signOut }: typeof import("../../web/lib/account.ts") = await import(
+  web("account.ts")
+);
 
 /** The app's words in the page's language: the one chosen on the page, whose cookie the page's
  * server shares on any port, or else the system's, which the page is told as well. */
@@ -133,9 +138,16 @@ async function installSkillFromMenu(t: Words): Promise<void> {
   }
 }
 
-/** The two install items, first in the app's menu on macOS (after About) and in File elsewhere;
- * the command only from an installed app, whose resources it runs. */
-function addInstallItems(t: Words): void {
+/** Signs out of the account, then shows the page again, which asks to sign in. */
+async function signOutFromMenu(): Promise<void> {
+  const where = places();
+  await signOut(accountFile(where), await readSupabase(where.editor));
+  if (window && !window.webContents.getURL().startsWith("data:")) window.webContents.reload();
+}
+
+/** The two install items and signing out, first in the app's menu on macOS (after About) and in
+ * File elsewhere; the command only from an installed app, whose resources it runs. */
+function addMenuItems(t: Words): void {
   const menu = Menu.getApplicationMenu();
   const first = menu?.items[0]?.submenu;
   if (!menu || !first) return;
@@ -157,6 +169,8 @@ function addInstallItems(t: Words): void {
       click: () => void installSkillFromMenu(t),
     }),
   );
+  add(new MenuItem({ type: "separator" }));
+  add(new MenuItem({ id: "sign-out", label: t.signOut, click: () => void signOutFromMenu() }));
   add(new MenuItem({ type: "separator" }));
   Menu.setApplicationMenu(menu);
 }
@@ -181,7 +195,7 @@ async function open(): Promise<void> {
     window = null;
   });
   const t = await words();
-  addInstallItems(t);
+  addMenuItems(t);
   // An installed command follows the app when it moves, or to a newer AppImage.
   if (app.isPackaged) {
     void repointLauncher(target()).catch((error: Error) =>
@@ -204,12 +218,45 @@ async function open(): Promise<void> {
       app.quit();
     });
     keepToPage(window, server.url);
+    if (app.isPackaged) await update(window);
     await window.loadURL(server.url);
   } catch (error) {
     if (stopping) return;
     dialog.showErrorBox(t.notStarted(NAME), (error as Error).message);
     app.quit();
   }
+}
+
+/** The page's address that restarts the app into a downloaded update (components/UpdateNotice). */
+const RESTART = "fineframe:restart";
+
+/**
+ * Checks for updates, and tells the page of one: as `window.fineframeUpdate` with an event, again
+ * after each load. Going to RESTART installs a downloaded one and opens it.
+ */
+async function update(window: BrowserWindow): Promise<void> {
+  const { autoUpdater } = (await import("electron-updater")).default;
+  let notice: Notice | null = null;
+  const tell = () => {
+    if (!notice || window.isDestroyed()) return;
+    void window.webContents
+      .executeJavaScript(
+        `window.fineframeUpdate = ${JSON.stringify(notice)}; window.dispatchEvent(new Event("fineframe:update"));`,
+      )
+      .catch(() => {});
+  };
+  window.webContents.on("did-finish-load", tell);
+  window.webContents.on("will-navigate", (event, target) => {
+    if (target !== RESTART || notice?.kind !== "ready") return;
+    event.preventDefault();
+    // The updated app starts before this one has quit: it must not hand over to this one.
+    app.releaseSingleInstanceLock();
+    autoUpdater.quitAndInstall();
+  });
+  watchUpdates(autoUpdater, process.platform, (found) => {
+    notice = found;
+    tell();
+  });
 }
 
 /** The window shows only the editor's page: links elsewhere open in the system's browser. */

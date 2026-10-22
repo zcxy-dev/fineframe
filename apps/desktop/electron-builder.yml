@@ -20,7 +20,11 @@ extraResources:
     to: .
     filter: ["editor/**/*", "bin/**/*"]
 artifactName: Fineframe-${version}-${os}-${arch}.${ext}
-publish: null
+# The update feed (src/updates.ts): the release workflow uploads the installers there with the
+# latest*.yml files written beside them.
+publish:
+  provider: generic
+  url: https://downloads.fineframe.app/
 mac:
   target: dmg
   category: public.app-category.video
@@ -29,8 +33,6 @@ mac:
   identity: "-"
   hardenedRuntime: false
   gatekeeperAssess: false
-dmg:
-  writeUpdateInfo: false
 win:
   target: nsis
 nsis:

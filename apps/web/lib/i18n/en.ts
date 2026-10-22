@@ -33,6 +33,7 @@ export const en = {
     language: "Language",
     keySaved: "API key saved · Replace",
     addKey: "Add your API key",
+    signIn: "Sign in",
   },
   compose: {
     title: "Drop in footage. Get back a finished video.",
@@ -55,6 +56,8 @@ export const en = {
     makeShorts: (count: number) => `Make ${plural(count, "short", "shorts")}`,
     needAnthropic: "Add your Anthropic API key to start",
     needOpenRouter: "Add your OpenRouter API key to start",
+    needAccount: "Sign in to Fineframe to start",
+    needSubscription: "Subscribe to Fineframe to start",
     estimate: (low: string, high: string) =>
       `Claude will cost about ${low} to ${high} for this edit`,
     estimateShorts: (low: string, high: string) =>
@@ -354,6 +357,41 @@ export const en = {
     save: "Check and save",
     stored: (name: string) =>
       `Saved on this computer in a file only your user can read. It is sent to ${name} and nowhere else, and this page never shows it again.`,
+  },
+  /** The desktop app's account: signing in, the subscription, signing out. */
+  account: {
+    signInTitle: "Sign in to Fineframe",
+    signInAbout:
+      "Making an edit needs a Fineframe account with a subscription. Sign in on fineframe.app in your browser, then come back here.",
+    signIn: "Sign in with your browser",
+    waiting: "Finish signing in in your browser…",
+    notStarted: "The sign-in could not start",
+    signedInAs: (email: string) => `Signed in as ${email}`,
+    subscribeTitle: "Subscribe to make edits",
+    subscribeAbout:
+      "This account has no subscription. Subscribe on fineframe.app, then check again. Rendering, opening earlier projects and downloads work without one.",
+    subscribe: "Subscribe",
+    checkAgain: "Check again",
+    checking: "Checking…",
+    offlineTitle: "Your subscription can't be checked",
+    offlineAbout:
+      "Fineframe could not reach its server, and the last check was more than 7 days ago. Connect to the internet, then check again.",
+    offline: "Offline: Fineframe works for 7 days after its last check.",
+    active: "Your subscription is active.",
+    manage: "Manage subscription",
+    signOut: "Sign out",
+    close: "Close",
+    later: "Later",
+    landingDone: "You are signed in to Fineframe. Close this tab and go back to the app.",
+    landingFailed: "Fineframe could not sign you in. Close this tab and try again from the app.",
+  },
+  /** The desktop app's update, once it has one. */
+  update: {
+    ready: (version: string) => `Fineframe ${version} is ready.`,
+    restart: "Restart to update",
+    available: (version: string) => `Fineframe ${version} is available.`,
+    download: "Download",
+    dismiss: "Dismiss",
   },
   run: {
     progress: "Progress",
@@ -874,6 +912,14 @@ export const en = {
     settingUp: "The analysis is still being set up; the page shows how far it is",
     notReady: "The video is not ready",
     noService: "No such service",
+    account: {
+      "sign-in": "Sign in to Fineframe to make an edit",
+      subscribe:
+        "Subscribe to Fineframe to make an edit. Rendering, earlier projects and downloads work without it",
+      offline:
+        "Connect to the internet so Fineframe can check your subscription: it works offline for 7 days after a check",
+    },
+    noSignIn: "This build of Fineframe cannot sign in",
     pasteKey: "Paste the whole key: one line of letters and digits",
     pastePrefixed: (prefix: string) => `Paste the whole key: one line, starting with ${prefix}`,
     rejected: (name: string, site: string) =>

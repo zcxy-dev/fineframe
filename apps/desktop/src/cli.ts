@@ -1,14 +1,16 @@
 // `fineframe edit` and `fineframe render`: `pnpm edit` and `pnpm render` with the desktop app's own
 // parts, for people and agents without a clone. The launcher the app's menu installs (install.ts)
 // runs this with the app's binary as Node, the app's folder in VIDEO_EDITOR_DATA. The editor runs
-// as the page's server runs it: from the app's resources, with its Python, uv and keys.
+// as the page's server runs it: from the app's resources, with its Python, uv and keys. An edit
+// needs the account signed in in the app to have a subscription, as one from the page does.
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { constants } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { parseEnv } from "node:util";
 import { NO_SANDBOX } from "./install.ts";
-import { keysFile, restoreLinks, runtimeEnvironment } from "./server.ts";
+import { accountFile, keysFile, restoreLinks, runtimeEnvironment } from "./server.ts";
 
 const COMMANDS: Record<string, string[]> = {
   edit: ["packages", "engine", "src", "edit", "cli.ts"],
@@ -46,6 +48,25 @@ if (!places.data || !existsSync(join(places.data, "python", "env", ".video-edito
   process.exit(1);
 }
 await restoreLinks(places.editor);
+
+if (command === "edit") {
+  const { editBlocker, SITE }: typeof import("../../web/lib/account.ts") = await import(
+    pathToFileURL(join(places.editor, "apps", "web", "lib", "account.ts")).href
+  );
+  const blocker = await editBlocker(accountFile(places), places.editor);
+  if (blocker) {
+    console.error(
+      `fineframe: ${
+        blocker === "sign-in"
+          ? "sign in first: open the Fineframe app, sign in, then run this again."
+          : blocker === "subscribe"
+            ? `this Fineframe account has no subscription. Subscribe at ${SITE}/en/pricing/, then run this again. fineframe render works without one.`
+            : "Fineframe could not check the subscription, and its last check is more than 7 days old. Connect to the internet and run this again."
+      }`,
+    );
+    process.exit(1);
+  }
+}
 
 // As in the app, a key saved in it is used over one in the environment.
 const keys = existsSync(keysFile(places)) ? parseEnv(readFileSync(keysFile(places), "utf8")) : {};

@@ -37,6 +37,7 @@ const en = {
   replaceButton: "Replace",
   cancel: "Cancel",
   notInstalled: "Could not install it",
+  signOut: "Sign Out",
 };
 
 export type DesktopMessages = typeof en;
@@ -77,5 +78,6 @@ export const DESKTOP: Record<Locale, DesktopMessages> = {
     replaceButton: "取代",
     cancel: "取消",
     notInstalled: "無法安裝",
+    signOut: "登出",
   },
 };
