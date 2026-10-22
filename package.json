@@ -9,7 +9,7 @@
     "render": "node packages/engine/src/cli.ts",
     "lint": "biome check",
     "knip": "knip",
-    "typecheck": "pnpm -r typecheck && tsc -p bench",
+    "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "gen": "pnpm -r gen",
     "check-gen": "pnpm -r check-gen"

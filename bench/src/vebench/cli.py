@@ -5,7 +5,7 @@ import sys
 from importlib.metadata import version
 from pathlib import Path
 
-from vebench import ascend, beats, edit, mix, render, review, shots, speakers, tables, transcript
+from vebench import ascend, beats, edit, mix, render, shots, speakers, tables, transcript
 from vebench.synth import corpus, published
 
 TRANSCRIPT_NAMES = ("transcript.json", "transcript.srt", "transcript.txt")
@@ -26,17 +26,10 @@ RESULT_KEYS = (
 def main(argv: list[str] | None = None) -> None:
     """Run one vebench command and print its result as JSON; `synth` prints what it wrote.
 
-    `review` serves the rating page until Ctrl+C, and `review-report` prints Markdown.
     Exits with 1 on a failure, and from `report` when any output failed to score.
     """
     args = _parser().parse_args(argv)
     try:
-        if args.command == "review":
-            review.serve(args.round, args.rater, args.seed, args.port)
-            return
-        if args.command == "review-report":
-            print(review.report(args.round), end="")
-            return
         if args.command == "tables":
             stale = tables.write(check=args.check)
             for doc in stale:
@@ -200,23 +193,6 @@ def _parser() -> argparse.ArgumentParser:
         default=0.1,
         help="shot tolerance in seconds (default: %(default)s)",
     )
-
-    p = sub.add_parser(
-        "review", help="serve edits to rate blind: each alone, or two versions side by side"
-    )
-    p.add_argument(
-        "round", type=Path, help="folder of <item>/<version>.mp4 edits; ratings go to ratings.jsonl"
-    )
-    p.add_argument("--rater", required=True, help="who is rating; saved with each rating")
-    p.add_argument(
-        "--seed", type=int, help="shuffle seed (default: a random one, saved with each rating)"
-    )
-    p.add_argument("--port", type=int, default=0, help="loopback port (default: a free one)")
-
-    p = sub.add_parser(
-        "review-report", help="mean scores, and preference rates for pairs, as Markdown"
-    )
-    p.add_argument("round", type=Path, help="round folder holding ratings.jsonl")
     return parser
 
 
