@@ -68,6 +68,7 @@ tmp_path_retention_policy = "none"
 markers = [
     "ml: needs the ml group and downloads model weights",
     "big: loads the speech model, too big for CI",
+    "beats: downloads the Beat This! checkpoint unless it is cached",
     "claude: calls the Claude API; runs only when ANTHROPIC_API_KEY is set",
 ]
 

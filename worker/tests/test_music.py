@@ -111,6 +111,7 @@ def test_the_command_refuses_a_track_without_a_licence(tmp_path, capsys):
 
 
 @pytest.mark.ml
+@pytest.mark.beats
 def test_a_synthetic_track_is_indexed_with_its_beats_and_sections(tmp_path):
     from vebench.beats import fmeasure
     from vebench.synth import corpus
