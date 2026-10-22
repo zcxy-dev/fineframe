@@ -13,17 +13,19 @@
 
 ## Install
 
-The desktop app needs nothing else installed: no Node, no Python, no command line. Download the installer for your computer from the [latest release](https://github.com/zcxy-dev/fineframe/releases/latest):
+The desktop app needs nothing else installed: no Node, no Python, no command line. Download the installer for your computer from the [download page](https://fineframe.app/en/download/), or straight from `downloads.fineframe.app`:
 
 | Computer | Installer |
 |---|---|
-| Mac with Apple silicon (M1 or later) | `Fineframe-<version>-mac-arm64.dmg` |
-| Windows 10 or 11 (x64) | `Fineframe-<version>-win-x64.exe` |
-| Linux (x86-64) | `Fineframe-<version>-linux-x86_64.AppImage` |
+| Mac with Apple silicon (M1 or later) | [`Fineframe-mac-arm64.dmg`](https://downloads.fineframe.app/Fineframe-mac-arm64.dmg) |
+| Windows 10 or 11 (x64) | [`Fineframe-win-x64.exe`](https://downloads.fineframe.app/Fineframe-win-x64.exe) |
+| Linux (x86-64) | [`Fineframe-linux-x86_64.AppImage`](https://downloads.fineframe.app/Fineframe-linux-x86_64.AppImage) |
+
+These are always the latest version; each version is also there as `Fineframe-<version>-<computer>`, such as `Fineframe-0.5.0-mac-arm64.dmg`.
 
 Macs with an Intel processor are not supported: PyTorch and ONNX Runtime, which the analysis runs on, no longer publish builds for them.
 
-**macOS.** Open the DMG and drag Fineframe into Applications. The app is not yet signed with an Apple Developer ID, so the first time you open it, macOS says it cannot check the app for malicious software and offers only Done or Move to Trash. Choose Done, then open **System Settings → Privacy & Security**, scroll to Security, and choose **Open Anyway** next to the message about Fineframe; confirm with your password. macOS remembers the choice, and later launches open normally. Each release's `SHA256SUMS` lets you check the file you downloaded, and `gh attestation verify <file> --repo zcxy-dev/fineframe` checks that GitHub Actions built it from this repository.
+**macOS.** Open the DMG and drag Fineframe into Applications. The app is not yet signed with an Apple Developer ID, so the first time you open it, macOS says it cannot check the app for malicious software and offers only Done or Move to Trash. Choose Done, then open **System Settings → Privacy & Security**, scroll to Security, and choose **Open Anyway** next to the message about Fineframe; confirm with your password. macOS remembers the choice, and later launches open normally. [`SHA256SUMS`](https://downloads.fineframe.app/SHA256SUMS) lets you check the file you downloaded, and `gh attestation verify <file> --repo zcxy-dev/fineframe` checks that GitHub Actions built it from this repository.
 
 **Windows.** Open the installer: it installs Fineframe for your user alone, with no administrator needed, and opens it. The installer is not yet signed with a code-signing certificate, so Microsoft Defender SmartScreen may show "Windows protected your PC". Choose **More info**, check that the app is Fineframe, then choose **Run anyway**.
 

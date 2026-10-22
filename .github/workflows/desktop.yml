@@ -4,8 +4,9 @@ name: desktop
 # a person would the first time (apps/desktop/scripts/smoke.ts): it installs the analysis, makes
 # an edit of a synthetic clip with stand-ins for Claude and OpenRouter, and quits, leaving nothing
 # running. A pull request that changes the app or the page builds and checks them; a tag v<version>
-# also attaches them to a draft release of that tag, which is published manually, and uploads them
-# with the update feed to Cloudflare R2, which downloads.fineframe.app serves.
+# also uploads them, with copies under names without the version that the website's download page
+# links to, their checksums and the update feed, to Cloudflare R2, which downloads.fineframe.app
+# serves. Nothing goes to GitHub's releases.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -138,7 +139,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: write
+      contents: read
       id-token: write
       attestations: write
     steps:
@@ -159,34 +160,36 @@ jobs:
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: installers/*
-      # The tag names the app's version, so the installers' names match the release's.
-      - name: Attach the installers to a draft release
+      # The tag names the app's version, so the installers' names match the tag.
+      - name: Check the tag
         run: |
           version=$(jq -r .version apps/desktop/package.json)
           if [ "$GITHUB_REF_NAME" != "v$version" ]; then
             echo "The tag $GITHUB_REF_NAME is not v$version, the version in apps/desktop/package.json"
             exit 1
           fi
-          (cd installers && sha256sum -- * > SHA256SUMS)
-          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft \
-              --verify-tag --title "Fineframe $version" \
-              --notes "Installers for macOS (Apple silicon), Windows and Linux. They are not signed yet: the README says how to open the app the first time (https://github.com/$GITHUB_REPOSITORY#install)."
-          fi
-          gh release upload "$GITHUB_REF_NAME" installers/* --repo "$GITHUB_REPOSITORY" --clobber
-        env:
-          GH_TOKEN: ${{ github.token }}
-      # The installers first, then the latest*.yml that point the apps at them (apps/desktop/src/
-      # updates.ts), with R2's S3 API. The checksums the AWS CLI adds by default are left out, as
-      # R2 asks.
+      # The installers first, then copies under names without the version (Fineframe-mac-arm64.dmg,
+      # Fineframe-win-x64.exe, Fineframe-linux-x86_64.AppImage) and SHA256SUMS of both, then the
+      # latest*.yml that point the apps at the installers (apps/desktop/src/updates.ts), with R2's
+      # S3 API. What a later release replaces is served with no-cache. The checksums the AWS CLI
+      # adds by default are left out, as R2 asks.
       - name: Upload the installers and the update feed to Cloudflare R2
         run: |
           if [ -z "$R2_ACCOUNT_ID" ] || [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$R2_BUCKET" ]; then
-            echo "::warning::Not uploaded to R2: the R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET secrets are not all set"
-            exit 0
+            echo "::error::The R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET secrets are not all set"
+            exit 1
           fi
+          version=${GITHUB_REF_NAME#v}
+          mkdir latest
+          for file in installers/*; do
+            name=${file#installers/}
+            cp "$file" "latest/${name/-$version-/-}"
+          done
+          sums=$(cd installers && sha256sum -- *; cd ../latest && sha256sum -- *)
+          echo "$sums" | tee latest/SHA256SUMS
           r2=(--endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com")
           aws s3 cp installers/ "s3://$R2_BUCKET/" --recursive "${r2[@]}"
+          aws s3 cp latest/ "s3://$R2_BUCKET/" --recursive --cache-control no-cache "${r2[@]}"
           aws s3 cp feed/ "s3://$R2_BUCKET/" --recursive --exclude "latest*.yml" "${r2[@]}"
           aws s3 cp feed/ "s3://$R2_BUCKET/" --recursive --exclude "*" --include "latest*.yml" \
             --cache-control no-cache "${r2[@]}"
