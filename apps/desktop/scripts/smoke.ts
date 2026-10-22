@@ -27,7 +27,7 @@ import { delimiter, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { _electron as electron, type Page } from "playwright-core";
 import { launcherPath, skillFolders } from "../src/install.ts";
-import { descendantsOf, type ProcessRow } from "./processes.ts";
+import { descendantsOf, type ProcessRow, stillRunning } from "./processes.ts";
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -335,9 +335,8 @@ async function shot(page: Page, name: string): Promise<void> {
   say(`saved ${name}.png`);
 }
 
-/** The processes `root` started, and theirs, by their ids, from a listing of every process with,
- * on Windows, when each started. */
-function descendants(root: number): number[] {
+/** Every running process, with, on Windows, when each started. */
+function processes(): ProcessRow[] {
   const listing =
     process.platform === "win32"
       ? spawnSync(
@@ -350,7 +349,7 @@ function descendants(root: number): number[] {
           { encoding: "utf8" },
         ).stdout
       : spawnSync("ps", ["-A", "-o", "pid=,ppid="], { encoding: "utf8" }).stdout;
-  const rows = listing
+  return listing
     .trim()
     .split("\n")
     .map((line): ProcessRow => {
@@ -361,17 +360,14 @@ function descendants(root: number): number[] {
         ...(Number.isFinite(created) ? { created } : {}),
       };
     });
-  return descendantsOf(rows, root);
 }
 
-const alive = (pid: number) => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-};
+/** The processes `root` started, and theirs. */
+function descendants(root: number): ProcessRow[] {
+  const rows = processes();
+  const found = new Set(descendantsOf(rows, root));
+  return rows.filter((row) => found.has(row.pid));
+}
 
 const clip = await makeClip();
 say(`made ${clip}`);
@@ -395,15 +391,14 @@ if (!windows) env.PATH = `${join(homeDir, ".local", "bin")}${delimiter}${env.PAT
 
 const app = await electron.launch({ executablePath: resolve(executable), env, timeout: 120_000 });
 const pid = app.process().pid as number;
-// Everything the app starts while it runs, to check none of it outlives the app.
-const started = new Set<number>();
-const tracking = setInterval(
-  () => {
-    for (const child of descendants(pid)) started.add(child);
-    // Listing Windows' processes takes about a second.
-  },
-  process.platform === "win32" ? 1000 : 250,
-);
+// Everything the app starts while it runs, to check none of it outlives the app, by id and, as
+// Windows reuses ids, when it started.
+const started = new Map<string, ProcessRow>();
+const track = () => {
+  for (const child of descendants(pid)) started.set(`${child.pid} ${child.created}`, child);
+};
+// Listing Windows' processes takes about a second.
+const tracking = setInterval(track, process.platform === "win32" ? 1000 : 250);
 const page = await app.firstWindow();
 page.on("pageerror", (error) => say(`page error: ${error.message}`));
 await page.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 120_000 });
@@ -706,10 +701,11 @@ const problems = await makeEdit()
 
 // Quitting stops everything the app started.
 clearInterval(tracking);
-for (const child of descendants(pid)) started.add(child);
+track();
 await app.close();
 await new Promise((done) => setTimeout(done, 2000));
-const left = [...started].filter(alive);
+const running = stillRunning([...started.values()], processes());
+const left = running.map((row) => row.pid);
 if (left.length > 0) {
   const listing =
     process.platform === "win32"
@@ -727,7 +723,7 @@ if (left.length > 0) {
         }).stdout;
   // Whether they were only slow to go, or would have outlived the app.
   await new Promise((done) => setTimeout(done, 10_000));
-  const later = left.filter(alive);
+  const later = stillRunning(running, processes()).map((row) => row.pid);
   problems.push(
     `still running after quitting:\n${listing}\n10 s later, ${later.length ? `still running: ${later.join(", ")}` : "all gone"}`,
   );
