@@ -440,7 +440,11 @@ def _models(asr_model: str | None):
     `recognize(wav, context)` returns the text heard and its language (None when it heard none);
     `align(wav, text)` returns each aligner token with its start and end in `wav`.
     """
-    recognize = gpu.Fallback("speech model", lambda on: _recognizer(asr_model, on))
+    recognize = gpu.Fallback(
+        "speech model",
+        lambda on: _recognizer(asr_model, on),
+        release=lambda: _recognizer.cache_clear(),
+    )
     return recognize, _aligner_function()
 
 
@@ -450,7 +454,9 @@ def _aligner_function(half: bool = False) -> gpu.Fallback:
     def timed(items: list[tuple[str, float, float]]) -> bool:
         return gpu.finite([t for _, start, end in items for t in (start, end)])
 
-    return gpu.Fallback("aligner", lambda on: _aligner(half, on), timed)
+    return gpu.Fallback(
+        "aligner", lambda on: _aligner(half, on), timed, release=lambda: _aligner.cache_clear()
+    )
 
 
 @cache

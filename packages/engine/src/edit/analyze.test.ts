@@ -130,3 +130,18 @@ test("the glossary reaches vework only where it uses it, and keys the index only
     indexName(worker, fingerprint, { correct: false }),
   );
 });
+
+test("an index analysed with the Mac's GPU is not reused for one asked of the CPU", (t) => {
+  const worker: Worker = { command: ["vework"], version: "test" };
+  const fingerprint = { sha256: "0".repeat(64), bytes: 7 };
+  const options: AnalysisOptions = { correct: false };
+  const configured = process.env.VEWORK_DEVICE;
+  t.after(() => {
+    if (configured === undefined) delete process.env.VEWORK_DEVICE;
+    else process.env.VEWORK_DEVICE = configured;
+  });
+  delete process.env.VEWORK_DEVICE;
+  const either = indexName(worker, fingerprint, options);
+  process.env.VEWORK_DEVICE = "CPU";
+  assert.notEqual(indexName(worker, fingerprint, options), either);
+});
