@@ -53,6 +53,7 @@ const versionsRoute = await import("./[id]/versions/route.ts");
 const versionRoute = await import("./[id]/versions/[n]/route.ts");
 const replanRoute = await import("./[id]/replan/route.ts");
 const shortsRoute = await import("./[id]/shorts/route.ts");
+const exportRoute = await import("./[id]/export/route.ts");
 const linksRoute = await import("../links/route.ts");
 
 test.after(() => rm(root, { recursive: true, force: true }));
@@ -638,6 +639,48 @@ test("a finished edit changes as versions, the newest three keeping their videos
     ctx({ id, n: "2" }),
   );
   assert.equal(back.status, 200, "a kept video needs no footage");
+});
+
+test("each version exports for an editing app, an older one again after another's export", async () => {
+  const { body: created } = await create([{ path: "e.mp4", size: 2 }]);
+  assert.equal((await put(created.id, 0, new Uint8Array(2))).status, 200);
+  assert.equal((await start(created.id)).status, 200);
+  const id = created.id;
+  const until = async (done: (job: Job) => boolean) => {
+    for (;;) {
+      const job = (await (await jobRoute.GET(new Request(url), ctx({ id }))).json()) as Job;
+      if (done(job)) return job;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  };
+  await until((job) => job.status === "done");
+  /** The zip of the version shown: each file's name and, for text, what it says. */
+  const exported = async () => {
+    const response = await exportRoute.GET(new Request(`${url}/${id}/export`), ctx({ id }));
+    assert.equal(response.status, 200, await response.clone().text());
+    const zip = Buffer.from(await response.arrayBuffer());
+    return zip.toString("latin1");
+  };
+  assert.match(await exported(), /edit\.project\.json/);
+  const changed = await versionsRoute.POST(
+    new Request(`${url}/${id}/versions`, {
+      method: "POST",
+      body: JSON.stringify({ revision: { captions: "pop" }, summary: "captions pop" }),
+    }),
+    ctx({ id }),
+  );
+  assert.equal(changed.status, 200);
+  await until((job) => job.render === undefined && job.current === 2);
+  // Version 2's export takes the place of version 1's beside it.
+  assert.match(await exported(), /edit-v2\.project\.json/);
+  assert.equal(existsSync(join(root, id, "out", "edit.export")), false);
+  const shown = await versionRoute.POST(
+    new Request(`${url}/${id}/versions/1`, { method: "POST" }),
+    ctx({ id, n: "1" }),
+  );
+  assert.equal(shown.status, 200);
+  await until((job) => job.render === undefined && job.current === 1);
+  assert.match(await exported(), /edit\.project\.json/);
 });
 
 test("a re-plan makes a new version from the same footage, at another length, aspect or music", async () => {

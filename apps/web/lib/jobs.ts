@@ -1583,8 +1583,11 @@ export class Jobs {
     this.#requireFootage(job);
     const beside = dirname(folder);
     for (const other of await readdir(beside)) {
-      if (other.endsWith(".export"))
-        await rm(join(beside, other), { recursive: true, force: true });
+      if (!other.endsWith(".export")) continue;
+      const path = join(beside, other);
+      await rm(path, { recursive: true, force: true });
+      // Exporting that version again makes it again.
+      if (path !== folder) this.#exports.delete(path);
     }
     const log: string[] = [];
     const run = runEdit({
