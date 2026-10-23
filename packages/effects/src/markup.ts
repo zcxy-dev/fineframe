@@ -162,3 +162,10 @@ export function markupProblem(html: string, css: string): string | null {
 export function cleanMarkup(html: string, restyle?: Restyle): string {
   return serialize(parse(html).root, restyle);
 }
+
+/** The markup's text as drawn: entities decoded, a space between elements, whitespace collapsed. */
+export function markupText(html: string): string {
+  const text = (node: Node): string =>
+    node.children.map((child) => (typeof child === "string" ? child : ` ${text(child)} `)).join("");
+  return text(parse(html).root).replace(/\s+/g, " ").trim();
+}

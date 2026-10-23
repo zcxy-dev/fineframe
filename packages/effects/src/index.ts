@@ -31,6 +31,7 @@ export {
 export { type IconName, iconNames, LOGOS, type LogoName, logoNames, marksIn } from "./icons.ts";
 export { type Aspect, COLORS, layoutFor, watermarkPlacement } from "./layout.ts";
 export { MAX_SVG_BYTES, svgProblem } from "./logo.ts";
+export { markupText } from "./markup.ts";
 export type { Box } from "./page.ts";
 export { rasterizeSvg } from "./raster.ts";
 export {
