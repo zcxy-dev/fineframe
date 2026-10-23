@@ -8,7 +8,7 @@
     "./layout": "./src/layout.ts",
     "./colour": "./src/colour.ts",
     "./logo": "./src/logo.ts",
-    "./markup": "./src/markup.ts"
+    "./text": "./src/text.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
