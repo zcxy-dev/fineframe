@@ -171,6 +171,15 @@ test("the captions' emoji turn on and off with nothing else changed", () => {
   assert.throws(() => revise(silent, { emoji: true }, sources), /no captions/);
 });
 
+test("a graphic's label is its text as drawn, every entity decoded", () => {
+  const project = edit();
+  const [graphic] = project.graphics ?? [];
+  assert.ok(graphic);
+  graphic.html = "<p>Fast&nbsp;&nbsp;cuts &mdash; <b>no&#160;clicks</b> &#x2713; &lt;3</p>";
+  const label = removables(project).find((item) => item.kind === "graphic")?.label;
+  assert.equal(label, "Graphic (panel): Fast cuts \u2014 no clicks \u2713 <3");
+});
+
 test("what goes with a removal goes too: a chapter's wipe, a panel's speaker, their sounds", () => {
   assert.deepEqual(
     removables(edit()).map((item) => [item.kind, item.index, item.label]),

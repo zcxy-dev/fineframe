@@ -2,6 +2,7 @@
 // change is a recipe of skills/video-editor/references/recipes.md, and cuts go through cutEdit
 // as `pnpm render --cut --retarget` takes them.
 
+import { markupText } from "@video-editor/effects/text";
 import { type Brand, type CaptionLine, type Project, ticksPerFrame } from "@video-editor/schema";
 import { withBrand } from "./brand/kit.ts";
 import { cutEdit } from "./cut.ts";
@@ -179,7 +180,7 @@ export function removables(project: Project): Removable[] {
     });
   }
   for (const [index, graphic] of (project.graphics ?? []).entries()) {
-    const text = graphicText(graphic.html);
+    const text = markupText(graphic.html);
     items.push({
       kind: "graphic",
       index,
@@ -215,17 +216,6 @@ export function isVisual(project: Project, index: number): boolean {
 }
 
 /** The words a graphic's markup shows, without its tags, on one line. */
-function graphicText(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&amp;/g, "&")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 /** `project` without what `removals` name, and what goes with each: a panel graphic's or a split's
  * speaker beside it and the sound effect at its start, and a chapter's wipe, the chapters left
  * renumbered. */
