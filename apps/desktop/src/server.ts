@@ -100,10 +100,9 @@ export async function workerInstall(
     "utf8",
   ).catch(() => null);
   if (stamp === null) return "missing";
-  const { workerVersion }: typeof import("../../../packages/engine/src/edit/analyze.ts") =
-    await import(
-      pathToFileURL(join(places.editor, "packages", "engine", "src", "edit", "analyze.ts")).href
-    );
+  const { workerVersion }: typeof import("../../web/lib/setup.ts") = await import(
+    pathToFileURL(join(places.editor, "apps", "web", "lib", "setup.ts")).href
+  );
   return stamp === (await workerVersion(join(places.editor, "worker"))) ? "ready" : "outdated";
 }
 

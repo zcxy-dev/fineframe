@@ -50,8 +50,9 @@ export function parseUvLine(
 }
 
 /** A hash of the worker's code and lockfile: when an update changes it, the worker is installed
- * again, as uv keeps a non-editable install of it as it is. */
-async function workerVersion(worker: string): Promise<string> {
+ * again, as uv keeps a non-editable install of it as it is. The `fineframe` command compares it
+ * with the stamp the install leaves (apps/desktop/src/server.ts). */
+export async function workerVersion(worker: string): Promise<string> {
   const code = (await readdir(join(worker, "src"), { recursive: true }))
     .filter((file) => file.endsWith(".py"))
     .map((file) => join("src", file))

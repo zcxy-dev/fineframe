@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { workerVersion } from "../../../packages/engine/src/edit/analyze.ts";
+import { workerVersion } from "../../web/lib/setup.ts";
 import {
   type Places,
   restoreLinks,
