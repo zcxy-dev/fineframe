@@ -52,7 +52,8 @@ class Fallback:
     `load(gpu)` returns the model's function: on the GPU when `gpu` is true, otherwise where the
     step runs without the Mac's GPU. It is loaded on the first call. When loading it on the GPU,
     calling it there or checking its result with `valid` fails, that call and every later one
-    run on the CPU. Each step says where it runs, on a Mac only.
+    run on the CPU, and `release()` first drops what keeps the GPU's copy loaded, such as a
+    cache of `load`. Each step says where it runs, on a Mac only.
     """
 
     def __init__(
@@ -61,9 +62,10 @@ class Fallback:
         load: Callable[[bool], Callable],
         valid: Callable[[Any], bool] = lambda result: True,
         backend: str = "MPS",
+        release: Callable[[], None] = lambda: None,
     ) -> None:
         self.step, self.load, self.valid = step, load, valid
-        self.backend = backend
+        self.backend, self.release = backend, release
         self.on_gpu = available()
         self.run: Callable | None = None
 
@@ -88,6 +90,11 @@ class Fallback:
         """Move this step to the CPU, saying why."""
         _say(f"{self.step}: failed on the GPU ({problem}); running it on the CPU")
         self.on_gpu, self.run = False, None
+        # The GPU's copy goes before the CPU's loads, so memory never holds both.
+        self.release()
+        torch = sys.modules.get("torch")
+        if self.backend == "MPS" and torch is not None and torch.backends.mps.is_available():
+            torch.mps.empty_cache()
 
 
 def decode[T](step: str, attempt: Callable[[Any], T]) -> T:

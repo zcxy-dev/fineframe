@@ -1,6 +1,9 @@
+import functools
+import gc
 import shutil
 import subprocess
 import sys
+import weakref
 from types import SimpleNamespace
 
 import av
@@ -106,14 +109,32 @@ def test_video_videotoolbox_cannot_decode_is_decoded_in_software(monkeypatch, ca
     assert lines[1].endswith("); decoding in software")
 
 
+class Model:
+    """A stand-in for a loaded model: what it returns, and where it was loaded."""
+
+    def __init__(self, result, on):
+        self.result, self.on = result, on
+
+    def __call__(self, *args):
+        return self.result
+
+
 def test_a_speech_model_that_hears_nothing_on_the_gpu_hears_it_all_again_on_the_cpu(
     monkeypatch, capsys
 ):
     on_mac_gpu(monkeypatch)
     heard = {True: ("", None), False: ("大家", "Chinese")}
-    monkeypatch.setattr(transcribe, "_recognizer", lambda model, on: lambda wav, ctx: heard[on])
+    loaded = []
+
+    @functools.cache
+    def recognizer(model, on):
+        loaded.append(weakref.ref(found := Model(heard[on], on)))
+        return found
+
+    monkeypatch.setattr(transcribe, "_recognizer", recognizer)
     timed = [("大", 0.1, 0.3), ("家", 0.3, 0.5)]
-    monkeypatch.setattr(transcribe, "_aligner", lambda half, on: lambda wav, text: timed)
+    aligner = functools.cache(lambda half, on: Model(timed, on))
+    monkeypatch.setattr(transcribe, "_aligner", aligner)
     steps = []
     samples = np.zeros(16_000, np.float32)
     found = transcribe.transcribe(samples, [{"start": 0.05, "end": 0.6}], progress=steps.append)
@@ -123,6 +144,26 @@ def test_a_speech_model_that_hears_nothing_on_the_gpu_hears_it_all_again_on_the_
         "running it on the CPU"
     ) in said(capsys)
     assert steps.count("transcribing 1/1") == 2
+    # The GPU's copy is let go when the step moves to the CPU, not kept beside the CPU's.
+    gc.collect()
+    assert [model() is not None for model in loaded] == [False, True]
+
+
+def test_an_aligner_that_fails_on_the_gpu_lets_its_gpu_copy_go(monkeypatch):
+    on_mac_gpu(monkeypatch)
+    loaded = []
+
+    @functools.cache
+    def aligner(half, on):
+        found = Model([("a", float("nan"), 0.1)] if on else [("a", 0.0, 0.1)], on)
+        loaded.append(weakref.ref(found))
+        return found
+
+    monkeypatch.setattr(transcribe, "_aligner", aligner)
+    align = transcribe._aligner_function()
+    assert align(None, "a") == [("a", 0.0, 0.1)]
+    gc.collect()
+    assert [model() is not None for model in loaded] == [False, True]
 
 
 @pytest.fixture
