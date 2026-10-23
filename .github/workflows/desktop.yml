@@ -76,6 +76,9 @@ jobs:
             echo "A release needs the FINEFRAME_SUPABASE_URL, FINEFRAME_SUPABASE_PUBLISHABLE_KEY and FINEFRAME_OAUTH_CLIENT_ID repository variables"
             exit 1
           fi
+          # Signing the macOS app (@electron/osx-sign) opens all of its files at once to find the
+          # binaries, more than the runner's default limit of open files allows at times (EMFILE).
+          if [ "$RUNNER_OS" = macOS ]; then ulimit -n "$(sysctl -n kern.maxfilesperproc)"; fi
           pnpm install --frozen-lockfile
           pnpm --filter @video-editor/desktop dist
       - name: Run the built app (macOS)

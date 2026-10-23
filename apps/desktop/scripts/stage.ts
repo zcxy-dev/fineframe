@@ -4,7 +4,8 @@
 //
 // - build/editor/: the repository's layout as the page's server and `pnpm edit` expect it, with
 //   the page built and only the packages they run (installed without symlinks between
-//   dependencies, as an installer copies files), the worker's code and lockfile, from which
+//   dependencies, as an installer copies files; the page's own, such as its icons, are
+//   devDependencies, which its build compiles in), the worker's code and lockfile, from which
 //   the app installs the analysis's Python on its first start, and the agent skill its menu
 //   installs. No FFmpeg, ffprobe or Chrome: the
 //   renderer downloads them on first use. With FINEFRAME_SUPABASE_URL,
@@ -130,6 +131,13 @@ run(
 const modules = join(editor, "node_modules");
 await rm(join(modules, "sharp"), { recursive: true, force: true });
 await rm(join(modules, "@img"), { recursive: true, force: true });
+// Nor the packages' source maps, which only a debugger reads: a quarter of their files, and
+// signing the macOS app opens every file it holds at once.
+for (const entry of await readdir(editor, { recursive: true, withFileTypes: true })) {
+  const path = join(entry.parentPath, entry.name);
+  if (entry.isFile() && entry.name.endsWith(".map") && path.includes(`${sep}node_modules${sep}`))
+    await rm(path);
+}
 
 // An NSIS installer keeps no links, and pnpm links the workspace's own packages, which Node runs
 // as TypeScript only from outside node_modules, so a copy will not do: on Windows the links are

@@ -147,7 +147,7 @@ Each of the [desktop app](apps/desktop/README.md)'s installers carries:
 
 - **Electron** (MIT), with the Chromium and Node.js it is built from; their licences are in `LICENSES.chromium.html` and `LICENSE.electron.txt` inside the app.
 - **[uv](https://github.com/astral-sh/uv)** (MIT OR Apache-2.0), pinned by version and SHA-256, which installs the analysis's Python on the first start.
-- **The editor's code and the npm packages it runs**, the production dependencies listed above and theirs, as pnpm installs them, under their own licences: almost all MIT, ISC, Apache-2.0 or BSD; caniuse-lite's data under CC-BY-4.0.
+- **The editor's code and the npm packages it runs**, the production dependencies listed above and theirs, as pnpm installs them, and the web page's own (radix-ui, motion, lucide-react, class-variance-authority, cn and Geist), compiled into the built page, under their own licences: almost all MIT, ISC, Apache-2.0 or BSD; caniuse-lite's data under CC-BY-4.0.
 
 Left out on purpose, and downloaded on first use instead, from their publishers, as when the editor runs from a clone:
 
