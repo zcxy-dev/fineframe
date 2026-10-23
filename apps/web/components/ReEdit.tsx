@@ -3,8 +3,21 @@
 import { CAPTION_STYLES, type CaptionStyle } from "@video-editor/engine/captions";
 import { lookIds } from "@video-editor/engine/looks";
 import {
+  Captions,
+  Clapperboard,
+  Contrast,
+  Layers,
+  Music2,
+  Scissors,
+  Stamp,
+  Type,
+  Undo2,
+  WandSparkles,
+} from "lucide-react";
+import {
   Fragment,
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
   type RefObject,
   useEffect,
   useMemo,
@@ -17,16 +30,22 @@ import { overlayLabel, progressText } from "../lib/i18n/program.ts";
 import type { EditView, Job } from "../lib/jobs.ts";
 import { formatClock, formatDollars } from "../lib/settings.ts";
 import { jobApi } from "../lib/shorts.ts";
+import { CHECK, CHOICE, cn, HELP, LABEL, LIST, META, SECTION, SLUG } from "../lib/styles.ts";
 import { dollarsOf } from "../lib/summary.ts";
 import { spacedWords } from "../lib/transcript.ts";
 import type { PageRevision } from "../lib/versions.ts";
 import { KitCaptionPreview, useKits } from "./BrandKits.tsx";
 import { CaptionPreview } from "./CaptionPreview.tsx";
 import { ErrorNote } from "./ErrorNote.tsx";
-import styles from "./editor.module.css";
 import { useLocale, useT } from "./I18n.tsx";
 import { MusicPicker } from "./MusicPicker.tsx";
 import { Replan } from "./Replan.tsx";
+import { Player } from "./ResultView.tsx";
+import { Bar } from "./RunView.tsx";
+import { Segments } from "./Segments.tsx";
+import { Button } from "./ui/button.tsx";
+import { Input, NativeSelect } from "./ui/input.tsx";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs.tsx";
 
 /** Ticks in a second, as project.json counts time. */
 const TICKS = 120_000;
@@ -60,18 +79,30 @@ type Word = EditView["lines"][number]["words"][number] & { line: number; word: n
 
 const seconds = (ticks: number) => (ticks / TICKS).toFixed(2);
 
-/** The finished video's transcript and what can change without planning again, applied in one
- * render as a new version. */
+/**
+ * The editing room for a finished edit: the player in the middle, the transcript as a timeline
+ * under it, and a panel on the right whose tabs hold the result's files and what can change
+ * without planning again, with Apply at its foot, which renders the changes once as a new
+ * version. A short of a stopped run (`editable` false) only plays and downloads.
+ */
 export function ReEdit({
   job,
   onJob,
   video,
+  head,
+  result,
+  editable,
 }: {
   job: Job;
   /** Called with the job as the server has it after a request changed it. */
   onJob: (job: Job) => void;
   /** The player, which Space plays and the arrow keys step. */
   video: RefObject<HTMLVideoElement | null>;
+  /** The panel's heading over its tabs: what the edit is. */
+  head: ReactNode;
+  /** The Result tab: the downloads, the versions and the edit's details. */
+  result: ReactNode;
+  editable: boolean;
 }) {
   const t = useT();
   const words = t.reedit;
@@ -89,9 +120,10 @@ export function ReEdit({
   const { list: kits } = useKits();
   const current = job.current ?? 1;
   const rendering = job.render && !job.render.error ? job.render : null;
+  const playing = usePlayback(video);
 
   // The version shown, again whenever another is shown; changes were to the one before.
-  const shownUrl = jobApi(job, "edit", { v: current });
+  const shownUrl = editable ? jobApi(job, "edit", { v: current }) : null;
   useEffect(() => {
     let live = true;
     setDraft(EMPTY);
@@ -99,6 +131,7 @@ export function ReEdit({
     setCursor(0);
     setSelection(null);
     setLanded(null);
+    if (!shownUrl) return;
     void fetch(shownUrl)
       .then((response) => response.json() as Promise<EditView & { error?: string }>)
       .then((found) => {
@@ -172,16 +205,52 @@ export function ReEdit({
     };
   }, [cuts, previewUrl]);
 
-  if (!view) {
+  // The word being said where the player is, lit amber as a caption is, and kept in view while
+  // the video plays.
+  const now = playing.time * TICKS;
+  const live = transcriptWords.findIndex((word) => word.start <= now && now < word.end);
+  useEffect(() => {
+    const box = transcript.current;
+    if (!playing.playing || live < 0 || !box) return;
+    const word = box.querySelector<HTMLElement>(`[data-word="${live}"]`);
+    if (!word) return;
+    const top = word.offsetTop - box.offsetTop;
+    if (top < box.scrollTop || top + word.offsetHeight > box.scrollTop + box.clientHeight) {
+      box.scrollTo({ top: Math.max(0, top - box.clientHeight / 3) });
+    }
+  }, [live, playing.playing]);
+
+  const layout = (main: ReactNode, panel: ReactNode, foot?: ReactNode) => (
+    <main className="grid lg:h-[calc(100dvh-3.5rem)] lg:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="flex min-h-0 min-w-0 flex-col">
+        <Player job={job} video={video} />
+        {main}
+      </div>
+      <aside
+        className="flex min-h-0 flex-col border-l bg-card max-lg:border-t max-lg:border-l-0"
+        aria-label={t.done.label}
+      >
+        <div className="shrink-0 border-b px-6 pt-5 pb-4 max-md:px-4">{head}</div>
+        {panel}
+        {foot}
+      </aside>
+    </main>
+  );
+  const resultOnly = <div className="min-h-0 flex-1 overflow-y-auto">{result}</div>;
+
+  if (!editable || !view) {
     keys.current = () => {};
-    return (
-      <section className={`${styles.card} ${styles.reedit}`} aria-label={words.label}>
-        {error ? (
-          <ErrorNote message={error} fallback={words.loadFallback} />
-        ) : (
-          <p className={styles.help}>{words.loading}</p>
-        )}
-      </section>
+    return layout(
+      editable && (
+        <section className={cn(PANE, "justify-center px-5")} aria-label={words.label}>
+          {error ? (
+            <ErrorNote message={error} fallback={words.loadFallback} />
+          ) : (
+            <p className={HELP}>{words.loading}</p>
+          )}
+        </section>
+      ),
+      resultOnly,
     );
   }
 
@@ -332,24 +401,17 @@ export function ReEdit({
   const spaced = view.lines.map(spacedWords);
   const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 
-  return (
-    <section className={`${styles.card} ${styles.reedit}`} aria-label={words.label}>
-      <div className={styles.reeditHead}>
-        <div>
-          <h2 className={styles.filesTitle}>{words.title}</h2>
-          <p className={styles.filesMeta}>
+  const transcriptPane = (
+    <section className={PANE} aria-label={words.label}>
+      <div className="flex items-start justify-between gap-6 px-5 pt-3">
+        <div className="flex shrink-0 items-baseline gap-3">
+          <h2 className={SLUG}>{words.transcript}</h2>
+          <p className={cn(META, "truncate")}>
             {words.version(view.version, formatClock(view.length / TICKS))}
             {landed && words.afterCuts(formatClock(landed.length / TICKS))}
           </p>
         </div>
-      </div>
-
-      <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>{words.transcript}</h3>
-        <p className={styles.help} id={`${job.id}-transcript-help`}>
-          {words.help}
-        </p>
-        <p className={styles.keys}>
+        <p className="flex min-w-0 flex-wrap justify-end gap-x-4 gap-y-1 text-xs text-muted-foreground max-xl:hidden [&>span]:inline-flex [&>span]:items-center [&>span]:gap-1 [&>span]:whitespace-nowrap">
           <span>
             <kbd>Space</kbd> {words.keys.play}
           </span>
@@ -369,86 +431,109 @@ export function ReEdit({
             <kbd>→</kbd> {words.keys.frame}
           </span>
         </p>
-        {transcriptWords.length === 0 ? (
-          <p className={styles.help}>{words.noCaptions}</p>
-        ) : (
-          <>
-            <Timeline
-              length={view.length}
-              asked={revision.cuts ?? []}
-              landed={landed?.removed ?? []}
-            />
-            <fieldset
-              ref={transcript}
-              className={styles.transcript}
-              aria-label={words.transcript}
-              aria-describedby={`${job.id}-transcript-help`}
-              onKeyDown={onTranscriptKey}
-            >
-              {view.lines.map((line, l) => (
-                <p key={line.words[0]?.start ?? line.text} className={styles.transcriptLine}>
-                  {line.words.map((_, w) => {
-                    const g = (offsets[l] ?? 0) + w;
-                    const word = transcriptWords[g] as Word;
-                    const fixed = draft.words[key(word)];
-                    const state =
-                      g >= from && g <= to
-                        ? "selected"
-                        : gone(word)
-                          ? "gone"
-                          : inCut(g)
-                            ? landed
-                              ? "kept"
-                              : "cut"
-                            : fixed !== undefined
-                              ? "fixed"
-                              : undefined;
-                    return (
-                      <Fragment key={key(word)}>
-                        {spaced[l]?.[w] && " "}
-                        {marksBefore(g).map((t) => (
-                          <span key={t} className={styles.cutMark} title={words.lands(seconds(t))}>
-                            ✂
-                          </span>
-                        ))}
-                        <button
-                          type="button"
-                          className={styles.word}
-                          data-state={state}
-                          data-word={g}
-                          tabIndex={g === cursor ? 0 : -1}
-                          aria-pressed={state === "selected"}
-                          onFocus={() => setCursor(g)}
-                          title={
-                            state === "kept"
-                              ? words.keptWord
-                              : words.span(seconds(word.start), seconds(word.end))
-                          }
-                          onClick={(event) =>
-                            setSelection(event.shiftKey && selection ? [selection[0], g] : [g, g])
-                          }
+      </div>
+      {transcriptWords.length === 0 ? (
+        <p className={cn(HELP, "px-5 py-4")}>{words.noCaptions}</p>
+      ) : (
+        <>
+          <Ruler
+            length={view.length}
+            asked={revision.cuts ?? []}
+            landed={landed?.removed ?? []}
+            at={now}
+            onSeek={(ticks) => {
+              const player = video.current;
+              if (player) player.currentTime = ticks / TICKS;
+            }}
+          />
+          <fieldset
+            ref={transcript}
+            className="relative mx-5 mb-2 min-h-0 min-w-0 flex-1 overflow-y-auto rounded-xl border bg-well px-4 py-2.5"
+            aria-label={words.transcript}
+            aria-describedby={`${job.id}-transcript-help`}
+            onKeyDown={onTranscriptKey}
+          >
+            {view.lines.map((line, l) => (
+              <p key={line.words[0]?.start ?? line.text} className="leading-[1.95]">
+                {line.words.map((_, w) => {
+                  const g = (offsets[l] ?? 0) + w;
+                  const word = transcriptWords[g] as Word;
+                  const fixed = draft.words[key(word)];
+                  const state =
+                    g >= from && g <= to
+                      ? "selected"
+                      : gone(word)
+                        ? "gone"
+                        : inCut(g)
+                          ? landed
+                            ? "kept"
+                            : "cut"
+                          : fixed !== undefined
+                            ? "fixed"
+                            : undefined;
+                  return (
+                    <Fragment key={key(word)}>
+                      {spaced[l]?.[w] && " "}
+                      {marksBefore(g).map((t) => (
+                        <span
+                          key={t}
+                          className="mx-px inline-flex translate-y-0.5 text-destructive"
+                          title={words.lands(seconds(t))}
                         >
-                          {fixed ?? word.text}
-                          {state && state !== "selected" && (
-                            <span className={styles.visuallyHidden}> ({words.states[state]})</span>
-                          )}
-                        </button>
-                      </Fragment>
-                    );
-                  })}
-                </p>
-              ))}
-              {marksAfterLast.map((t) => (
-                <span key={t} className={styles.cutMark} title={words.lands(seconds(t))}>
-                  ✂
-                </span>
-              ))}
-            </fieldset>
-          </>
-        )}
-        {selection && (
-          <div className={styles.toolbar}>
-            <span className={styles.help}>
+                          <Scissors className="size-3.5" aria-hidden="true" />
+                        </span>
+                      ))}
+                      <button
+                        type="button"
+                        className={cn(
+                          "rounded-[4px] px-px text-[15px] text-foreground transition-colors duration-150 hover:bg-raised focus-visible:outline-offset-1",
+                          g === live && !state && "text-primary",
+                          state === "selected" &&
+                            "bg-foreground text-background hover:bg-foreground",
+                          state === "cut" && "text-muted-foreground line-through",
+                          state === "kept" &&
+                            "underline decoration-muted-foreground decoration-dotted underline-offset-[3px]",
+                          state === "gone" &&
+                            "bg-destructive/15 text-destructive line-through hover:bg-destructive/20",
+                          state === "fixed" &&
+                            "underline decoration-success underline-offset-[3px]",
+                        )}
+                        data-state={state}
+                        data-word={g}
+                        tabIndex={g === cursor ? 0 : -1}
+                        aria-pressed={state === "selected"}
+                        onFocus={() => setCursor(g)}
+                        title={
+                          state === "kept"
+                            ? words.keptWord
+                            : words.span(seconds(word.start), seconds(word.end))
+                        }
+                        onClick={(event) =>
+                          setSelection(event.shiftKey && selection ? [selection[0], g] : [g, g])
+                        }
+                      >
+                        {fixed ?? word.text}
+                        {state && state !== "selected" && (
+                          <span className="sr-only"> ({words.states[state]})</span>
+                        )}
+                      </button>
+                    </Fragment>
+                  );
+                })}
+              </p>
+            ))}
+            {marksAfterLast.map((t) => (
+              <span key={t} className="text-destructive" title={words.lands(seconds(t))}>
+                <Scissors className="inline size-3.5" aria-hidden="true" />
+              </span>
+            ))}
+          </fieldset>
+        </>
+      )}
+      <div className="flex max-h-[38%] shrink-0 flex-col gap-2 overflow-y-auto px-5 pb-3">
+        {selection ? (
+          <div className="flex flex-wrap items-center gap-2.5 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
+            <span className={HELP}>
               {words.selected(
                 to - from + 1,
                 words.span(
@@ -457,9 +542,10 @@ export function ReEdit({
                 ),
               )}
             </span>
-            <button type="button" className={styles.button} onClick={deleteSelection}>
+            <Button type="button" variant="outline" size="sm" onClick={deleteSelection}>
+              <Scissors aria-hidden="true" />
               {words.delete}
-            </button>
+            </Button>
             {single && (
               <WordFix
                 key={key(single)}
@@ -473,324 +559,516 @@ export function ReEdit({
                 }}
               />
             )}
-            <button type="button" className={styles.linkButton} onClick={() => setSelection(null)}>
+            <Button type="button" variant="link" size="inline" onClick={() => setSelection(null)}>
               {words.clear}
-            </button>
+            </Button>
           </div>
+        ) : (
+          draft.cuts.length === 0 && (
+            <p className={cn(HELP, "line-clamp-2")} title={words.help}>
+              {words.help}
+            </p>
+          )
         )}
+        {/* Read by assistive tech whatever shows above. */}
+        <p id={`${job.id}-transcript-help`} className="sr-only">
+          {words.help}
+        </p>
         {draft.cuts.length > 0 && (
-          <ul className={styles.cutList}>
+          <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
             {draft.cuts.map(([a, b], i) => {
               const asked = revision.cuts?.[i];
               const span = asked && landed?.removed.find(([x, y]) => x < asked[1] && y > asked[0]);
               return (
-                <li key={`${a}-${b}`}>
-                  {words.cutWords(
-                    said(
-                      transcriptWords
-                        .slice(a, b + 1)
-                        .map((word) => draft.words[key(word)] ?? word.text),
-                    ),
-                  )}
-                  {span && words.landsSpan(words.span(seconds(span[0]), seconds(span[1])))}{" "}
-                  {landed?.outside
-                    .filter((extra) => extra.range === i)
-                    .map((extra) => (
-                      <span key={extra.words} className={styles.warning}>
-                        {words.outside(extra.words)}
-                      </span>
-                    ))}
-                  <button
+                <li
+                  key={`${a}-${b}`}
+                  className="inline-flex max-w-full items-center gap-2 rounded-lg border bg-well py-1 pr-1 pl-2.5 text-xs text-steel animate-in fade-in-0 zoom-in-95 duration-200"
+                >
+                  <Scissors className="size-3 shrink-0 text-destructive" aria-hidden="true" />
+                  <span className="min-w-0">
+                    {words.cutWords(
+                      said(
+                        transcriptWords
+                          .slice(a, b + 1)
+                          .map((word) => draft.words[key(word)] ?? word.text),
+                      ),
+                    )}
+                    {span && words.landsSpan(words.span(seconds(span[0]), seconds(span[1])))}{" "}
+                    {landed?.outside
+                      .filter((extra) => extra.range === i)
+                      .map((extra) => (
+                        <span key={extra.words} className="text-foreground">
+                          {words.outside(extra.words)}
+                        </span>
+                      ))}
+                  </span>
+                  <Button
                     type="button"
-                    className={styles.inlineButton}
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2"
                     onClick={() => change({ ...draft, cuts: draft.cuts.filter((_, j) => j !== i) })}
                   >
+                    <Undo2 aria-hidden="true" />
                     {words.undo}
-                  </button>
+                  </Button>
                 </li>
               );
             })}
           </ul>
         )}
       </div>
+    </section>
+  );
 
-      {view.titles.length > 0 && (
-        <div className={styles.section}>
-          <h3 className={styles.sectionTitle}>{words.titles}</h3>
-          {view.titles.map((title) => (
-            <div key={title.index} className={styles.titleFields}>
-              {Object.entries(title.limits).map(([name, limit]) => (
-                <label key={name} className={styles.field}>
-                  <span className={styles.label}>
-                    {title.template === "title" ? "" : words.lowerThird}
-                    {words.params[name] ?? name}
+  const tabs = [
+    { value: "result", icon: Clapperboard, label: words.tabs.result, show: true },
+    { value: "music", icon: Music2, label: words.tabs.music, show: true },
+    { value: "look", icon: Contrast, label: words.tabs.look, show: true },
+    { value: "captions", icon: Captions, label: words.tabs.captions, show: Boolean(view.captions) },
+    { value: "brand", icon: Stamp, label: words.tabs.brand, show: true },
+    { value: "text", icon: Type, label: words.tabs.text, show: view.titles.length > 0 },
+    {
+      value: "overlays",
+      icon: Layers,
+      label: words.tabs.overlays,
+      show: view.removables.length > 0,
+    },
+    { value: "replan", icon: WandSparkles, label: words.tabs.replan, show: true },
+  ].filter((tab) => tab.show);
+
+  const panel = (
+    <Tabs defaultValue="result" className="min-h-0 flex-1">
+      <TabsList aria-label={words.label}>
+        {tabs.map(({ value, icon: Icon, label }) => (
+          <TabsTrigger key={value} value={value}>
+            <Icon aria-hidden="true" />
+            {label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+
+      <TabsContent value="result">{result}</TabsContent>
+
+      <TabsContent value="music">
+        <div className={SECTION}>
+          <h3 className={SLUG}>{words.music}</h3>
+          {view.music && <p className={HELP}>{words.playing(view.music.name)}</p>}
+          {view.music ? (
+            <div className="flex flex-col gap-3">
+              <label className="flex flex-col gap-2">
+                <span className={cn(LABEL, "tabular-nums")}>
+                  {words.volume}
+                  <span className="font-normal text-muted-foreground">
+                    {gainOf(draft) !== null &&
+                      `${(gainOf(draft) ?? 0) > 0 ? "+" : ""}${gainOf(draft) ?? 0} dB`}
                   </span>
-                  <input
-                    className={styles.input}
-                    maxLength={limit}
-                    value={draft.titles[title.index]?.[name] ?? title.params[name] ?? ""}
-                    onChange={(event) => {
-                      const params = { ...draft.titles[title.index], [name]: event.target.value };
-                      if (event.target.value === (title.params[name] ?? "")) delete params[name];
-                      const titles = { ...draft.titles, [title.index]: params };
-                      if (Object.keys(params).length === 0) delete titles[title.index];
-                      change({ ...draft, titles });
-                    }}
-                  />
-                </label>
-              ))}
+                </span>
+                <input
+                  type="range"
+                  className="w-full"
+                  min={-12}
+                  max={6}
+                  step={1}
+                  disabled={gainOf(draft) === null}
+                  value={gainOf(draft) ?? 0}
+                  onChange={(event) => {
+                    const gainDb = Number(event.target.value);
+                    const { music: _, ...rest } = draft;
+                    change(gainDb === 0 ? rest : { ...draft, music: { gainDb } });
+                  }}
+                />
+              </label>
+              <label className={CHECK}>
+                <input
+                  type="checkbox"
+                  checked={draft.music === "remove"}
+                  onChange={(event) => {
+                    const { music: _, ...rest } = draft;
+                    change(event.target.checked ? { ...draft, music: "remove" } : rest);
+                  }}
+                />
+                {words.removeMusic}
+              </label>
             </div>
-          ))}
+          ) : (
+            <p className={HELP}>{words.noMusic}</p>
+          )}
         </div>
-      )}
-
-      <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>{words.music}</h3>
-        {view.music && <p className={styles.help}>{words.playing(view.music.name)}</p>}
-        {view.music ? (
-          <div className={styles.musicRow}>
-            <label className={styles.field}>
-              <span className={styles.label}>
-                {words.volume}{" "}
-                {gainOf(draft) !== null &&
-                  `${(gainOf(draft) ?? 0) > 0 ? "+" : ""}${gainOf(draft) ?? 0} dB`}
-              </span>
-              <input
-                type="range"
-                min={-12}
-                max={6}
-                step={1}
-                disabled={gainOf(draft) === null}
-                value={gainOf(draft) ?? 0}
-                onChange={(event) => {
-                  const gainDb = Number(event.target.value);
-                  const { music: _, ...rest } = draft;
-                  change(gainDb === 0 ? rest : { ...draft, music: { gainDb } });
-                }}
-              />
-            </label>
-            <label className={styles.check}>
-              <input
-                type="checkbox"
-                checked={draft.music === "remove"}
-                onChange={(event) => {
-                  const { music: _, ...rest } = draft;
-                  change(event.target.checked ? { ...draft, music: "remove" } : rest);
-                }}
-              />
-              {words.removeMusic}
-            </label>
-          </div>
-        ) : (
-          <p className={styles.help}>{words.noMusic}</p>
-        )}
-        <MusicPicker
-          current={view.music}
-          chosen={
-            draft.music === "remove"
-              ? null
-              : draft.music && "track" in draft.music
-                ? draft.music.track
-                : undefined
-          }
-          onChoose={(track) => {
-            const { music: _, ...rest } = draft;
-            change(track ? { ...draft, music: { track: track.id, title: track.title } } : rest);
-          }}
-        />
-      </div>
-
-      <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>{words.look}</h3>
-        <div className={styles.chips}>
-          {LOOKS.map((look) => (
-            <button
-              key={look}
-              type="button"
-              className={styles.chip}
-              aria-pressed={(draft.look ?? view.look) === look}
-              onClick={() => {
-                const { look: _, ...rest } = draft;
-                change(look === view.look ? rest : { ...draft, look });
-              }}
-            >
-              {t.looks[look].name}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>{t.kits.picker}</h3>
-        <select
-          className={styles.input}
-          aria-label={t.kits.picker}
-          value={draft.kit === undefined ? (view.brand ? "keep" : "") : (draft.kit?.id ?? "")}
-          onChange={(event) => {
-            const { kit: _, captions: __, ...rest } = draft;
-            const picked = event.target.value;
-            if (picked === "keep" || (picked === "" && !view.brand)) {
-              change(draft.captions ? { ...rest, captions: draft.captions } : rest);
-              return;
+        <div className={cn(SECTION, "border-t")}>
+          <MusicPicker
+            current={view.music}
+            chosen={
+              draft.music === "remove"
+                ? null
+                : draft.music && "track" in draft.music
+                  ? draft.music.track
+                  : undefined
             }
-            const chosen = kits?.kits.find((each) => each.id === picked);
-            const kit = chosen ? { id: chosen.id, name: chosen.brand.name } : null;
-            // A kit with custom captions draws them, in place of a style picked here.
-            const keeps = draft.captions && !chosen?.brand.captions;
-            change({ ...rest, kit, ...(keeps ? { captions: draft.captions } : {}) });
-          }}
-        >
-          {view.brand && <option value="keep">{words.brandKeep(view.brand.name)}</option>}
-          <option value="">{t.kits.none}</option>
-          {kits?.kits.map((each) => (
-            <option key={each.id} value={each.id}>
-              {each.brand.name}
-            </option>
-          ))}
-        </select>
-        <p className={styles.help}>{words.brandHelp}</p>
-      </div>
+            onChoose={(track) => {
+              const { music: _, ...rest } = draft;
+              change(track ? { ...draft, music: { track: track.id, title: track.title } } : rest);
+            }}
+          />
+        </div>
+      </TabsContent>
+
+      <TabsContent value="look">
+        <div className={SECTION}>
+          <h3 className={SLUG}>{words.look}</h3>
+          <Segments
+            className="flex-wrap"
+            options={LOOKS.map((look) => ({ value: look as string, label: t.looks[look].name }))}
+            value={draft.look ?? view.look}
+            onChange={(look) => {
+              const { look: _, ...rest } = draft;
+              change(look === view.look ? rest : { ...draft, look });
+            }}
+          />
+          <p className={HELP}>
+            {t.looks[(draft.look ?? view.look) as keyof Messages["looks"]]?.description}
+          </p>
+        </div>
+      </TabsContent>
 
       {view.captions && (
-        <div className={styles.section}>
-          <h3 className={styles.sectionTitle}>{words.captionStyle}</h3>
-          <div className={styles.captionStyles}>
-            {brandCaptions && (
-              <button
-                type="button"
-                className={styles.captionStyle}
-                aria-pressed={shownCaptions === "brand"}
-                onClick={() => {
-                  const { captions: _, ...rest } = draft;
-                  change(rest);
+        <TabsContent value="captions">
+          <div className={SECTION}>
+            <h3 className={SLUG}>{words.captionStyle}</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {brandCaptions && (
+                <button
+                  type="button"
+                  className={cn(CHOICE, "gap-1.5 p-1.5 pb-2 text-[13px] font-medium")}
+                  aria-pressed={shownCaptions === "brand"}
+                  onClick={() => {
+                    const { captions: _, ...rest } = draft;
+                    change(rest);
+                  }}
+                >
+                  {chosenKit ? (
+                    <KitCaptionPreview kit={chosenKit} />
+                  ) : (
+                    <CaptionPreview style="bold" />
+                  )}
+                  {t.kits.captionsName}
+                </button>
+              )}
+              {CAPTION_STYLES.map((style) => (
+                <button
+                  key={style}
+                  type="button"
+                  className={cn(CHOICE, "gap-1.5 p-1.5 pb-2 text-[13px] font-medium")}
+                  aria-pressed={shownCaptions === style}
+                  onClick={() => {
+                    const { captions: _, ...rest } = draft;
+                    const unchanged =
+                      style === view.captions && !view.brand?.captions && draft.kit === undefined;
+                    change(unchanged ? rest : { ...draft, captions: style });
+                  }}
+                >
+                  <CaptionPreview style={style} />
+                  {t.captions[style].name}
+                </button>
+              ))}
+            </div>
+            <label className={CHECK}>
+              <input
+                type="checkbox"
+                checked={draft.emoji ?? view.emoji}
+                onChange={(event) => {
+                  const { emoji: _, ...rest } = draft;
+                  const emoji = event.target.checked;
+                  change(emoji === view.emoji ? rest : { ...draft, emoji });
                 }}
-              >
-                {chosenKit ? (
-                  <KitCaptionPreview kit={chosenKit} />
-                ) : (
-                  <CaptionPreview style="bold" />
-                )}
-                {t.kits.captionsName}
-              </button>
-            )}
-            {CAPTION_STYLES.map((style) => (
-              <button
-                key={style}
-                type="button"
-                className={styles.captionStyle}
-                aria-pressed={shownCaptions === style}
-                onClick={() => {
-                  const { captions: _, ...rest } = draft;
-                  const unchanged =
-                    style === view.captions && !view.brand?.captions && draft.kit === undefined;
-                  change(unchanged ? rest : { ...draft, captions: style });
-                }}
-              >
-                <CaptionPreview style={style} />
-                {t.captions[style].name}
-              </button>
+              />
+              {words.emoji}
+            </label>
+            <p className={HELP}>{words.emojiHelp}</p>
+          </div>
+        </TabsContent>
+      )}
+
+      <TabsContent value="brand">
+        <div className={SECTION}>
+          <h3 className={SLUG}>{t.kits.picker}</h3>
+          <NativeSelect
+            aria-label={t.kits.picker}
+            value={draft.kit === undefined ? (view.brand ? "keep" : "") : (draft.kit?.id ?? "")}
+            onChange={(event) => {
+              const { kit: _, captions: __, ...rest } = draft;
+              const picked = event.target.value;
+              if (picked === "keep" || (picked === "" && !view.brand)) {
+                change(draft.captions ? { ...rest, captions: draft.captions } : rest);
+                return;
+              }
+              const chosen = kits?.kits.find((each) => each.id === picked);
+              const kit = chosen ? { id: chosen.id, name: chosen.brand.name } : null;
+              // A kit with custom captions draws them, in place of a style picked here.
+              const keeps = draft.captions && !chosen?.brand.captions;
+              change({ ...rest, kit, ...(keeps ? { captions: draft.captions } : {}) });
+            }}
+          >
+            {view.brand && <option value="keep">{words.brandKeep(view.brand.name)}</option>}
+            <option value="">{t.kits.none}</option>
+            {kits?.kits.map((each) => (
+              <option key={each.id} value={each.id}>
+                {each.brand.name}
+              </option>
+            ))}
+          </NativeSelect>
+          <p className={HELP}>{words.brandHelp}</p>
+        </div>
+      </TabsContent>
+
+      {view.titles.length > 0 && (
+        <TabsContent value="text">
+          <div className={SECTION}>
+            <h3 className={SLUG}>{words.titles}</h3>
+            {view.titles.map((title) => (
+              <div key={title.index} className="flex flex-col gap-3">
+                {Object.entries(title.limits).map(([name, limit]) => (
+                  <div key={name} className="flex flex-col gap-2">
+                    <label className={LABEL} htmlFor={`${job.id}-title-${title.index}-${name}`}>
+                      {title.template === "title" ? "" : words.lowerThird}
+                      {words.params[name] ?? name}
+                    </label>
+                    <Input
+                      id={`${job.id}-title-${title.index}-${name}`}
+                      maxLength={limit}
+                      value={draft.titles[title.index]?.[name] ?? title.params[name] ?? ""}
+                      onChange={(event) => {
+                        const params = {
+                          ...draft.titles[title.index],
+                          [name]: event.target.value,
+                        };
+                        if (event.target.value === (title.params[name] ?? "")) delete params[name];
+                        const titles = { ...draft.titles, [title.index]: params };
+                        if (Object.keys(params).length === 0) delete titles[title.index];
+                        change({ ...draft, titles });
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
             ))}
           </div>
-          <label className={styles.check}>
-            <input
-              type="checkbox"
-              checked={draft.emoji ?? view.emoji}
-              onChange={(event) => {
-                const { emoji: _, ...rest } = draft;
-                const emoji = event.target.checked;
-                change(emoji === view.emoji ? rest : { ...draft, emoji });
-              }}
-            />
-            {words.emoji}
-          </label>
-          <p className={styles.help}>{words.emojiHelp}</p>
-        </div>
+        </TabsContent>
       )}
 
       {view.removables.length > 0 && (
-        <div className={styles.section}>
-          <h3 className={styles.sectionTitle}>{words.overlays}</h3>
-          <ul className={styles.overlayList}>
-            {view.removables.map((item) => {
-              const id = `${item.kind}:${item.index}`;
-              const removed = draft.remove.includes(id);
-              return (
-                <li key={id} className={styles.overlayItem} data-removed={removed}>
-                  <span className={styles.tabular}>{formatClock(item.start / TICKS)}</span>
-                  <span className={styles.overlayLabel}>{overlayLabel(item.label, t)}</span>
-                  <button
-                    type="button"
-                    className={styles.inlineButton}
-                    onClick={() =>
-                      change({
-                        ...draft,
-                        remove: removed
-                          ? draft.remove.filter((each) => each !== id)
-                          : [...draft.remove, id],
-                      })
-                    }
+        <TabsContent value="overlays">
+          <div className={SECTION}>
+            <h3 className={SLUG}>{words.overlays}</h3>
+            <ul className={LIST}>
+              {view.removables.map((item) => {
+                const id = `${item.kind}:${item.index}`;
+                const removed = draft.remove.includes(id);
+                return (
+                  <li
+                    key={id}
+                    className="grid grid-cols-[3.5em_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-[13px]"
                   >
-                    {removed ? words.keep : words.remove}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+                    <button
+                      type="button"
+                      className="text-left text-xs text-muted-foreground tabular-nums hover:text-foreground"
+                      onClick={() => {
+                        const player = video.current;
+                        if (player) player.currentTime = item.start / TICKS;
+                      }}
+                    >
+                      {formatClock(item.start / TICKS)}
+                    </button>
+                    <span
+                      className={cn("truncate", removed && "text-muted-foreground line-through")}
+                    >
+                      {overlayLabel(item.label, t)}
+                    </span>
+                    <Button
+                      type="button"
+                      variant={removed ? "outline" : "ghost"}
+                      size="sm"
+                      className="h-7"
+                      onClick={() =>
+                        change({
+                          ...draft,
+                          remove: removed
+                            ? draft.remove.filter((each) => each !== id)
+                            : [...draft.remove, id],
+                        })
+                      }
+                    >
+                      {removed ? words.keep : words.remove}
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </TabsContent>
       )}
 
-      <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>{words.replanTitle}</h3>
-        <p className={styles.help}>{words.replanHelp}</p>
-        {view.older && <p className={styles.help}>{words.older}</p>}
-        {replanning ? (
-          <Replan job={job} onJob={onJob} onClose={() => setReplanning(false)} />
-        ) : (
-          <button
-            type="button"
-            className={styles.button}
-            onClick={() => setReplanning(true)}
-            disabled={!view.footage || rendering !== null}
-          >
-            {words.replan}
-          </button>
-        )}
-      </div>
+      <TabsContent value="replan">
+        <div className={SECTION}>
+          <h3 className={SLUG}>{words.replanTitle}</h3>
+          {!replanning && <p className={HELP}>{words.replanHelp}</p>}
+          {view.older && <p className={HELP}>{words.older}</p>}
+          {replanning ? (
+            <Replan job={job} onJob={onJob} onClose={() => setReplanning(false)} />
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              className="self-start"
+              onClick={() => setReplanning(true)}
+              disabled={!view.footage || rendering !== null}
+            >
+              <WandSparkles aria-hidden="true" />
+              {words.replan}
+            </Button>
+          )}
+        </div>
+      </TabsContent>
+    </Tabs>
+  );
 
+  // Apply, in the panel's foot whichever tab shows: the changes so far, or the new version
+  // rendering.
+  const foot = (
+    <div className="flex shrink-0 flex-col gap-3 border-t bg-surface px-6 py-4 shadow-[0_-16px_32px_-16px_rgb(0_0_0/0.7)] max-lg:sticky max-lg:bottom-0 max-md:px-4">
       {error && <ErrorNote message={error} fallback={words.fallback} />}
       {job.render?.error && (
         <ErrorNote message={job.render.error} fallback={words.renderFallback} />
       )}
       {rendering ? (
-        <div className={styles.uploading} aria-live="polite">
-          <div className={styles.uploadHead}>
-            <span>{words.rendering(rendering.version, progressText(rendering.message, t))}</span>
-            <span className={styles.tabular}>{Math.floor(rendering.fraction * 100)}%</span>
+        <div className="flex flex-col gap-2.5" aria-live="polite">
+          <div className="flex justify-between gap-3 text-[13px] font-medium">
+            <span className="min-w-0">
+              {words.rendering(rendering.version, progressText(rendering.message, t))}
+            </span>
+            <span className="tabular-nums">{Math.floor(rendering.fraction * 100)}%</span>
           </div>
-          <div className={styles.bar}>
-            <div className={styles.barFill} style={{ width: `${rendering.fraction * 100}%` }} />
+          <Bar fraction={rendering.fraction} />
+          <div className="flex items-center gap-3">
+            <p className={cn(HELP, "flex-1")}>{words.keepsPlaying(current)}</p>
+            <Button type="button" variant="outline" size="sm" onClick={stop}>
+              {words.stop}
+            </Button>
           </div>
-          <p className={styles.help}>{words.keepsPlaying(current)}</p>
-          <button type="button" className={styles.button} onClick={stop}>
-            {words.stop}
-          </button>
         </div>
       ) : (
-        <div className={styles.go}>
-          <button
+        <div className="flex items-center gap-4">
+          <p className={cn(HELP, "line-clamp-3 flex-1")}>
+            {blocked ?? words.renders(describe(draft, t), nextVersion(job))}
+          </p>
+          <Button
             type="button"
-            className={styles.primary}
+            size="lg"
+            className="shrink-0"
             disabled={blocked !== null}
             onClick={() => void apply()}
           >
             {count > 0 ? words.applyCount(count) : words.apply}
-          </button>
-          <p className={styles.help}>
-            {blocked ?? words.renders(describe(draft, t), nextVersion(job))}
-          </p>
+          </Button>
         </div>
       )}
-    </section>
+    </div>
+  );
+
+  return layout(transcriptPane, panel, foot);
+}
+
+/** The transcript pane under the player: its height on a wide screen, and a stack below. */
+const PANE =
+  "flex shrink-0 flex-col gap-2 border-t bg-background lg:h-[clamp(240px,36vh,340px)] max-lg:min-h-80";
+
+/** The player's time, in seconds, and whether it plays; kept current as it plays and seeks. */
+function usePlayback(video: RefObject<HTMLVideoElement | null>) {
+  const [state, setState] = useState({ time: 0, playing: false });
+  useEffect(() => {
+    const player = video.current;
+    if (!player) return;
+    const read = () => setState({ time: player.currentTime, playing: !player.paused });
+    const events = ["timeupdate", "seeked", "play", "pause", "loadedmetadata"] as const;
+    for (const name of events) player.addEventListener(name, read);
+    read();
+    return () => {
+      for (const name of events) player.removeEventListener(name, read);
+    };
+  }, [video]);
+  return state;
+}
+
+/** Seconds between labelled ticks, so a ruler has at most a dozen. */
+const STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800];
+
+/**
+ * The edit's length as a timeline ruler over its sound: the stretches asked to be cut, where the
+ * cuts land, and the amber playhead where the player is. A click plays from there; the keyboard
+ * keeps the player's own controls and the transcript.
+ */
+function Ruler({
+  length,
+  asked,
+  landed,
+  at,
+  onSeek,
+}: {
+  length: number;
+  asked: readonly [number, number][];
+  landed: readonly [number, number][];
+  at: number;
+  onSeek: (ticks: number) => void;
+}) {
+  const total = Math.max(1, length);
+  const pct = (ticks: number) => `${(Math.min(Math.max(ticks, 0), total) / total) * 100}%`;
+  const span = total / TICKS;
+  const step = STEPS.find((each) => span / each <= 12) ?? 3600;
+  // A label too near the end would run past it.
+  const ticks = Array.from({ length: Math.floor(span / step) + 1 }, (_, i) => i * step).filter(
+    (second) => second === 0 || second <= span * 0.96,
+  );
+  return (
+    <div
+      aria-hidden="true"
+      className="relative mx-5 h-14 shrink-0 cursor-pointer select-none"
+      onPointerDown={(event) => {
+        const box = event.currentTarget.getBoundingClientRect();
+        onSeek(((event.clientX - box.left) / box.width) * total);
+      }}
+    >
+      {ticks.map((second) => (
+        <span
+          key={second}
+          className="absolute top-0 flex h-5 items-start"
+          style={{ left: pct(second * TICKS) }}
+        >
+          <span className="h-4 w-px bg-edge" />
+          <span className="mt-px ml-1 text-[10px] leading-none text-muted-foreground tabular-nums">
+            {formatClock(second)}
+          </span>
+        </span>
+      ))}
+      <div className="wave-keep absolute inset-x-0 bottom-0 h-7 rounded-md bg-raised/70 opacity-80" />
+      {asked.map(([a, b]) => (
+        <span
+          key={`a${a}`}
+          className="absolute bottom-0 h-7 rounded-[3px] bg-white/18"
+          style={{ left: pct(a), width: pct(b - a) }}
+        />
+      ))}
+      {landed.map(([a, b]) => (
+        <span
+          key={`l${a}`}
+          className="absolute bottom-0 h-7 rounded-[3px] border-x-2 border-destructive bg-destructive/35 animate-in fade-in-0 duration-300"
+          style={{ left: pct(a), width: pct(b - a) }}
+        />
+      ))}
+      <span
+        className="absolute top-3.5 bottom-0 w-0.5 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_10px_rgb(255_181_71/0.55)] transition-[left] duration-300 ease-linear before:absolute before:-top-1 before:left-1/2 before:size-2 before:-translate-x-1/2 before:rotate-45 before:rounded-[2px] before:bg-primary"
+        style={{ left: pct(at) }}
+      />
+    </div>
   );
 }
 
@@ -799,53 +1077,22 @@ function WordFix({ text, onFix }: { text: string; onFix: (text: string) => void 
   const [value, setValue] = useState(text);
   return (
     <form
-      className={styles.wordFix}
+      className="flex gap-2"
       onSubmit={(event) => {
         event.preventDefault();
         if (value.trim()) onFix(value.trim());
       }}
     >
-      <input
-        className={styles.input}
+      <Input
+        className="h-8 w-36"
         aria-label={words.word}
         value={value}
         onChange={(event) => setValue(event.target.value)}
       />
-      <button type="submit" className={styles.button} disabled={!value.trim()}>
+      <Button type="submit" variant="outline" size="sm" disabled={!value.trim()}>
         {words.fix}
-      </button>
+      </Button>
     </form>
-  );
-}
-
-/** The edit's length as a bar: the stretches asked for, and where the cuts land. */
-function Timeline({
-  length,
-  asked,
-  landed,
-}: {
-  length: number;
-  asked: readonly [number, number][];
-  landed: readonly [number, number][];
-}) {
-  const at = (t: number) => `${(t / Math.max(1, length)) * 100}%`;
-  return (
-    <div className={styles.timeline} aria-hidden="true">
-      {asked.map(([a, b]) => (
-        <span
-          key={`a${a}`}
-          className={styles.timelineAsked}
-          style={{ left: at(a), width: at(b - a) }}
-        />
-      ))}
-      {landed.map(([a, b]) => (
-        <span
-          key={`l${a}`}
-          className={styles.timelineLanded}
-          style={{ left: at(a), width: at(b - a) }}
-        />
-      ))}
-    </div>
   );
 }
 
@@ -869,17 +1116,25 @@ export function Versions({ job, onJob }: { job: Job; onJob: (job: Job) => void }
     }
   };
   return (
-    <div className={styles.versions}>
-      <h3 className={styles.sectionTitle}>{words.title}</h3>
-      <ul className={styles.versionList}>
+    <div className="flex flex-col gap-2.5">
+      <h3 className={SLUG}>{words.title}</h3>
+      <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
         {[...versions].reverse().map((version) => (
-          <li key={version.n} className={styles.versionItem} data-current={version.n === current}>
-            <span className={styles.fileText}>
-              <span className={styles.fileName}>
+          <li
+            key={version.n}
+            className={cn(
+              "relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border px-3 py-2.5 animate-in fade-in-0 duration-300",
+              // The version shown, in viewfinder corners as the work on screen.
+              version.n === current &&
+                "viewfinder border-transparent bg-raised [--cc:var(--foreground)] [--corner:9px] [--inset:0px]",
+            )}
+          >
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-[13px] font-medium">
                 {words.version(version.n)}
                 {version.n === current && words.shown}
               </span>
-              <span className={styles.fileMeta}>
+              <span className={META}>
                 {t.date(version.created)}
                 {version.seconds !== undefined && ` · ${formatClock(version.seconds)}`}
                 {version.claude && ` · Claude ${formatDollars(dollarsOf(version.claude), t)}`}
@@ -895,19 +1150,20 @@ export function Versions({ job, onJob }: { job: Job; onJob: (job: Job) => void }
               </span>
             </span>
             {version.n !== current && !(busy && job.render?.version === version.n) && (
-              <button
+              <Button
                 type="button"
-                className={styles.button}
+                variant="outline"
+                size="sm"
                 disabled={busy}
                 onClick={() => void show(version.n)}
               >
                 {version.video ? words.show : words.again}
-              </button>
+              </Button>
             )}
           </li>
         ))}
       </ul>
-      <p className={styles.help}>{words.kept}</p>
+      <p className={HELP}>{words.kept}</p>
       {error && <ErrorNote message={error} fallback={words.fallback} />}
     </div>
   );

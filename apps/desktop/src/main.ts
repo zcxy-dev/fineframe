@@ -12,7 +12,6 @@ import {
   Menu,
   MenuItem,
   type MessageBoxOptions,
-  nativeTheme,
   session,
   shell,
 } from "electron";
@@ -184,8 +183,8 @@ async function open(): Promise<void> {
       process.platform === "linux"
         ? fileURLToPath(new URL("../assets/icons/512x512.png", import.meta.url))
         : undefined,
-    // The page's own background, dark unless the system is light.
-    backgroundColor: nativeTheme.shouldUseDarkColors ? BACKGROUND.dark : BACKGROUND.light,
+    // The page's own background.
+    backgroundColor: BACKGROUND,
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
   });
   window.on("closed", () => {
@@ -291,11 +290,22 @@ app.on("before-quit", (event) => {
 });
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, () => app.quit());
 
-/** The window while the page's server starts, saying `text`. */
+/** The window while the page's server starts: `text` in viewfinder corners over an amber line
+ * running along a track, in the page's colours. */
 const startingPage = (
   text: string,
 ) => `<!doctype html><html><head><meta charset="utf-8"><title>${NAME}</title>
-<style>body{margin:0;height:100vh;display:grid;place-items:center;font:15px system-ui,sans-serif;
-color:#a1a1aa;background:${BACKGROUND.dark}}
-@media (prefers-color-scheme:light){body{color:#52525b;background:${BACKGROUND.light}}}</style></head>
-<body>${text}</body></html>`;
+<style>body{margin:0;height:100vh;display:grid;place-items:center;background:${BACKGROUND};color:#b4b9c1;
+font:500 14px/1.5 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei",sans-serif}
+main{display:grid;gap:16px;justify-items:center;padding:28px 44px;--c:rgb(255 255 255/.42);
+background:linear-gradient(var(--c) 0 0) 0 0/14px 1.5px,linear-gradient(var(--c) 0 0) 0 0/1.5px 14px,
+linear-gradient(var(--c) 0 0) 100% 0/14px 1.5px,linear-gradient(var(--c) 0 0) 100% 0/1.5px 14px,
+linear-gradient(var(--c) 0 0) 0 100%/14px 1.5px,linear-gradient(var(--c) 0 0) 0 100%/1.5px 14px,
+linear-gradient(var(--c) 0 0) 100% 100%/14px 1.5px,linear-gradient(var(--c) 0 0) 100% 100%/1.5px 14px;
+background-repeat:no-repeat}
+i{display:block;width:160px;height:2px;border-radius:1px;background:rgb(255 255 255/.08);overflow:hidden}
+i::after{content:"";display:block;width:40%;height:100%;background:#ffb547;
+animation:run 1.4s cubic-bezier(.16,1,.3,1) infinite}
+@keyframes run{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+@media (prefers-reduced-motion:reduce){i::after{animation:none;width:100%;opacity:.5}}</style></head>
+<body><main>${text}<i></i></main></body></html>`;

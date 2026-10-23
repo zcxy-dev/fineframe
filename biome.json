@@ -10,5 +10,6 @@
       "!packages/engine/assets/music/*.music.json"
     ]
   },
-  "formatter": { "indentStyle": "space", "lineWidth": 100 }
+  "formatter": { "indentStyle": "space", "lineWidth": 100 },
+  "css": { "parser": { "tailwindDirectives": true } }
 }

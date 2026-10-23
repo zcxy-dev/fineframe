@@ -1,180 +1,612 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* `lang-zh:` styles the page in Traditional Chinese. */
+@custom-variant lang-zh (&:lang(zh-TW));
+
+/* The states the shadcn/ui components style, as Radix marks them. */
+@custom-variant data-open (&:where([data-state="open"]));
+@custom-variant data-closed (&:where([data-state="closed"]));
+@custom-variant data-active (&:where([data-state="active"]));
+
+/* The editing room, as on the website: a graphite ground where the work sits in viewfinder
+   corners, timelines run under it and words light up as captions do. Steel type, white hairlines,
+   and one amber from the icon for the primary action, progress, the playhead, cut points and the
+   lit word. Components are styled with Tailwind's utilities; this file holds the tokens, the fonts
+   and the few motifs a utility cannot say. The page is dark only, as the website is. */
+
+/* shadcn/ui's tokens, set to the editing room. */
 :root {
   color-scheme: dark;
-  /* --bg comes from lib/theme.ts, through the root layout: the graphite of the main pane. */
-  /* A press proof: graphite sheets divided by hairlines, steel type, one amber laser line. */
-  --pane: var(--bg);
-  --inspector: #17181b;
-  --topbar: #141518;
-  --viewer: #111215;
-  --well: #121316;
-  --raised: #24262b;
-  --line: #2e3036;
-  --line-strong: #3a3d44;
-  --text: #e6e8eb;
-  --text-2: #a9adb5;
-  --muted: #8b8f97;
-  /* Laser amber: the primary action, progress, focus and the active item's registration line. */
-  --accent: #ffb547;
-  --accent-hover: #ffc46d;
-  --accent-ink: #1a1408;
-  --danger: #e0807a;
-  --danger-soft: rgb(224 128 122 / 0.1);
+  --background: #08090b;
+  --foreground: #f2f3f5;
+  --card: #0f1013;
+  --card-foreground: #f2f3f5;
+  --popover: #15171b;
+  --popover-foreground: #f2f3f5;
+  --primary: #ffb547;
+  --primary-foreground: #1a1408;
+  --secondary: rgb(255 255 255 / 0.03);
+  --secondary-foreground: #f2f3f5;
+  --muted: #15171b;
+  --muted-foreground: #8a8f98;
+  --accent: rgb(255 255 255 / 0.06);
+  --accent-foreground: #f2f3f5;
+  --destructive: #e5654b;
+  --border: rgb(255 255 255 / 0.08);
+  --input: rgb(255 255 255 / 0.15);
+  --ring: #ffb547;
+  --radius: 0.625rem;
+  --steel: #b4b9c1;
+  --surface: #15171b;
+  --raised: #1d1f24;
+  --well: #0b0c0e;
+  --edge: rgb(255 255 255 / 0.15);
+  --amber-hover: #ffc46d;
+  /* Finished steps only. */
   --success: #7bc29a;
-  --focus: #ffb547;
-  /* Crop marks: four L-shaped corners in the element's own `color`, drawn as a background. */
-  --crop:
-    linear-gradient(currentColor, currentColor) left top / 12px 1px no-repeat,
-    linear-gradient(currentColor, currentColor) left top / 1px 12px no-repeat,
-    linear-gradient(currentColor, currentColor) right top / 12px 1px no-repeat,
-    linear-gradient(currentColor, currentColor) right top / 1px 12px no-repeat,
-    linear-gradient(currentColor, currentColor) left bottom / 12px 1px no-repeat,
-    linear-gradient(currentColor, currentColor) left bottom / 1px 12px no-repeat,
-    linear-gradient(currentColor, currentColor) right bottom / 12px 1px no-repeat,
-    linear-gradient(currentColor, currentColor) right bottom / 1px 12px no-repeat;
-  --crop-sm:
-    linear-gradient(currentColor, currentColor) left top / 8px 1px no-repeat,
-    linear-gradient(currentColor, currentColor) left top / 1px 8px no-repeat,
-    linear-gradient(currentColor, currentColor) right top / 8px 1px no-repeat,
-    linear-gradient(currentColor, currentColor) right top / 1px 8px no-repeat,
-    linear-gradient(currentColor, currentColor) left bottom / 8px 1px no-repeat,
-    linear-gradient(currentColor, currentColor) left bottom / 1px 8px no-repeat,
-    linear-gradient(currentColor, currentColor) right bottom / 8px 1px no-repeat,
-    linear-gradient(currentColor, currentColor) right bottom / 1px 8px no-repeat;
-  --mark: rgb(230 232 235 / 0.4);
-  --radius: 2px;
-  /* Five text steps; only the screen titles are larger. */
-  --text-xs: 12.5px;
-  --text-sm: 13.5px;
-  --text-md: 15px;
-  --text-lg: 17px;
-  --text-xl: 24px;
-  /* A 4px scale, with half steps for tight groups. */
-  --space-0-5: 2px;
-  --space-1: 4px;
-  --space-1-5: 6px;
-  --space-2: 8px;
-  --space-2-5: 10px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-7: 28px;
-  --space-8: 32px;
-  --space-10: 40px;
-  --space-12: 48px;
-  --space-14: 56px;
-  --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --font:
-    "Inter Variable", "Noto Sans TC", system-ui, -apple-system, "Segoe UI", "PingFang TC",
+  --ease-cut: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-steel: var(--steel);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-well: var(--well);
+  --color-edge: var(--edge);
+  --color-amber-hover: var(--amber-hover);
+  --color-success: var(--success);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  /* Geist sets Latin text and numbers; Noto Sans TC, Chinese. Headings take weight 800, which
+     Geist draws and Noto Sans TC meets with its Black. */
+  --font-sans:
+    "Geist Variable", "Noto Sans TC", system-ui, -apple-system, "Segoe UI", "PingFang TC",
     "Microsoft JhengHei", sans-serif;
-  /* The wordmark's face, set SemiExpanded with `font-stretch: 112.5%`. */
-  --font-display: "Archivo Variable", var(--font);
-}
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --ease-cut: cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-clip: clip 500ms var(--ease-cut) both;
+  --animate-playhead: playhead 1400ms 200ms var(--ease-cut) both;
 
-/* The desktop app is dark; the light scheme is kept working but not tuned. */
-@media (prefers-color-scheme: light) {
-  :root {
-    color-scheme: light;
-    --inspector: #eeeeec;
-    --topbar: #e6e6e3;
-    --viewer: #1c1d21;
-    --well: #ffffff;
-    --raised: #e3e3df;
-    --line: #d9d9d4;
-    --line-strong: #c4c4bf;
-    --text: #17181b;
-    --text-2: #45474d;
-    --muted: #63666d;
-    --accent: #ffb547;
-    --accent-hover: #ffa61f;
-    --accent-ink: #1a1408;
-    --danger: #b93a32;
-    --danger-soft: rgb(185 58 50 / 0.08);
-    --success: #1f7a4d;
-    --focus: #17181b;
-    --mark: rgb(23 24 27 / 0.4);
+  /* A clip landing on the progress timeline as the edit gets that far. */
+  @keyframes clip {
+    from {
+      opacity: 0;
+      transform: scaleY(0.2);
+    }
+  }
+
+  /* An amber playhead running in along a ruler as a screen opens. */
+  @keyframes playhead {
+    from {
+      opacity: 0;
+      transform: translateX(0);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(min(28vw, 320px));
+    }
   }
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: var(--edge) transparent;
+  }
+
+  html {
+    @apply bg-background font-sans;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply min-h-dvh bg-background text-sm text-foreground antialiased;
+    line-height: 1.55;
+  }
+
+  body:lang(zh-TW) {
+    line-height: 1.7;
+  }
+
+  ::selection {
+    @apply bg-primary text-primary-foreground;
+  }
+
+  a {
+    @apply underline decoration-edge decoration-1 underline-offset-[3px] transition-[text-decoration-color] duration-150 hover:decoration-primary;
+  }
+
+  :focus-visible {
+    @apply rounded-sm outline-2 outline-offset-2 outline-primary;
+  }
+
+  input,
+  textarea,
+  progress {
+    accent-color: var(--primary);
+  }
+
+  input,
+  textarea {
+    caret-color: var(--primary);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  kbd {
+    @apply inline-grid h-5 min-w-5 place-items-center rounded-[5px] border border-edge bg-well px-1 font-sans text-[11px] leading-none font-semibold text-steel;
+  }
+
+  /* biome-ignore-start lint/complexity/noImportantStyles: motion is off everywhere, whatever a
+     component sets. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+  /* biome-ignore-end lint/complexity/noImportantStyles: see above */
 }
 
-html {
-  -webkit-text-size-adjust: 100%;
-}
+/* Headings in the display face: Geist 800 for Latin, Noto Sans TC Black for Chinese, set tight
+   in Latin and with half-width punctuation in Chinese. */
+@utility display {
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
 
-body {
-  margin: 0;
-  min-height: 100dvh;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font);
-  font-size: var(--text-md);
-  line-height: 1.5;
-  font-feature-settings: "cv11", "ss01";
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-button,
-input,
-textarea,
-select {
-  font: inherit;
-  color: inherit;
-}
-
-button {
-  cursor: pointer;
-}
-
-button:disabled {
-  cursor: not-allowed;
-}
-
-input,
-progress {
-  accent-color: var(--accent);
-}
-
-::selection {
-  background: rgb(230 232 235 / 0.24);
-  color: var(--text);
-}
-
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
-}
-
-:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-h1,
-h2,
-h3,
-p {
-  margin: 0;
-}
-
-a {
-  color: inherit;
-}
-
-/* biome-ignore-start lint/complexity/noImportantStyles: motion is off everywhere, whatever a
-   component sets. */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  &:lang(zh-TW) {
+    font-feature-settings: "halt";
+    text-spacing-trim: trim-both;
+    letter-spacing: 0.01em;
+    line-height: 1.25;
   }
 }
-/* biome-ignore-end lint/complexity/noImportantStyles: see above */
+
+/* Viewfinder corners, the shape of the icon, around a piece of work. They open out and turn
+   amber on hover or focus, or while `data-over` is set. `--corner` sets their length. */
+@utility corners {
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: 2;
+    pointer-events: none;
+    --l: var(--corner, 14px);
+    --t: 1.5px;
+    --cc: rgb(255 255 255 / 0.42);
+    background:
+      linear-gradient(var(--cc) 0 0) 0 0 / var(--l) var(--t),
+      linear-gradient(var(--cc) 0 0) 0 0 / var(--t) var(--l),
+      linear-gradient(var(--cc) 0 0) 100% 0 / var(--l) var(--t),
+      linear-gradient(var(--cc) 0 0) 100% 0 / var(--t) var(--l),
+      linear-gradient(var(--cc) 0 0) 0 100% / var(--l) var(--t),
+      linear-gradient(var(--cc) 0 0) 0 100% / var(--t) var(--l),
+      linear-gradient(var(--cc) 0 0) 100% 100% / var(--l) var(--t),
+      linear-gradient(var(--cc) 0 0) 100% 100% / var(--t) var(--l);
+    background-repeat: no-repeat;
+    transition: inset 420ms var(--ease-cut);
+  }
+
+  &:hover::after,
+  &:focus-within::after,
+  &[data-over="true"]::after {
+    inset: -7px;
+    --cc: var(--primary);
+  }
+}
+
+/* Corners that stay put, as on a monitor; `--cc` sets their colour and `--inset` their distance
+   from the edge. */
+@utility viewfinder {
+  &::after {
+    content: "";
+    position: absolute;
+    inset: var(--inset, 8px);
+    z-index: 3;
+    pointer-events: none;
+    --l: var(--corner, 14px);
+    --t: 1.5px;
+    --c: var(--cc, rgb(255 255 255 / 0.6));
+    background:
+      linear-gradient(var(--c) 0 0) 0 0 / var(--l) var(--t),
+      linear-gradient(var(--c) 0 0) 0 0 / var(--t) var(--l),
+      linear-gradient(var(--c) 0 0) 100% 0 / var(--l) var(--t),
+      linear-gradient(var(--c) 0 0) 100% 0 / var(--t) var(--l),
+      linear-gradient(var(--c) 0 0) 0 100% / var(--l) var(--t),
+      linear-gradient(var(--c) 0 0) 0 100% / var(--t) var(--l),
+      linear-gradient(var(--c) 0 0) 100% 100% / var(--l) var(--t),
+      linear-gradient(var(--c) 0 0) 100% 100% / var(--t) var(--l);
+    background-repeat: no-repeat;
+  }
+}
+
+/* A timeline ruler of ticks along an element's bottom edge. */
+@utility ruler {
+  background:
+    repeating-linear-gradient(90deg, var(--edge) 0 1px, transparent 1px 60px) bottom / 100% 12px
+    no-repeat,
+    repeating-linear-gradient(90deg, var(--border) 0 1px, transparent 1px 12px) bottom / 100% 6px
+    no-repeat;
+}
+
+/* A track drawn as a waveform of speech: steel where the edit keeps it (`wave-keep`), darker where
+   it is still to come (`wave-dim`). */
+@utility wave-keep {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='40' fill='%237a808a'%3E%3Cpath d='M1 16h2v8H1zM5 11h2v18H5zM9 6h2v28H9zM13 13h2v14h-2zM17 9h2v22h-2zM21 15h2v10h-2zM25 4h2v32h-2zM29 10h2v20h-2zM33 14h2v12h-2zM37 7h2v26h-2zM41 12h2v16h-2zM45 17h2v6h-2z'/%3E%3C/svg%3E")
+    left center / 48px 100% repeat-x;
+}
+
+@utility wave-dim {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='40' fill='%233d4148'%3E%3Cpath d='M1 16h2v8H1zM5 11h2v18H5zM9 6h2v28H9zM13 13h2v14h-2zM17 9h2v22h-2zM21 15h2v10h-2zM25 4h2v32h-2zM29 10h2v20h-2zM33 14h2v12h-2zM37 7h2v26h-2zM41 12h2v16h-2zM45 17h2v6h-2z'/%3E%3C/svg%3E")
+    left center / 48px 100% repeat-x;
+}
+
+/* A select's chevron, in muted steel at its right edge, over its well. */
+@utility chevron {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a8f98' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
+    right 10px center no-repeat,
+    var(--well);
+}
+
+/* Diagonal hatching for an empty frame, as outside a crop. */
+@utility hatch {
+  background:
+    repeating-linear-gradient(-45deg, rgb(255 255 255 / 0.022) 0 10px, transparent 10px 20px),
+    var(--well);
+}
+
+/* A sheen that crosses an element on hover: its `::before` sits under the content. */
+@utility sheen {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(
+      105deg,
+      transparent 30%,
+      rgb(255 255 255 / var(--sheen, 0.22)) 48%,
+      rgb(255 255 255 / 0.06) 56%,
+      transparent 70%
+    );
+    transform: translateX(-110%);
+  }
+
+  &:hover::before {
+    transform: translateX(110%);
+    transition: transform 700ms var(--ease-cut);
+  }
+}
+
+/* CaptionPreview: a caption style over a dark frame, in a 2.4 s loop of four words said 0.45 s
+   apart from 0 s, the caption up until 2.1 s and gone by 2.2 s, as each style shows them. The
+   percentages are of the 2.4 s loop. The colours are the caption's own, which belong to the
+   video. */
+@layer components {
+  .caption-frame {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 56px;
+    border-radius: calc(var(--radius) * 0.6);
+    background: linear-gradient(160deg, #4a5058, #23262c 60%, #15161a);
+    font-size: 13px;
+    overflow: hidden;
+  }
+
+  .caption-text,
+  .caption-chunk {
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .caption-word {
+    display: inline-block;
+    white-space: pre;
+  }
+
+  .caption-frame * {
+    animation-duration: 2.4s;
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
+  }
+
+  .caption-frame[data-style="bold"] .caption-text {
+    animation-name: caption-settle;
+  }
+
+  .caption-frame[data-style="bold"] .caption-word[data-i="0"] {
+    animation-name: caption-lit-0;
+  }
+
+  .caption-frame[data-style="bold"] .caption-word[data-i="1"] {
+    animation-name: caption-lit-1;
+  }
+
+  .caption-frame[data-style="bold"] .caption-word[data-i="2"] {
+    animation-name: caption-lit-2;
+  }
+
+  .caption-frame[data-style="bold"] .caption-word[data-i="3"] {
+    animation-name: caption-lit-3;
+  }
+
+  .caption-frame[data-style="creator"] .caption-chunk {
+    position: absolute;
+    animation-name: caption-chunk-0;
+  }
+
+  .caption-frame[data-style="creator"] .caption-chunk[data-i="2"] {
+    animation-name: caption-chunk-1;
+  }
+
+  .caption-frame[data-style="minimal"] .caption-text {
+    animation-name: caption-fade;
+  }
+
+  .caption-frame[data-style="pop"] .caption-word[data-i="0"] {
+    animation-name: caption-pop-0;
+  }
+
+  .caption-frame[data-style="pop"] .caption-word[data-i="1"] {
+    animation-name: caption-pop-1;
+  }
+
+  .caption-frame[data-style="pop"] .caption-word[data-i="2"] {
+    animation-name: caption-pop-2;
+  }
+
+  .caption-frame[data-style="pop"] .caption-word[data-i="3"] {
+    animation-name: caption-pop-3;
+  }
+
+  /* Held still: bold with its second word lit, creator's first caption, every word shown. */
+  @media (prefers-reduced-motion: reduce) {
+    .caption-frame * {
+      animation: none;
+    }
+
+    .caption-frame[data-style="bold"] .caption-word[data-i="1"] {
+      color: var(--active);
+    }
+
+    .caption-frame[data-style="creator"] .caption-chunk[data-i="2"] {
+      visibility: hidden;
+    }
+  }
+}
+
+@keyframes caption-settle {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  6.67%,
+  87.5% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  91.67%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes caption-fade {
+  0% {
+    opacity: 0;
+  }
+  6.67%,
+  87.5% {
+    opacity: 1;
+  }
+  91.67%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes caption-lit-0 {
+  0%,
+  18.74% {
+    color: var(--active);
+  }
+  18.75% {
+    color: var(--text);
+  }
+}
+
+@keyframes caption-lit-1 {
+  0%,
+  18.74% {
+    color: var(--text);
+  }
+  18.75%,
+  37.49% {
+    color: var(--active);
+  }
+  37.5% {
+    color: var(--text);
+  }
+}
+
+@keyframes caption-lit-2 {
+  0%,
+  37.49% {
+    color: var(--text);
+  }
+  37.5%,
+  56.24% {
+    color: var(--active);
+  }
+  56.25% {
+    color: var(--text);
+  }
+}
+
+@keyframes caption-lit-3 {
+  0%,
+  56.24% {
+    color: var(--text);
+  }
+  56.25%,
+  87.5% {
+    color: var(--active);
+  }
+  87.51% {
+    color: var(--text);
+  }
+}
+
+@keyframes caption-chunk-0 {
+  0% {
+    opacity: 1;
+    transform: scale(0.8);
+  }
+  4.58%,
+  49.99% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes caption-chunk-1 {
+  0%,
+  49.99% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+    transform: scale(0.8);
+  }
+  54.58%,
+  87.5% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  91.67%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes caption-pop-0 {
+  0% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+  5.83%,
+  87.5% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  91.67%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes caption-pop-1 {
+  0%,
+  18.74% {
+    opacity: 0;
+  }
+  18.75% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+  24.58%,
+  87.5% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  91.67%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes caption-pop-2 {
+  0%,
+  37.49% {
+    opacity: 0;
+  }
+  37.5% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+  43.33%,
+  87.5% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  91.67%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes caption-pop-3 {
+  0%,
+  56.24% {
+    opacity: 0;
+  }
+  56.25% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+  62.08%,
+  87.5% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  91.67%,
+  100% {
+    opacity: 0;
+  }
+}

@@ -1,11 +1,13 @@
 "use client";
 
+import { Pause, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { EditView } from "../lib/jobs.ts";
 import { formatClock } from "../lib/settings.ts";
-import styles from "./editor.module.css";
+import { cn, HELP, LABEL, LIST } from "../lib/styles.ts";
 import { useT } from "./I18n.tsx";
-import { PauseIcon, PlayIcon } from "./icons.tsx";
+import { Segments } from "./Segments.tsx";
+import { Button } from "./ui/button.tsx";
 
 /** A library track as /api/music lists it. */
 export interface LibraryEntry {
@@ -71,63 +73,70 @@ export function MusicPicker({
   };
 
   return (
-    <div className={styles.library}>
-      <span className={styles.label}>{words.title}</span>
+    <div className="flex flex-col gap-2.5">
+      <span className={LABEL}>{words.title}</span>
       {/* biome-ignore lint/a11y/useMediaCaption: a music preview has no words to caption. */}
       <audio ref={audio} onEnded={() => setPlaying(null)} onPause={() => setPlaying(null)} />
-      <div className={styles.chips}>
-        {MOODS.map((each) => (
-          <button
-            key={each}
-            type="button"
-            className={styles.chip}
-            aria-pressed={each === shown}
-            onClick={() => setMood(each)}
-          >
-            {words.moods[each]}
-          </button>
-        ))}
-      </div>
-      <ul className={styles.overlayList}>
+      <Segments
+        className="flex-wrap"
+        options={MOODS.map((each) => ({ value: each, label: words.moods[each] }))}
+        value={shown}
+        onChange={setMood}
+      />
+      <ul className={LIST}>
         {tracks
           .filter((track) => track.mood === shown)
           .map((track) => {
             const using = chosen === undefined ? current?.track === track.id : chosen === track.id;
             return (
-              <li key={track.id} className={styles.overlayItem} data-chosen={using}>
-                <button
+              <li
+                key={track.id}
+                className={cn(
+                  "grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-2.5 py-1.5 pr-3 pl-1.5 text-[13px] transition-colors hover:bg-white/[0.025]",
+                  using && "bg-raised",
+                )}
+              >
+                <Button
                   type="button"
-                  className={styles.iconButton}
+                  variant="ghost"
+                  size="icon"
+                  className={cn(playing === track.id && "text-primary")}
                   aria-label={
                     playing === track.id ? words.stop(track.title) : words.play(track.title)
                   }
                   onClick={() => preview(track)}
                 >
-                  {playing === track.id ? <PauseIcon /> : <PlayIcon />}
-                </button>
-                <span className={styles.overlayLabel}>
-                  {track.title}
-                  <span className={styles.trackMeta}>
-                    {` · ${track.artist} · ${formatClock(track.seconds)}${track.bpm ? ` · ${Math.round(track.bpm)} BPM` : ""}`}
+                  {playing === track.id ? (
+                    <Pause aria-hidden="true" />
+                  ) : (
+                    <Play aria-hidden="true" />
+                  )}
+                </Button>
+                <span className="flex min-w-0 flex-col">
+                  <span className={cn("truncate", using && "font-semibold")}>{track.title}</span>
+                  <span className="truncate text-xs text-muted-foreground tabular-nums">
+                    {`${track.artist} · ${formatClock(track.seconds)}${track.bpm ? ` · ${Math.round(track.bpm)} BPM` : ""}`}
                   </span>
                 </span>
                 {using ? (
-                  <span className={styles.trackMeta}>{words.using}</span>
+                  <span className="text-xs text-steel">{words.using}</span>
                 ) : (
-                  <button
+                  <Button
                     type="button"
-                    className={styles.inlineButton}
+                    variant="outline"
+                    size="sm"
+                    className="h-7"
                     onClick={() => onChoose(track.id === current?.track ? undefined : track)}
                   >
                     {words.use}
-                  </button>
+                  </Button>
                 )}
               </li>
             );
           })}
       </ul>
-      <p className={styles.help}>{words.help}</p>
-      <p className={styles.help}>{words.claim}</p>
+      <p className={HELP}>{words.help}</p>
+      <p className={HELP}>{words.claim}</p>
     </div>
   );
 }

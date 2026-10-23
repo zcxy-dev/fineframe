@@ -70,13 +70,20 @@ Models that come inside a package: the TransNetV2 weights in transnetv2-pytorch,
 | [@hyperframes/producer](https://github.com/heygen-com/hyperframes) | Apache-2.0 | effects, rendering the effects and graphics |
 | [puppeteer-core](https://pptr.dev) | Apache-2.0 | effects, checking the graphics |
 | [htmlparser2](https://github.com/fb55/htmlparser2) | MIT | effects, reading the graphics' markup |
-| [PostCSS](https://postcss.org) | MIT | effects, reading the graphics' styles |
+| [PostCSS](https://postcss.org) | MIT | effects, reading the graphics' styles; web page, building its styles |
 | [@puppeteer/browsers](https://pptr.dev/browsers-api) | Apache-2.0 | engine, downloading Chrome Headless Shell |
 | [react](https://react.dev), react-dom | MIT | web page |
 | [ajv](https://github.com/ajv-validator/ajv) | MIT | schema, effects |
 | [@fontsource/noto-sans-tc](https://fontsource.org/fonts/noto-sans-tc) | OFL-1.1 | effects, web page |
-| [@fontsource-variable/inter](https://fontsource.org/fonts/inter) | OFL-1.1 | effects, web page |
-| [@fontsource-variable/archivo](https://fontsource.org/fonts/archivo) | OFL-1.1 | web page, the wordmark and titles |
+| [@fontsource-variable/inter](https://fontsource.org/fonts/inter) | OFL-1.1 | effects, web page (the brand kit's sample frame) |
+| [@fontsource-variable/geist](https://fontsource.org/fonts/geist) ([Geist](https://github.com/vercel/geist-font)) | OFL-1.1 | web page, its text |
+| [radix-ui](https://www.radix-ui.com) | MIT | web page: the dialogs, tabs and language menu |
+| [motion](https://motion.dev) | MIT | web page, its animation |
+| [lucide-react](https://lucide.dev) | ISC; the icons Lucide derived from Feather also MIT | web page, its icons |
+| [class-variance-authority](https://cva.style) | Apache-2.0 | web page, the button's variants |
+| [cn](https://github.com/shadcn-ui/cn) | MIT | web page, merging class names |
+| [tailwindcss](https://tailwindcss.com), @tailwindcss/postcss | MIT | web page, building its styles |
+| [tw-animate-css](https://github.com/Wombosvideo/tw-animate-css) | MIT | web page, the components' enter and exit animations |
 | [next](https://nextjs.org) | MIT | web page |
 | [typescript](https://www.typescriptlang.org) | Apache-2.0 | development |
 | [@biomejs/biome](https://biomejs.dev) | MIT OR Apache-2.0 | development |
@@ -110,6 +117,13 @@ In `packages/engine/assets/sfx/`, 22 short Ogg Vorbis files, 144 KB in all, each
 | [Simple Icons](https://simpleicons.org) 16.33.0 | CC0-1.0 | effects, brand logos |
 
 Each brand logo is its owner's trademark ([notes](#icons-and-logos)): a graphic shows a brand's logo only where the video names that brand. The logos Simple Icons' data gives a licence of their own are left out.
+
+### Components, copied into the web page
+
+`apps/web/components/ui/` holds components copied from these projects and changed for the page:
+
+- from [shadcn/ui](https://ui.shadcn.com) (MIT, Copyright (c) 2023 shadcn): `button`, `input` (with its textarea and native select), `tabs`, `dialog`, `dropdown-menu`;
+- from [Magic UI](https://magicui.design) (MIT, Copyright (c) Magic UI): `text-animate`, `number-ticker`.
 
 ## Notes
 
@@ -198,7 +212,7 @@ Simple Icons' logos are brands' trademarks, which its CC0 dedication does not co
 
 ### Wordmark
 
-The wordmark (`brand/wordmark.svg`, `brand/wordmark-on-dark.svg`) sets "Fineframe" in [Archivo](https://github.com/Omnibus-Type/Archivo) SemiExpanded by Omnibus-Type, under the [SIL Open Font License 1.1](https://openfontlicense.org). Its letters are outlined into paths there. The web page sets the name beside the icon, its titles and its section headings in the same face, from @fontsource-variable/archivo (listed above).
+The wordmark (`brand/wordmark.svg`, `brand/wordmark-on-dark.svg`) sets "Fineframe" in [Archivo](https://github.com/Omnibus-Type/Archivo) SemiExpanded by Omnibus-Type, under the [SIL Open Font License 1.1](https://openfontlicense.org). Its letters are outlined into paths there. The web page sets the name beside the icon in Geist, as the website does.
 
 ### B-roll from the web
 

@@ -1,12 +1,13 @@
 "use client";
 
+import { Check, Copy, Download } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { Job, ShortEdit } from "../lib/jobs.ts";
 import { formatClock, formatRange } from "../lib/settings.ts";
 import { fewerShorts, jobApi, shortView } from "../lib/shorts.ts";
-import styles from "./editor.module.css";
+import { cn, HELP, LABEL, META, PANEL_TITLE, SLUG, WARNING } from "../lib/styles.ts";
 import { useT } from "./I18n.tsx";
-import { DownloadIcon } from "./icons.tsx";
+import { Button } from "./ui/button.tsx";
 
 /** The range each short's length lies in, in `t`'s words. */
 function useRange(job: Job): string {
@@ -19,6 +20,12 @@ function useRange(job: Job): string {
 function secondsOf(short: ShortEdit): number | undefined {
   return short.versions?.find((version) => version.n === (short.current ?? 1))?.seconds;
 }
+
+const SCREEN: Record<string, string> = {
+  "9:16": "aspect-[9/16]",
+  "1:1": "aspect-square",
+  "16:9": "aspect-video",
+};
 
 /**
  * The shorts in Claude's order, best first, each as soon as it is made: a player, its length, its
@@ -34,26 +41,36 @@ export function ShortsGrid({ job, onOpen }: { job: Job; onOpen: (folder: string)
   const of = job.progress?.short?.of ?? job.settings.shorts?.count ?? shorts.length;
   const waiting = running ? Math.max(0, of - shorts.length) : 0;
   const files = new Set(shorts.map((short) => short.source));
+  const screen = SCREEN[job.settings.aspect];
   return (
-    <section className={`${styles.card} ${styles.shorts}`} aria-label={words.label}>
-      <div className={styles.filesHead}>
-        <div>
-          <h2 className={styles.filesTitle}>{words.title(shorts.length)}</h2>
-          <p className={styles.filesMeta}>
-            {running ? words.making(shorts.length, of) : range} · {job.settings.aspect}
-          </p>
-        </div>
+    <section
+      className="flex flex-col gap-4 border-t px-10 py-8 max-md:px-4"
+      aria-label={words.label}
+    >
+      <div>
+        <h2 className={SLUG}>{words.title(shorts.length)}</h2>
+        <p className={cn(META, "mt-1")}>
+          {running ? words.making(shorts.length, of) : range} · {job.settings.aspect}
+        </p>
       </div>
-      <ol className={styles.shortGrid}>
+      <ol className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-x-5 gap-y-6 p-0">
         {shorts.map((short, i) => {
           const view = shortView(job, short.folder) as Job;
           const seconds = secondsOf(short) ?? short.seconds;
           return (
-            <li key={short.folder} className={styles.shortCard}>
-              <div className={styles.shortScreen} data-aspect={job.settings.aspect}>
+            <li
+              key={short.folder}
+              className="flex min-w-0 flex-col gap-2.5 animate-in fade-in-0 zoom-in-[0.97] duration-500"
+            >
+              <div
+                className={cn(
+                  "corners grid place-items-center overflow-hidden rounded-xl border bg-black [--corner:10px]",
+                  screen,
+                )}
+              >
                 {/* biome-ignore lint/a11y/useMediaCaption: the captions are burned into the picture. */}
                 <video
-                  className={styles.video}
+                  className="block size-full bg-black"
                   // A moment in, so the card shows a frame rather than the first black one.
                   src={`${jobApi(view, "video", { v: view.current ?? 1 })}#t=1`}
                   controls
@@ -61,35 +78,34 @@ export function ShortsGrid({ job, onOpen }: { job: Job; onOpen: (folder: string)
                   preload="metadata"
                 />
               </div>
-              <div className={styles.shortText}>
-                <span className={styles.shortTitle}>
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <span className="text-[13px] leading-snug font-semibold">
                   {i + 1}. {short.title}
                 </span>
-                <span className={styles.fileMeta}>
+                <span className={META}>
                   {formatClock(seconds)} ·{" "}
                   {words.stretch(formatClock(short.start), formatClock(short.end))}
                   {files.size > 1 && ` · ${short.source.split("/").at(-1)}`}
                 </span>
               </div>
-              <div className={styles.shortActions}>
-                <button
+              <div className="grid grid-cols-2 gap-2">
+                <Button
                   type="button"
-                  className={styles.button}
+                  variant="outline"
+                  size="sm"
                   // Each made short plays and downloads at once; it opens once the run ends.
                   disabled={running}
                   aria-label={words.card(i + 1, short.title)}
                   onClick={() => onOpen(short.folder)}
                 >
                   {words.open}
-                </button>
-                <a
-                  className={styles.button}
-                  href={jobApi(view, "video", { download: "" })}
-                  download
-                >
-                  <DownloadIcon width={16} height={16} />
-                  {words.download}
-                </a>
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <a href={jobApi(view, "video", { download: "" })} download>
+                    <Download aria-hidden="true" />
+                    {words.download}
+                  </a>
+                </Button>
               </div>
             </li>
           );
@@ -98,13 +114,15 @@ export function ShortsGrid({ job, onOpen }: { job: Job; onOpen: (folder: string)
           <li
             // biome-ignore lint/suspicious/noArrayIndexKey: places for shorts not made yet.
             key={i}
-            className={`${styles.shortCard} ${styles.shortWaiting}`}
+            className="flex min-w-0 flex-col gap-2.5"
             aria-busy="true"
           >
-            <div className={styles.shortScreen} data-aspect={job.settings.aspect} />
-            <div className={styles.shortText}>
-              <span className={styles.shortTitle}>{shorts.length + i + 1}.</span>
-              <span className={styles.fileMeta}>{words.waiting}</span>
+            <div className={cn("hatch rounded-xl border border-dashed border-edge", screen)} />
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[13px] font-semibold text-muted-foreground">
+                {shorts.length + i + 1}.
+              </span>
+              <span className={META}>{words.waiting}</span>
             </div>
           </li>
         ))}
@@ -120,27 +138,27 @@ export function ShortsDone({ job }: { job: Job }) {
   const range = useRange(job);
   const fewer = fewerShorts(job);
   return (
-    <div className={styles.block}>
+    <div className="flex flex-col gap-3 px-6 py-5">
       <div>
-        <h2 className={styles.panelTitle}>{words.title(job.shorts?.length ?? 0)}</h2>
-        <p className={styles.resultMeta}>
+        <h2 className={PANEL_TITLE}>{words.title(job.shorts?.length ?? 0)}</h2>
+        <p className="mt-1 text-[13px] text-steel tabular-nums">
           {range} · {job.settings.aspect}
         </p>
       </div>
       {fewer && (
-        <p className={styles.warning}>
+        <p className={WARNING}>
           {fewer.cost
             ? words.stoppedCost(fewer.made, fewer.asked)
             : words.fewer(fewer.made, fewer.asked, range)}
         </p>
       )}
-      <div className={styles.downloads}>
-        <a className={styles.primary} href={jobApi(job, "shorts")} download>
-          <DownloadIcon width={18} height={18} />
+      <Button asChild>
+        <a href={jobApi(job, "shorts")} download>
+          <Download aria-hidden="true" />
           {words.downloadAll}
         </a>
-        <p className={styles.help}>{words.allHelp}</p>
-      </div>
+      </Button>
+      <p className={HELP}>{words.allHelp}</p>
     </div>
   );
 }
@@ -151,14 +169,14 @@ export function ShortsKept({ job }: { job: Job }) {
   const t = useT();
   const words = t.shorts;
   return (
-    <div className={styles.block}>
-      <p className={styles.help}>{words.unchangeable(job.status === "cancelled")}</p>
-      <div className={styles.downloads}>
-        <a className={styles.button} href={jobApi(job, "shorts")} download>
-          <DownloadIcon width={18} height={18} />
+    <div className="flex flex-col gap-3 border-t px-6 py-5">
+      <p className={HELP}>{words.unchangeable(job.status === "cancelled")}</p>
+      <Button asChild variant="outline">
+        <a href={jobApi(job, "shorts")} download>
+          <Download aria-hidden="true" />
           {words.downloadAll}
         </a>
-      </div>
+      </Button>
     </div>
   );
 }
@@ -173,12 +191,15 @@ export function ShortText({ short }: { short: ShortEdit }) {
     { name: words.hashtags, text: short.hashtags.join(" ") },
   ];
   return (
-    <dl className={styles.shortFields}>
+    <dl className="m-0 flex flex-col gap-3">
       {fields.map((field) => (
-        <div key={field.name} className={styles.shortField}>
-          <dt className={styles.label}>{field.name}</dt>
-          <dd className={styles.shortValue}>{field.text}</dd>
-          <dd>
+        <div
+          key={field.name}
+          className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1"
+        >
+          <dt className={cn(LABEL, "col-span-full")}>{field.name}</dt>
+          <dd className="m-0 text-[13px] leading-relaxed [overflow-wrap:anywhere]">{field.text}</dd>
+          <dd className="m-0">
             <CopyButton text={field.text} label={`${words.copy}: ${field.name}`} />
           </dd>
         </div>
@@ -196,13 +217,15 @@ function CopyButton({ text, label }: { text: string; label: string }) {
     return () => clearTimeout(timer);
   }, [copied]);
   return (
-    <button
+    <Button
       type="button"
-      className={styles.button}
+      variant="outline"
+      size="sm"
       aria-label={label}
       onClick={() => void navigator.clipboard.writeText(text).then(() => setCopied(true))}
     >
+      {copied ? <Check className="text-success" aria-hidden="true" /> : <Copy aria-hidden="true" />}
       {copied ? t.shorts.copied : t.shorts.copy}
-    </button>
+    </Button>
   );
 }

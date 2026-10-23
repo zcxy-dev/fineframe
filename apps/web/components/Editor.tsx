@@ -1,12 +1,22 @@
 "use client";
 
 import { estimateCost, estimateShortsCost } from "@video-editor/engine/estimate";
+import {
+  ArrowLeft,
+  Captions,
+  Check,
+  Download,
+  FileText,
+  KeyRound,
+  LockKeyhole,
+  SquareArrowOutUpRight,
+  Stamp,
+} from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Picked } from "../lib/collect.ts";
 import { durationOf } from "../lib/collect.ts";
 import { fixFor } from "../lib/fixes.ts";
-import { LOCALE_NAMES, LOCALES } from "../lib/i18n/locale.ts";
 import type { Messages } from "../lib/i18n/messages.ts";
 import type { Job } from "../lib/jobs.ts";
 import type { Service } from "../lib/key.ts";
@@ -29,22 +39,25 @@ import {
 } from "../lib/settings.ts";
 import type { SetupState } from "../lib/setup.ts";
 import { jobApi, shortView } from "../lib/shorts.ts";
+import { cn, HELP, PANEL_TITLE, SECTION, TITLE } from "../lib/styles.ts";
 import { dollarsOf, summaryRows } from "../lib/summary.ts";
 import { AccountDialog, mayEdit, useAccount } from "./Account.tsx";
 import { BrandKits, useKits } from "./BrandKits.tsx";
 import { ErrorNote } from "./ErrorNote.tsx";
-import styles from "./editor.module.css";
 import { Footage, type Item, type LinkItem } from "./Footage.tsx";
-import { useLocale, useT } from "./I18n.tsx";
-import { CaptionsIcon, CheckIcon, DownloadIcon, ExportIcon, LockIcon } from "./icons.tsx";
+import { useT } from "./I18n.tsx";
 import { KeyDialog } from "./KeyDialog.tsx";
+import { Language } from "./Language.tsx";
 import { Projects } from "./Projects.tsx";
 import { ReEdit, Versions } from "./ReEdit.tsx";
-import { Player, ResultSummary, useVideoLength } from "./ResultView.tsx";
-import { DownloadView, RunView } from "./RunView.tsx";
+import { ResultSummary, useVideoLength } from "./ResultView.tsx";
+import { Bar, DownloadView, RunView } from "./RunView.tsx";
 import { type Choices, chosenLength, type Machine, SettingsPanel } from "./SettingsPanel.tsx";
 import { ShortsDone, ShortsGrid, ShortsKept, ShortText } from "./Shorts.tsx";
 import { UpdateNotice } from "./UpdateNotice.tsx";
+import { Button } from "./ui/button.tsx";
+import { TextAnimate } from "./ui/text-animate.tsx";
+import { Workspace } from "./Workspace.tsx";
 
 /** What /api/key says: which keys the server has, never the keys. */
 type Keys = { set: boolean; openrouter: boolean; pexels: boolean; pixabay: boolean };
@@ -74,7 +87,6 @@ function showInAddress(id: string | null): void {
 
 export function Editor() {
   const t = useT();
-  const { locale, choose } = useLocale();
   const [items, setItems] = useState<Item[]>([]);
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [linkError, setLinkError] = useState<string | null>(null);
@@ -462,59 +474,64 @@ export function Editor() {
     if (!job?.shorts?.some((short) => short.folder === opened)) setOpened(null);
   }, [job, opened]);
 
+  const done = status === "done" && job !== null;
+  const failed = (status === "error" || status === "cancelled") && job !== null;
+
   return (
-    <div className={styles.shell}>
-      <header className={styles.header}>
-        <span className={styles.brand}>
-          <Image src="/icon.svg" width={32} height={32} alt="" loading="eager" />
-          <span className={styles.wordmark}>Fineframe</span>
+    <div className="flex min-h-dvh flex-col">
+      <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-1.5 border-b bg-background px-4 max-sm:px-2">
+        <span className="group/brand mr-auto inline-flex items-center gap-2.5 text-[17px] font-bold tracking-[-0.02em]">
+          <Image
+            src="/icon.svg"
+            width={26}
+            height={26}
+            alt=""
+            loading="eager"
+            className="transition-transform duration-500 ease-(--ease-cut) group-hover/brand:rotate-90 motion-reduce:group-hover/brand:rotate-0"
+          />
+          <span className="max-[479px]:sr-only">Fineframe</span>
         </span>
-        <div className={styles.headerTools}>
-          <button
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="aria-pressed:bg-accent aria-pressed:text-foreground"
+          aria-pressed={kitsOpen}
+          onClick={() => {
+            if (kitsOpen) reloadKits();
+            setKitsOpen(!kitsOpen);
+          }}
+        >
+          <Stamp aria-hidden="true" />
+          <span className="max-sm:sr-only">{t.kits.menu}</span>
+        </Button>
+        <Language />
+        {account?.gated && (
+          <Button type="button" variant="ghost" size="sm" onClick={() => setAccountOpen(true)}>
+            {account.signedIn ? account.email : t.header.signIn}
+          </Button>
+        )}
+        {keySet !== null && (
+          <Button
             type="button"
-            className={styles.keyButton}
-            aria-pressed={kitsOpen}
-            onClick={() => {
-              if (kitsOpen) reloadKits();
-              setKitsOpen(!kitsOpen);
-            }}
+            variant={keySet ? "outline" : "default"}
+            size="sm"
+            className="ml-1.5"
+            onClick={() => setAsking("anthropic")}
           >
-            {t.kits.menu}
-          </button>
-          {LOCALES.filter((each) => each !== locale).map((other) => (
-            <button
-              key={other}
-              type="button"
-              className={styles.keyButton}
-              lang={other}
-              aria-label={`${t.header.language}: ${LOCALE_NAMES[other]}`}
-              onClick={() => choose(other)}
-            >
-              {LOCALE_NAMES[other]}
-            </button>
-          ))}
-          {account?.gated && (
-            <button type="button" className={styles.keyButton} onClick={() => setAccountOpen(true)}>
-              {account.signedIn ? account.email : t.header.signIn}
-            </button>
-          )}
-          {keySet !== null && (
-            <button
-              type="button"
-              className={styles.keyButton}
-              onClick={() => setAsking("anthropic")}
-            >
-              {keySet ? (
-                <>
-                  <CheckIcon width={14} height={14} />
-                  {t.header.keySaved}
-                </>
-              ) : (
-                t.header.addKey
-              )}
-            </button>
-          )}
-        </div>
+            {keySet ? (
+              <>
+                <Check className="text-success" aria-hidden="true" />
+                {t.header.keySaved}
+              </>
+            ) : (
+              <>
+                <KeyRound aria-hidden="true" />
+                {t.header.addKey}
+              </>
+            )}
+          </Button>
+        )}
       </header>
       <AccountDialog
         account={account}
@@ -550,11 +567,110 @@ export function Editor() {
           }}
         />
       ) : phase.kind === "compose" || phase.kind === "uploading" ? (
-        <main className={styles.layout}>
-          <div className={styles.main}>
-            <div className={styles.hero}>
-              <h1 className={styles.title}>{t.compose.title}</h1>
-              <p className={styles.lede}>{t.compose.lede}</p>
+        <Workspace
+          label={t.compose.settings}
+          panel={
+            <>
+              <SettingsPanel
+                choices={choices}
+                onChange={setChoices}
+                footageSeconds={footageSeconds}
+                music={music}
+                machine={setup}
+                openrouter={keys?.openrouter ?? null}
+                onAddOpenRouter={() => setAsking("openrouter")}
+                stock={keys}
+                onAddStock={setAsking}
+                kits={kits?.kits ?? null}
+                onBrand={() => setBrandChosen(true)}
+                onEditKits={() => setKitsOpen(true)}
+              />
+              <p className={cn(HELP, "flex gap-2 border-t px-6 py-5 max-md:px-4")}>
+                <LockKeyhole className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                <span>
+                  {choices.asr === "cloud" ? t.compose.privacyCloud : t.compose.privacyLocal}
+                </span>
+              </p>
+            </>
+          }
+          foot={
+            <>
+              {phase.kind === "compose" && phase.error && (
+                <ErrorNote message={phase.error} fallback={t.compose.startFallback} />
+              )}
+              {phase.kind === "uploading" ? (
+                <div className="flex flex-col gap-2.5" aria-live="polite">
+                  <div className="flex justify-between gap-3 text-[13px] font-medium">
+                    <span>{t.compose.sending(phase.file + 1, used.length)}</span>
+                    <span className="tabular-nums">
+                      {Math.floor((phase.sent / Math.max(1, phase.total)) * 100)}%
+                    </span>
+                  </div>
+                  <Bar fraction={phase.sent / Math.max(1, phase.total)} />
+                  <div className="flex items-center gap-3">
+                    <p className={cn(HELP, "flex-1 tabular-nums")}>
+                      {t.compose.of(formatBytes(phase.sent), formatBytes(phase.total))}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void cancel(phase.job)}
+                    >
+                      {t.compose.cancel}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    size="lg"
+                    className="w-full"
+                    disabled={blocked !== null}
+                    onClick={() => void start()}
+                  >
+                    {several
+                      ? t.compose.makeShorts(choices.count)
+                      : "seconds" in length
+                        ? t.compose.make(formatLength(length.seconds, t))
+                        : t.compose.makeVideo}
+                  </Button>
+                  <p className={cn(HELP, "text-center")}>
+                    {blocked ??
+                      (account?.gated && mayEdit(account) === false
+                        ? account.signedIn
+                          ? t.compose.needSubscription
+                          : t.compose.needAccount
+                        : keySet === false
+                          ? t.compose.needAnthropic
+                          : choices.asr === "cloud" && keys?.openrouter === false
+                            ? t.compose.needOpenRouter
+                            : estimate &&
+                              (several ? t.compose.estimateShorts : t.compose.estimate)(
+                                formatDollars(estimate.low, t),
+                                formatDollars(estimate.high, t),
+                              ))}
+                  </p>
+                </>
+              )}
+            </>
+          }
+        >
+          <div className="flex flex-col gap-8 px-10 py-9 max-md:gap-6 max-md:px-4 max-md:py-6">
+            <div className="flex flex-col gap-3">
+              <TextAnimate
+                as="h1"
+                by="word"
+                animation="caption"
+                startOnView={false}
+                className={TITLE}
+              >
+                {t.compose.title}
+              </TextAnimate>
+              <p className="max-w-[64ch] text-[15px] leading-relaxed text-pretty text-steel">
+                {t.compose.lede}
+              </p>
             </div>
             {setup && setup.state !== "ready" && (
               <SetupView setup={setup} onRetry={() => void retrySetup().then(setSetup)} />
@@ -584,174 +700,91 @@ export function Editor() {
             />
             {phase.kind === "compose" && <Projects onOpen={(id) => void open(id)} />}
           </div>
-
-          <aside
-            className={`${styles.card} ${styles.panel} ${styles.dock}`}
-            aria-label={t.compose.settings}
-          >
-            <SettingsPanel
-              choices={choices}
-              onChange={setChoices}
-              footageSeconds={footageSeconds}
-              music={music}
-              machine={setup}
-              openrouter={keys?.openrouter ?? null}
-              onAddOpenRouter={() => setAsking("openrouter")}
-              stock={keys}
-              onAddStock={setAsking}
-              kits={kits?.kits ?? null}
-              onBrand={() => setBrandChosen(true)}
-              onEditKits={() => setKitsOpen(true)}
+        </Workspace>
+      ) : one ? (
+        <ReEdit
+          job={one}
+          onJob={update}
+          video={video}
+          // A short of a run stopped or cancelled before it ended does not change.
+          editable={status === "done"}
+          head={<DoneHead job={one} onBack={() => setOpened(null)} />}
+          result={
+            <DoneFiles
+              job={one}
+              onJob={update}
+              onNew={() => setPhase({ kind: "compose" })}
+              onBack={() => setOpened(null)}
+              fixed={status !== "done"}
             />
-            {phase.kind === "compose" && phase.error && (
-              <ErrorNote message={phase.error} fallback={t.compose.startFallback} />
-            )}
-            {phase.kind === "uploading" ? (
-              <div className={styles.uploading}>
-                <div className={styles.uploadHead}>
-                  <span>{t.compose.sending(phase.file + 1, used.length)}</span>
-                  <span className={styles.tabular}>
-                    {Math.floor((phase.sent / Math.max(1, phase.total)) * 100)}%
-                  </span>
-                </div>
-                <div className={styles.bar}>
-                  <div
-                    className={styles.barFill}
-                    style={{ width: `${(phase.sent / Math.max(1, phase.total)) * 100}%` }}
-                  />
-                </div>
-                <p className={styles.help}>
-                  {t.compose.of(formatBytes(phase.sent), formatBytes(phase.total))}
-                </p>
-                <button
-                  type="button"
-                  className={styles.button}
-                  onClick={() => void cancel(phase.job)}
-                >
-                  {t.compose.cancel}
-                </button>
-              </div>
-            ) : (
-              <div className={styles.go}>
-                <button
-                  type="button"
-                  className={styles.primary}
-                  disabled={blocked !== null}
-                  onClick={() => void start()}
-                >
-                  {several
-                    ? t.compose.makeShorts(choices.count)
-                    : "seconds" in length
-                      ? t.compose.make(formatLength(length.seconds, t))
-                      : t.compose.makeVideo}
-                </button>
-                {blocked ? (
-                  <p className={styles.help}>{blocked}</p>
-                ) : account?.gated && mayEdit(account) === false ? (
-                  <p className={styles.help}>
-                    {account.signedIn ? t.compose.needSubscription : t.compose.needAccount}
-                  </p>
-                ) : keySet === false ? (
-                  <p className={styles.help}>{t.compose.needAnthropic}</p>
-                ) : choices.asr === "cloud" && keys?.openrouter === false ? (
-                  <p className={styles.help}>{t.compose.needOpenRouter}</p>
-                ) : (
-                  estimate && (
-                    <p className={styles.help}>
-                      {(several ? t.compose.estimateShorts : t.compose.estimate)(
-                        formatDollars(estimate.low, t),
-                        formatDollars(estimate.high, t),
-                      )}
-                    </p>
-                  )
-                )}
-              </div>
-            )}
-            <p className={styles.note}>
-              <LockIcon width={14} height={14} />
-              <span>
-                {choices.asr === "cloud" ? t.compose.privacyCloud : t.compose.privacyLocal}
-              </span>
-            </p>
-          </aside>
-        </main>
+          }
+        />
+      ) : done && !job.settings.shorts ? (
+        <ReEdit
+          job={job}
+          onJob={update}
+          video={video}
+          editable
+          head={<DoneHead job={job} />}
+          result={
+            <DoneFiles job={job} onJob={update} onNew={() => setPhase({ kind: "compose" })} />
+          }
+        />
       ) : (
-        <main className={styles.layout} data-status={status ?? undefined}>
-          <div className={styles.main}>
-            {one ? (
+        job && (
+          <Workspace
+            label={t.done.label}
+            panelFirst={failed}
+            panel={
               <>
-                <Player job={one} video={video} />
-                {/* A short of a run stopped or cancelled before it ended does not change. */}
-                {status === "done" && <ReEdit job={one} onJob={update} video={video} />}
+                {status === "running" && <Running job={job} onCancel={() => cancel(job)} />}
+                {done && (
+                  <>
+                    <ShortsDone job={job} />
+                    <div className={cn(SECTION, "border-t")}>
+                      <Summary job={job} />
+                    </div>
+                    <div className={cn(SECTION, "border-t")}>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="inline"
+                        className="self-start"
+                        onClick={() => setPhase({ kind: "compose" })}
+                      >
+                        {t.done.another}
+                      </Button>
+                    </div>
+                  </>
+                )}
+                {failed && (
+                  <Failed
+                    job={job}
+                    onBack={() => setPhase({ kind: "compose" })}
+                    onRetry={
+                      blocked === null
+                        ? () => {
+                            // The footage is still here: the same edit again, as it was asked for.
+                            const asked = job.settings.instructions ?? "";
+                            setChoices((current) => ({ ...current, instructions: asked }));
+                            setPhase({ kind: "compose" });
+                            void start(asked);
+                          }
+                        : null
+                    }
+                    onReplaceKey={(service) => setAsking(service)}
+                  />
+                )}
+                {failed && job.shorts?.length ? <ShortsKept job={job} /> : null}
               </>
-            ) : status === "done" && job && !job.settings.shorts ? (
-              <>
-                <Player job={job} video={video} />
-                <ReEdit job={job} onJob={update} video={video} />
-              </>
-            ) : (
-              job && (
-                <>
-                  {status !== "done" && <RunView job={job} />}
-                  {job.settings.shorts && (job.shorts?.length || status === "running") && (
-                    <ShortsGrid job={job} onOpen={setOpened} />
-                  )}
-                </>
-              )
+            }
+          >
+            {status !== "done" && <RunView job={job} />}
+            {job.settings.shorts && (job.shorts?.length || status === "running") && (
+              <ShortsGrid job={job} onOpen={setOpened} />
             )}
-          </div>
-          <aside className={`${styles.card} ${styles.panel}`} aria-label={t.done.label}>
-            {status === "running" && job && <Running job={job} onCancel={() => cancel(job)} />}
-            {one && (
-              <Done
-                job={one}
-                onJob={update}
-                onNew={() => setPhase({ kind: "compose" })}
-                onBack={() => setOpened(null)}
-                fixed={status !== "done"}
-              />
-            )}
-            {status === "done" && job && !one && job.settings.shorts && (
-              <>
-                <ShortsDone job={job} />
-                <Summary job={job} />
-                <div className={styles.block}>
-                  <button
-                    type="button"
-                    className={styles.linkButton}
-                    onClick={() => setPhase({ kind: "compose" })}
-                  >
-                    {t.done.another}
-                  </button>
-                </div>
-              </>
-            )}
-            {status === "done" && job && !one && !job.settings.shorts && (
-              <Done job={job} onJob={update} onNew={() => setPhase({ kind: "compose" })} />
-            )}
-            {(status === "error" || status === "cancelled") && job && !one && (
-              <Failed
-                job={job}
-                onBack={() => setPhase({ kind: "compose" })}
-                onRetry={
-                  blocked === null
-                    ? () => {
-                        // The footage is still here: the same edit again, as it was asked for.
-                        const asked = job.settings.instructions ?? "";
-                        setChoices((current) => ({ ...current, instructions: asked }));
-                        setPhase({ kind: "compose" });
-                        void start(asked);
-                      }
-                    : null
-                }
-                onReplaceKey={(service) => setAsking(service)}
-              />
-            )}
-            {(status === "error" || status === "cancelled") && job && !one && job.shorts?.length ? (
-              <ShortsKept job={job} />
-            ) : null}
-          </aside>
-        </main>
+          </Workspace>
+        )
       )}
     </div>
   );
@@ -767,16 +800,18 @@ function Running({ job, onCancel }: { job: Job; onCancel: () => void }) {
   }, [sure]);
   return (
     <>
-      <Summary job={job} />
-      <div className={styles.block}>
-        <button
+      <div className={SECTION}>
+        <Summary job={job} />
+      </div>
+      <div className={cn(SECTION, "border-t")}>
+        <Button
           type="button"
-          className={sure ? `${styles.button} ${styles.danger}` : styles.button}
+          variant={sure ? "danger" : "outline"}
           onClick={() => (sure ? onCancel() : setSure(true))}
         >
           {sure ? t.run.sure : t.run.cancel}
-        </button>
-        <p className={styles.help}>{t.run.closeable}</p>
+        </Button>
+        <p className={HELP}>{t.run.closeable}</p>
       </div>
     </>
   );
@@ -807,27 +842,62 @@ function ExportButton({ job }: { job: Job }) {
   };
   return (
     <>
-      <button
+      <Button
         type="button"
-        className={styles.button}
+        variant="outline"
         onClick={run}
         disabled={state === "busy"}
         title={t.done.exportHelp}
       >
-        <ExportIcon width={18} height={18} />
+        <SquareArrowOutUpRight aria-hidden="true" />
         {state === "busy" ? t.done.exporting : t.done.exportApp}
-      </button>
+      </Button>
       {typeof state === "object" && (
         <ErrorNote message={state.error} fallback={t.done.exportFallback} />
       )}
-      {state === "done" && <p className={styles.help}>{t.done.exported(FOOTAGE_KEPT)}</p>}
+      {state === "done" && <p className={HELP}>{t.done.exported(FOOTAGE_KEPT)}</p>}
     </>
   );
 }
 
-/** A finished edit, or one short of several with its title, description and hashtags and a way
- * back to the others. */
-function Done({
+/** A finished edit's heading in the editor's panel, lit word by word as it opens: its title, or
+ * a short's with a way back to the others, and its length and aspect. */
+function DoneHead({ job, onBack }: { job: Job; onBack?: () => void }) {
+  const t = useT();
+  const seconds = useVideoLength(job);
+  const short = job.shorts?.find((each) => each.folder === job.short);
+  return (
+    <div className="flex flex-col items-start">
+      {onBack && (
+        <Button
+          type="button"
+          variant="link"
+          size="inline"
+          className="mb-2 text-xs"
+          onClick={onBack}
+        >
+          <ArrowLeft aria-hidden="true" />
+          {t.shorts.back}
+        </Button>
+      )}
+      <TextAnimate
+        key={short?.title ?? t.done.ready}
+        as="h2"
+        by="word"
+        animation="caption"
+        startOnView={false}
+        className={PANEL_TITLE}
+      >
+        {short ? short.title : t.done.ready}
+      </TextAnimate>
+      <ResultSummary job={job} seconds={seconds} />
+    </div>
+  );
+}
+
+/** The Result tab of a finished edit, or of one short of several with its title, description and
+ * hashtags: the downloads, the versions, the details and a way on. */
+function DoneFiles({
   job,
   onJob,
   onNew,
@@ -847,47 +917,60 @@ function Done({
   const download = { download: "" };
   return (
     <>
-      <div className={styles.block}>
-        {onBack && (
-          <button type="button" className={styles.linkButton} onClick={onBack}>
-            ← {t.shorts.back}
-          </button>
-        )}
-        <div>
-          <h2 className={styles.panelTitle}>{short ? short.title : t.done.ready}</h2>
-          <ResultSummary job={job} seconds={seconds} />
-        </div>
-        <div className={styles.downloads}>
-          <a className={styles.primary} href={jobApi(job, "video", download)} download>
-            <DownloadIcon width={18} height={18} />
+      <div className={SECTION}>
+        <Button asChild size="lg">
+          <a href={jobApi(job, "video", download)} download>
+            <Download aria-hidden="true" />
             {t.done.download}
           </a>
-          {job.result?.captions && (
-            <a className={styles.button} href={jobApi(job, "captions", download)} download>
-              <CaptionsIcon width={18} height={18} />
+        </Button>
+        {job.result?.captions && (
+          <Button asChild variant="outline">
+            <a href={jobApi(job, "captions", download)} download>
+              <Captions aria-hidden="true" />
               {t.done.downloadCaptions}
             </a>
-          )}
-          {job.result?.broll && (
-            <a className={styles.button} href={jobApi(job, "broll", download)} download>
-              <DownloadIcon width={18} height={18} />
+          </Button>
+        )}
+        {job.result?.broll && (
+          <Button asChild variant="outline">
+            <a href={jobApi(job, "broll", download)} download>
+              <FileText aria-hidden="true" />
               {t.done.downloadCredits}
             </a>
-          )}
-          <ExportButton job={job} />
-        </div>
+          </Button>
+        )}
+        <ExportButton job={job} />
       </div>
-      {short && <ShortText short={short} />}
-      {fixed ? (
-        <p className={styles.help}>{t.shorts.unchangeable(job.status === "cancelled")}</p>
-      ) : (
-        <Versions job={job} onJob={onJob} />
+      {short && (
+        <div className={cn(SECTION, "border-t")}>
+          <ShortText short={short} />
+        </div>
       )}
-      <Summary job={job} actual={seconds} />
-      <div className={styles.block}>
-        <button type="button" className={styles.linkButton} onClick={onBack ?? onNew}>
+      {fixed ? (
+        <p className={cn(HELP, SECTION, "border-t")}>
+          {t.shorts.unchangeable(job.status === "cancelled")}
+        </p>
+      ) : (
+        (job.versions?.length ?? 0) > 1 && (
+          <div className={cn(SECTION, "border-t")}>
+            <Versions job={job} onJob={onJob} />
+          </div>
+        )
+      )}
+      <div className={cn(SECTION, "border-t")}>
+        <Summary job={job} actual={seconds} />
+      </div>
+      <div className={cn(SECTION, "border-t")}>
+        <Button
+          type="button"
+          variant="link"
+          size="inline"
+          className="self-start"
+          onClick={onBack ?? onNew}
+        >
           {onBack ? t.shorts.back : t.done.another}
-        </button>
+        </Button>
       </div>
     </>
   );
@@ -930,31 +1013,27 @@ function Failed({
     },
   ].filter((action) => action !== false && action !== null);
   return (
-    <div className={styles.block}>
-      <h2 className={styles.panelTitle}>{cancelled ? t.failed.cancelled : t.failed.title}</h2>
+    <div className={SECTION}>
+      <h2 className={PANEL_TITLE}>{cancelled ? t.failed.cancelled : t.failed.title}</h2>
       {!cancelled && (
         <ErrorNote message={job.error ?? t.failed.wrong} fallback={t.failed.fallback} />
       )}
       {spent !== null && spent !== 0 && (
-        <p className={styles.help}>{t.failed.spent(formatDollars(spent, t))}</p>
+        <p className={HELP}>{t.failed.spent(formatDollars(spent, t))}</p>
       )}
-      <div className={styles.actions}>
+      <div className="flex flex-col gap-2">
         {actions.map((action, i) => {
-          const className = i === 0 ? styles.primary : styles.button;
+          const variant = i === 0 ? "default" : "outline";
           return "href" in action ? (
-            <a
-              key={action.label}
-              className={className}
-              href={action.href}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {action.label}
-            </a>
+            <Button key={action.label} asChild variant={variant}>
+              <a href={action.href} target="_blank" rel="noreferrer">
+                {action.label}
+              </a>
+            </Button>
           ) : (
-            <button key={action.label} type="button" className={className} onClick={action.run}>
+            <Button key={action.label} type="button" variant={variant} onClick={action.run}>
               {action.label}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -962,14 +1041,15 @@ function Failed({
   );
 }
 
+/** The edit's details as a spec sheet: name left, value right, hairline rows. */
 function Summary({ job, actual }: { job: Job; actual?: number | null }) {
   const rows = summaryRows(job, actual, useT());
   return (
-    <dl className={styles.summary}>
+    <dl className="m-0 flex flex-col divide-y">
       {rows.map(([name, value]) => (
-        <div key={name} className={styles.summaryRow}>
-          <dt>{name}</dt>
-          <dd>{value}</dd>
+        <div key={name} className="flex items-baseline justify-between gap-3 py-2 text-[13px]">
+          <dt className="text-muted-foreground">{name}</dt>
+          <dd className="m-0 text-right font-medium tabular-nums">{value}</dd>
         </div>
       ))}
     </dl>
@@ -980,23 +1060,26 @@ function Summary({ job, actual }: { job: Job; actual?: number | null }) {
 function SetupView({ setup, onRetry }: { setup: Setup; onRetry: () => void }) {
   const t = useT();
   return (
-    <section className={`${styles.card} ${styles.setup}`} aria-label={t.setup.title}>
+    <section
+      className="flex flex-col gap-3 rounded-2xl border bg-card p-5 animate-in fade-in-0 duration-300"
+      aria-label={t.setup.title}
+    >
       <div>
-        <h2 className={styles.panelTitle}>
+        <h2 className="text-[17px] font-bold tracking-[-0.01em]">
           {setup.state === "failed" ? t.setup.failed : t.setup.title}
         </h2>
-        <p className={styles.help}>{t.setup.about}</p>
+        <p className={cn(HELP, "mt-1")}>{t.setup.about}</p>
       </div>
       {setup.state === "failed" ? (
         <ErrorNote message={setup.error ?? t.failed.wrong} fallback={t.setup.fallback}>
-          <button type="button" className={styles.button} onClick={onRetry}>
+          <Button type="button" variant="outline" size="sm" className="mt-1.5" onClick={onRetry}>
             {t.setup.retry}
-          </button>
+          </Button>
         </ErrorNote>
       ) : setup.download ? (
         <DownloadView download={setup.download} />
       ) : (
-        <p className={styles.help}>{t.setup.starting}</p>
+        <p className={HELP}>{t.setup.starting}</p>
       )}
     </section>
   );
