@@ -3,7 +3,7 @@
 
 import { copyFile, mkdir, readdir, writeFile } from "node:fs/promises";
 import { basename, extname, join, resolve } from "node:path";
-import { ffmpeg, ffprobe } from "../ffmpeg.ts";
+import { checkEncoders, EXPORT_ENCODERS, ffmpeg, ffprobe } from "../ffmpeg.ts";
 import { captionsFor, loadEdit, type RenderOptions, renderEffects } from "../render.ts";
 import { fcpxml } from "./fcpxml.ts";
 import { type Media, readMedia } from "./media.ts";
@@ -63,6 +63,8 @@ export async function exportEdit(
   const report = options.onProgress ?? (() => {});
   report(0, "Checking sources");
   const { project, sources, brand, timeline } = await loadEdit(projectPath, options.onDownload);
+  const overlay = hasOverlay(timeline, brand);
+  if (overlay) await checkEncoders(await ffmpeg(), EXPORT_ENCODERS);
   const captions = await captionsFor(project, timeline, brand);
   const probe = await ffprobe();
   const media = new Map<string, Media>();
@@ -90,7 +92,6 @@ export async function exportEdit(
     locations.set(source.id, { relative: `${MEDIA_FOLDER}/${copy}` });
   }
 
-  const overlay = hasOverlay(timeline, brand);
   if (overlay) {
     const bin = await ffmpeg();
     const share = 0.5;
