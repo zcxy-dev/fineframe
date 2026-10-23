@@ -238,7 +238,7 @@ export const zhTW: Messages = {
     menu: "品牌套組",
     title: "品牌套組",
     lede: "你的標誌、顏色、字型和自訂字幕，保存在這台電腦上，可以套用到任何剪輯。改用其他套組只需重新輸出：不必重新規劃，也沒有 Claude 費用。",
-    back: "← 返回",
+    back: "返回",
     kits: "套組",
     isDefault: "預設",
     newName: "新套組名稱",

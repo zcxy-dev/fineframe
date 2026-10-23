@@ -242,7 +242,7 @@ export const en = {
     menu: "Brand kits",
     title: "Brand kits",
     lede: "Your logo, colours, fonts and captions, kept on this computer and applied to any edit. Changing an edit's kit only renders it again: no new plan, no Claude cost.",
-    back: "← Back",
+    back: "Back",
     kits: "Kits",
     isDefault: "Default",
     newName: "New kit's name",
