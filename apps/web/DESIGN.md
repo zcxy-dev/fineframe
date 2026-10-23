@@ -2,144 +2,106 @@
 name: Fineframe
 description: Drop in footage, choose a length and an aspect, and get back a finished video.
 colors:
-  pane: "#1c1d21"
-  inspector: "#17181b"
-  topbar: "#141518"
-  viewer: "#111215"
-  well: "#121316"
-  raised: "#24262b"
-  line: "#2e3036"
-  line-strong: "#3a3d44"
-  text: "#e6e8eb"
-  text-2: "#a9adb5"
-  muted: "#8b8f97"
+  background: "#08090b"
+  card: "#0f1013"
+  surface: "#15171b"
+  raised: "#1d1f24"
+  well: "#0b0c0e"
+  border: "rgb(255 255 255 / 0.08)"
+  edge: "rgb(255 255 255 / 0.15)"
+  foreground: "#f2f3f5"
+  steel: "#b4b9c1"
+  muted-foreground: "#8a8f98"
   laser-amber: "#ffb547"
   laser-amber-hover: "#ffc46d"
   accent-ink: "#1a1408"
-  danger: "#e0807a"
+  destructive: "#e5654b"
   success: "#7bc29a"
-  light-bg: "#f6f6f4"
-  light-inspector: "#eeeeec"
-  light-text: "#17181b"
 typography:
-  display:
-    fontFamily: "Archivo Variable (font-stretch 112.5%, SemiExpanded), Inter Variable, Noto Sans TC, sans-serif"
-    fontSize: "26px"
-    fontWeight: 600
-  slug:
-    fontFamily: "Archivo Variable (font-stretch 112.5%)"
-    fontSize: "11.5px"
-    fontWeight: 600
-    letterSpacing: "0.06em"
-    textTransform: uppercase
-  xl:
+  title:
+    fontFamily: "Geist Variable, Noto Sans TC"
+    fontSize: "clamp(26px, 2.6vw, 36px)"
+    fontWeight: "800 (Noto Sans TC draws it with its 900 Black)"
+    letterSpacing: "-0.04em; zh 0.01em with halt"
+  panel-title:
     fontSize: "24px"
-  lg:
-    fontSize: "17px"
-  md:
-    fontFamily: "Inter Variable, Noto Sans TC, system-ui, sans-serif"
-    fontSize: "15px"
-    lineHeight: 1.5
-  sm:
-    fontSize: "13.5px"
-  xs:
-    fontSize: "12.5px"
+    fontWeight: 800
+  slug:
+    fontSize: "11px; zh 12px"
+    fontWeight: 600
+    letterSpacing: "0.1em; zh 0.16em"
+    textTransform: uppercase
+  body:
+    fontFamily: "Geist Variable, Noto Sans TC, system-ui, sans-serif"
+    fontSize: "14px; controls and labels 13px; hints 12px; transcript words 15px"
+    lineHeight: "1.55; zh 1.7"
 rounded:
-  controls: "2px"
-  panes: "0"
+  controls: "8px, buttons 10px"
+  frames: "12px to 16px: the drop zone, lists, the player's stage"
+  panes: "0: the docked panes"
 spacing:
-  "0.5": "2px"
-  "1": "4px"
-  "1.5": "6px"
-  "2": "8px"
-  "2.5": "10px"
-  "3": "12px"
-  "4": "16px"
-  "5": "20px"
-  "6": "24px"
-  "7": "28px"
-  "8": "32px"
-  "10": "40px"
-  "12": "48px"
-  "14": "56px"
+  pane: "40px gutter in the main pane, 24px in the panel; 16px on phones"
+  panel: "400px"
 components:
   button-primary:
     backgroundColor: "{colors.laser-amber}"
     textColor: "{colors.accent-ink}"
-    rounded: "{rounded.controls}"
   button-primary-hover:
     backgroundColor: "{colors.laser-amber-hover}"
   segment-selected:
-    backgroundColor: "{colors.text}"
-    textColor: "{colors.pane}"
-  inspector:
-    backgroundColor: "{colors.inspector}"
+    backgroundColor: "{colors.raised}"
+    textColor: "{colors.foreground}"
 ---
 
 # Design System: Fineframe
 
 ## Overview
 
-**Creative North Star: "The Proof Sheet"**
+**The editing room**, the website's visual system brought into the app: a graphite ground where the work sits in viewfinder corners, timelines run under it and words light up as captions do. The page is a docked, full-height tool, as in Descript or CapCut: a top bar, the work in the main pane and a panel on the right, each with its own scroll, so a screen never becomes one long page. Its motion is quieter than the website's: progress, transitions and button feedback only, with no light leaks or film grain.
 
-A press proof: one sheet divided by hairlines, with crop marks around the work. The page is a docked, full-height app, as in Final Cut Pro or DaVinci Resolve: a top bar, the work in the main pane and the settings in an inspector on the right, sharing one hairline edge. Nothing floats; panes and sections are divided by 1px lines. The materials are the icon's: graphite sheets, steel type and marks, and one amber laser line for what is live or next.
+The components are styled with Tailwind CSS utilities, as the website's are. `app/globals.css` holds the tokens (shadcn/ui's, set to the palette below, plus `steel`, `surface`, `raised`, `well`, `edge`, `amber-hover` and `success`), the keyframes and the motifs a utility cannot say (`display`, `corners`, `viewfinder`, `ruler`, `wave-*`, `hatch`, `sheen`, `chevron`, the caption previews). `lib/styles.ts` holds the class lists several components share. `components/ui/` holds the shadcn/ui and Magic UI components, restyled to this system. The page is dark only, as the website is; `lib/theme.ts` gives its background to the browser and the desktop window.
 
-Tokens live in `app/globals.css`; `components/editor.module.css` uses them. The page background comes from `lib/theme.ts`.
+## Colours
 
-**Key Characteristics:**
-- Graphite panes in a few tonal steps, divided by hairlines; no cards, shadows or glow.
-- Steel for type, marks and the chosen option; amber only for the primary action, progress and focus.
-- Crop marks frame only the work itself.
-- Dark first; a light theme from `prefers-color-scheme` keeps the same roles, less tuned.
-
-## Colors
-
-### Primary
-- **Laser Amber** (#ffb547, ink #1a1408): the primary button, progress fills, the active stage's top line, focus rings, range and checkbox accents. Never decoration and never a chosen state. The caption previews keep the captions' own colours, which belong to the video.
-
-### Neutral
-- **Pane** (#1c1d21; light #f6f6f4): the main pane and the page's background (`lib/theme.ts`).
-- **Inspector** (#17181b), **Top bar** (#141518), **Viewer** (#111215): the docked panes, darkest where the picture plays.
-- **Well** (#121316): inputs, segmented tracks, the transcript; **Raised** (#24262b): hover and chosen cards.
-- **Lines** (#2e3036, strong #3a3d44): every division and control edge.
-- **Steel** (#e6e8eb, #a9adb5, #8b8f97): primary, secondary and muted text, all at least 4.5:1 on the panes.
-- **Danger** (#e0807a) and **Success** (#7bc29a): errors and finished steps only.
-
-**The One Laser Rule.** Amber marks what is live or next, once per view where it can; a chosen option is steel.
+- **Laser amber** (#ffb547 on ink #1a1408, `primary`): the primary action, progress, the playhead, cut points, the lit word and focus. Never a chosen state: a chosen option is steel. The caption previews keep the captions' own colours, which belong to the video.
+- **Graphite** (#08090b `background`, #0f1013 `card` for the docked panel, #15171b `surface` for dialogs, menus and the panel's foot, #1d1f24 `raised` for hover and a chosen option, #0b0c0e `well` under video, inputs and the transcript), divided by white hairlines at 8 % (`border`) and 15 % (`edge`).
+- **Steel** text in three steps (`foreground`, `steel`, `muted-foreground`), all at least 4.5:1 on the ground.
+- **Destructive** (#e5654b) for errors and cuts that land; **success** (#7bc29a) for finished steps and a fixed caption word.
 
 ## Typography
 
-**Faces:** Archivo SemiExpanded (`"Archivo Variable"` with `font-stretch: 112.5%`) for the wordmark, screen titles and slugs; Inter Variable with Noto Sans TC for everything else. Numbers are tabular wherever they are data: times, sizes, costs, percentages.
-
-### Hierarchy
-- **Display** (Archivo 600, 26px; 22px on phones): screen titles, such as the compose title and "Making your edit"; panel titles 22px.
-- **Slug** (Archivo 600, 11.5px caps, 0.06em; in Chinese, which has no caps, 12.5px at 0.08em): a pane section's heading only (Footage, Projects, Versions, Change the edit and its sections, the analysis steps). Field labels are never slugs.
-- **xl** (24px), **lg** (17px): the run's percentage and the drop zone's title.
-- **md** (15px): body and transcript words.
-- **sm** (13.5px): controls, labels, file names, messages. Field labels are 600 in the inspector.
-- **xs** (12.5px): hints, metadata, step details.
+One family for every script, as on the website: Geist (variable) for Latin text and numbers, Noto Sans TC for Chinese, both from npm packages (`@fontsource-variable/geist`, `@fontsource/noto-sans-tc`). Screen and panel titles take weight 800 (`display`), which Noto Sans TC meets with its Black; in Chinese they set `halt` and `text-spacing-trim`. A pane section's heading is a slug (`SLUG`: small caps in steel); field labels stay in sentence case at 13px semibold. Numbers are tabular wherever they are data: times, sizes, costs, percentages. Inter is loaded only for the brand kit's sample frame, whose lower third the renderer draws in it.
 
 ## Layout
 
-A full-height grid: a 44px top bar, then the main pane and a 360px inspector (320px below 1024px) with its own scroll and the primary action pinned at its foot. Sections inside a pane are divided by hairlines with 20–24px padding. Spacing comes from the 4px scale in `app/globals.css`. Below 720px the panes stack, the inspector after the work; a finished edit's result and downloads come before the re-edit, and a failed edit's reason and next steps before its stages.
+- **Top bar** (56 px): the icon and the name, "Brand kits", the language menu (`components/Language.tsx`: a globe with the page's language, opening the languages, as on the website), the account in the desktop app, and the key.
+- **Workspace** (`components/Workspace.tsx`): the work in the main pane, a 400 px panel on the right with its own scroll and its action pinned at its foot. The start screen puts the footage and the projects in the main pane and the settings in the panel, with "Make the video" at its foot; a running edit puts its progress in the main pane and its details and Cancel in the panel; a failed one its reason and next steps in the panel. Brand kits put the sample frame in the main pane and the kits in the panel, with Save at its foot.
+- **Editor** (`components/ReEdit.tsx`), for a finished edit: the player in the middle of a dark stage, as large as the stage allows; the transcript under it as a timeline, a ruler over the edit's sound with the cuts asked for, where they land, and the amber playhead, then the words, the one being said lit amber; and on the right a panel whose heading names the edit, with tabs for its result (downloads, export, versions, details), music, look, captions, brand kit, the title and lower thirds and the overlays when the edit has them, and re-plan. "Apply" stays at the panel's foot whichever tab shows, saying what it will render, or the new version's progress.
+- Below 1024 px the panes stack, the panel after the work; a failed edit's panel comes first.
 
-## Elevation & Depth
+## Shapes and depth
 
-None by shadow: depth is the tonal step between panes and the hairline between them. The key dialog alone casts a shadow, over a dimmed page.
+Docked panes are square and divided by hairlines; what sits in them takes a radius: controls 8–10 px, frames 12–16 px. Depth is tonal, with real shadows only where something floats: dialogs, menus, the update notice, the panel's foot over its scroll, and the picture on its stage.
 
-## Shapes
+## Signature: viewfinder corners
 
-Panes are square; controls and inputs take a 2px radius. Segmented controls join their options with hairline dividers.
+Four L-shaped corners, the shape of the icon. `corners` frames the drop zone and the shorts' players: they open out and turn amber on hover, focus or while footage is dragged over. `viewfinder` keeps them still around the player, the brand kit's sample frame, the version shown and the dialogs. They never mark a chosen option.
 
-## Signature: crop marks
+## Motion
 
-Four L-shaped corners (`--crop`, `--crop-sm`) in steel at 40% frame the drop zone, the player and the version shown. They turn amber while footage is dragged over the drop zone. They never mark a chosen option or decorate a section.
+Motion (`motion`) and tw-animate-css run it, quieter than the website's:
+
+- **Titles** light up word by word as captions do (Magic UI's `text-animate`, its `caption` preset): each word amber for a moment, then steel.
+- **Progress:** the run's timeline builds up clip by clip as the edit gets further, with the amber playhead at its edge; the percentage counts on (Magic UI's `number-ticker`); the live stage's amber line draws in along its top; bars fill smoothly.
+- **Transitions:** panels, lists, errors and dialogs fade and rise into place; tabs underline in steel.
+- **Feedback:** buttons lift a pixel with a sheen crossing them; the drop zone's corners open out and turn amber.
+- Under `prefers-reduced-motion` nothing moves: titles stand lit, numbers are written, the caption previews hold one frame.
 
 ## Do's and Don'ts
 
-- Do use the tokens in `app/globals.css` for colour, size, spacing and radius.
-- Do show a chosen option in steel: a filled segment, a steel-framed card, a steel-filled word.
-- Don't use amber for anything but the primary action, progress and focus.
+- Do use the tokens and the shared class lists; restyle any new shadcn/ui or Magic UI component to them before it ships.
+- Do keep amber to the action, progress, the playhead, cut points, the lit word and focus.
+- Do show a chosen option in steel: a raised segment, a steel-framed card, a steel-filled word.
 - Don't set field labels or values in caps; slugs head pane sections only.
-- Don't add cards, shadows or glows to panes.
+- Don't add light leaks, film grain or decoration that moves while someone works.
 - Don't hard-code the background colour: import it from `lib/theme.ts`.

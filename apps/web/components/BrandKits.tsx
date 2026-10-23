@@ -5,11 +5,17 @@ import { layoutFor, rgba, watermarkPlacement } from "@video-editor/effects/layou
 import { brandPreset, type DrawnStyle, PRESETS, TYPE_SCALE } from "@video-editor/engine/captions";
 import type { FaceId } from "@video-editor/engine/faces";
 import type { Brand, BrandCaptions, BrandFont } from "@video-editor/schema";
+import { ArrowLeft, Plus, Upload } from "lucide-react";
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
+import { CHECK, cn, HELP, LABEL, LABEL_HINT, SECTION, TITLE } from "../lib/styles.ts";
 import { CaptionPreview } from "./CaptionPreview.tsx";
 import { ErrorNote } from "./ErrorNote.tsx";
-import styles from "./editor.module.css";
 import { useT } from "./I18n.tsx";
+import { Segments } from "./Segments.tsx";
+import { Button, buttonVariants } from "./ui/button.tsx";
+import { Input, NativeSelect } from "./ui/input.tsx";
+import { TextAnimate } from "./ui/text-animate.tsx";
+import { Workspace } from "./Workspace.tsx";
 
 /** A brand kit as the server keeps it. */
 export interface Kit {
@@ -99,6 +105,12 @@ const FRAMES = {
   "9:16": { width: 1080, height: 1920 },
 } as const;
 
+/** A neutral stand-in for footage: a soft key light on a grey wall. */
+const WALL: CSSProperties = {
+  background:
+    "radial-gradient(ellipse 55% 60% at 38% 40%, rgb(255 255 255 / 0.16), transparent 70%), radial-gradient(ellipse at center, transparent 40%, rgb(0 0 0 / 0.45) 100%), linear-gradient(160deg, #66707a, #3f464e 55%, #2a2e34)",
+};
+
 /** A sample frame in a kit's look, as an edit draws it: a name lower third in the graphics'
  * colours and face, a caption in the kit's captions, and the logo as its watermark. Laid out at
  * the output's size and scaled to fit, so every size and margin is the renderer's. */
@@ -185,14 +197,17 @@ function KitPreview({
   return (
     <div
       ref={frame}
-      className={styles.kitFrame}
+      className="relative w-full overflow-hidden rounded-md bg-black"
       style={{ aspectRatio: `${width} / ${height}` }}
       role="img"
       aria-label={t.kits.previewLabel}
     >
-      <div className={styles.kitStage} style={{ width, height, transform: `scale(${scale})` }}>
+      <div
+        className="absolute top-0 left-0 origin-top-left overflow-hidden"
+        style={{ ...WALL, width, height, transform: `scale(${scale})` }}
+      >
         <div
-          className={styles.kitThird}
+          className="absolute flex items-stretch border border-white/16 bg-[rgba(13,14,17,0.84)] text-[#f5f6f8]"
           style={{
             left: safe.left,
             ...(aspect === "9:16" ? { top: safe.top } : { bottom: safe.bottom }),
@@ -204,7 +219,7 @@ function KitPreview({
           }}
         >
           <span
-            className={styles.kitBar}
+            className="flex-none rounded-full"
             style={{
               width: 1.1 * u,
               background: tones.primary,
@@ -212,15 +227,24 @@ function KitPreview({
             }}
           />
           <span>
-            <span className={styles.kitName} style={{ fontSize: layout.type("name") }}>
+            <span
+              className="block leading-tight font-extrabold whitespace-nowrap"
+              style={{ fontSize: layout.type("name") }}
+            >
               {t.kits.sampleName}
             </span>
-            <span className={styles.kitRole} style={{ fontSize: layout.type("role") }}>
+            <span
+              className="mt-[0.15em] block leading-snug font-bold whitespace-nowrap text-[#a9adb5]"
+              style={{ fontSize: layout.type("role") }}
+            >
               {t.kits.sampleRole}
             </span>
           </span>
         </div>
-        <div className={styles.kitCaption} style={{ ...captionAt, ...caption }}>
+        <div
+          className="absolute left-1/2 -translate-x-1/2 leading-[1.2] whitespace-nowrap"
+          style={{ ...captionAt, ...caption }}
+        >
           {sample.map((word, i) => (
             <span
               // The words never change order.
@@ -245,7 +269,7 @@ function KitPreview({
           <img
             src={logoUrl}
             alt=""
-            className={styles.kitLogo}
+            className="absolute object-contain"
             onLoad={(event) => {
               const image = event.currentTarget;
               setLogo({
@@ -356,152 +380,171 @@ export function BrandKits({ onClose }: { onClose: () => void }) {
   const set = (changes: Partial<Brand>) => draft && setDraft({ ...draft, ...changes });
 
   return (
-    <main className={styles.layout}>
-      <div className={styles.main}>
-        <div className={styles.hero}>
-          <button type="button" className={styles.linkButton} onClick={onClose}>
+    <Workspace
+      label={words.title}
+      panel={
+        <>
+          <div className={SECTION}>
+            <span className={LABEL}>{words.kits}</span>
+            {list && list.kits.length > 0 && (
+              <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                {list.kits.map((each) => (
+                  <li key={each.id}>
+                    <button
+                      type="button"
+                      className="flex min-h-10 w-full items-center gap-2.5 rounded-lg border border-transparent px-3 text-left text-[13px] text-steel transition-colors hover:bg-raised hover:text-foreground aria-pressed:border-edge aria-pressed:bg-raised aria-pressed:font-semibold aria-pressed:text-foreground"
+                      aria-pressed={each.id === chosen}
+                      onClick={() => setChosen(each.id)}
+                    >
+                      <span
+                        className="size-3.5 flex-none rounded-[4px] shadow-[inset_0_0_0_1px_rgb(255_255_255/0.2)]"
+                        style={{ background: each.brand.colors.primary }}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{each.brand.name}</span>
+                      {each.id === list.default && (
+                        <span className={LABEL_HINT}>{words.isDefault}</span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="flex items-center gap-2">
+              <Input
+                className="flex-1"
+                value={name}
+                maxLength={60}
+                placeholder={words.newName}
+                aria-label={words.newName}
+                onChange={(event) => setName(event.target.value)}
+              />
+              <Button type="button" variant="outline" disabled={busy} onClick={create}>
+                <Plus aria-hidden="true" />
+                {words.create}
+              </Button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="px-6 pb-5 max-md:px-4">
+              <ErrorNote message={error} fallback={words.failed} />
+            </div>
+          )}
+
+          {kit && draft && list && (
+            <KitFields
+              kit={kit}
+              draft={draft}
+              faces={list.faces}
+              isDefault={list.default === kit.id}
+              busy={busy}
+              set={set}
+              onDefault={makeDefault}
+              onLogo={(file) =>
+                upload(`/api/kits/${kit.id}/logo`, file, (saved, current) => ({
+                  ...current,
+                  ...(saved.logo
+                    ? { logo: { ...(current.logo ?? saved.logo), file: saved.logo.file } }
+                    : {}),
+                }))
+              }
+              onRemoveLogo={async () => {
+                const saved = await send(`/api/kits/${kit.id}/logo`, { method: "DELETE" });
+                if (saved) {
+                  const { logo: _, ...rest } = draft;
+                  setDraft(rest);
+                }
+                reload();
+              }}
+              onFont={(use, file) =>
+                upload(
+                  `/api/kits/${kit.id}/fonts/${use}?name=${encodeURIComponent(file.name)}`,
+                  file,
+                  (saved, current) => ({
+                    ...current,
+                    fonts: { ...current.fonts, [use]: saved.fonts?.[use] },
+                  }),
+                )
+              }
+            />
+          )}
+        </>
+      }
+      foot={
+        kit &&
+        draft && (
+          <>
+            <div className="flex gap-2">
+              <Button type="button" className="flex-1" disabled={!dirty || busy} onClick={save}>
+                {dirty ? words.save : words.saved}
+              </Button>
+              <Button
+                type="button"
+                variant={sure ? "danger" : "outline"}
+                disabled={busy}
+                onClick={remove}
+              >
+                {sure ? words.sure : words.remove}
+              </Button>
+            </div>
+            <p className={HELP}>{words.removeHelp}</p>
+          </>
+        )
+      }
+    >
+      <div className="flex flex-col gap-6 px-10 py-9 max-md:px-4 max-md:py-6">
+        <div className="flex flex-col items-start gap-3">
+          <Button type="button" variant="link" size="inline" onClick={onClose}>
+            <ArrowLeft aria-hidden="true" />
             {words.back}
-          </button>
-          <h1 className={styles.title}>{words.title}</h1>
-          <p className={styles.lede}>{words.lede}</p>
+          </Button>
+          <TextAnimate as="h1" by="word" animation="caption" startOnView={false} className={TITLE}>
+            {words.title}
+          </TextAnimate>
+          <p className="max-w-[64ch] text-sm leading-relaxed text-steel">{words.lede}</p>
         </div>
         {kit && draft ? (
-          <section className={styles.kitPreview} aria-label={words.preview}>
-            <div className={styles.chips}>
-              {(["16:9", "9:16"] as const).map((each) => (
-                <button
-                  key={each}
-                  type="button"
-                  className={styles.chip}
-                  aria-pressed={aspect === each}
-                  onClick={() => setAspect(each)}
-                >
-                  {each}
-                </button>
-              ))}
+          <section className="flex flex-col gap-4" aria-label={words.preview}>
+            <Segments
+              className="w-auto self-start"
+              options={(["16:9", "9:16"] as const).map((each) => ({ value: each, label: each }))}
+              value={aspect}
+              onChange={setAspect}
+            />
+            <div className="grid place-items-center rounded-2xl border bg-well p-8 max-md:p-4">
+              <div
+                className={cn(
+                  "viewfinder relative w-full [--inset:-10px]",
+                  aspect === "9:16" && "w-[min(100%,calc(58vh*9/16))]",
+                )}
+              >
+                <KitPreview kit={kit.id} brand={draft} aspect={aspect} />
+              </div>
             </div>
-            <div className={styles.kitPreviewFrame} data-aspect={aspect}>
-              <KitPreview kit={kit.id} brand={draft} aspect={aspect} />
-            </div>
-            <p className={styles.help}>{words.previewHelp}</p>
+            <p className={HELP}>{words.previewHelp}</p>
           </section>
         ) : (
           list && (
-            <section className={styles.kitPreview}>
-              <p className={styles.help}>{words.empty}</p>
+            <section className="hatch grid min-h-60 place-items-center rounded-2xl border p-8 text-center">
+              <p className="max-w-[44ch] text-[13px] text-steel">{words.empty}</p>
             </section>
           )
         )}
       </div>
-      <aside className={`${styles.card} ${styles.panel} ${styles.dock}`} aria-label={words.title}>
-        <div className={styles.field}>
-          <span className={styles.label}>{words.kits}</span>
-          {list && list.kits.length > 0 && (
-            <ul className={styles.kitList}>
-              {list.kits.map((each) => (
-                <li key={each.id}>
-                  <button
-                    type="button"
-                    className={styles.kitItem}
-                    aria-pressed={each.id === chosen}
-                    onClick={() => setChosen(each.id)}
-                  >
-                    <span
-                      className={styles.kitSwatch}
-                      style={{ background: each.brand.colors.primary }}
-                    />
-                    <span className={styles.kitItemName}>{each.brand.name}</span>
-                    {each.id === list.default && (
-                      <span className={styles.labelHint}>{words.isDefault}</span>
-                    )}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className={styles.kitNew}>
-            <input
-              className={styles.input}
-              value={name}
-              maxLength={60}
-              placeholder={words.newName}
-              aria-label={words.newName}
-              onChange={(event) => setName(event.target.value)}
-            />
-            <button type="button" className={styles.button} disabled={busy} onClick={create}>
-              {words.create}
-            </button>
-          </div>
-        </div>
-
-        {error && <ErrorNote message={error} fallback={words.failed} />}
-
-        {kit && draft && list && (
-          <KitFields
-            kit={kit}
-            draft={draft}
-            faces={list.faces}
-            isDefault={list.default === kit.id}
-            busy={busy}
-            set={set}
-            onDefault={makeDefault}
-            onLogo={(file) =>
-              upload(`/api/kits/${kit.id}/logo`, file, (saved, current) => ({
-                ...current,
-                ...(saved.logo
-                  ? { logo: { ...(current.logo ?? saved.logo), file: saved.logo.file } }
-                  : {}),
-              }))
-            }
-            onRemoveLogo={async () => {
-              const saved = await send(`/api/kits/${kit.id}/logo`, { method: "DELETE" });
-              if (saved) {
-                const { logo: _, ...rest } = draft;
-                setDraft(rest);
-              }
-              reload();
-            }}
-            onFont={(use, file) =>
-              upload(
-                `/api/kits/${kit.id}/fonts/${use}?name=${encodeURIComponent(file.name)}`,
-                file,
-                (saved, current) => ({
-                  ...current,
-                  fonts: { ...current.fonts, [use]: saved.fonts?.[use] },
-                }),
-              )
-            }
-          />
-        )}
-
-        {kit && draft && (
-          <div className={styles.block}>
-            <button
-              type="button"
-              className={styles.primary}
-              disabled={!dirty || busy}
-              onClick={save}
-            >
-              {dirty ? words.save : words.saved}
-            </button>
-            <button
-              type="button"
-              className={sure ? `${styles.button} ${styles.danger}` : styles.button}
-              disabled={busy}
-              onClick={remove}
-            >
-              {sure ? words.sure : words.remove}
-            </button>
-            <p className={styles.help}>{words.removeHelp}</p>
-          </div>
-        )}
-      </aside>
-    </main>
+    </Workspace>
   );
 }
 
 const CORNERS = ["top-left", "top-right", "bottom-left", "bottom-right"] as const;
 const STYLES: DrawnStyle[] = ["bold", "creator", "minimal", "pop"];
+const SUB = "text-xs text-steel";
+/** A colour well and its name. */
+const COLOUR = "flex items-center gap-2.5 text-[13px]";
+const SWATCH =
+  "h-7 w-9 flex-none cursor-pointer rounded-md border border-edge bg-well p-0.5 disabled:cursor-not-allowed disabled:opacity-50";
+/** A labelled slider and its value. */
+const RANGE =
+  "grid grid-cols-[5.5em_minmax(0,1fr)_3.5em] items-center gap-2 text-[13px] text-steel";
 
 /** A kit's settings, each section changing the draft. */
 function KitFields({
@@ -531,18 +574,18 @@ function KitFields({
   const words = t.kits;
   const tones = brandTones(draft.colors);
   const colour = (role: "primary" | "secondary" | "accent") => (
-    <div className={styles.kitColour} key={role}>
+    <div className={COLOUR} key={role}>
       <input
         type="color"
-        className={styles.kitColourInput}
+        className={SWATCH}
         aria-label={words.colours[role]}
         value={draft.colors[role] ?? tones[role]}
         disabled={role !== "primary" && draft.colors[role] === undefined}
         onChange={(event) => set({ colors: { ...draft.colors, [role]: event.target.value } })}
       />
-      <span className={styles.kitColourName}>{words.colours[role]}</span>
+      <span className="flex-1">{words.colours[role]}</span>
       {role !== "primary" && (
-        <label className={styles.kitCheck}>
+        <label className={CHECK}>
           <input
             type="checkbox"
             checked={draft.colors[role] === undefined}
@@ -564,13 +607,12 @@ function KitFields({
     const uploaded = own && "path" in own ? own : current && "path" in current ? current : null;
     const value = !current ? "noto-sans-tc" : "id" in current ? current.id : "file";
     return (
-      <div className={styles.field} key={use}>
-        <label className={styles.label} htmlFor={`kit-${use}`}>
+      <div className="flex flex-col gap-2" key={use}>
+        <label className={LABEL} htmlFor={`kit-${use}`}>
           {use === "graphics" ? words.graphicsFont : words.captionsFont}
         </label>
-        <select
+        <NativeSelect
           id={`kit-${use}`}
-          className={styles.input}
           value={value}
           onChange={(event) => {
             const picked = event.target.value;
@@ -594,12 +636,12 @@ function KitFields({
               {words.uploaded(uploaded.path.replace(/^fonts\/|-[0-9a-f]{12}(?=\.\w+$)/g, ""))}
             </option>
           )}
-        </select>
-        <label className={styles.kitUpload}>
+        </NativeSelect>
+        <label className="cursor-pointer self-start rounded-sm text-[13px] font-medium text-steel underline decoration-edge underline-offset-[3px] hover:text-foreground hover:decoration-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary">
           <input
             type="file"
             accept=".ttf,.otf,font/ttf,font/otf"
-            className={styles.visuallyHidden}
+            className="sr-only"
             disabled={busy}
             onChange={(event) => {
               const file = event.target.files?.[0];
@@ -607,7 +649,7 @@ function KitFields({
               if (file) onFont(use, file);
             }}
           />
-          <span className={styles.linkButton}>{words.uploadFont}</span>
+          {words.uploadFont}
         </label>
       </div>
     );
@@ -617,21 +659,22 @@ function KitFields({
     custom && set({ captions: { ...custom, ...changes } });
   const lights = custom && PRESETS[custom.style].active !== PRESETS[custom.style].text;
   const keywords = custom && PRESETS[custom.style].keyword !== undefined;
+  const fieldset = cn(SECTION, "m-0 min-w-0 border-0 border-t");
+  const legend = cn(LABEL, "float-left");
 
   return (
     <>
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor="kit-name">
+      <div className={cn(SECTION, "border-t")}>
+        <label className={LABEL} htmlFor="kit-name">
           {words.name}
         </label>
-        <input
+        <Input
           id="kit-name"
-          className={styles.input}
           value={draft.name}
           maxLength={60}
           onChange={(event) => set({ name: event.target.value })}
         />
-        <label className={styles.kitCheck}>
+        <label className={CHECK}>
           <input
             type="checkbox"
             checked={isDefault}
@@ -642,26 +685,31 @@ function KitFields({
         </label>
       </div>
 
-      <fieldset className={styles.field}>
-        <legend className={styles.label}>{words.coloursTitle}</legend>
+      <fieldset className={fieldset}>
+        <legend className={legend}>{words.coloursTitle}</legend>
         {(["primary", "secondary", "accent"] as const).map(colour)}
-        <p className={styles.help}>{words.coloursHelp}</p>
+        <p className={HELP}>{words.coloursHelp}</p>
       </fieldset>
 
-      <div className={styles.block}>
+      <div className={cn(SECTION, "border-t")}>
         {font("graphics")}
         {font("captions")}
-        <p className={styles.help}>{words.fontNote}</p>
+        <p className={HELP}>{words.fontNote}</p>
       </div>
 
-      <fieldset className={styles.field}>
-        <legend className={styles.label}>{words.logo}</legend>
-        <div className={styles.kitNew}>
-          <label className={styles.kitUpload}>
+      <fieldset className={fieldset}>
+        <legend className={legend}>{words.logo}</legend>
+        <div className="flex items-center gap-3">
+          <label
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary",
+            )}
+          >
             <input
               type="file"
               accept=".png,.svg,image/png,image/svg+xml"
-              className={styles.visuallyHidden}
+              className="sr-only"
               disabled={busy}
               onChange={(event) => {
                 const file = event.target.files?.[0];
@@ -669,19 +717,18 @@ function KitFields({
                 if (file) onLogo(file);
               }}
             />
-            <span className={styles.button}>
-              {draft.logo ? words.replaceLogo : words.uploadLogo}
-            </span>
+            <Upload aria-hidden="true" />
+            {draft.logo ? words.replaceLogo : words.uploadLogo}
           </label>
           {draft.logo && (
-            <button type="button" className={styles.linkButton} onClick={onRemoveLogo}>
+            <Button type="button" variant="link" size="inline" onClick={onRemoveLogo}>
               {words.removeLogo}
-            </button>
+            </Button>
           )}
         </div>
         {draft.logo && (
           <>
-            <label className={styles.kitCheck}>
+            <label className={CHECK}>
               <input
                 type="checkbox"
                 checked={draft.logo.show}
@@ -691,20 +738,13 @@ function KitFields({
               />
               {words.watermark}
             </label>
-            <div className={styles.chips}>
-              {CORNERS.map((corner) => (
-                <button
-                  key={corner}
-                  type="button"
-                  className={styles.chip}
-                  aria-pressed={draft.logo?.corner === corner}
-                  onClick={() => draft.logo && set({ logo: { ...draft.logo, corner } })}
-                >
-                  {words.corners[corner]}
-                </button>
-              ))}
-            </div>
-            <label className={styles.kitRange}>
+            <Segments
+              className="flex-wrap"
+              options={CORNERS.map((corner) => ({ value: corner, label: words.corners[corner] }))}
+              value={draft.logo.corner}
+              onChange={(corner) => draft.logo && set({ logo: { ...draft.logo, corner } })}
+            />
+            <label className={RANGE}>
               <span>{words.size}</span>
               <input
                 type="range"
@@ -716,9 +756,9 @@ function KitFields({
                   set({ logo: { ...draft.logo, size: Number(event.target.value) / 100 } })
                 }
               />
-              <span className={styles.tabular}>{Math.round(draft.logo.size * 100)} %</span>
+              <span className="tabular-nums">{Math.round(draft.logo.size * 100)} %</span>
             </label>
-            <label className={styles.kitRange}>
+            <label className={RANGE}>
               <span>{words.opacity}</span>
               <input
                 type="range"
@@ -730,16 +770,16 @@ function KitFields({
                   set({ logo: { ...draft.logo, opacity: Number(event.target.value) / 100 } })
                 }
               />
-              <span className={styles.tabular}>{Math.round(draft.logo.opacity * 100)} %</span>
+              <span className="tabular-nums">{Math.round(draft.logo.opacity * 100)} %</span>
             </label>
           </>
         )}
-        <p className={styles.help}>{words.logoHelp}</p>
+        <p className={HELP}>{words.logoHelp}</p>
       </fieldset>
 
-      <fieldset className={styles.field}>
-        <legend className={styles.label}>{words.captions}</legend>
-        <label className={styles.kitCheck}>
+      <fieldset className={fieldset}>
+        <legend className={legend}>{words.captions}</legend>
+        <label className={CHECK}>
           <input
             type="checkbox"
             checked={custom !== undefined}
@@ -749,103 +789,73 @@ function KitFields({
         </label>
         {custom && (
           <>
-            <span className={styles.kitSub}>{words.startsFrom}</span>
-            <div className={styles.chips}>
-              {STYLES.map((style) => (
-                <button
-                  key={style}
-                  type="button"
-                  className={styles.chip}
-                  aria-pressed={custom.style === style}
-                  onClick={() => setCaptions({ style })}
-                >
-                  {t.captions[style].name}
-                </button>
-              ))}
-            </div>
-            <span className={styles.kitSub}>{words.size}</span>
-            <div className={styles.chips}>
-              {(["S", "M", "L"] as const).map((size) => (
-                <button
-                  key={size}
-                  type="button"
-                  className={styles.chip}
-                  aria-pressed={custom.size === size}
-                  onClick={() => setCaptions({ size })}
-                >
-                  {words.sizes[size]}
-                </button>
-              ))}
-            </div>
-            <div className={styles.kitColour}>
+            <span className={SUB}>{words.startsFrom}</span>
+            <Segments
+              options={STYLES.map((style) => ({ value: style, label: t.captions[style].name }))}
+              value={custom.style}
+              onChange={(style) => setCaptions({ style })}
+            />
+            <span className={SUB}>{words.size}</span>
+            <Segments
+              options={(["S", "M", "L"] as const).map((size) => ({
+                value: size,
+                label: words.sizes[size],
+              }))}
+              value={custom.size}
+              onChange={(size) => setCaptions({ size })}
+            />
+            <div className={COLOUR}>
               <input
                 type="color"
-                className={styles.kitColourInput}
+                className={SWATCH}
                 aria-label={words.text}
                 value={custom.text}
                 onChange={(event) => setCaptions({ text: event.target.value })}
               />
-              <span className={styles.kitColourName}>{words.text}</span>
+              <span className="flex-1">{words.text}</span>
             </div>
             {(lights || keywords) && (
-              <div className={styles.kitColour}>
+              <div className={COLOUR}>
                 <input
                   type="color"
-                  className={styles.kitColourInput}
+                  className={SWATCH}
                   aria-label={words.highlight}
                   value={custom.highlight}
                   onChange={(event) => setCaptions({ highlight: event.target.value })}
                 />
-                <span className={styles.kitColourName}>
-                  {keywords ? words.keywords : words.highlight}
-                </span>
+                <span className="flex-1">{keywords ? words.keywords : words.highlight}</span>
               </div>
             )}
-            <span className={styles.kitSub}>{words.frame}</span>
-            <div className={styles.chips}>
-              {(["outline", "box"] as const).map((frame) => (
-                <button
-                  key={frame}
-                  type="button"
-                  className={styles.chip}
-                  aria-pressed={custom.frame === frame}
-                  onClick={() => setCaptions({ frame })}
-                >
-                  {words.frames[frame]}
-                </button>
-              ))}
-            </div>
-            <span className={styles.kitSub}>{words.position}</span>
-            <div className={styles.chips}>
-              {(["bottom", "middle", "top"] as const).map((position) => (
-                <button
-                  key={position}
-                  type="button"
-                  className={styles.chip}
-                  aria-pressed={custom.position === position}
-                  onClick={() => setCaptions({ position })}
-                >
-                  {words.positions[position]}
-                </button>
-              ))}
-            </div>
-            <span className={styles.kitSub}>{words.lines}</span>
-            <div className={styles.chips}>
-              {([1, 2] as const).map((lines) => (
-                <button
-                  key={lines}
-                  type="button"
-                  className={styles.chip}
-                  aria-pressed={custom.lines === lines}
-                  onClick={() => setCaptions({ lines })}
-                >
-                  {words.lineCount(lines)}
-                </button>
-              ))}
-            </div>
+            <span className={SUB}>{words.frame}</span>
+            <Segments
+              options={(["outline", "box"] as const).map((frame) => ({
+                value: frame,
+                label: words.frames[frame],
+              }))}
+              value={custom.frame}
+              onChange={(frame) => setCaptions({ frame })}
+            />
+            <span className={SUB}>{words.position}</span>
+            <Segments
+              options={(["bottom", "middle", "top"] as const).map((position) => ({
+                value: position,
+                label: words.positions[position],
+              }))}
+              value={custom.position}
+              onChange={(position) => setCaptions({ position })}
+            />
+            <span className={SUB}>{words.lines}</span>
+            <Segments
+              options={([1, 2] as const).map((lines) => ({
+                value: lines,
+                label: words.lineCount(lines),
+              }))}
+              value={custom.lines}
+              onChange={(lines) => setCaptions({ lines })}
+            />
           </>
         )}
-        <p className={styles.help}>{custom ? words.captionsHelp : words.captionsOff}</p>
+        <p className={HELP}>{custom ? words.captionsHelp : words.captionsOff}</p>
       </fieldset>
     </>
   );

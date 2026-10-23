@@ -435,7 +435,8 @@ export const zhTW: Messages = {
     player: "你的剪輯",
     ready: "剪輯完成",
     captions: " · 字幕",
-    musicSkipped: "Claude 選的配樂下載失敗，所以這支影片沒有配樂。可以在下方的配樂庫選一首加上。",
+    musicSkipped:
+      "Claude 選的配樂下載失敗，所以這支影片沒有配樂。可以在「配樂」分頁的配樂庫選一首加上。",
     beatsSkipped: "節拍模型下載失敗，所以你的配樂從頭播放，沒有對齊節拍。下次剪輯會再試一次。",
     download: "下載 MP4",
     downloadCaptions: "下載字幕（SRT）",
@@ -539,6 +540,16 @@ export const zhTW: Messages = {
   },
   reedit: {
     label: "修改剪輯",
+    tabs: {
+      result: "成品",
+      music: "配樂",
+      look: "風格",
+      captions: "字幕",
+      brand: "品牌",
+      text: "文字",
+      overlays: "疊加",
+      replan: "重新規劃",
+    },
     loadFallback: "無法載入這次剪輯的修改內容。",
     loading: "載入中…",
     noFootage: "這個專案的素材已刪除，無法再修改；請用素材重新剪輯",

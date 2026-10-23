@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { LockKeyhole } from "lucide-react";
+import { useId, useState } from "react";
+import { HELP, LABEL } from "../lib/styles.ts";
 import { ErrorNote } from "./ErrorNote.tsx";
-import styles from "./editor.module.css";
 import { useT } from "./I18n.tsx";
-import { LockIcon } from "./icons.tsx";
+import { Button } from "./ui/button.tsx";
+import { Dialog, DialogContent, DialogTitle } from "./ui/dialog.tsx";
+import { Input } from "./ui/input.tsx";
 
 /** Where to get each service's key, and the name the dialog calls it by; the rest is in each
  * language's words. */
@@ -40,16 +43,14 @@ export function KeyDialog({ service, open, replacing, onClose, onSaved }: Props)
   const words = t.keys;
   const text = { ...SITES[service], ...words[service] };
   const id = useId();
-  const dialog = useRef<HTMLDialogElement>(null);
   const [key, setKey] = useState("");
   const [state, setState] = useState<{ checking: boolean; error?: string }>({ checking: false });
 
-  useEffect(() => {
-    const element = dialog.current;
-    if (!element) return;
-    if (open && !element.open) element.showModal();
-    if (!open && element.open) element.close();
-  }, [open]);
+  const close = () => {
+    setKey("");
+    setState({ checking: false });
+    onClose();
+  };
 
   const save = async () => {
     setState({ checking: true });
@@ -70,68 +71,58 @@ export function KeyDialog({ service, open, replacing, onClose, onSaved }: Props)
   };
 
   return (
-    <dialog
-      ref={dialog}
-      className={styles.dialog}
-      aria-labelledby={`${id}-title`}
-      onClose={() => {
-        setKey("");
-        setState({ checking: false });
-        onClose();
-      }}
-    >
-      <form
-        className={styles.dialogBody}
-        onSubmit={(event) => {
-          event.preventDefault();
-          void save();
-        }}
+    <Dialog open={open} onOpenChange={(next) => !next && close()}>
+      <DialogContent
+        // Only "Later" or Escape closes it, as a click beside it may be a slip.
+        onInteractOutside={(event) => event.preventDefault()}
       >
-        <h2 id={`${id}-title`} className={styles.panelTitle}>
-          {replacing ? words.replace(text.name) : text.title}
-        </h2>
-        <p className={styles.dialogText}>
-          {text.about}{" "}
-          <a href={text.link} target="_blank" rel="noreferrer">
-            {text.site}
-          </a>
-          {text.end}
-        </p>
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor={`${id}-key`}>
-            {words.key}
-          </label>
-          <input
-            id={`${id}-key`}
-            className={styles.input}
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder={text.placeholder}
-            value={key}
-            aria-invalid={state.error !== undefined}
-            autoFocus
-            onChange={(event) => setKey(event.target.value)}
-          />
-        </div>
-        {state.error && <ErrorNote message={state.error} fallback={words.fallback} />}
-        <div className={styles.dialogActions}>
-          <button type="button" className={styles.button} onClick={() => dialog.current?.close()}>
-            {replacing ? words.cancel : words.later}
-          </button>
-          <button
-            type="submit"
-            className={`${styles.primary} ${styles.dialogPrimary}`}
-            disabled={state.checking || key.trim() === ""}
-          >
-            {state.checking ? words.checking(text.name) : words.save}
-          </button>
-        </div>
-        <p className={styles.note}>
-          <LockIcon width={14} height={14} />
-          <span>{words.stored(text.name)}</span>
-        </p>
-      </form>
-    </dialog>
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void save();
+          }}
+        >
+          <DialogTitle>{replacing ? words.replace(text.name) : text.title}</DialogTitle>
+          <p className="text-[13px] leading-relaxed text-steel">
+            {text.about}{" "}
+            <a className="text-foreground" href={text.link} target="_blank" rel="noreferrer">
+              {text.site}
+            </a>
+            {text.end}
+          </p>
+          <div className="flex flex-col gap-2">
+            <label className={LABEL} htmlFor={`${id}-key`}>
+              {words.key}
+            </label>
+            <Input
+              id={`${id}-key`}
+              className="h-10"
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={text.placeholder}
+              value={key}
+              aria-invalid={state.error !== undefined}
+              autoFocus
+              onChange={(event) => setKey(event.target.value)}
+            />
+          </div>
+          {state.error && <ErrorNote message={state.error} fallback={words.fallback} />}
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={close}>
+              {replacing ? words.cancel : words.later}
+            </Button>
+            <Button type="submit" className="flex-1" disabled={state.checking || key.trim() === ""}>
+              {state.checking ? words.checking(text.name) : words.save}
+            </Button>
+          </div>
+          <p className={`flex gap-2 border-t pt-4 ${HELP}`}>
+            <LockKeyhole className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+            <span>{words.stored(text.name)}</span>
+          </p>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

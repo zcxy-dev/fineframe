@@ -1,6 +1,7 @@
 "use client";
 
 import type { CaptionStyle } from "@video-editor/engine/captions";
+import { ChevronRight } from "lucide-react";
 import { useId } from "react";
 import { en, type Messages } from "../lib/i18n/messages.ts";
 import {
@@ -30,10 +31,13 @@ import {
   VISUALS,
   type Visuals,
 } from "../lib/settings.ts";
+import { CHOICE, cn, HELP, HIDDEN_RADIO, LABEL, LABEL_HINT, WARNING } from "../lib/styles.ts";
 import { type Kit, KitCaptionPreview } from "./BrandKits.tsx";
 import { CaptionPreview } from "./CaptionPreview.tsx";
-import styles from "./editor.module.css";
 import { useT } from "./I18n.tsx";
+import { Segments } from "./Segments.tsx";
+import { Button } from "./ui/button.tsx";
+import { Input, NativeSelect, Textarea } from "./ui/input.tsx";
 
 export interface Choices {
   /** One video, or several shorts from one long video. */
@@ -120,6 +124,19 @@ interface Props {
   onEditKits: () => void;
 }
 
+/** One of the inspector's sections, divided from the next by a hairline. */
+const SECTION =
+  "m-0 flex min-w-0 flex-col gap-2.5 border-0 border-t px-6 py-5 first:border-t-0 max-md:px-4";
+/** A fieldset's legend, laid out as an ordinary first line. */
+const LEGEND = cn(LABEL, "float-left");
+
+/** The silhouette of each aspect, in px. */
+const SHAPES: Record<Aspect, string> = {
+  "9:16": "h-[34px] w-5",
+  "1:1": "size-7",
+  "16:9": "h-[23px] w-10",
+};
+
 export function SettingsPanel({
   choices,
   onChange,
@@ -147,109 +164,81 @@ export function SettingsPanel({
   const kit = kits?.find((each) => each.id === choices.brand) ?? null;
   const [fewest, most] = SHORTS_COUNT;
   const counts = Array.from({ length: most - fewest + 1 }, (_, i) => fewest + i);
+  const onOff = (value: boolean) => ({ value, label: value ? words.on : words.off });
 
   return (
     <>
-      <fieldset className={styles.field}>
-        <legend className={styles.label}>{words.what}</legend>
-        <div className={styles.chips}>
-          {(["one", "shorts"] as const).map((make) => (
-            <button
-              key={make}
-              type="button"
-              className={styles.chip}
-              aria-pressed={choices.make === make}
-              // Shorts are watched on phones, so they start vertical.
-              onClick={() => set({ make, ...(make === "shorts" ? { aspect: "9:16" } : {}) })}
-            >
-              {words.whatChoices[make]}
-            </button>
-          ))}
-        </div>
+      <fieldset className={SECTION}>
+        <legend className={LEGEND}>{words.what}</legend>
+        <Segments
+          options={(["one", "shorts"] as const).map((make) => ({
+            value: make,
+            label: words.whatChoices[make],
+          }))}
+          value={choices.make}
+          // Shorts are watched on phones, so they start vertical.
+          onChange={(make) => set({ make, ...(make === "shorts" ? { aspect: "9:16" } : {}) })}
+        />
       </fieldset>
 
       {several ? (
         <>
-          <fieldset className={styles.field}>
-            <legend className={styles.label}>{words.shortLength}</legend>
-            <div className={styles.chips}>
-              {SHORT_RANGES.map(([from, to], i) => (
-                <button
-                  key={from}
-                  type="button"
-                  className={styles.chip}
-                  aria-pressed={choices.range === i}
-                  onClick={() => set({ range: i })}
-                >
-                  {formatRange(from, to, t)}
-                </button>
-              ))}
-            </div>
-            <p className={styles.help}>{words.shortLengthHelp}</p>
+          <fieldset className={SECTION}>
+            <legend className={LEGEND}>{words.shortLength}</legend>
+            <Segments
+              options={SHORT_RANGES.map(([from, to], i) => ({
+                value: i,
+                label: formatRange(from, to, t),
+              }))}
+              value={choices.range}
+              onChange={(range) => set({ range })}
+            />
+            <p className={HELP}>{words.shortLengthHelp}</p>
           </fieldset>
-          <fieldset className={styles.field}>
-            <legend className={styles.label}>{words.count}</legend>
-            <div className={styles.chips}>
-              {counts.map((count) => (
-                <button
-                  key={count}
-                  type="button"
-                  className={styles.chip}
-                  aria-pressed={choices.count === count}
-                  onClick={() => set({ count })}
-                >
-                  {count}
-                </button>
-              ))}
-            </div>
-            <p className={styles.help}>{words.countHelp}</p>
+          <fieldset className={SECTION}>
+            <legend className={LEGEND}>{words.count}</legend>
+            <Segments
+              options={counts.map((count) => ({ value: count, label: count }))}
+              value={choices.count}
+              onChange={(count) => set({ count })}
+            />
+            <p className={HELP}>{words.countHelp}</p>
           </fieldset>
         </>
       ) : (
-        <fieldset className={styles.field}>
-          <legend className={styles.label}>
+        <fieldset className={SECTION}>
+          <legend className={LEGEND}>
             {words.length}
-            <span className={styles.labelHint}>
+            <span className={LABEL_HINT}>
               {words.range(formatLength(shortest, t), formatLength(longest, t))}
             </span>
           </legend>
-          <div className={styles.chips}>
-            {LENGTH_PRESETS.map((seconds) => (
-              <button
-                key={seconds}
-                type="button"
-                className={styles.chip}
-                aria-pressed={choices.preset === seconds}
-                onClick={() => set({ preset: seconds })}
-              >
-                {formatLength(seconds, t)}
-              </button>
-            ))}
-            <button
-              type="button"
-              className={styles.chip}
-              aria-pressed={choices.preset === "custom"}
-              onClick={() => set({ preset: "custom" })}
-            >
-              {words.custom}
-            </button>
-          </div>
+          <Segments
+            options={[
+              ...LENGTH_PRESETS.map((seconds) => ({
+                value: seconds as number | "custom",
+                label: formatLength(seconds, t),
+              })),
+              { value: "custom" as const, label: words.custom },
+            ]}
+            value={choices.preset}
+            onChange={(preset) => set({ preset })}
+          />
           {choices.preset === "custom" && (
-            <div className={styles.custom}>
-              <input
+            <div className="flex items-center gap-3 animate-in fade-in-0 slide-in-from-top-1 duration-200">
+              <Input
                 id={`${id}-custom`}
-                className={styles.input}
+                className="w-40 flex-none"
                 inputMode="text"
                 autoComplete="off"
                 placeholder={words.customPlaceholder}
                 aria-label={words.customLabel}
                 aria-invalid={"problem" in length && choices.custom.trim() !== ""}
                 value={choices.custom}
-                // biome-ignore lint/a11y/noAutofocus: the field appears because it was asked for.
                 autoFocus
                 onChange={(event) => set({ custom: event.target.value })}
               />
-              <span className={styles.customOut} aria-live="polite">
+              <span className="text-xs text-muted-foreground tabular-nums" aria-live="polite">
                 {"seconds" in length
                   ? `= ${formatLength(length.seconds, t)}`
                   : choices.custom.trim()
@@ -258,43 +247,47 @@ export function SettingsPanel({
               </span>
             </div>
           )}
-          {tooLong && (
-            <p className={styles.warning}>{words.tooLong(formatLength(footageSeconds, t))}</p>
-          )}
+          {tooLong && <p className={WARNING}>{words.tooLong(formatLength(footageSeconds, t))}</p>}
         </fieldset>
       )}
 
-      <fieldset className={styles.field}>
-        <legend className={styles.label}>{words.aspect}</legend>
-        <div className={styles.aspects}>
+      <fieldset className={SECTION}>
+        <legend className={LEGEND}>{words.aspect}</legend>
+        <div className="grid grid-cols-3 gap-2">
           {ASPECTS.map((aspect) => (
-            <label key={aspect} className={styles.aspect}>
+            <label key={aspect} className={cn(CHOICE, "group gap-1 px-1.5 pt-3 pb-2.5")}>
               <input
                 type="radio"
                 name={`${id}-aspect`}
-                className={styles.radio}
+                className={HIDDEN_RADIO}
                 value={aspect}
                 checked={choices.aspect === aspect}
                 onChange={() => set({ aspect })}
               />
-              <span className={styles.shapeBox}>
-                <span className={styles.shape} data-aspect={aspect} />
+              <span className="mb-0.5 grid h-9 place-items-center">
+                <span
+                  className={cn(
+                    "block rounded-[2px] border-[1.5px] border-muted-foreground transition-colors duration-150 group-has-checked:border-foreground group-has-checked:bg-white/10",
+                    SHAPES[aspect],
+                  )}
+                />
               </span>
-              <span className={styles.aspectName}>{words.aspects[aspect].name}</span>
-              <span className={styles.aspectHint}>{words.aspects[aspect].hint}</span>
+              <span className="text-[13px] font-semibold">{words.aspects[aspect].name}</span>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {words.aspects[aspect].hint}
+              </span>
             </label>
           ))}
         </div>
       </fieldset>
 
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor={`${id}-instructions`}>
+      <div className={SECTION}>
+        <label className={LABEL} htmlFor={`${id}-instructions`}>
           {words.instructions}
-          <span className={styles.labelHint}>{words.optional}</span>
+          <span className={LABEL_HINT}>{words.optional}</span>
         </label>
-        <textarea
+        <Textarea
           id={`${id}-instructions`}
-          className={styles.textarea}
           rows={3}
           placeholder={words.instructionsPlaceholder}
           aria-invalid={asked !== null}
@@ -302,42 +295,36 @@ export function SettingsPanel({
           value={choices.instructions}
           onChange={(event) => set({ instructions: event.target.value })}
         />
-        <p id={`${id}-instructions-help`} className={asked ? styles.warning : styles.help}>
+        <p id={`${id}-instructions-help`} className={asked ? WARNING : HELP}>
           {asked ?? words.instructionsHelp(INSTRUCTIONS_MAX)}
         </p>
       </div>
 
-      <fieldset className={styles.field}>
-        <legend className={styles.label}>
+      <fieldset className={SECTION}>
+        <legend className={LEGEND}>
           {words.style}
-          <span className={styles.labelHint}>{words.optional}</span>
+          <span className={LABEL_HINT}>{words.optional}</span>
         </legend>
-        <div className={styles.chips}>
-          {STYLES.map((style) => (
-            <button
-              key={style}
-              type="button"
-              className={styles.chip}
-              aria-pressed={choices.style === style}
-              aria-describedby={choices.style === style ? `${id}-style` : undefined}
-              onClick={() => set({ style })}
-            >
-              {styleName(style, t)}
-            </button>
-          ))}
-        </div>
-        <p id={`${id}-style`} className={styles.help}>
+        <Segments
+          options={STYLES.map((style) => ({
+            value: style,
+            label: styleName(style, t),
+            describedBy: choices.style === style ? `${id}-style` : undefined,
+          }))}
+          value={choices.style}
+          onChange={(style) => set({ style })}
+        />
+        <p id={`${id}-style`} className={HELP}>
           {t.looks[choices.style].description}
         </p>
       </fieldset>
 
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor={`${id}-brand`}>
+      <div className={SECTION}>
+        <label className={LABEL} htmlFor={`${id}-brand`}>
           {t.kits.picker}
         </label>
-        <select
+        <NativeSelect
           id={`${id}-brand`}
-          className={styles.input}
           value={choices.brand ?? ""}
           onChange={(event) => {
             const picked = kits?.find((kit) => kit.id === event.target.value) ?? null;
@@ -358,244 +345,224 @@ export function SettingsPanel({
               {kit.brand.name}
             </option>
           ))}
-        </select>
-        <button type="button" className={styles.linkButton} onClick={onEditKits}>
+        </NativeSelect>
+        <Button
+          type="button"
+          variant="link"
+          size="inline"
+          className="self-start"
+          onClick={onEditKits}
+        >
           {t.kits.edit}
-        </button>
-        <p className={styles.help}>{t.kits.pickerHelp}</p>
+          <ChevronRight aria-hidden="true" />
+        </Button>
+        <p className={HELP}>{t.kits.pickerHelp}</p>
       </div>
 
-      <fieldset className={styles.field}>
-        <legend className={styles.label}>{words.captionStyle}</legend>
-        <div className={styles.captionStyles}>
+      <fieldset className={SECTION}>
+        <legend className={LEGEND}>{words.captionStyle}</legend>
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(104px,1fr))] gap-2">
           {kit?.brand.captions && (
-            <label className={styles.captionStyle}>
+            <label className={cn(CHOICE, "gap-1.5 p-1.5 pb-2 text-[13px] font-medium")}>
               <input
                 type="radio"
                 name={`${id}-captions`}
-                className={styles.radio}
+                className={HIDDEN_RADIO}
                 value="brand"
                 checked={choices.captions === "brand"}
                 onChange={() => set({ captions: "brand" })}
               />
               <KitCaptionPreview kit={kit} />
-              <span className={styles.aspectName}>{t.kits.captionsName}</span>
+              <span>{t.kits.captionsName}</span>
             </label>
           )}
           {CAPTION_STYLES.map((captions) => (
-            <label key={captions} className={styles.captionStyle}>
+            <label
+              key={captions}
+              className={cn(CHOICE, "gap-1.5 p-1.5 pb-2 text-[13px] font-medium")}
+            >
               <input
                 type="radio"
                 name={`${id}-captions`}
-                className={styles.radio}
+                className={HIDDEN_RADIO}
                 value={captions}
                 checked={choices.captions === captions}
                 onChange={() => set({ captions })}
               />
               <CaptionPreview style={captions} />
-              <span className={styles.aspectName}>{t.captions[captions].name}</span>
+              <span>{t.captions[captions].name}</span>
             </label>
           ))}
         </div>
-        <p className={styles.help}>
+        <p className={HELP}>
           {choices.captions === "brand"
             ? t.kits.captionsDescription
             : t.captions[choices.captions].description}
         </p>
       </fieldset>
 
-      <fieldset className={styles.field}>
-        <legend className={styles.label}>{words.emoji}</legend>
-        <div className={styles.chips}>
-          {[false, true].map((emoji) => (
-            <button
-              key={String(emoji)}
-              type="button"
-              className={styles.chip}
-              aria-pressed={choices.emoji === emoji}
-              onClick={() => set({ emoji })}
-            >
-              {emoji ? words.on : words.off}
-            </button>
-          ))}
-        </div>
-        <p className={styles.help}>{words.emojiHelp}</p>
+      <fieldset className={SECTION}>
+        <legend className={LEGEND}>{words.emoji}</legend>
+        <Segments
+          options={[onOff(false), onOff(true)]}
+          value={choices.emoji}
+          onChange={(emoji) => set({ emoji })}
+        />
+        <p className={HELP}>{words.emojiHelp}</p>
       </fieldset>
 
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor={`${id}-names`}>
+      <div className={SECTION}>
+        <label className={LABEL} htmlFor={`${id}-names`}>
           {words.names}
-          <span className={styles.labelHint}>{words.optional}</span>
+          <span className={LABEL_HINT}>{words.optional}</span>
         </label>
-        <textarea
+        <Textarea
           id={`${id}-names`}
-          className={styles.textarea}
           rows={2}
+          className="min-h-15"
           placeholder={"王小明\nAlex Chen"}
           value={choices.names}
           onChange={(event) => set({ names: event.target.value })}
         />
-        <p className={styles.help}>{words.namesHelp}</p>
+        <p className={HELP}>{words.namesHelp}</p>
       </div>
 
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor={`${id}-terms`}>
+      <div className={SECTION}>
+        <label className={LABEL} htmlFor={`${id}-terms`}>
           {words.terms}
-          <span className={styles.labelHint}>{words.optional}</span>
+          <span className={LABEL_HINT}>{words.optional}</span>
         </label>
-        <textarea
+        <Textarea
           id={`${id}-terms`}
-          className={styles.textarea}
           rows={2}
+          className="min-h-15"
           placeholder={"GPU\nRemotion"}
           value={choices.terms}
           onChange={(event) => set({ terms: event.target.value })}
         />
-        <p className={styles.help}>{words.termsHelp}</p>
+        <p className={HELP}>{words.termsHelp}</p>
       </div>
 
-      <fieldset className={styles.field}>
-        <legend className={styles.label}>{words.speech}</legend>
-        <div className={styles.chips}>
-          <button
-            type="button"
-            className={styles.chip}
-            aria-pressed={choices.asr === "local"}
-            onClick={() => set({ asr: "local" })}
-          >
-            {words.local}
-          </button>
-          <button
-            type="button"
-            className={styles.chip}
-            aria-pressed={choices.asr === "cloud"}
-            onClick={() => set({ asr: "cloud" })}
-          >
-            OpenRouter
-          </button>
-        </div>
+      <fieldset className={SECTION}>
+        <legend className={LEGEND}>{words.speech}</legend>
+        <Segments
+          options={[
+            { value: "local" as Asr, label: words.local },
+            { value: "cloud" as Asr, label: "OpenRouter" },
+          ]}
+          value={choices.asr}
+          onChange={(asr) => set({ asr })}
+        />
         {machine && machine.memory < machine.needed && (
-          <p className={styles.warning}>
-            {words.lowMemory(Math.round(machine.memory / 1024 ** 3))}
-          </p>
+          <p className={WARNING}>{words.lowMemory(Math.round(machine.memory / 1024 ** 3))}</p>
         )}
-        <p className={styles.help}>{choices.asr === "local" ? words.localHelp : words.cloudHelp}</p>
+        <p className={HELP}>{choices.asr === "local" ? words.localHelp : words.cloudHelp}</p>
         {choices.asr === "cloud" && openrouter === false && (
-          <button type="button" className={styles.button} onClick={onAddOpenRouter}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="self-start"
+            onClick={onAddOpenRouter}
+          >
             {words.addOpenRouter}
-          </button>
+          </Button>
         )}
       </fieldset>
 
-      <fieldset className={styles.field}>
-        <legend className={styles.label}>{words.visuals}</legend>
-        <div className={styles.chips}>
-          {VISUALS.map((visuals) => (
-            <button
-              key={visuals}
-              type="button"
-              className={styles.chip}
-              aria-pressed={choices.visuals === visuals}
-              onClick={() => set({ visuals })}
-            >
-              {words.visualsChoices[visuals].name}
-            </button>
-          ))}
-        </div>
-        <p className={styles.help}>{words.visualsChoices[choices.visuals].help}</p>
+      <fieldset className={SECTION}>
+        <legend className={LEGEND}>{words.visuals}</legend>
+        <Segments
+          options={VISUALS.map((visuals) => ({
+            value: visuals,
+            label: words.visualsChoices[visuals].name,
+          }))}
+          value={choices.visuals}
+          onChange={(visuals) => set({ visuals })}
+        />
+        <p className={HELP}>{words.visualsChoices[choices.visuals].help}</p>
         {choices.visuals === "rich" && stock && (
-          <p className={styles.help}>
+          <p className={HELP}>
             {words.stock}{" "}
             {(["pexels", "pixabay"] as const).map((service, i) => (
               <span key={service}>
                 {i > 0 && " · "}
-                <button
+                <Button
                   type="button"
-                  className={styles.linkButton}
+                  variant="link"
+                  size="inline"
+                  className="text-xs"
                   onClick={() => onAddStock(service)}
                 >
                   {words.stockKey(service === "pexels" ? "Pexels" : "Pixabay", stock[service])}
-                </button>
+                </Button>
               </span>
             ))}
           </p>
         )}
       </fieldset>
 
-      <fieldset className={styles.field}>
-        <legend className={styles.label}>{words.fillers}</legend>
-        <div className={styles.chips}>
-          {FILLER_MODES.map((fillers) => (
-            <button
-              key={fillers}
-              type="button"
-              className={styles.chip}
-              aria-pressed={choices.fillers === fillers}
-              onClick={() => set({ fillers })}
-            >
-              {words.fillersChoices[fillers].name}
-            </button>
-          ))}
-        </div>
-        <p className={styles.help}>{words.fillersChoices[choices.fillers].help}</p>
+      <fieldset className={SECTION}>
+        <legend className={LEGEND}>{words.fillers}</legend>
+        <Segments
+          options={FILLER_MODES.map((fillers) => ({
+            value: fillers,
+            label: words.fillersChoices[fillers].name,
+          }))}
+          value={choices.fillers}
+          onChange={(fillers) => set({ fillers })}
+        />
+        <p className={HELP}>{words.fillersChoices[choices.fillers].help}</p>
       </fieldset>
 
-      <details className={styles.advanced}>
-        <summary className={styles.advancedSummary}>{words.advanced}</summary>
-        <div className={styles.advancedBody}>
-          <fieldset className={styles.field}>
-            <legend className={styles.label}>{words.quality}</legend>
-            <div className={styles.chips}>
-              {QUALITIES.map((quality) => (
-                <button
-                  key={quality}
-                  type="button"
-                  className={styles.chip}
-                  aria-pressed={choices.quality === quality}
-                  onClick={() => set({ quality })}
-                >
-                  {words.qualities[quality].name}
-                </button>
-              ))}
-            </div>
-            <p className={styles.help}>{words.qualities[choices.quality].help}</p>
+      <details className="group/advanced border-t px-6 py-5 max-md:px-4">
+        <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[13px] font-semibold text-steel transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+          <ChevronRight
+            className="size-4 transition-transform duration-200 group-open/advanced:rotate-90"
+            aria-hidden="true"
+          />
+          {words.advanced}
+        </summary>
+        <div className="flex flex-col gap-5 pt-5">
+          <fieldset className="m-0 flex min-w-0 flex-col gap-2.5 border-0 p-0">
+            <legend className={LEGEND}>{words.quality}</legend>
+            <Segments
+              options={QUALITIES.map((quality) => ({
+                value: quality,
+                label: words.qualities[quality].name,
+              }))}
+              value={choices.quality}
+              onChange={(quality) => set({ quality })}
+            />
+            <p className={HELP}>{words.qualities[choices.quality].help}</p>
           </fieldset>
 
-          <fieldset className={styles.field}>
-            <legend className={styles.label}>{words.correction}</legend>
-            <div className={styles.chips}>
-              {[false, true].map((correct) => (
-                <button
-                  key={String(correct)}
-                  type="button"
-                  className={styles.chip}
-                  aria-pressed={choices.correct === correct}
-                  onClick={() => set({ correct })}
-                >
-                  {correct ? words.on : words.off}
-                </button>
-              ))}
-            </div>
-            <p className={styles.help}>{words.correctionHelp}</p>
+          <fieldset className="m-0 flex min-w-0 flex-col gap-2.5 border-0 border-t p-0 pt-5">
+            <legend className={LEGEND}>{words.correction}</legend>
+            <Segments
+              options={[onOff(false), onOff(true)]}
+              value={choices.correct}
+              onChange={(correct) => set({ correct })}
+            />
+            <p className={HELP}>{words.correctionHelp}</p>
           </fieldset>
         </div>
       </details>
 
       {music > 0 && (
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor={`${id}-license`}>
+        <div className={SECTION}>
+          <label className={LABEL} htmlFor={`${id}-license`}>
             {words.license}
           </label>
-          <input
+          <Input
             id={`${id}-license`}
-            className={styles.input}
             autoComplete="off"
             maxLength={MAX_LICENSE_LENGTH}
             placeholder="CC0 1.0"
             value={choices.musicLicense}
             onChange={(event) => set({ musicLicense: event.target.value })}
           />
-          <p className={styles.help}>{words.licenseHelp}</p>
+          <p className={HELP}>{words.licenseHelp}</p>
         </div>
       )}
     </>

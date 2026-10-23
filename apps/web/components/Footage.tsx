@@ -1,20 +1,13 @@
 "use client";
 
+import { Film, FolderOpen, ImageIcon, Link2, Music2, Plus, Upload, X } from "lucide-react";
 import { type DragEvent, useId, useRef, useState } from "react";
 import { fromDrop, fromInput, type Picked } from "../lib/collect.ts";
 import { formatBytes, formatClock, type Role } from "../lib/settings.ts";
-import styles from "./editor.module.css";
+import { cn, HELP, ICON_FRAME, LABEL, LIST, META, SLUG } from "../lib/styles.ts";
 import { useT } from "./I18n.tsx";
-import {
-  AudioIcon,
-  CloseIcon,
-  FilmIcon,
-  FolderIcon,
-  ImageIcon,
-  LinkIcon,
-  PlusIcon,
-  UploadIcon,
-} from "./icons.tsx";
+import { Button } from "./ui/button.tsx";
+import { Input } from "./ui/input.tsx";
 
 export interface Item {
   key: string;
@@ -49,6 +42,10 @@ interface Props {
   onToggle: (key: string) => void;
   onClear: () => void;
 }
+
+const ROW =
+  "grid grid-cols-[32px_minmax(0,1fr)_32px] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.025] animate-in fade-in-0 slide-in-from-top-1 duration-300";
+const NAME = "truncate text-[13px] font-medium";
 
 /** The drop zone and the link field, then the list of what was dropped and pasted. */
 export function Footage({
@@ -92,9 +89,17 @@ export function Footage({
   const compact = items.length + links.length > 0;
 
   return (
-    <div className={styles.footage}>
+    <div className="flex flex-col gap-6">
+      {/* The footage going in, in viewfinder corners that open out and turn amber while it is
+          dragged over. */}
       <section
-        className={compact ? `${styles.drop} ${styles.dropCompact}` : styles.drop}
+        className={cn(
+          "corners flex items-center rounded-2xl border transition-[background-color,border-color] duration-300",
+          compact
+            ? "gap-3 bg-card px-4 py-3 max-sm:flex-wrap"
+            : "hatch min-h-72 flex-col justify-center gap-5 px-6 py-12 text-center max-sm:min-h-52",
+          over && "border-primary/40 bg-primary/[0.04]",
+        )}
         data-over={over}
         aria-label={words.dropHere}
         onDragEnter={(event) => {
@@ -109,22 +114,46 @@ export function Footage({
         }}
         onDrop={drop}
       >
-        <div className={styles.dropIcon}>
-          <UploadIcon width={22} height={22} />
+        <div
+          className={cn(
+            "grid shrink-0 place-items-center rounded-full border border-edge bg-background text-steel transition-[color,transform,border-color] duration-500 ease-(--ease-cut)",
+            compact ? "size-9 [&_svg]:size-4" : "size-14 [&_svg]:size-5.5",
+            over && "-translate-y-1 border-primary/60 text-primary",
+          )}
+        >
+          <Upload aria-hidden="true" />
         </div>
-        <div className={styles.dropText}>
-          <p className={styles.dropTitle}>{compact ? words.dropMore : words.drop}</p>
-          {!compact && <p className={styles.dropHint}>{words.hint}</p>}
+        <div
+          className={cn("flex flex-col gap-1.5", compact ? "flex-1 items-start" : "items-center")}
+        >
+          <p
+            className={cn("font-semibold", compact ? "text-[13px]" : "text-lg tracking-[-0.01em]")}
+          >
+            {compact ? words.dropMore : words.drop}
+          </p>
+          {!compact && <p className="max-w-[48ch] text-[13px] text-steel">{words.hint}</p>}
         </div>
-        <div className={styles.dropButtons}>
-          <button type="button" className={styles.button} onClick={() => files.current?.click()}>
-            <PlusIcon width={16} height={16} />
+        <div className={cn("flex flex-wrap justify-center gap-2", compact && "max-sm:w-full")}>
+          <Button
+            type="button"
+            variant="outline"
+            size={compact ? "sm" : "default"}
+            className="max-sm:flex-1"
+            onClick={() => files.current?.click()}
+          >
+            <Plus aria-hidden="true" />
             {words.chooseFiles}
-          </button>
-          <button type="button" className={styles.button} onClick={() => folder.current?.click()}>
-            <FolderIcon width={16} height={16} />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size={compact ? "sm" : "default"}
+            className="max-sm:flex-1"
+            onClick={() => folder.current?.click()}
+          >
+            <FolderOpen aria-hidden="true" />
             {words.chooseFolder}
-          </button>
+          </Button>
         </div>
         <input
           ref={files}
@@ -149,14 +178,14 @@ export function Footage({
         />
       </section>
 
-      <div className={styles.linkField}>
-        <label className={styles.label} htmlFor={`${id}-link`}>
+      <div className="flex flex-col gap-2">
+        <label className={LABEL} htmlFor={`${id}-link`}>
           {words.link}
         </label>
-        <div className={styles.linkRow}>
-          <input
+        <div className="flex gap-2">
+          <Input
             id={`${id}-link`}
-            className={styles.input}
+            className="h-10 flex-1"
             type="url"
             inputMode="url"
             autoComplete="off"
@@ -169,28 +198,31 @@ export function Footage({
               if (event.key === "Enter") addLinks();
             }}
           />
-          <button type="button" className={styles.button} onClick={addLinks}>
-            <LinkIcon width={16} height={16} />
+          <Button type="button" variant="outline" onClick={addLinks}>
+            <Link2 aria-hidden="true" />
             {words.addLink}
-          </button>
+          </Button>
         </div>
         {linkError && (
-          <p className={styles.linkError} role="alert">
+          <p
+            className="text-xs leading-relaxed text-destructive [overflow-wrap:anywhere]"
+            role="alert"
+          >
             {linkError}
           </p>
         )}
-        <p className={styles.help} id={`${id}-link-hint`}>
+        <p className={HELP} id={`${id}-link-hint`}>
           {words.linkHint}
         </p>
-        <p className={styles.rights}>{words.rights}</p>
+        <p className="text-xs leading-relaxed text-steel">{words.rights}</p>
       </div>
 
       {compact && (
-        <div className={`${styles.card} ${styles.files}`}>
-          <div className={styles.filesHead}>
+        <section className="flex flex-col gap-3 animate-in fade-in-0 duration-300">
+          <div className="flex items-end justify-between gap-4">
             <div>
-              <h2 className={styles.filesTitle}>{words.title}</h2>
-              <p className={styles.filesMeta}>
+              <h2 className={SLUG}>{words.title}</h2>
+              <p className={cn(META, "mt-1")}>
                 {words.videos(videos.length + links.length)}
                 {photos > 0 && ` · ${words.photos(photos)}`}
                 {music > 0 && ` · ${words.tracks(music)}`}
@@ -198,29 +230,29 @@ export function Footage({
                 {skipped > 0 && ` · ${words.leftOut(skipped)}`}
               </p>
             </div>
-            <button type="button" className={styles.linkButton} onClick={onClear}>
+            <Button type="button" variant="link" size="inline" onClick={onClear}>
               {words.clear}
-            </button>
+            </Button>
           </div>
-          <ul className={styles.fileList}>
+          <ul className={cn(LIST, "max-h-[420px] overflow-y-auto")}>
             {items.map((item) => (
-              <li key={item.key} className={styles.file} data-unused={item.off === true}>
-                <span className={styles.fileIcon}>
+              <li key={item.key} className={ROW}>
+                <span className={cn(ICON_FRAME, item.off && "text-muted-foreground")}>
                   {item.use === "video" ? (
-                    <FilmIcon />
+                    <Film aria-hidden="true" />
                   ) : item.use === "image" ? (
-                    <ImageIcon />
+                    <ImageIcon aria-hidden="true" />
                   ) : (
-                    <AudioIcon />
+                    <Music2 aria-hidden="true" />
                   )}
                 </span>
-                <span className={styles.fileText}>
-                  <span className={styles.fileName} title={item.path}>
+                <span className="flex min-w-0 flex-col">
+                  <span className={cn(NAME, item.off && "text-muted-foreground")} title={item.path}>
                     {item.path}
                   </span>
-                  <span className={styles.fileMeta}>
+                  <span className={META}>
                     {item.off ? (
-                      <span className={styles.badge}>{words.notUsed}</span>
+                      <span className="text-steel">{words.notUsed}</span>
                     ) : (
                       <>
                         {item.use === "music" && `${words.music} · `}
@@ -243,7 +275,7 @@ export function Footage({
                         {" · "}
                         <button
                           type="button"
-                          className={styles.inlineButton}
+                          className="text-steel underline decoration-edge underline-offset-2 hover:text-foreground hover:decoration-primary"
                           aria-label={
                             item.off
                               ? words.asMusicLabel(item.path)
@@ -257,26 +289,27 @@ export function Footage({
                     )}
                   </span>
                 </span>
-                <button
+                <Button
                   type="button"
-                  className={styles.iconButton}
+                  variant="ghost"
+                  size="icon"
                   aria-label={words.remove(item.path)}
                   onClick={() => onRemove(item.key)}
                 >
-                  <CloseIcon width={16} height={16} />
-                </button>
+                  <X aria-hidden="true" />
+                </Button>
               </li>
             ))}
             {links.map((link) => (
-              <li key={link.url} className={styles.file}>
-                <span className={styles.fileIcon}>
-                  <LinkIcon />
+              <li key={link.url} className={ROW}>
+                <span className={ICON_FRAME}>
+                  <Link2 aria-hidden="true" />
                 </span>
-                <span className={styles.fileText}>
-                  <span className={styles.fileName} title={link.url}>
+                <span className="flex min-w-0 flex-col">
+                  <span className={NAME} title={link.url}>
                     {link.video?.title ?? link.url}
                   </span>
-                  <span className={styles.fileMeta}>
+                  <span className={META}>
                     {link.video
                       ? [
                           link.video.site,
@@ -290,18 +323,19 @@ export function Footage({
                       : words.reading}
                   </span>
                 </span>
-                <button
+                <Button
                   type="button"
-                  className={styles.iconButton}
+                  variant="ghost"
+                  size="icon"
                   aria-label={words.remove(link.video?.title ?? link.url)}
                   onClick={() => onRemoveLink(link.url)}
                 >
-                  <CloseIcon width={16} height={16} />
-                </button>
+                  <X aria-hidden="true" />
+                </Button>
               </li>
             ))}
           </ul>
-        </div>
+        </section>
       )}
     </div>
   );

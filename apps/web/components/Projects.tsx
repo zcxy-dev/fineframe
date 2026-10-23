@@ -1,13 +1,14 @@
 "use client";
 
+import { Film } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { ProjectSummary } from "../lib/jobs.ts";
 import { FOOTAGE_KEPT } from "../lib/retention.ts";
 import { formatBytes, formatLength } from "../lib/settings.ts";
+import { cn, ICON_FRAME, LIST, META, SLUG } from "../lib/styles.ts";
 import { ErrorNote } from "./ErrorNote.tsx";
-import styles from "./editor.module.css";
 import { useT } from "./I18n.tsx";
-import { FilmIcon } from "./icons.tsx";
+import { Button } from "./ui/button.tsx";
 
 /** Earlier edits, to open again or delete, with the disk space each takes. */
 export function Projects({ onOpen }: { onOpen: (id: string) => void }) {
@@ -45,27 +46,31 @@ export function Projects({ onOpen }: { onOpen: (id: string) => void }) {
   if (shown.length === 0) return null;
   const total = shown.reduce((sum, project) => sum + project.bytes, 0);
   return (
-    <section className={`${styles.card} ${styles.files}`} aria-label={words.title}>
-      <div className={styles.filesHead}>
-        <div>
-          <h2 className={styles.filesTitle}>{words.title}</h2>
-          <p className={styles.filesMeta}>
-            {words.meta(shown.length, formatBytes(total), FOOTAGE_KEPT)}
-          </p>
-        </div>
+    <section
+      className="flex flex-col gap-3 animate-in fade-in-0 duration-500"
+      aria-label={words.title}
+    >
+      <div>
+        <h2 className={SLUG}>{words.title}</h2>
+        <p className={cn(META, "mt-1")}>
+          {words.meta(shown.length, formatBytes(total), FOOTAGE_KEPT)}
+        </p>
       </div>
       {error && <ErrorNote message={error} fallback={words.fallback} />}
-      <ul className={styles.fileList}>
+      <ul className={LIST}>
         {shown.map((project) => (
-          <li key={project.id} className={styles.project}>
-            <span className={styles.fileIcon}>
-              <FilmIcon />
+          <li
+            key={project.id}
+            className="grid grid-cols-[32px_minmax(0,1fr)_auto_auto] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.025] max-sm:grid-cols-[32px_minmax(0,1fr)_auto]"
+          >
+            <span className={ICON_FRAME}>
+              <Film aria-hidden="true" />
             </span>
-            <span className={styles.fileText}>
-              <span className={styles.fileName} title={project.name}>
+            <span className="flex min-w-0 flex-col max-sm:col-span-2">
+              <span className="truncate text-[13px] font-medium" title={project.name}>
                 {project.name || words.untitled}
               </span>
-              <span className={styles.fileMeta}>
+              <span className={META}>
                 {t.date(project.created)} ·{" "}
                 {project.shorts === undefined
                   ? formatLength(project.length, t)
@@ -74,21 +79,26 @@ export function Projects({ onOpen }: { onOpen: (id: string) => void }) {
                 {project.status === "done" && !project.footage && words.footageRemoved}
               </span>
             </span>
-            <button type="button" className={styles.button} onClick={() => onOpen(project.id)}>
-              {words.open}
-            </button>
-            <button
+            <Button
               type="button"
-              className={
-                deleting === project.id ? `${styles.button} ${styles.danger}` : styles.button
-              }
+              variant="outline"
+              size="sm"
+              className="max-sm:col-start-2 max-sm:justify-self-start"
+              onClick={() => onOpen(project.id)}
+            >
+              {words.open}
+            </Button>
+            <Button
+              type="button"
+              variant={deleting === project.id ? "danger" : "ghost"}
+              size="sm"
               disabled={project.status === "running"}
               onClick={() =>
                 deleting === project.id ? void remove(project.id) : setDeleting(project.id)
               }
             >
               {deleting === project.id ? words.sure : words.delete}
-            </button>
+            </Button>
           </li>
         ))}
       </ul>

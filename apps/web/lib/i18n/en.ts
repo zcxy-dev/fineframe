@@ -458,7 +458,7 @@ export const en = {
     ready: "Your edit is ready",
     captions: " · captions",
     musicSkipped:
-      "The music track Claude chose could not be downloaded, so this edit has no music. Pick one from the music library below to add it.",
+      "The music track Claude chose could not be downloaded, so this edit has no music. Pick one in the Music tab to add it.",
     beatsSkipped:
       "The beat model could not be downloaded, so your music plays from its start without following its beats. The next edit tries again.",
     download: "Download MP4",
@@ -564,6 +564,17 @@ export const en = {
   },
   reedit: {
     label: "Change the edit",
+    /** The editor panel's tabs, each a short name under its icon. */
+    tabs: {
+      result: "Result",
+      music: "Music",
+      look: "Look",
+      captions: "Captions",
+      brand: "Brand",
+      text: "Text",
+      overlays: "Overlays",
+      replan: "Re-plan",
+    },
     loadFallback: "This edit's changes could not be loaded.",
     loading: "Loading…",
     noFootage:
