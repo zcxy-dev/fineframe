@@ -2,7 +2,9 @@
 // render and the check, which take about as long on any machine, from the edit's length.
 
 import { en, type Messages } from "./i18n/en.ts";
-import type { Stage } from "./jobs.ts";
+import type { Job, Stage } from "./jobs.ts";
+
+type Step = NonNullable<Job["progress"]>["step"];
 
 /** Too little of the analysis to say how fast it goes: its first half minute, or 2 % of the
  * bar. */
@@ -27,8 +29,11 @@ export function afterAnalysis(length: number): number {
 /**
  * Follows one edit and estimates when it finishes. The finish moves by at most half the time
  * since the last line, so the time left only counts down, at half to one and a half times the
- * clock's pace. Time while `paused` (a model downloading, which shows its own time left) is not
- * counted as the analysis's work and moves the finish later by as long.
+ * clock's pace. Time while `downloading` (a model, which shows its own time left), or on an
+ * analysis line that is none of the footage's steps (checking Claude, a first-use download such
+ * as FFmpeg's, the analysis starting, the music's analysis), is not counted as the analysis's
+ * work and moves the finish later by as long: on a first edit it can take minutes that say
+ * nothing of the footage's pace.
  */
 export class Finish {
   readonly #after: number;
@@ -45,9 +50,16 @@ export class Finish {
     this.#after = afterAnalysis(length) * edits * 1000;
   }
 
-  /** The bar at `at` (epoch milliseconds) in `stage`; returns the estimated finish, or undefined
-   * until there is enough to go on. */
-  update(at: number, fraction: number, stage: Stage, paused = false): number | undefined {
+  /** The bar at `at` (epoch milliseconds) in `stage`, on the analysis's `step`; returns the
+   * estimated finish, or undefined until there is enough to go on. */
+  update(
+    at: number,
+    fraction: number,
+    stage: Stage,
+    downloading = false,
+    step?: Step,
+  ): number | undefined {
+    const paused = downloading || (stage === "analyze" && (step === undefined || step === "music"));
     const last = this.#last;
     if (!last) this.#from = fraction;
     const elapsed = last ? Math.max(0, at - last.at) : 0;

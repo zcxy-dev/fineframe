@@ -420,6 +420,8 @@ export const en = {
       check: { name: "Check", doing: "Checking", what: "Every cut reviewed and fixed" },
     },
     steps: {
+      ready: "Getting ready",
+      music: "Music",
       probe: "Reading the file",
       shots: "Shots",
       speech: "Voice activity",

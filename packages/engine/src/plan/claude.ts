@@ -179,9 +179,9 @@ const broken = (error: InstanceType<typeof Anthropic.AnthropicError>) =>
     : error.cause instanceof Error;
 
 /**
- * Fails, saying why, when `model`, the planning model, cannot be called: no key, a wrong one, or
- * no access to it. Run before work that takes long, so an edit does not fail only once its
- * footage is analysed. Looking a model up costs nothing.
+ * Fails, saying why, when `model`, the planning model, cannot be called: no key, a wrong one, no
+ * access to it, or no connection to Claude. Run before work that takes long, so an edit does not
+ * fail only once its footage is analysed. Looking a model up costs nothing.
  */
 export async function checkClaude(
   model = PLAN_MODELS.best,
@@ -190,6 +190,13 @@ export async function checkClaude(
   try {
     await client.models.retrieve(model);
   } catch (error) {
+    // The key may well be right: only the connection failed.
+    if (error instanceof Anthropic.APIConnectionError) {
+      throw new ClaudeError(
+        `Cannot reach Claude (${model}) to plan the edit: ${error.message.replace(/\.$/, "")}. ` +
+          "Check the internet connection",
+      );
+    }
     throw new ClaudeError(
       `Planning needs Claude (${model}), which answered: ${(error as Error).message}. ` +
         "Set ANTHROPIC_API_KEY, or put it in the .env at the repository root",

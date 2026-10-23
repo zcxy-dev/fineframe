@@ -7,28 +7,13 @@ import type { Messages } from "../lib/i18n/messages.ts";
 import { downloadName, progressText } from "../lib/i18n/program.ts";
 import type { Job, Stage } from "../lib/jobs.ts";
 import { formatBytes, formatClock, formatLength, formatRange } from "../lib/settings.ts";
+import { analysisSteps } from "../lib/steps.ts";
 import { cn, HELP, META, SLUG, TITLE } from "../lib/styles.ts";
 import { useT } from "./I18n.tsx";
 import { NumberTicker } from "./ui/number-ticker.tsx";
 import { TextAnimate } from "./ui/text-animate.tsx";
 
 const ORDER: Stage[] = ["analyze", "plan", "render", "check"];
-
-type Step = NonNullable<NonNullable<Job["progress"]>["step"]>;
-
-/** The analysis's steps for one file, in the order vework takes them. */
-const STEPS: Exclude<Step, "music">[] = [
-  "probe",
-  "shots",
-  "speech",
-  "loudness",
-  "events",
-  "faces",
-  "denoise",
-  "transcribe",
-  "correct",
-  "align",
-];
 
 /** How many clips the progress timeline is built of. */
 const CLIPS = 48;
@@ -267,19 +252,11 @@ function TimeLeft({ finish }: { finish: number }) {
   );
 }
 
-/** The analysis's steps for the file it is on: done, running or still to come. A step vework
- * had nothing to do for, such as faces in a file without picture, counts as done once it is
- * passed. */
+/** The analysis's checklist (lib/steps.ts). */
 function AnalysisSteps({ job }: { job: Job }) {
   const words = useT().run;
-  const running = job.status === "running";
-  const stage = job.progress?.stage;
-  const analysing = stage === "analyze";
-  const at = analysing ? STEPS.indexOf(job.progress?.step as (typeof STEPS)[number]) : -1;
-  const passed = stage !== undefined && stage !== "analyze";
-  const failed = job.status === "error" && analysing;
+  const analysing = job.progress?.stage === "analyze";
   const music = job.progress?.step === "music";
-  const shown = STEPS.filter((step) => step !== "correct" || job.settings.correct);
   const stopped = job.status === "error" || job.status === "cancelled";
   return (
     <div className={cn("flex flex-col gap-3", stopped && "opacity-60")}>
@@ -293,53 +270,36 @@ function AnalysisSteps({ job }: { job: Job }) {
         )}
       </p>
       <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-x-3 gap-y-2 p-0">
-        {shown.map((step) => {
-          const index = STEPS.indexOf(step);
-          const state =
-            passed || (at >= 0 && index < at)
-              ? "done"
-              : index === at
-                ? failed
-                  ? "failed"
-                  : running
-                    ? "active"
-                    : "pending"
-                : "pending";
-          const count =
-            state === "active" && (step === "shots" || step === "transcribe" || step === "align")
-              ? job.progress?.message.match(/(\d+\/\d+|\d+%)/)?.[1]
-              : undefined;
-          return (
-            <li
-              key={step}
+        {analysisSteps(job).map(({ step, state, count }) => (
+          <li
+            key={step}
+            className={cn(
+              "flex items-center gap-2 text-xs text-steel",
+              state === "pending" && "text-muted-foreground",
+              state === "active" && "font-semibold text-foreground",
+            )}
+          >
+            <span
               className={cn(
-                "flex items-center gap-2 text-xs text-steel",
-                state === "pending" && "text-muted-foreground",
-                state === "active" && "font-semibold text-foreground",
+                "grid size-3.5 shrink-0 place-items-center rounded-[4px] border border-edge [&_svg]:size-2.5",
+                state === "active" && "border-primary bg-primary motion-safe:animate-pulse",
+                state === "done" && "border-success/60 text-success",
+                state === "failed" && "border-destructive text-destructive",
               )}
             >
-              <span
-                className={cn(
-                  "grid size-3.5 shrink-0 place-items-center rounded-[4px] border border-edge [&_svg]:size-2.5",
-                  state === "active" && "border-primary bg-primary motion-safe:animate-pulse",
-                  state === "done" && "border-success/60 text-success",
-                  state === "failed" && "border-destructive text-destructive",
-                )}
-              >
-                {state === "done" ? (
-                  <Check aria-hidden="true" />
-                ) : state === "failed" ? (
-                  <TriangleAlert aria-hidden="true" />
-                ) : null}
-              </span>
-              <span>{words.steps[step]}</span>
-              {count && (
-                <span className="font-normal text-muted-foreground tabular-nums">{count}</span>
-              )}
-              <span className="sr-only">{words.states[state]}</span>
-            </li>
-          );
-        })}
+              {state === "done" ? (
+                <Check aria-hidden="true" />
+              ) : state === "failed" ? (
+                <TriangleAlert aria-hidden="true" />
+              ) : null}
+            </span>
+            <span>{words.steps[step]}</span>
+            {count && (
+              <span className="font-normal text-muted-foreground tabular-nums">{count}</span>
+            )}
+            <span className="sr-only">{words.states[state]}</span>
+          </li>
+        ))}
       </ul>
     </div>
   );

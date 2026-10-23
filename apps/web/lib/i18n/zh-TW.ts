@@ -400,6 +400,8 @@ export const zhTW: Messages = {
       check: { name: "檢查", doing: "檢查中", what: "逐一檢查並修正每個剪接點" },
     },
     steps: {
+      ready: "準備",
+      music: "配樂",
       probe: "讀取檔案",
       shots: "鏡頭",
       speech: "人聲偵測",
