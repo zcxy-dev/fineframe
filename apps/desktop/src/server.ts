@@ -9,6 +9,7 @@ import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { delimiter, dirname, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
+import { pathToFileURL } from "node:url";
 
 /** Where the app's parts are and where it keeps its own files. */
 export interface Places {
@@ -86,6 +87,24 @@ export function runtimeEnvironment(
     UV_NO_DEV: "1",
     UV_NO_EDITABLE: "1",
   };
+}
+
+/** Whether the analysis's Python, which the page's server installs on its start
+ * (apps/web/lib/setup.ts), is there, and holds the worker in the app's resources rather than an
+ * earlier release's, which the server's next start replaces. */
+export async function workerInstall(
+  places: Pick<Places, "editor" | "data">,
+): Promise<"missing" | "outdated" | "ready"> {
+  const stamp = await readFile(
+    join(places.data, "python", "env", ".video-editor-worker"),
+    "utf8",
+  ).catch(() => null);
+  if (stamp === null) return "missing";
+  const { workerVersion }: typeof import("../../../packages/engine/src/edit/analyze.ts") =
+    await import(
+      pathToFileURL(join(places.editor, "packages", "engine", "src", "edit", "analyze.ts")).href
+    );
+  return stamp === (await workerVersion(join(places.editor, "worker"))) ? "ready" : "outdated";
 }
 
 /** The keys' file in the app's folder, which the page saves and the `fineframe` command reads. */

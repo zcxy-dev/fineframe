@@ -10,7 +10,13 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseEnv } from "node:util";
 import { NO_SANDBOX } from "./install.ts";
-import { accountFile, keysFile, restoreLinks, runtimeEnvironment } from "./server.ts";
+import {
+  accountFile,
+  keysFile,
+  restoreLinks,
+  runtimeEnvironment,
+  workerInstall,
+} from "./server.ts";
 
 const COMMANDS: Record<string, string[]> = {
   edit: ["packages", "engine", "src", "edit", "cli.ts"],
@@ -40,14 +46,14 @@ const places = {
   bin: join(process.resourcesPath, "bin"),
   data: process.env.VIDEO_EDITOR_DATA ?? "",
 };
-// The stamp the page's server writes once the analysis's Python is installed (apps/web/lib/setup.ts).
-if (!places.data || !existsSync(join(places.data, "python", "env", ".video-editor-worker"))) {
+await restoreLinks(places.editor);
+const install = places.data ? await workerInstall(places) : "missing";
+if (install !== "ready") {
   console.error(
-    "fineframe: Fineframe is not set up yet. Open the Fineframe app once and wait until it is ready, then run this again.",
+    `fineframe: ${install === "missing" ? "Fineframe is not set up yet" : "Fineframe was updated"}. Open the Fineframe app once and wait until it is ready, then run this again.`,
   );
   process.exit(1);
 }
-await restoreLinks(places.editor);
 
 if (command === "edit") {
   const { editBlocker, SITE }: typeof import("../../web/lib/account.ts") = await import(
