@@ -322,6 +322,10 @@ test("pnpm render --cut says when the cut leaves the planned length", async (t) 
     failed.stderr,
     /render: error: The cut edit lasts 5\.00 s, outside the 8\.00 s ± 5 %/,
   );
+  const app = await run("node", [cli, path, "--cut", "5-8", "-o", join(dir, "v2.mp4")], {
+    env: { ...process.env, VIDEO_EDITOR_COMMAND: "fineframe" },
+  }).catch((e) => e);
+  assert.match(app.stderr, /plan again with fineframe edit$/m);
   // --retarget keeps the shorter edit: the cut project is written, then the render reads the
   // footage, which these fakes are not.
   const kept = await run("node", [
@@ -345,6 +349,13 @@ test("pnpm render --cut says when the cut leaves the planned length", async (t) 
   );
   assert.equal(bad.code, 2);
   assert.match(bad.stderr, /--cut 8-5 is not <from>-<to>/);
+});
+
+test("fineframe render's help and errors name the app's command, not pnpm", async () => {
+  const env = { ...process.env, VIDEO_EDITOR_COMMAND: "fineframe" };
+  const { stdout } = await run("node", [cli, "--help"], { env });
+  assert.match(stdout, /^Usage: fineframe render /);
+  assert.doesNotMatch(stdout, /pnpm/);
 });
 
 test("the speaker beside a split screen splits with the main track, so it stays in step", () => {

@@ -106,11 +106,19 @@ SHA2-256SUMS, and updated before each link is fetched.
       --music-license
                  the licence of every track without its own <name>.txt, such as "CC0 1.0"
 
-Progress goes to stdout as JSON lines (packages/schema/progress.schema.json), and everything
+${
+  command === "pnpm"
+    ? `Progress goes to stdout as JSON lines (packages/schema/progress.schema.json), and everything
 for a person to stderr. Each file's analysis is kept in ~/.cache/video-editor/indexes, so
 editing the same footage again starts at the plan. Claude plans the edit and checks its cuts:
 ANTHROPIC_API_KEY, OPENROUTER_API_KEY for --asr cloud and the stock footage keys come from the
-environment or the git-ignored .env at the repository root.`;
+environment or the git-ignored .env at the repository root.`
+    : `Progress goes to stdout as JSON lines, and everything for a person to stderr. Each file's
+analysis is kept in ~/.cache/video-editor/indexes, so editing the same footage again starts at
+the plan. Claude plans the edit and checks its cuts: ANTHROPIC_API_KEY, OPENROUTER_API_KEY for
+--asr cloud and the stock footage keys come from the keys saved in the Fineframe app, or else
+from the environment.`
+}`;
 
 // A caller reading stdout, such as the web page, gets the reason as the last progress line.
 const fail = (message: string): never => {

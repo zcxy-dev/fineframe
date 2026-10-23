@@ -1,17 +1,18 @@
 // What the app's menu installs: the `fineframe` command, which runs cli.ts with the app's own
-// binary as Node, and the agent skill, copied into Claude Code's and Codex's skills folders. Only
-// Node's own modules, so it is tested without Electron.
+// binary as Node, and the agent skill, copied into Claude Code's and Codex's skills folders and
+// updated with the app. Only Node's own modules, so it is tested without Electron.
 import { spawnSync } from "node:child_process";
 import { constants } from "node:fs";
 import {
   access,
   chmod,
-  cp,
   lstat,
   mkdir,
+  readdir,
   readFile,
   readlink,
   rm,
+  stat,
   symlink,
   writeFile,
 } from "node:fs/promises";
@@ -230,32 +231,90 @@ export const skillFolders = (home: string) => [
 /** A file in each copy the app installed, which it replaces without asking. */
 const MARK = ".installed-by-fineframe";
 
+/** Whether `to` is a copy the app installed: a folder with MARK in it, never a link. */
+async function ours(to: string): Promise<boolean> {
+  const there = await lstat(to).catch(() => null);
+  return (
+    !!there?.isDirectory() &&
+    (await access(join(to, MARK)).then(
+      () => true,
+      () => false,
+    ))
+  );
+}
+
+/** The files under `folder`, by their path in it. */
+async function filesIn(folder: string): Promise<Map<string, Buffer>> {
+  const files = new Map<string, Buffer>();
+  for (const name of await readdir(folder, { recursive: true })) {
+    const path = join(folder, name);
+    if ((await stat(path)).isFile()) files.set(name, await readFile(path));
+  }
+  return files;
+}
+
 /**
- * Copies the skill in `from` to `to`, over a copy the app installed, or over anything else there
- * only when `confirm` says so. A link there goes, never what it points at. Returns whether it
- * was installed.
+ * The skill as the app installs it, by path: the editor's `skills/video-editor`, and beside it the
+ * editor's own files it names (`packages/…`), so an agent reads those of the version it runs.
+ */
+async function skillFiles(editor: string): Promise<Map<string, Buffer>> {
+  const files = await filesIn(join(editor, "skills", "video-editor"));
+  for (const [name, content] of [...files]) {
+    if (!name.endsWith(".md")) continue;
+    for (const [, named = ""] of content
+      .toString("utf8")
+      .matchAll(/`(packages\/[\w./-]+\.\w+)`/g)) {
+      const path = join(...named.split("/"));
+      files.set(path, await readFile(join(editor, path)));
+    }
+  }
+  return files;
+}
+
+async function writeSkill(to: string, files: Map<string, Buffer>): Promise<void> {
+  for (const [name, content] of files) {
+    await mkdir(dirname(join(to, name)), { recursive: true });
+    await writeFile(join(to, name), content);
+  }
+  await writeFile(
+    join(to, MARK),
+    "Installed by the Fineframe app, which installs the skill again over this folder when it is updated or from its menu.\n",
+  );
+}
+
+/**
+ * Copies the skill of the editor in `editor` to `to`, over a copy the app installed, or over
+ * anything else there only when `confirm` says so. A link there goes, never what it points at.
+ * Returns whether it was installed.
  */
 export async function installSkill(
-  from: string,
+  editor: string,
   to: string,
   confirm: (path: string) => Promise<boolean>,
 ): Promise<boolean> {
-  const there = await lstat(to).catch(() => null);
-  if (there) {
-    const ours =
-      there.isDirectory() &&
-      (await access(join(to, MARK)).then(
-        () => true,
-        () => false,
-      ));
-    if (!ours && !(await confirm(to))) return false;
+  const files = await skillFiles(editor);
+  if (await lstat(to).catch(() => null)) {
+    if (!(await ours(to)) && !(await confirm(to))) return false;
     await rm(to, { recursive: true, force: true });
   }
-  await mkdir(dirname(to), { recursive: true });
-  await cp(from, to, { recursive: true });
-  await writeFile(
-    join(to, MARK),
-    "Installed by the Fineframe app, whose menu installs the skill again over this folder.\n",
-  );
+  await writeSkill(to, files);
+  return true;
+}
+
+/**
+ * Installs the skill again over a copy the app installed that differs from the editor's, as after
+ * the app updated; leaves anything else at `to` as it is. Returns whether it did.
+ */
+export async function refreshSkill(editor: string, to: string): Promise<boolean> {
+  if (!(await ours(to))) return false;
+  const files = await skillFiles(editor);
+  const installed = await filesIn(to);
+  installed.delete(MARK);
+  const same =
+    installed.size === files.size &&
+    [...files].every(([name, content]) => installed.get(name)?.equals(content));
+  if (same) return false;
+  await rm(to, { recursive: true, force: true });
+  await writeSkill(to, files);
   return true;
 }

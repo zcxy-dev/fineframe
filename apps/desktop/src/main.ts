@@ -1,7 +1,7 @@
 // The desktop app: the page's server on a free loopback port, the page in the app's own window,
-// and everything the server started stopped when the app quits. Its menu installs the `fineframe`
-// command and the agent skill, and signs out of the account the page signs in. An installed app
-// updates itself (updates.ts).
+// and everything the server started stopped when the app quits. Its menu, in the page's language,
+// installs the `fineframe` command and the agent skill, and signs out of the account the page signs
+// in. An installed app updates itself (updates.ts), and the command and skill it installed with it.
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -18,6 +18,7 @@ import {
 import {
   installCommand,
   installSkill,
+  refreshSkill,
   repointLauncher,
   skillFolders,
   type Target,
@@ -61,8 +62,11 @@ async function words() {
   const [saved] = await defaultSession.cookies
     .get({ url: "http://127.0.0.1", name: LOCALE_COOKIE })
     .catch(() => []);
-  return DESKTOP[resolveLocale(saved ? `${saved.name}=${saved.value}` : null, languages)];
+  return wordsFor(saved ?? null, languages);
 }
+
+const wordsFor = (cookie: Electron.Cookie | null, languages: string[]) =>
+  DESKTOP[resolveLocale(cookie ? `${cookie.name}=${cookie.value}` : null, languages)];
 
 let starting: Promise<Server> | null = null;
 let window: BrowserWindow | null = null;
@@ -84,6 +88,8 @@ const target = (): Target => ({
 });
 
 type Words = Awaited<ReturnType<typeof words>>;
+/** The app's words now: the page's language changes them while the app runs. */
+let t: Words;
 
 /** A message over the window, or alone when there is none; the button chosen. */
 async function show(options: MessageBoxOptions): Promise<number> {
@@ -94,7 +100,7 @@ async function show(options: MessageBoxOptions): Promise<number> {
 }
 
 /** Asks before replacing what is at `path`, which the app did not install. */
-const confirmReplace = (t: Words) => async (path: string) =>
+const confirmReplace = async (path: string) =>
   (await show({
     type: "question",
     message: t.replace(path),
@@ -104,10 +110,10 @@ const confirmReplace = (t: Words) => async (path: string) =>
     cancelId: 1,
   })) === 0;
 
-async function installCommandFromMenu(t: Words): Promise<void> {
+async function installCommandFromMenu(): Promise<void> {
   try {
     const installed = await installCommand(target(), {
-      confirm: confirmReplace(t),
+      confirm: confirmReplace,
       home: homedir(),
     });
     if (!installed) return;
@@ -121,13 +127,14 @@ async function installCommandFromMenu(t: Words): Promise<void> {
   }
 }
 
-async function installSkillFromMenu(t: Words): Promise<void> {
+async function installSkillFromMenu(): Promise<void> {
   try {
-    const skill = join(places().editor, "skills", "video-editor");
     const installed: string[] = [];
     const kept: string[] = [];
     for (const folder of skillFolders(homedir())) {
-      ((await installSkill(skill, folder, confirmReplace(t))) ? installed : kept).push(folder);
+      ((await installSkill(places().editor, folder, confirmReplace)) ? installed : kept).push(
+        folder,
+      );
     }
     await show({ type: "info", message: t.skillInstalled, detail: t.skillDetail(installed, kept) });
   } catch (error) {
@@ -141,34 +148,49 @@ async function signOutFromMenu(): Promise<void> {
   if (window && !window.webContents.getURL().startsWith("data:")) window.webContents.reload();
 }
 
+/** The system's menu as it was, before the app's own items went in. */
+let systemMenu: Menu | null = null;
+
 /** The two install items and signing out, first in the app's menu on macOS (after About) and in
- * File elsewhere; the command only from an installed app, whose resources it runs. */
-function addMenuItems(t: Words): void {
-  const menu = Menu.getApplicationMenu();
-  const first = menu?.items[0]?.submenu;
-  if (!menu || !first) return;
-  let at = process.platform === "darwin" ? 2 : 0;
-  const add = (item: MenuItem) => first.insert(at++, item);
-  if (app.isPackaged) {
-    add(
-      new MenuItem({
-        id: "install-command",
-        label: t.installCommand,
-        click: () => void installCommandFromMenu(t),
-      }),
-    );
-  }
-  add(
+ * File elsewhere, in the app's words now; the command only from an installed app, whose
+ * resources it runs. Set again, from the system's menu, when the words change. */
+function setMenu(): void {
+  systemMenu ??= Menu.getApplicationMenu();
+  const [top, ...rest] = systemMenu?.items ?? [];
+  if (!top?.submenu) return;
+  const ours = [
+    ...(app.isPackaged
+      ? [
+          new MenuItem({
+            id: "install-command",
+            label: t.installCommand,
+            click: () => void installCommandFromMenu(),
+          }),
+        ]
+      : []),
     new MenuItem({
       id: "install-skill",
       label: t.installSkill,
-      click: () => void installSkillFromMenu(t),
+      click: () => void installSkillFromMenu(),
     }),
+    new MenuItem({ type: "separator" }),
+    new MenuItem({ id: "sign-out", label: t.signOut, click: () => void signOutFromMenu() }),
+    new MenuItem({ type: "separator" }),
+  ];
+  const items = [...top.submenu.items];
+  items.splice(process.platform === "darwin" ? 2 : 0, 0, ...ours);
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([{ label: top.label, submenu: Menu.buildFromTemplate(items) }, ...rest]),
   );
-  add(new MenuItem({ type: "separator" }));
-  add(new MenuItem({ id: "sign-out", label: t.signOut, click: () => void signOutFromMenu() }));
-  add(new MenuItem({ type: "separator" }));
-  Menu.setApplicationMenu(menu);
+}
+
+/** The menu and the dialogs follow the page when it switches language. */
+function followLanguage(): void {
+  session.defaultSession.cookies.on("changed", (_event, cookie, _cause, removed) => {
+    if (cookie.name !== LOCALE_COOKIE || removed) return;
+    t = wordsFor(cookie, app.getPreferredSystemLanguages());
+    setMenu();
+  });
 }
 
 async function open(): Promise<void> {
@@ -190,13 +212,20 @@ async function open(): Promise<void> {
   window.on("closed", () => {
     window = null;
   });
-  const t = await words();
-  addMenuItems(t);
-  // An installed command follows the app when it moves, or to a newer AppImage.
+  t = await words();
+  setMenu();
+  followLanguage();
   if (app.isPackaged) {
+    // An installed command follows the app when it moves, or to a newer AppImage.
     void repointLauncher(target()).catch((error: Error) =>
       console.error(`Could not update the fineframe command: ${error.message}`),
     );
+    // An installed skill follows the app's updates.
+    for (const folder of skillFolders(homedir())) {
+      void refreshSkill(places().editor, folder).catch((error: Error) =>
+        console.error(`Could not update the agent skill in ${folder}: ${error.message}`),
+      );
+    }
   }
   void window.loadURL(
     `data:text/html;charset=utf-8,${encodeURIComponent(startingPage(t.starting(NAME)))}`,
