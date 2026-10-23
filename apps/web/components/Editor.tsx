@@ -11,6 +11,7 @@ import type { Messages } from "../lib/i18n/messages.ts";
 import type { Job } from "../lib/jobs.ts";
 import type { Service } from "../lib/key.ts";
 import type { Remembered } from "../lib/remembered.ts";
+import { FOOTAGE_KEPT } from "../lib/retention.ts";
 import {
   DEFAULT_CAPTIONS,
   DEFAULT_FILLERS,
@@ -785,7 +786,7 @@ function Running({ job, onCancel }: { job: Job; onCancel: () => void }) {
  * does, then downloads the zip. */
 function ExportButton({ job }: { job: Job }) {
   const t = useT();
-  const [state, setState] = useState<"idle" | "busy" | { error: string }>("idle");
+  const [state, setState] = useState<"idle" | "busy" | "done" | { error: string }>("idle");
   const run = async () => {
     setState("busy");
     try {
@@ -795,7 +796,7 @@ function ExportButton({ job }: { job: Job }) {
         setState({ error: body.error ?? t.failed.wrong });
         return;
       }
-      setState("idle");
+      setState("done");
       const link = document.createElement("a");
       link.href = jobApi(job, "export");
       link.download = "";
@@ -819,6 +820,7 @@ function ExportButton({ job }: { job: Job }) {
       {typeof state === "object" && (
         <ErrorNote message={state.error} fallback={t.done.exportFallback} />
       )}
+      {state === "done" && <p className={styles.help}>{t.done.exported(FOOTAGE_KEPT)}</p>}
     </>
   );
 }

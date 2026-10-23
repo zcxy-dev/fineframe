@@ -2,7 +2,17 @@
 // One server runs one edit at a time, as the machine's memory allows one analysis at a time.
 import { randomUUID } from "node:crypto";
 import { createWriteStream, existsSync } from "node:fs";
-import { mkdir, readdir, readFile, rename, rm, stat, statfs, writeFile } from "node:fs/promises";
+import {
+  appendFile,
+  mkdir,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  statfs,
+  writeFile,
+} from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -304,6 +314,14 @@ export interface EditView {
    * when it renders the edit again. */
   older: boolean;
 }
+
+/** What the page's exports add to README.txt: the timelines play the footage in the project's
+ * folder, which goes once the project is older than the newest FOOTAGE_KEPT. */
+const FOOTAGE_NOTE = `
+The footage is this project's copy in Fineframe, which deletes the footage once this project is not one of your ${FOOTAGE_KEPT} newest finished projects. To use these timelines after that, relink the footage to your own copy in your editing app.
+
+素材是 Fineframe 裡這個專案的副本；當這個專案不再是你最新的 ${FOOTAGE_KEPT} 個已完成專案之一時，Fineframe 會刪除素材。之後若還要使用這些時間軸，請在剪輯軟體中把素材重新連結到你自己的檔案。
+`;
 
 /** A request the job cannot take in its state; the message is for the page, said in the words of
  * the language the page asks for (`say`; `message` is the English), and `code` names what its
@@ -1583,8 +1601,11 @@ export class Jobs {
     this.#requireFootage(job);
     const beside = dirname(folder);
     for (const other of await readdir(beside)) {
-      if (other.endsWith(".export"))
-        await rm(join(beside, other), { recursive: true, force: true });
+      if (!other.endsWith(".export")) continue;
+      const path = join(beside, other);
+      await rm(path, { recursive: true, force: true });
+      // Exporting that version again makes it again.
+      if (path !== folder) this.#exports.delete(path);
     }
     const log: string[] = [];
     const run = runEdit({
@@ -1595,7 +1616,10 @@ export class Jobs {
       onLog: (line) => log.push(line),
     });
     const { code } = await run.exited;
-    if (code === 0) return;
+    if (code === 0) {
+      await appendFile(join(folder, "README.txt"), FOOTAGE_NOTE);
+      return;
+    }
     await rm(folder, { recursive: true, force: true });
     const reason = [...log].reverse().find((line) => line.startsWith("render: error: "));
     const error = reason ? reason.slice("render: error: ".length) : `exit code ${code}`;

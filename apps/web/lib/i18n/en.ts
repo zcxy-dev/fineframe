@@ -469,6 +469,8 @@ export const en = {
     exportFallback: "The export could not be made.",
     exportHelp:
       "A zip for Final Cut Pro, DaVinci Resolve or Premiere Pro, with the B-roll, music and graphics",
+    exported: (kept: number) =>
+      `The timelines play this project's footage, which Fineframe deletes once the project is not one of your ${kept} newest; after that, relink the footage to your own copy in your editing app.`,
     another: "Make another edit",
   },
   shorts: {
@@ -903,11 +905,8 @@ export const en = {
     noChanges: "No changes to apply",
     noCredits: "This edit has no B-roll credits",
     noCaptions: "This edit has no captions",
-    exportTooLarge:
-      "The export is too large for one zip; export it with pnpm render --export instead",
     exportFailed: (error: string) => `The export failed: ${error}`,
     noShort: "No such short",
-    tooLarge: "The shorts are too large for one zip; download them one by one",
     emptyFile: "The file is empty",
     noFootage: "Drop some footage first",
     setupFailed: (error: string) => `The analysis could not be set up: ${error}`,

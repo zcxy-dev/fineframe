@@ -445,6 +445,8 @@ export const zhTW: Messages = {
     exportFallback: "無法完成匯出。",
     exportHelp:
       "給 Final Cut Pro、DaVinci Resolve 或 Premiere Pro 的 ZIP，含 B-roll、音樂和動態圖卡",
+    exported: (kept) =>
+      `時間軸讀取的是這個專案的素材；當這個專案不再是你最新的 ${kept} 個專案之一時，Fineframe 會刪除素材，之後請在剪輯軟體中把素材重新連結到你自己的檔案。`,
     another: "開始新的剪輯",
   },
   shorts: {
@@ -838,10 +840,8 @@ export const zhTW: Messages = {
     noChanges: "沒有要套用的修改",
     noCredits: "這次剪輯沒有 B-roll 版權資訊",
     noCaptions: "這次剪輯沒有字幕",
-    exportTooLarge: "匯出的檔案太大，無法放進一個 ZIP；請改用 pnpm render --export 匯出",
     exportFailed: (error) => `匯出失敗：${error}`,
     noShort: "沒有這支短影音",
-    tooLarge: "短影音太大，無法放進一個 ZIP；請逐支下載",
     emptyFile: "檔案是空的",
     noFootage: "請先放入素材",
     setupFailed: (error) => `無法設定分析環境：${error}`,
