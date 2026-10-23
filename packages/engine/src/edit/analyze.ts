@@ -78,7 +78,8 @@ function glossaryUsed(
 }
 
 /** The cached index's file name: the footage's SHA-256, then a hash of everything else the
- * index depends on, so the same file analysed another way, or by other code, is analysed again. */
+ * index depends on, so the same file analysed another way, on another device or by other code, is
+ * analysed again. */
 export function indexName(
   worker: Worker,
   fingerprint: Source["fingerprint"],
@@ -89,6 +90,8 @@ export function indexName(
     options.correct,
     glossaryUsed(options) ? options.glossary.text : null,
     options.asr ?? "local",
+    // VEWORK_DEVICE=cpu keeps a Mac's analysis off its GPU, as worker/src/vework/gpu.py reads it.
+    process.env.VEWORK_DEVICE?.toLowerCase() === "cpu" ? "cpu" : "any",
   ]);
   const key = createHash("sha256").update(settings).digest("hex").slice(0, 16);
   return `${fingerprint.sha256}-${key}.index.json`;
