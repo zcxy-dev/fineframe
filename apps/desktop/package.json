@@ -1,6 +1,6 @@
 {
   "name": "@video-editor/desktop",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "productName": "Fineframe",
   "private": true,
   "description": "A fully automatic video editor",
