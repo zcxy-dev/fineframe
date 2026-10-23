@@ -661,7 +661,10 @@ test("each version exports for an editing app, an older one again after another'
     const zip = Buffer.from(await response.arrayBuffer());
     return zip.toString("latin1");
   };
-  assert.match(await exported(), /edit\.project\.json/);
+  const first = await exported();
+  assert.match(first, /edit\.project\.json/);
+  // The timelines play the footage in the project's folder, which goes with older projects.
+  assert.match(first, /deletes the footage once this project is not one of your 5 newest/);
   const changed = await versionsRoute.POST(
     new Request(`${url}/${id}/versions`, {
       method: "POST",

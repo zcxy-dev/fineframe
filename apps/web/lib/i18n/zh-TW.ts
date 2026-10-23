@@ -445,6 +445,8 @@ export const zhTW: Messages = {
     exportFallback: "無法完成匯出。",
     exportHelp:
       "給 Final Cut Pro、DaVinci Resolve 或 Premiere Pro 的 ZIP，含 B-roll、音樂和動態圖卡",
+    exported: (kept) =>
+      `時間軸讀取的是這個專案的素材；當這個專案不再是你最新的 ${kept} 個專案之一時，Fineframe 會刪除素材，之後請在剪輯軟體中把素材重新連結到你自己的檔案。`,
     another: "開始新的剪輯",
   },
   shorts: {
