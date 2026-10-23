@@ -5,7 +5,15 @@ import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { test } from "node:test";
-import { type Places, restoreLinks, serverEnvironment, startServer } from "./server.ts";
+import { fileURLToPath } from "node:url";
+import { workerVersion } from "../../web/lib/setup.ts";
+import {
+  type Places,
+  restoreLinks,
+  serverEnvironment,
+  startServer,
+  workerInstall,
+} from "./server.ts";
 
 const alive = (pid: number) => {
   try {
@@ -120,4 +128,18 @@ test("the links the Windows installer leaves out are made again, once", async (t
   );
   // Without a list, as from a clone or on macOS and Linux, nothing happens.
   await restoreLinks(join(editor, "packages"));
+});
+
+test("the analysis's Python counts as set up only for the worker the app now carries", async (t) => {
+  const data = await mkdtemp(join(tmpdir(), "fineframe-data-"));
+  t.after(() => rm(data, { recursive: true, force: true }));
+  // This checkout stands in for the app's editor: it has the worker the stamp is checked against.
+  const places = { editor: fileURLToPath(new URL("../../..", import.meta.url)), data };
+  assert.equal(await workerInstall(places), "missing");
+  const stamp = join(data, "python", "env", ".video-editor-worker");
+  await mkdir(join(data, "python", "env"), { recursive: true });
+  await writeFile(stamp, "the previous release's worker");
+  assert.equal(await workerInstall(places), "outdated");
+  await writeFile(stamp, await workerVersion(join(places.editor, "worker")));
+  assert.equal(await workerInstall(places), "ready");
 });
