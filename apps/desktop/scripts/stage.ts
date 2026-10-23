@@ -20,6 +20,7 @@ import { createHash } from "node:crypto";
 import { chmod, cp, mkdir, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { copyPage } from "./page.ts";
 
 const desktop = fileURLToPath(new URL("..", import.meta.url));
 const root = join(desktop, "..", "..");
@@ -100,11 +101,7 @@ for (const file of new Set(listed)) {
     if (error.code !== "ENOENT") throw error;
   });
 }
-// The built page, without the build's own cache.
-await cp(join(root, "apps", "web", ".next"), join(editor, "apps", "web", ".next"), {
-  recursive: true,
-  filter: (path) => !path.includes(`${join(".next", "cache")}`),
-});
+await copyPage(join(root, "apps", "web", ".next"), join(editor, "apps", "web", ".next"));
 
 const supabase = {
   url: process.env.FINEFRAME_SUPABASE_URL,
