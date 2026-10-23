@@ -10,12 +10,21 @@ import {
   loadJson,
   type MusicIndex,
   type Project,
+  secondsToTicks,
   TICKS_PER_SECOND,
+  ticksPerFrame,
   validateMediaIndex,
   validateMusicIndex,
 } from "@video-editor/schema";
 import { cacheDir, type DownloadProgress, exists, pinnedFile } from "./download.ts";
-import { fitMusic, type MusicInput, speechLoudness } from "./plan/music.ts";
+import {
+  fitMusic,
+  loudestSection,
+  type MusicInput,
+  onBeats,
+  outputBeats,
+  speechLoudness,
+} from "./plan/music.ts";
 import { editLength } from "./revise.ts";
 
 /** The moods the library is tagged with, each with 8 tracks. */
@@ -158,8 +167,9 @@ export async function fetchLibraryMusic(
 
 /**
  * `project`, read from `projectPath`, with its music replaced by the library track `id`, fitted
- * to the edit as the planner fits it: from its first section, at the level the speech calls for,
- * ducked under it. Null takes the music out. Nothing else changes, so it only renders again.
+ * to the edit as the planner fits it: from its loudest section, at the level the speech calls
+ * for, ducked under it, with the B-roll's edges moved onto its beats. Null takes the music out
+ * and leaves the B-roll where it is. Nothing else changes, so it only renders again.
  */
 export async function swapMusic(
   project: Project,
@@ -189,15 +199,16 @@ export async function swapMusic(
   const taken = new Set(out.sources.map((source) => source.id));
   let sourceId = `music-${track.id}`;
   for (let n = 2; taken.has(sourceId); n++) sourceId = `music-${track.id}-${n}`;
+  const index = await loadJson(track.index, validateMusicIndex);
   const music = fitMusic(
     {
       id: sourceId,
       path: libraryFile(track),
       indexPath: track.index,
-      index: await loadJson(track.index, validateMusicIndex),
+      index,
       fingerprint: { bytes: track.bytes, sha256: track.sha256 },
     },
-    1,
+    loudestSection(index),
     editLength(out) / TICKS_PER_SECOND,
     speechLoudness(clips),
   );
@@ -211,5 +222,29 @@ export async function swapMusic(
     fingerprint: { bytes: track.bytes, sha256: track.sha256 },
   });
   out.audio.music = music;
+  if (out.broll) out.broll = brollOnBeats(out, outputBeats(music, index));
   return out;
+}
+
+/** The B-roll of `project` on `beats`, as the planner places it: each shot's start on the
+ * nearest beat within reach and its end on the last its length allows, never past its end nor
+ * over a picture it was clear of. A shot that would show for under a second stays as it was. */
+function brollOnBeats(project: Project, beats: readonly number[]): Project["broll"] {
+  const frame = ticksPerFrame(project.output.fps);
+  const pictures = [
+    ...(project.broll ?? []).map((clip) => ({ start: clip.start, duration: clip.out - clip.in })),
+    ...(project.overlays ?? []),
+    ...(project.graphics ?? []),
+  ].map((picture) => picture.start + picture.duration);
+  return project.broll?.map((clip) => {
+    const end = clip.start + clip.out - clip.in;
+    const free = Math.max(0, ...pictures.filter((before) => before <= clip.start));
+    const shot = onBeats(
+      { start: clip.start, free, longest: clip.out - clip.in, end },
+      beats,
+      frame,
+    );
+    if (shot.length < secondsToTicks(1)) return clip;
+    return { ...clip, start: shot.start, out: clip.in + shot.length };
+  });
 }

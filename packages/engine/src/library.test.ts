@@ -3,7 +3,7 @@ import { copyFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { loadJson, validateMusicIndex } from "@video-editor/schema";
+import { loadJson, type Project, validateMusicIndex } from "@video-editor/schema";
 import {
   catalogTracks,
   libraryFile,
@@ -14,7 +14,7 @@ import {
   MOODS,
   swapMusic,
 } from "./library.ts";
-import { describeMusic, loadMusic } from "./plan/music.ts";
+import { describeMusic, loadMusic, outputBeats } from "./plan/music.ts";
 import { project, SECOND, scratch } from "./testing.ts";
 
 test("the library has 8 tracks of each mood, each with its music index", async () => {
@@ -109,4 +109,57 @@ test("a swap fits a library track to the edit, or takes the music out", async (t
   assert.equal(none.audio.music, undefined);
   assert.ok(!none.sources.some((each) => each.id === "music-own"));
   await assert.rejects(swapMusic(edit, path, "no-such-track"), /No library track/);
+});
+
+test("a swap opens on the track's loudest section and moves B-roll edges onto its beats", async (t) => {
+  const dir = await scratch(t, "library-");
+  const example = fileURLToPath(
+    new URL("../../schema/examples/media-index.example.json", import.meta.url),
+  );
+  await copyFile(example, join(dir, "a.json"));
+  const path = join(dir, "project.json");
+  const frame = SECOND / 30;
+  const onFrame = (seconds: number) => Math.round((seconds * SECOND) / frame) * frame;
+  // A track that opens quieter than it gets, with a steady beat.
+  const track = catalogTracks().find((each) => each.id === "energizing");
+  assert.ok(track);
+  const index = await loadJson(track.index, validateMusicIndex);
+  const loudest = index.sections.reduce((a, b) => (b.loudness > a.loudness ? b : a));
+  assert.notEqual(loudest, index.sections[0]);
+
+  const plain = project([{ source: "a", in: 0, out: 10 * SECOND }]);
+  const music = (await swapMusic(plain, path, track.id)).audio.music ?? [];
+  const entry = (music[0]?.in ?? 0) / SECOND;
+  assert.ok(entry >= loudest.start - 0.1 && entry < loudest.end, `enters at ${entry} s`);
+
+  // B-roll planned on another track's beats: 0.1 s after one of this track's, and ending off
+  // them, where this track's beats still play.
+  const beats = outputBeats(music, index);
+  const beat = beats[1] as number;
+  const start = onFrame(beat) + 3 * frame;
+  const still = { source: "still", in: 0, out: 2 * SECOND + 2 * frame, start };
+  assert.ok((beats.at(-1) as number) * SECOND > start + still.out);
+  const edit = project(plain.main, { broll: [still] });
+  edit.sources.push({
+    id: "still",
+    kind: "image",
+    path: "still.png",
+    fingerprint: { bytes: 1, sha256: "2".repeat(64) },
+  });
+  const [moved] = (await swapMusic(edit, path, track.id)).broll ?? [];
+  assert.ok(moved);
+  const onBeat = (ticks: number) => beats.some((b) => Math.abs(onFrame(b) - ticks) < frame / 2);
+  assert.equal(moved.start, onFrame(beat));
+  assert.ok(onBeat(moved.start + moved.out - moved.in), "ends on a beat");
+  // It stays inside the span it had, showing no more than it did.
+  assert.ok(moved.start + moved.out - moved.in <= start + still.out);
+  assert.equal(moved.in, 0);
+
+  // An overlay that ends where the B-roll starts keeps it from moving under the overlay.
+  const card = { template: "keyword", params: { text: "x" }, start: 0, duration: start };
+  const [kept] =
+    (await swapMusic({ ...edit, overlays: [card] } as Project, path, track.id)).broll ?? [];
+  assert.equal(kept?.start, start);
+  // Taking the music out leaves the B-roll where it was.
+  assert.deepEqual((await swapMusic(edit, path, null)).broll, [still]);
 });

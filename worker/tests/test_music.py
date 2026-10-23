@@ -41,6 +41,20 @@ def test_tempo_is_read_finer_than_the_trackers_frames():
     assert music.tempo(beats, beats[::4])["bpm"] == pytest.approx(128, rel=0.005)
 
 
+def test_beats_read_over_160_bpm_fold_to_every_other_one_from_each_downbeat():
+    # A 96 BPM track the tracker reads at 192, four of its eighth notes to a bar.
+    beats = np.arange(64) * 60 / 192 + 0.04
+    folded = music.folded(beats, beats[::4])
+    assert np.array_equal(folded, beats[::2])
+    assert music.tempo(folded, beats[::4]) == {"bpm": 96.0, "beats_per_bar": 2}
+    # A pickup before the first downbeat keeps the beats an even count of eighths before it.
+    assert np.array_equal(music.folded(beats, beats[1::4]), beats[1::2])
+    # Slower, or with an odd number to a bar, they stay as they are.
+    slow = np.arange(64) * 60 / 150
+    assert np.array_equal(music.folded(slow, slow[::4]), slow)
+    assert np.array_equal(music.folded(beats, beats[::3]), beats)
+
+
 def test_sections_start_where_the_instruments_change():
     layout = ["kh"] * 8 + ["kshb"] * 12 + ["hb"] * 8
     spect = fake_spectrogram(layout)
