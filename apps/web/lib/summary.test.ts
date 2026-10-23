@@ -91,3 +91,18 @@ test("the summary tells the length asked for from the length the video came out 
   assert.equal(row(summaryRows(job(1), 30.4), "Length"), "Target 1 min · Actual 0:30");
   assert.equal(row(summaryRows(job(3), 31), "Length"), "Target 30 s · Actual 0:31");
 });
+
+test("the summary names the library track the video plays, or the tracks offered until it is done", () => {
+  const library = {
+    ...job(1),
+    result: { message: "Finished", captions: true, music: ["Funshine"] },
+  };
+  assert.equal(row(summaryRows(library), "Music"), "Funshine");
+  // A library edit not done yet, or done without music, has nothing to say of it.
+  assert.equal(row(summaryRows(job(1)), "Music"), undefined);
+  const offered = {
+    ...job(1),
+    files: [...job(1).files, { path: "music/song.mp3", size: 1, use: "music", received: 1 }],
+  } as Job;
+  assert.equal(row(summaryRows(offered), "Music"), "1 track offered");
+});

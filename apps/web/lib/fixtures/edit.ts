@@ -2,12 +2,13 @@
 // download among them, and one going back, as a stage may report), waits while $FAKE_EDIT_HOLD
 // names a file that exists, then writes the outputs and the done line with what Claude cost, with
 // the schema's example project (with a lower third and a title as the planner writes them)
-// playing the first --music track and, with --visuals=rich, the B-roll credits. It fails unless
-// ANTHROPIC_API_KEY is $FAKE_EDIT_KEY, and records the OpenRouter key it was given in
-// openrouter.txt and the Pexels and Pixabay ones in stock.txt.
+// playing the first --music track, or the library's first with --music library, and, with
+// --visuals=rich, the B-roll credits. It fails unless ANTHROPIC_API_KEY is $FAKE_EDIT_KEY, and
+// records the OpenRouter key it was given in openrouter.txt and the Pexels and Pixabay ones in
+// stock.txt.
 // $FAKE_EDIT_NO_CAPTIONS leaves the captions file empty, as the engine does when no speech is kept.
-// $FAKE_EDIT_SKIP_MUSIC says the library track Claude chose could not be downloaded, and
-// $FAKE_EDIT_NO_BEATS that a given track was analysed without the beat model.
+// $FAKE_EDIT_SKIP_MUSIC says the library track Claude chose could not be downloaded, and plays
+// none, and $FAKE_EDIT_NO_BEATS that a given track was analysed without the beat model.
 // With --shorts it makes two shorts, fewer than asked, from the first file in out/01 and out/02,
 // each playing a stretch of that file, whose media index says it lasts 100 s. After the first it
 // waits while $FAKE_SHORTS_HOLD names a file that exists, and with $FAKE_SHORTS_STOP it stops
@@ -16,6 +17,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
+import { catalogTracks, libraryFile } from "@video-editor/engine/library";
 
 const args = process.argv.slice(2);
 await writeFile("args.json", JSON.stringify(args));
@@ -131,7 +133,11 @@ example.overlays = [
   { ...word, template: "title", params: { text: "Claude" } },
 ];
 const music = example.sources.find((source: { kind: string }) => source.kind === "audio");
-if (track) music.path = relative(dirname(out), track);
+const [first] = catalogTracks();
+if (track === "library" && first && !process.env.FAKE_EDIT_SKIP_MUSIC) {
+  music.path = relative(dirname(out), libraryFile(first));
+  music.fingerprint = { bytes: first.bytes, sha256: first.sha256 };
+} else if (track && track !== "library") music.path = relative(dirname(out), track);
 else {
   example.sources = example.sources.filter((source: unknown) => source !== music);
   delete example.audio.music;

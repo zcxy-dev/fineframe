@@ -155,7 +155,8 @@ export interface Job {
   result?: {
     message: string;
     captions: boolean;
-    /** The music files the video plays, by their paths in the job. */
+    /** The music the video plays, in the order it first plays: a library track by its title,
+     * a file by its path in the job. */
     music?: string[];
     /** Whether the edit wrote the credits of the B-roll it shows. */
     broll?: boolean;
@@ -1050,12 +1051,10 @@ export class Jobs {
     const captions = await stat(join(dir, files.captions)).catch(() => null);
     result.captions = (captions?.size ?? 0) > 0;
     result.broll = existsSync(join(dir, files.broll));
-    if (job.files.some((file) => file.use === "music")) {
-      // Unknown, rather than none, when the project cannot be read.
-      const played = await playedMusic(dir, files.project).catch(() => null);
-      if (played) result.music = played;
-      else delete result.music;
-    }
+    // Unknown, rather than none, when the project cannot be read.
+    const played = await playedMusic(dir, files.project).catch(() => null);
+    if (played) result.music = played;
+    else delete result.music;
   }
 
   /** The versions of a finished edit or short, oldest first. */
@@ -1683,21 +1682,20 @@ function slotOf(job: Job, folder: string | undefined): Slot | undefined {
   return folder === undefined ? job : job.shorts?.find((short) => short.folder === folder);
 }
 
-/** The music files the project `file` in `dir` plays, in the order they first play, by their paths
- * under footage/. */
+/** The music the project `file` in `dir` plays, in the order it first plays: a library track by
+ * its title, as the re-edit panel names it, and a file by its path under footage/. */
 async function playedMusic(dir: string, file: string): Promise<string[]> {
-  const project = JSON.parse(await readFile(join(dir, file), "utf8")) as {
-    sources: { id: string; path: string }[];
-    audio: { music?: { source: string; start: number }[] };
-  };
+  const project = JSON.parse(await readFile(join(dir, file), "utf8")) as Project;
   const ranges = [...(project.audio.music ?? [])].sort((a, b) => a.start - b.start);
-  const paths = ranges.flatMap((range) => {
+  const names = ranges.flatMap((range) => {
     const source = project.sources.find((each) => each.id === range.source);
     if (!source) return [];
+    const track = libraryTrackOf(source.fingerprint.sha256);
+    if (track) return [track.title];
     const path = relative(join(dir, "footage"), resolve(dir, dirname(VIDEO), source.path));
     return [path.split(sep).join("/")];
   });
-  return [...new Set(paths)];
+  return [...new Set(names)];
 }
 
 /** The words of the sources a revision's cuts need, read only when it has cuts. */

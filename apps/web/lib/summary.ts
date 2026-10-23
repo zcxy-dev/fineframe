@@ -63,9 +63,10 @@ export function summaryRows(
       `${t.footage.videos(videos)}${photos ? `${t.list}${t.footage.photos(photos)}` : ""}`,
     ],
   ];
-  if (offered > 0) {
-    // Claude picks one of the tracks offered, or none; the page knows which once it is done.
-    const played = job.result?.music;
+  // Claude picks one of the tracks offered, or of the library's, or none; the page knows which
+  // once it is done.
+  const played = job.result?.music;
+  if (offered > 0 || played?.length) {
     rows.push([
       words.music,
       played
