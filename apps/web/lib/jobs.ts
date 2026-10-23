@@ -973,7 +973,13 @@ export class Jobs {
           : new Finish(job.settings.length);
         this.#finishes.set(job.id, finish);
       }
-      const estimate = finish.update(now, job.progress.fraction, stage, job.download !== undefined);
+      const estimate = finish.update(
+        now,
+        job.progress.fraction,
+        stage,
+        job.download !== undefined,
+        job.progress.step,
+      );
       if (estimate !== undefined) job.finish = Math.round(estimate);
     }
     this.#emit(job);

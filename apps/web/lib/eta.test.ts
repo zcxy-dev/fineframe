@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { afterAnalysis, Finish, formatEstimate } from "./eta.ts";
-import type { Stage } from "./jobs.ts";
+import type { Job, Stage } from "./jobs.ts";
+
+type Step = NonNullable<NonNullable<Job["progress"]>["step"]>;
 
 /** Where the bar is at the start of each step of an edit that analyses one file: vework's steps
  * (../../../packages/engine/src/edit/analyze.ts) over nine tenths of it, the transcript in
@@ -11,6 +13,12 @@ const ANALYSIS = [
   ...Array.from({ length: 10 }, (_, i) => 0.35 + 0.042 * i),
   ...Array.from({ length: 5 }, (_, i) => 0.77 + 0.046 * i),
 ].map((start) => start * 0.9);
+/** The step each line of ANALYSIS starts. */
+const STEPS: Step[] = [
+  ...(["probe", "speech", "loudness", "events", "faces", "denoise"] as const),
+  ...Array.from({ length: 10 }, () => "transcribe" as const),
+  ...Array.from({ length: 5 }, () => "align" as const),
+];
 const AFTER: [number, Stage][] = [
   [0.9, "plan"],
   [0.915, "plan"],
@@ -30,16 +38,16 @@ function run(analysis: number, length: number, seed: number) {
     return state / 2147483647;
   };
   const steps = [
-    ...ANALYSIS.map((fraction): [number, Stage] => [fraction, "analyze"]),
+    ...ANALYSIS.map((fraction, i): [number, Stage, Step?] => [fraction, "analyze", STEPS[i]]),
     ...AFTER,
-  ].map(([fraction, stage], i, all) => {
+  ].map(([fraction, stage, step], i, all) => {
     const share = ((all[i + 1]?.[0] ?? 1) - fraction) / (stage === "analyze" ? 0.9 : 0.1);
     const seconds = share * (stage === "analyze" ? analysis : afterAnalysis(length));
-    return { fraction, stage, takes: seconds * 1000 * (0.6 + 0.8 * random()) };
+    return { fraction, stage, step, takes: seconds * 1000 * (0.6 + 0.8 * random()) };
   });
   let at = 0;
-  const lines = steps.map(({ fraction, stage, takes }) => {
-    const line = { at, fraction, stage };
+  const lines = steps.map(({ fraction, stage, step, takes }) => {
+    const line = { at, fraction, stage, step };
     at += takes;
     return line;
   });
@@ -57,8 +65,8 @@ test("the time left counts down, never jumping, and nears the truth as the edit 
       const finish = new Finish(length);
       const { lines, end } = run(analysis, length, seed);
       let previous: { at: number; estimate: number } | undefined;
-      for (const { at, fraction, stage } of lines) {
-        const estimate = finish.update(at, fraction, stage);
+      for (const { at, fraction, stage, step } of lines) {
+        const estimate = finish.update(at, fraction, stage, false, step);
         if (estimate === undefined) continue;
         if (previous) {
           // The finish moves by at most half the time since the last line: the time left only
@@ -81,6 +89,34 @@ test("the time left counts down, never jumping, and nears the truth as the edit 
   }
 });
 
+test("a first edit's setup before the footage's steps is not counted at the analysis's pace", () => {
+  for (let seed = 1; seed <= 20; seed++) {
+    const finish = new Finish(30);
+    const { lines, end } = run(120, 30, seed);
+    // Checking Claude, FFmpeg downloading, the analysis's Python starting and the music analysed
+    // with its beat model downloading: 100 s before the footage's first step.
+    const setup: [number, Stage, boolean, Step?][] = [
+      [0, "analyze", false],
+      [1_000, "analyze", true],
+      [40_000, "analyze", false],
+      [70_000, "analyze", false, "music"],
+      [80_000, "analyze", true, "music"],
+      [95_000, "analyze", false, "music"],
+    ];
+    for (const [at, stage, paused, step] of setup) finish.update(at, 0, stage, paused, step);
+    for (const { at, fraction, stage, step } of lines) {
+      const estimate = finish.update(100_000 + at, fraction, stage, false, step);
+      if (estimate === undefined) continue;
+      // The time left within a quarter of the edit's length of the truth from the first estimate
+      // on, as the steps after it allow.
+      assert.ok(
+        Math.abs(estimate - (100_000 + end)) < (100_000 + end) / 4,
+        `run ${seed}: ${(estimate - 100_000 - end) / 1000} s off at ${at / 1000} s`,
+      );
+    }
+  }
+});
+
 test("the stages after the analysis take what the edit's length says, from where they start", () => {
   // Analysed before: the plan starts at once, and the estimate with it.
   const finish = new Finish(60);
@@ -91,17 +127,19 @@ test("the stages after the analysis take what the edit's length says, from where
 test("a download's wait moves the finish by as long, without changing the rate", () => {
   const finish = new Finish(60);
   const after = afterAnalysis(60) * 1000;
-  assert.equal(finish.update(0, 0, "analyze"), undefined);
-  assert.equal(finish.update(20_000, 0.1, "analyze"), undefined, "too soon to say");
+  const shots = (at: number, fraction: number, downloading = false) =>
+    finish.update(at, fraction, "analyze", downloading, "shots");
+  assert.equal(shots(0, 0), undefined);
+  assert.equal(shots(20_000, 0.1), undefined, "too soon to say");
   // 0.3 of the bar in a minute: the analysis's 0.9 in three.
-  const before = Math.round(finish.update(60_000, 0.3, "analyze") ?? assert.fail("no estimate"));
+  const before = Math.round(shots(60_000, 0.3) ?? assert.fail("no estimate"));
   assert.equal(before, 180_000 + after);
   // Two minutes of download are not the edit's work: the finish moves by as long, and the rate
   // after it is what it was.
-  finish.update(60_000, 0.3, "analyze", true);
-  assert.equal(Math.round(finish.update(180_000, 0.3, "analyze", true) ?? 0), before + 120_000);
-  assert.equal(Math.round(finish.update(180_000, 0.3, "analyze") ?? 0), before + 120_000);
-  assert.equal(Math.round(finish.update(200_000, 0.4, "analyze") ?? 0), before + 120_000);
+  shots(60_000, 0.3, true);
+  assert.equal(Math.round(shots(180_000, 0.3, true) ?? 0), before + 120_000);
+  assert.equal(Math.round(shots(180_000, 0.3) ?? 0), before + 120_000);
+  assert.equal(Math.round(shots(200_000, 0.4) ?? 0), before + 120_000);
 });
 
 test("the time left reads more roughly the longer it is", () => {
