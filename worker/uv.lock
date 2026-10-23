@@ -1923,7 +1923,7 @@ wheels = [
 
 [[package]]
 name = "vebench"
-version = "0.5.1"
+version = "0.6.0"
 source = { editable = "../bench" }
 dependencies = [
     { name = "imageio-ffmpeg" },
@@ -1956,7 +1956,7 @@ dev = [
 
 [[package]]
 name = "vework"
-version = "0.5.1"
+version = "0.6.0"
 source = { editable = "." }
 default-groups = ["dev", "ml"]
 dependencies = [
