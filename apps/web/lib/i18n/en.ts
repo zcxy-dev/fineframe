@@ -903,11 +903,8 @@ export const en = {
     noChanges: "No changes to apply",
     noCredits: "This edit has no B-roll credits",
     noCaptions: "This edit has no captions",
-    exportTooLarge:
-      "The export is too large for one zip; export it with pnpm render --export instead",
     exportFailed: (error: string) => `The export failed: ${error}`,
     noShort: "No such short",
-    tooLarge: "The shorts are too large for one zip; download them one by one",
     emptyFile: "The file is empty",
     noFootage: "Drop some footage first",
     setupFailed: (error: string) => `The analysis could not be set up: ${error}`,

@@ -1,6 +1,6 @@
 import { attachment, checkOrigin, errorResponse, shortParam } from "../../../../../lib/http.ts";
-import { JobError, jobs } from "../../../../../lib/jobs.ts";
-import { ArchiveTooLarge, zipStream } from "../../../../../lib/zip.ts";
+import { jobs } from "../../../../../lib/jobs.ts";
+import { zipStream } from "../../../../../lib/zip.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -23,10 +23,7 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
       (await ctx.params).id,
       shortParam(request),
     );
-    const stream = await zipStream(entries).catch((error: Error) => {
-      if (error instanceof ArchiveTooLarge) throw new JobError((t) => t.server.exportTooLarge, 400);
-      throw error;
-    });
+    const stream = await zipStream(entries);
     return new Response(stream, {
       headers: {
         "Content-Type": "application/zip",
