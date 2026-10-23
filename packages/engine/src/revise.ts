@@ -2,7 +2,7 @@
 // change is a recipe of skills/video-editor/references/recipes.md, and cuts go through cutEdit
 // as `pnpm render --cut --retarget` takes them.
 
-import { markupText } from "@video-editor/effects";
+import { markupText } from "@video-editor/effects/markup";
 import { type Brand, type CaptionLine, type Project, ticksPerFrame } from "@video-editor/schema";
 import { withBrand } from "./brand/kit.ts";
 import { cutEdit } from "./cut.ts";
