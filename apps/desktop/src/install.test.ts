@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
+  copyFile,
   lstat,
   mkdir,
   mkdtemp,
@@ -118,6 +119,54 @@ test("the Windows launcher checks for the app and passes its arguments on", () =
   assert.match(text, /set "VIDEO_EDITOR_DATA=C:\\Users\\a\\Fineframe"\r\n/);
   assert.match(text, /"C:\\Apps\\Fineframe\.exe" -e "[^"]+" -- %\*\r\n/);
   assert.equal(launcherPath("C:\\data", "win32").endsWith("fineframe.cmd"), true);
+});
+
+test("the Windows launcher keeps % and & in its paths as they are", () => {
+  const text = launcher({ program: "C:\\R&D 100%PATH%\\F.exe", data: "C:\\R&D %TEMP%" }, "win32");
+  assert.match(text, /if exist "C:\\R&D 100%%PATH%%\\F\.exe" goto run\r\n/);
+  assert.match(text, /echo fineframe: .* C:\\R\^&D 100%%PATH%%\\F\.exe\. .* 1>&2\r\n/);
+  assert.match(text, /set "VIDEO_EDITOR_DATA=C:\\R&D %%TEMP%%"\r\n/);
+  assert.match(text, /"C:\\R&D 100%%PATH%%\\F\.exe" -e /);
+});
+
+test("the Windows launcher runs an app whose paths hold % and &, and says when it is gone", {
+  skip: posix && "cmd.exe runs the launcher",
+}, async () => {
+  const dir = await mkdtemp(join(tmpdir(), "fineframe-cmd-"));
+  try {
+    // Node itself stands in for the app's binary, and a preloaded script prints how it was run.
+    const odd = join(dir, "R&D 100%PATH%");
+    await mkdir(odd);
+    const program = join(odd, "Fineframe.exe");
+    await copyFile(process.execPath, program);
+    const preload = join(dir, "print.cjs");
+    await writeFile(
+      preload,
+      "console.log(JSON.stringify([process.env.ELECTRON_RUN_AS_NODE, process.env.VIDEO_EDITOR_DATA, process.argv.slice(1)])); process.exit(0);",
+    );
+    const data = join(odd, "data");
+    const file = join(dir, "fineframe.cmd");
+    const runIt = async (target: { program: string; data: string }) => {
+      await writeFile(file, launcher(target, "win32"));
+      return spawnSync(`"${file}" edit "a b"`, {
+        shell: true,
+        encoding: "utf8",
+        env: { ...process.env, NODE_OPTIONS: `--require "${preload}"` },
+      });
+    };
+    const run = await runIt({ program, data });
+    assert.equal(run.status, 0, run.stderr);
+    assert.deepEqual(JSON.parse(run.stdout), ["1", data, ["edit", "a b"]]);
+    const gone = join(odd, "R&D.exe");
+    const moved = await runIt({ program: gone, data });
+    assert.equal(moved.status, 1);
+    assert.equal(
+      moved.stderr.trim(),
+      `fineframe: the Fineframe app is not at ${gone}. Install it or open it once, and it sets this command up again.`,
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("the skill replaces the app's own copy, and anything else only when confirmed", async () => {

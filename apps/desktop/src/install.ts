@@ -40,6 +40,10 @@ const AGAIN = "Install it or open it once, and it sets this command up again.";
 
 /** `text` as one word for sh, inside single quotes. */
 const shellQuote = (text: string) => `'${text.replaceAll("'", "'\\''")}'`;
+/** `text` in a .cmd file, where cmd.exe expands `%…%` even inside quotes. */
+const cmdText = (text: string) => text.replaceAll("%", "%%");
+/** `text` as cmd.exe's echo prints it unquoted: its command separators and redirections too. */
+const cmdEcho = (text: string) => cmdText(text).replace(/[\^&|<>()]/g, "^$&");
 
 /**
  * The launcher: it says so if the app is gone, and otherwise runs the app's binary as Node on
@@ -50,14 +54,14 @@ export function launcher(target: Target, platform: NodeJS.Platform = process.pla
     return `${[
       "@echo off",
       "rem Fineframe's command line. The Fineframe app wrote this, and writes it again when it moves.",
-      `if exist "${target.program}" goto run`,
-      `echo fineframe: ${MOVED} ${target.program}. ${AGAIN} 1>&2`,
+      `if exist "${cmdText(target.program)}" goto run`,
+      `echo ${cmdEcho(`fineframe: ${MOVED} ${target.program}. ${AGAIN}`)} 1>&2`,
       "exit /b 1",
       ":run",
       "setlocal",
-      `set "VIDEO_EDITOR_DATA=${target.data}"`,
+      `set "VIDEO_EDITOR_DATA=${cmdText(target.data)}"`,
       "set ELECTRON_RUN_AS_NODE=1",
-      `"${target.program}" -e "${BOOT}" -- %*`,
+      `"${cmdText(target.program)}" -e "${BOOT}" -- %*`,
       "exit /b %ERRORLEVEL%",
     ].join("\r\n")}\r\n`;
   }
