@@ -151,7 +151,8 @@ test("the Windows launcher runs an app whose paths hold % and &, and says when i
       return spawnSync(`"${file}" edit "a b"`, {
         shell: true,
         encoding: "utf8",
-        env: { ...process.env, NODE_OPTIONS: `--require "${preload}"` },
+        // NODE_OPTIONS reads a backslash as an escape.
+        env: { ...process.env, NODE_OPTIONS: `--require "${preload.replaceAll("\\", "/")}"` },
       });
     };
     const run = await runIt({ program, data });
