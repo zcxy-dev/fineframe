@@ -26,6 +26,20 @@ test("the estimate's range holds what whole edits cost in the measured runs", ()
   }
 });
 
+test("edits whose plan lists the music library cost well inside the estimate's range", () => {
+  // packages/engine/MEASUREMENTS.md's library measurements: footage, length, what Claude cost.
+  const runs: [number, number, number][] = [
+    [420, 30, 0.1152],
+    [420, 60, 0.092],
+    [420, 300, 0.2131],
+  ];
+  for (const [footage, length, dollars] of runs) {
+    const { low, high } = estimateCost(footage, length, "minimal");
+    // A tenth of the range to spare at either end, so a run a little dearer still fits.
+    assert.ok(low * 1.1 <= dollars && dollars * 1.1 <= high, `${length} s: ${low}–${high}`);
+  }
+});
+
 test("a longer edit from more footage costs more", () => {
   const short = estimateCost(120, 30);
   const long = estimateCost(3 * 3600, 3600);

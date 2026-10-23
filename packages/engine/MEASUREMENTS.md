@@ -202,6 +202,21 @@ cd ../../bench && uv run vebench report synthetic/
 - **Choice:** Claude put the 112 BPM track under the energetic short talks and the 96 BPM one, from its quiet intro, under the conversations and the long talk; under the talk show it chose the chill groove. A 300 s edit plays the 71 s track's intro and main part five times, then its outro, and ends on the track's ending.
 - **Not measured yet:** how people rate the result.
 
+Every plan request lists the built-in library's 40 tracks, about 10,000 characters, when the user gives no music. Three `pnpm edit` runs of the synthetic talk-a (seed 0), at 16:9 with `--visuals minimal`, the library offered and no stock footage, measured what that listing costs; `estimateCost` is fitted to them. Before the library, the plan of the same footage cost $0.06 for 30 s, $0.07 for 1 min and $0.12 for 5 min.
+
+```bash
+PEXELS_API_KEY= PIXABAY_API_KEY= node --env-file=../../.env src/edit/cli.ts ../../bench/synthetic/talk-a{1,2,3}/source.mp4 \
+  --length 60s --aspect 16:9 --visuals minimal --music library -o out/edit.mp4 > progress.jsonl
+```
+
+<!-- results:engine-library -->
+| Footage | Target | Made | Track Claude chose | Cuts inside words | Clicks, drift | Claude: plan (requests), cut checks |
+|---|---|---|---|---|---|---|
+| talk-a (3 clips, 7.0 min) | 30 s | 28.5 s (-4.9 %) | And Just Like That (upbeat) | 0 of 6 | 0 of 2, 0.0 ms | $0.104 (1), $0.012 |
+| talk-a (3 clips, 7.0 min) | 60 s | 60.3 s (+0.5 %) | And Just Like That (upbeat) | 0 of 8 | 0 of 3, 0.0 ms | $0.080 (2), $0.012 |
+| talk-a (3 clips, 7.0 min) | 300 s | 300.6 s (+0.2 %) | Study and Relax (calm) | 0 of 40 | 0 of 19, 0.0 ms | $0.197 (4), $0.016 |
+<!-- /results -->
+
 ## Changing an edit
 
 Measured before rich visuals, with what is now `--visuals minimal`, on a 60 s 9:16 edit of the [synthetic](../../bench/README.md#synthetic-corpus) conversation chat-b (seed 0) with music, a lower third and two keywords: a fresh agent with only the skill made three versions from what a person would say, twice. It cut the 4.1 s segment about clicks at the joins with `--cut 29.14-32.72` and `--retarget`, fixed a misheard caption (能比如說 to 嗯　比如說) and added a title, shortened to end where the first keyword starts. The planned edit rendered in 32 s on the reference machine; the agents' renders took 39 s to 2.8 min, with other renders running beside them. By hand, one more cut took a sentence out of the middle of a clip (`--cut 43.56-47.56 --retarget`), which split it in the pauses on either side, and two more versions covered the other recipes: a lower third's role, a keyword removed and one added, a chapter, the music 3 dB down, then no music, the `warm` look and the `sweep` captions (a preset since removed). `vebench report` on all of them:
