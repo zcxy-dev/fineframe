@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { test } from "node:test";
+import Anthropic from "@anthropic-ai/sdk";
+import { checkClaude } from "@video-editor/engine/claude";
 import { explain, fixFor, withoutPaths } from "./fixes.ts";
 
 test("an edit that failed for a reason its owner can fix says what to do", () => {
@@ -45,6 +49,35 @@ test("an edit that failed for a reason its owner can fix says what to do", () =>
     const fix = fixFor(message);
     assert.equal(fix?.kind ?? null, kind, message);
     if (fix) assert.ok(fix.summary.length > 0 && fix.next.length > 0);
+  }
+});
+
+test("a check of Claude that fails says whether the key was refused or Claude was out of reach", async (t) => {
+  const refusing = createServer((_request, response) => {
+    response.writeHead(401, { "content-type": "application/json" });
+    const error = { type: "authentication_error", message: "invalid x-api-key" };
+    response.end(JSON.stringify({ type: "error", error }));
+  });
+  const address = async (server: ReturnType<typeof createServer>) => {
+    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+    return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  };
+  const refused = await address(refusing);
+  t.after(() => refusing.close());
+  // A port nothing listens on any more: the connection fails.
+  const closed = createServer();
+  const unreachable = await address(closed);
+  await new Promise((done) => closed.close(done));
+  for (const [baseURL, kind] of [
+    [refused, "key"],
+    [unreachable, "network"],
+  ] as const) {
+    const client = new Anthropic({ apiKey: "sk-ant-test", baseURL, maxRetries: 0 });
+    const message = await checkClaude(undefined, client).then(
+      () => assert.fail("the check passed"),
+      (error: Error) => error.message,
+    );
+    assert.equal(fixFor(message)?.kind, kind, message);
   }
 });
 
