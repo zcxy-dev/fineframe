@@ -1,7 +1,8 @@
 // The `fineframe` command's launcher, run for real against a stand-in for the app's binary, and the
-// skill's install over the app's own copy, someone else's and a link.
+// skill's install over the app's own copy, someone else's and a link, and its update with the app.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import {
   copyFile,
   lstat,
@@ -16,11 +17,13 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   installCommand,
   installSkill,
   launcher,
   launcherPath,
+  refreshSkill,
   repointLauncher,
   skillFolders,
 } from "./install.ts";
@@ -170,20 +173,31 @@ test("the Windows launcher runs an app whose paths hold % and &, and says when i
   }
 });
 
+const recipes = "The schema says what each field means (`packages/schema/project.schema.json`).";
+
+/** An editor's folder whose skill names one of its files, as the app's resources hold it. */
+async function editor(dir: string, skill: string, schema: string): Promise<string> {
+  const root = join(dir, "editor");
+  const folder = join(root, "skills", "video-editor");
+  await mkdir(join(folder, "references"), { recursive: true });
+  await writeFile(join(folder, "SKILL.md"), skill);
+  await writeFile(join(folder, "references", "recipes.md"), recipes);
+  await mkdir(join(root, "packages", "schema"), { recursive: true });
+  await writeFile(join(root, "packages", "schema", "project.schema.json"), schema);
+  return root;
+}
+
 test("the skill replaces the app's own copy, and anything else only when confirmed", async () => {
   const dir = await mkdtemp(join(tmpdir(), "fineframe-skill-"));
   try {
-    const skill = join(dir, "skill");
-    await mkdir(join(skill, "references"), { recursive: true });
-    await writeFile(join(skill, "SKILL.md"), "new");
-    await writeFile(join(skill, "references", "recipes.md"), "recipes");
+    const app = await editor(dir, "new", "schema");
     const [claude, agents] = skillFolders(join(dir, "home")) as [string, string];
     const no = async () => false;
 
-    assert.equal(await installSkill(skill, claude, no), true);
-    assert.equal(await readFile(join(claude, "references", "recipes.md"), "utf8"), "recipes");
-    await writeFile(join(skill, "SKILL.md"), "newer");
-    assert.equal(await installSkill(skill, claude, no), true);
+    assert.equal(await installSkill(app, claude, no), true);
+    assert.equal(await readFile(join(claude, "references", "recipes.md"), "utf8"), recipes);
+    await writeFile(join(app, "skills", "video-editor", "SKILL.md"), "newer");
+    assert.equal(await installSkill(app, claude, no), true);
     assert.equal(await readFile(join(claude, "SKILL.md"), "utf8"), "newer");
 
     // A link to someone's own clone: kept when declined, and when replaced, the clone stays.
@@ -192,12 +206,85 @@ test("the skill replaces the app's own copy, and anything else only when confirm
     await writeFile(join(clone, "SKILL.md"), "the clone's");
     await mkdir(join(agents, ".."), { recursive: true });
     await symlink(clone, agents, "junction");
-    assert.equal(await installSkill(skill, agents, no), false);
+    assert.equal(await installSkill(app, agents, no), false);
     assert.equal((await lstat(agents)).isSymbolicLink(), true);
-    assert.equal(await installSkill(skill, agents, async () => true), true);
+    assert.equal(await installSkill(app, agents, async () => true), true);
     assert.equal((await lstat(agents)).isSymbolicLink(), false);
     assert.equal(await readFile(join(agents, "SKILL.md"), "utf8"), "newer");
     assert.equal(await readFile(join(clone, "SKILL.md"), "utf8"), "the clone's");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("the skill carries the editor's files it names, of the app's own version", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "fineframe-skill-"));
+  try {
+    const app = await editor(dir, "skill", "the app's schema");
+    const [claude] = skillFolders(join(dir, "home")) as [string];
+    assert.equal(await installSkill(app, claude, async () => false), true);
+    assert.equal(
+      await readFile(join(claude, "packages", "schema", "project.schema.json"), "utf8"),
+      "the app's schema",
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("every editor file the repository's skill names is installed with it", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "fineframe-skill-"));
+  try {
+    const repository = fileURLToPath(new URL("../../../", import.meta.url));
+    const to = join(dir, "video-editor");
+    assert.equal(await installSkill(repository, to, async () => false), true);
+    const skill = join(repository, "skills", "video-editor");
+    const text = `${await readFile(join(skill, "SKILL.md"), "utf8")}${await readFile(join(skill, "references", "recipes.md"), "utf8")}`;
+    const named = [...text.matchAll(/`(packages\/[^`]+)`/g)].map((match) => match[1] as string);
+    assert.ok(named.length > 0);
+    for (const path of named) assert.ok(existsSync(join(to, path)), path);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("an update of the app updates the skill it installed, and nothing else", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "fineframe-skill-"));
+  try {
+    const app = await editor(dir, "old", "old schema");
+    const [claude, agents] = skillFolders(join(dir, "home")) as [string, string];
+    assert.equal(await installSkill(app, claude, async () => false), true);
+    // Not installed: stays so.
+    assert.equal(await refreshSkill(app, agents), false);
+    assert.equal(existsSync(agents), false);
+    // As installed: left alone.
+    assert.equal(await refreshSkill(app, claude), false);
+
+    // The app updated: a changed skill, a changed file it names, a reference it no longer has.
+    await writeFile(join(app, "skills", "video-editor", "SKILL.md"), "new");
+    await writeFile(join(app, "packages", "schema", "project.schema.json"), "new schema");
+    await writeFile(join(claude, "references", "gone.md"), "an old reference");
+    assert.equal(await refreshSkill(app, claude), true);
+    assert.equal(await readFile(join(claude, "SKILL.md"), "utf8"), "new");
+    assert.equal(
+      await readFile(join(claude, "packages", "schema", "project.schema.json"), "utf8"),
+      "new schema",
+    );
+    assert.equal(existsSync(join(claude, "references", "gone.md")), false);
+    assert.equal(await refreshSkill(app, claude), false);
+
+    // Someone else's copy, and a link to a clone, are theirs.
+    await mkdir(agents, { recursive: true });
+    await writeFile(join(agents, "SKILL.md"), "their own");
+    assert.equal(await refreshSkill(app, agents), false);
+    assert.equal(await readFile(join(agents, "SKILL.md"), "utf8"), "their own");
+    await rm(agents, { recursive: true });
+    const clone = join(dir, "clone");
+    await mkdir(clone);
+    await writeFile(join(clone, "SKILL.md"), "the clone's");
+    await symlink(clone, agents, "junction");
+    assert.equal(await refreshSkill(app, agents), false);
+    assert.equal((await lstat(agents)).isSymbolicLink(), true);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

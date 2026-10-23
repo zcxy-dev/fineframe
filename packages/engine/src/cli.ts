@@ -20,7 +20,7 @@ import { rebase, render } from "./render.ts";
 const command = process.env.VIDEO_EDITOR_COMMAND ?? "pnpm";
 const usage = `Usage: ${command} render <project.json> -o <out.mp4> [--cut <from>-<to>]... [--retarget] \\
     [--brand <kit folder | none>] [--music <library track id | none>]
-       pnpm render <project.json> --export <folder>
+       ${command} render <project.json> --export <folder>
 
 Renders the edit a project.json describes, without analysing or planning again, and writes
 <name>.project.json, <name>.srt and edit_cuts.json beside the video.
@@ -180,7 +180,7 @@ async function cut(project: Project): Promise<Project> {
     throw new Error(
       `The cut edit lasts ${seconds(cut.length)} s, outside the ${seconds(duration)} s ± ` +
         `${tolerance * 100} % it was planned for. --retarget keeps it at ${seconds(cut.length)} s; ` +
-        "for another length, plan again with pnpm edit",
+        `for another length, plan again with ${command} edit`,
     );
   }
   process.stderr.write(`render: the edit now lasts ${seconds(cut.length)} s\n`);

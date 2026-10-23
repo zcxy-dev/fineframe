@@ -4,14 +4,9 @@ Each recipe starts from the newest version, here `out/edit.project.json`, and ma
 
 **Ticks.** Every time and length is an integer: 120 000 ticks a second. Seconds × 120 000, rounded, gives ticks; `start` of captions, overlays, graphics, B-roll, music and sound effects is on the output timeline, from the video's first frame.
 
-**Editing a copy.** Recipes other than cutting change a copy of the project in the same folder, so its relative paths still resolve. Use your own file tools on the copy, or for a change across many entries:
+**Editing a copy.** Recipes other than cutting change a copy of the project in the same folder, so its relative paths still resolve: read the newest version and write it, changed, as `out/edit-v2.project.json` with your own file tools. A change across many entries can be a short script in a language installed on this computer; the app does not provide one. Then render the copy:
 
 ```bash
-node -e '
-const fs = require("node:fs");
-const p = JSON.parse(fs.readFileSync("out/edit.project.json", "utf8"));
-// … change p …
-fs.writeFileSync("out/edit-v2.project.json", JSON.stringify(p, null, 2) + "\n");'
 fineframe render out/edit-v2.project.json -o out/edit-v2.mp4
 ```
 

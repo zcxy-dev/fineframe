@@ -734,6 +734,27 @@ test("the command reports arguments it cannot use as an error line too", async (
   assert.match(last.message, /song\.mp3: audio only/);
 });
 
+test("the help says where the keys come from for whoever runs it", async () => {
+  const cli = fileURLToPath(new URL("cli.ts", import.meta.url));
+  const help = (command?: string) =>
+    new Promise<string>((done) => {
+      const env = { ...process.env, VIDEO_EDITOR_COMMAND: command };
+      if (!command) delete env.VIDEO_EDITOR_COMMAND;
+      const child = spawn(process.execPath, [cli, "--help"], { env });
+      let stderr = "";
+      child.stderr.on("data", (chunk) => {
+        stderr += chunk;
+      });
+      child.on("close", () => done(stderr));
+    });
+  assert.match(await help(), /the git-ignored \.env at the repository root/);
+  // The app's command has neither a clone nor its .env: its keys are the ones saved in the app.
+  const app = await help("fineframe");
+  assert.match(app, /^Usage: fineframe edit /);
+  assert.match(app, /saved in the Fineframe app/);
+  assert.doesNotMatch(app, /\.env|repository|packages\/|pnpm/);
+});
+
 test("what Claude cost is summed by stage, the callouts found while planning with the plan", () => {
   const usage = (purpose: Usage["purpose"], dollars: number): Usage => ({
     purpose,

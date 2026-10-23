@@ -4,8 +4,8 @@
 //
 // It opens the app's window, with the subscription's check off, saves a key, waits while the
 // analysis's Python installs, chooses cloud speech and its key, adds a synthetic spoken clip,
-// makes a 15 s edit and checks the video,
-// installs the `fineframe` command and the agent skill from the app's menu, checks the skill's
+// makes a 15 s edit and checks the video, switches the page's language,
+// installs the `fineframe` command and the agent skill from the app's menu in it, checks the skill's
 // files and makes an edit of the clip with the command, then quits the app and checks nothing it
 // started is left running. Claude and OpenRouter are
 // local stand-ins that answer as they would, so it costs nothing: the plan keeps the lines in
@@ -26,6 +26,8 @@ import { homedir, tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { _electron as electron, type Page } from "playwright-core";
+import { DESKTOP } from "../../web/lib/i18n/desktop.ts";
+import { LOCALE_NAMES, type Locale } from "../../web/lib/i18n/locale.ts";
 import { launcherPath, skillFolders } from "../src/install.ts";
 import { descendantsOf, type ProcessRow, stillRunning } from "./processes.ts";
 
@@ -611,12 +613,29 @@ async function makeEdit(): Promise<string[]> {
   ].filter((problem): problem is string => typeof problem === "string");
 }
 
+/** The menu item `id`'s label. */
+const label = (id: string) =>
+  app.evaluate(({ Menu }, id) => Menu.getApplicationMenu()?.getMenuItemById(id)?.label, id);
+
 /**
- * Chooses both install items in the app's menu, with each dialog's words printed in place of the
- * dialog and nothing already there replaced, then checks the skill's files and runs the installed command as its owner would in a
- * terminal: its help, then a 15 s edit of the clip, with only the keys saved in the app.
+ * Switches the page to its other language, then chooses both install items in the app's menu,
+ * which follow it, with each dialog's words printed in place of the dialog and nothing already
+ * there replaced, then checks the skill's files and runs the installed command as its owner would
+ * in a terminal: its help, then a 15 s edit of the clip, with only the keys saved in the app.
  */
 async function useCommandLine(): Promise<string[]> {
+  const from = (await page.evaluate(() => document.documentElement.lang)) as Locale;
+  const to: Locale = from === "en" ? "zh-TW" : "en";
+  await page.getByRole("button", { name: LOCALE_NAMES[from] }).click();
+  await page.getByRole("menuitem", { name: LOCALE_NAMES[to] }).click();
+  const words = DESKTOP[to];
+  for (let waited = 0; (await label("install-skill")) !== words.installSkill; waited += 250) {
+    if (waited > 10_000) {
+      return [`the menu stayed in ${from} after the page switched to ${to}`];
+    }
+    await new Promise((done) => setTimeout(done, 250));
+  }
+  say(`the page and the menu switched from ${from} to ${to}`);
   await app.evaluate(({ dialog }) => {
     const shown: string[] = [];
     (globalThis as { shown?: string[] }).shown = shown;
@@ -677,9 +696,11 @@ async function useCommandLine(): Promise<string[]> {
   const seconds = existsSync(video) ? await duration(video) : 0;
   say(`the command's edit is ${seconds.toFixed(2)} s`);
   return [
-    !dialogs.some((line) => line.startsWith("The fineframe command is installed")) &&
+    (await label("install-command")) !== words.installCommand &&
+      `the command's item stayed ${await label("install-command")}`,
+    !dialogs.some((line) => line.startsWith(words.commandInstalled)) &&
       `the menu did not install the command: ${dialogs.join("; ")}`,
-    !dialogs.some((line) => line.startsWith("The agent skill is installed")) &&
+    !dialogs.some((line) => line.startsWith(words.skillInstalled)) &&
       `the menu did not install the skill: ${dialogs.join("; ")}`,
     missing.length > 0 && `the skill's files did not land: ${missing.join(", ")}`,
     !help.stdout.includes("Usage: fineframe edit") &&

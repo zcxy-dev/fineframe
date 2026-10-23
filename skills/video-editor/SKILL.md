@@ -12,7 +12,7 @@ The editor runs one of two ways, with the same options:
 - **The Fineframe app**, whose menu installs the `fineframe` command: run `fineframe edit` and `fineframe render` from any folder.
 - **A clone of the repository**, for working on the editor: run `pnpm -s edit` in place of `fineframe edit` and `pnpm -s render` in place of `fineframe render` throughout, from the repository root: the folder two levels above this skill's `SKILL.md`, once symlinks are resolved (`git -C <that folder> rev-parse --show-toplevel`).
 
-File paths below that start with `packages/` are in the repository: in the clone, or at https://github.com/zcxy-dev/fineframe.
+File paths below that start with `packages/` are the editor's own, of the version that runs: with the app, in this skill's folder, where the app installs them with the skill and updates them with itself; from a clone, at the repository root.
 
 ## 1. Check the setup
 
