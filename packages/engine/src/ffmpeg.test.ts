@@ -3,6 +3,9 @@ import { chmod, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
+  checkEncoders,
+  checkFeatures,
+  EXPORT_ENCODERS,
   FFMPEG_ENV,
   ffmpeg,
   parseCodecs,
@@ -115,6 +118,38 @@ test(
       assert.ok(error.message.startsWith(`${fake} lacks `), error.message);
       assert.match(error.message, /-\/filter_complex \(FFmpeg 7\.0 or later\)/);
       assert.ok(!error.message.includes("filter crop"), error.message);
+      return true;
+    });
+  },
+);
+
+test(
+  "an FFmpeg without ProRes renders, and fails only when an export needs it",
+  fakes,
+  async (t) => {
+    const dir = await scratch(t, "no-prores-");
+    await writeFile(
+      join(dir, "filters"),
+      REQUIRED_FILTERS.map((name) => ` ... ${name}  V->V  x`).join("\n"),
+    );
+    await writeFile(join(dir, "encoders"), " V....D libx264  x\n A....D aac  x\n");
+    await writeFile(
+      join(dir, "decoders"),
+      REQUIRED_DECODERS.map((name) => ` V....D ${name}  x`).join("\n"),
+    );
+    const fake = join(dir, "ffmpeg");
+    await writeFile(
+      fake,
+      `#!/bin/sh\ncase "$2" in\n  -filters) cat "${dir}/filters" ;;\n` +
+        `  -encoders) cat "${dir}/encoders" ;;\n  -decoders) cat "${dir}/decoders" ;;\nesac\n`,
+    );
+    await chmod(fake, 0o755);
+    await checkFeatures(fake);
+    await assert.rejects(checkEncoders(fake, EXPORT_ENCODERS), (error: Error) => {
+      assert.equal(
+        error.message,
+        `${fake} lacks encoder prores_ks, which an export needs; unset ${FFMPEG_ENV} to use the pinned build.`,
+      );
       return true;
     });
   },

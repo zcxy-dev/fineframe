@@ -165,8 +165,9 @@ export const REQUIRED_FILTERS = [
   "xfade",
   "zscale",
 ];
+export const REQUIRED_ENCODERS = ["libx264", "aac"];
 /** prores_ks writes the overlay video an export lays over the footage (ProRes 4444 with alpha). */
-export const REQUIRED_ENCODERS = ["libx264", "aac", "prores_ks"];
+export const EXPORT_ENCODERS = ["prores_ks"];
 /** libvpx reads the alpha of the effect overlays (VP9 in WebM). */
 export const REQUIRED_DECODERS = ["libvpx-vp9"];
 
@@ -241,6 +242,19 @@ export async function checkFeatures(path: string): Promise<void> {
     throw new Error(
       `${path} lacks ${missing.join(", ")}. The renderer needs an FFmpeg built with libass, ` +
         `libx264, libvpx and zimg; unset ${FFMPEG_ENV} to use the pinned build.`,
+    );
+  }
+}
+
+/** Fails naming each of the encoders `names` the build lacks, which an export needs besides what
+ * every render does. */
+export async function checkEncoders(path: string, names: string[]): Promise<void> {
+  const encoders = parseCodecs((await run(path, ["-hide_banner", "-encoders"])).stdout);
+  const missing = names.filter((name) => !encoders.has(name)).map((name) => `encoder ${name}`);
+  if (missing.length > 0) {
+    throw new Error(
+      `${path} lacks ${missing.join(", ")}, which an export needs; unset ${FFMPEG_ENV} to use ` +
+        `the pinned build.`,
     );
   }
 }
