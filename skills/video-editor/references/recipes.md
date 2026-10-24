@@ -83,7 +83,7 @@ It also cuts away to web captures or stock footage: `broll` entries whose source
   fineframe render out/edit.project.json --music funky-energy-loop -o out/edit-v2.mp4
   ```
 
-  It fits the track to the edit as a plan does, from its first section, at the level the speech calls for, ducked under it, and writes `out/edit-v2.project.json`; the track downloads on its first use. B-roll keeps the beats of the track it was planned on. `edit-v2.music.txt` names the track; library tracks are CC0, and if a platform claims one, the claim is disputed with that licence.
+  It fits the track to the edit as a plan does, from its loudest section, at the level the speech calls for, ducked under it, moves the B-roll's edges onto its beats, and writes `out/edit-v2.project.json`; the track downloads on its first use. `edit-v2.music.txt` names the track; library tracks are CC0, and if a platform claims one, the claim is disputed with that licence.
 - **Level:** `audio.music[i].gainDb` is the music's level in dB; −3 more is about a third quieter. The music still ducks under speech by `ducking.depthDb`. The finished mix is normalised to `audio.loudness`, so the voice stays at the same loudness.
 - **Remove:** delete `audio.music`. The video then has no `edit-v2.music.txt`.
 - **Sound effects** are `audio.sfx`, each `{ "source", "start", "gainDb" }`: lower `gainDb` to make one quieter, or delete the entry.

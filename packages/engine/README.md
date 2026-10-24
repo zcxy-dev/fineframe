@@ -227,7 +227,7 @@ A finished edit changes by changing its `<name>.project.json` and rendering it a
 pnpm render out/edit.project.json --cut 29-33 -o out/edit-v2.mp4
 ```
 
-`--music <id>` plays that track of the [music library](#editing-footage) under the edit instead of its music, and `--music none` takes the music out: a render alone, with no new plan. The track is fitted to the edit as a plan fits it ([`library.ts`](src/library.ts)), from its first section, at the level the speech calls for and ducked under it; B-roll keeps the beats of the track it was planned on. The edit as changed is written to `<name>.project.json` beside the video.
+`--music <id>` plays that track of the [music library](#editing-footage) under the edit instead of its music, and `--music none` takes the music out: a render alone, with no new plan. The track is fitted to the edit as a plan fits it ([`library.ts`](src/library.ts)), from its loudest section, at the level the speech calls for and ducked under it, and the B-roll's edges move onto its beats as a plan places them, each within the time it had. The edit as changed is written to `<name>.project.json` beside the video.
 
 `--brand <folder>` renders the edit in that [brand kit's](#brand-kits) look, its files copied into `brand/` beside the video, and `--brand none` in the house look; the kit's custom captions draw in place of the edit's caption style, which taking the kit off brings back. Either is a render alone, with no new plan, as a caption style is. The edit as changed is written to `<name>.project.json` beside the video.
 

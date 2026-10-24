@@ -52,12 +52,11 @@ import { calloutRect, LOCATE_MODEL, type Located, locate, wishKey } from "./loca
 import {
   describeMusic,
   fitMusic,
-  lastBeat,
   loadMusic,
   type MusicInput,
   type MusicSource,
+  onBeats,
   outputBeats,
-  snapToBeat,
   speechLoudness,
 } from "./music.ts";
 import {
@@ -1122,7 +1121,6 @@ function brollClips(
   beats: readonly number[],
 ): BrollClip[] {
   const frame = ticksPerFrame(state.fps);
-  const onFrame = (ticks: number) => Math.round(ticks / frame) * frame;
   const clips: BrollClip[] = [];
   let free = 0;
   const placements = state.decisions.broll
@@ -1139,34 +1137,23 @@ function brollClips(
     .filter((placement) => placement !== null)
     .sort((a, b) => a.start - b.start);
   for (const { item, broll, start } of placements) {
-    let begin = Math.max(start, free);
-    if (beats.length > 0) {
-      const beat = onFrame(secondsToTicks(snapToBeat(begin / TICKS_PER_SECOND, beats)));
-      // The shot before ends on the grid, so a start that rounds below it moves a frame on.
-      begin = beat >= free ? beat : onFrame(begin) < free ? onFrame(begin) + frame : onFrame(begin);
-    }
     // A still has no time of its own: its clip runs from 0 for as long as it shows.
     const still = broll.kind === "image";
     const inTicks = still ? 0 : secondsToTicks(Math.max(0, item.start));
     const available = still
       ? secondsToTicks(Math.max(0, item.end - item.start))
       : secondsToTicks(Math.max(0, Math.min(item.end, broll.duration))) - inTicks;
-    const most = Math.min(available, secondsToTicks(BROLL_MAX), edit - begin);
-    let frames = Math.floor(most / frame);
-    if (beats.length > 0) {
-      const onBeats = beats.map((b) => onFrame(secondsToTicks(b)) - begin);
-      const end = lastBeat(frames * frame, secondsToTicks(1), onBeats);
-      frames = Math.floor(end / frame);
-    }
-    if (frames * frame < secondsToTicks(1)) continue;
+    const longest = Math.min(available, secondsToTicks(BROLL_MAX));
+    const shot = onBeats({ start, free, longest, end: edit }, beats, frame);
+    if (shot.length < secondsToTicks(1)) continue;
     clips.push({
       source: broll.id,
       in: inTicks,
-      out: inTicks + frames * frame,
-      start: begin,
+      out: inTicks + shot.length,
+      start: shot.start,
       fade: secondsToTicks(BROLL_FADE),
     });
-    free = begin + frames * frame;
+    free = shot.start + shot.length;
   }
   return clips;
 }

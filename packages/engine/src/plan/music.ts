@@ -479,6 +479,43 @@ export function lastBeat(latest: number, earliest: number, beats: readonly numbe
   return found ?? latest;
 }
 
+/**
+ * Where a shot whose cuts need not fall between words lands, in ticks on the frame grid of
+ * `frame` ticks: from `start`, never before `free`, for at most `longest` and never past `end`.
+ * With `beats`, the music's on the output timeline in seconds, its start moves to the nearest
+ * beat within SNAP and its end comes back to the last beat its length allows.
+ */
+export function onBeats(
+  shot: { start: number; free: number; longest: number; end: number },
+  beats: readonly number[],
+  frame: number,
+): { start: number; length: number } {
+  const { free } = shot;
+  const onFrame = (ticks: number) => Math.round(ticks / frame) * frame;
+  let begin = Math.max(shot.start, free);
+  if (beats.length > 0) {
+    const beat = onFrame(secondsToTicks(snapToBeat(begin / TICKS_PER_SECOND, beats)));
+    // The shot before ends on the grid, so a start that rounds below it moves a frame on.
+    begin = beat >= free ? beat : onFrame(begin) < free ? onFrame(begin) + frame : onFrame(begin);
+  }
+  let frames = Math.floor(Math.min(shot.longest, shot.end - begin) / frame);
+  if (beats.length > 0) {
+    const ticks = beats.map((b) => onFrame(secondsToTicks(b)) - begin);
+    frames = Math.floor(lastBeat(frames * frame, secondsToTicks(1), ticks) / frame);
+  }
+  return { start: begin, length: frames * frame };
+}
+
+/** The section an edit opens on when no one chose one: the loudest, where the track plays in
+ * full rather than a quiet intro, counted from 1. */
+export function loudestSection(index: MusicIndex): number {
+  let best = 0;
+  for (const [i, section] of index.sections.entries()) {
+    if (section.loudness > (index.sections[best]?.loudness ?? -Infinity)) best = i;
+  }
+  return best + 1;
+}
+
 /** The beat nearest `seconds`, if one is within SNAP; otherwise `seconds` itself. */
 export function snapToBeat(seconds: number, beats: readonly number[]): number {
   let best = seconds;

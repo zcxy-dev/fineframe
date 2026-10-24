@@ -25,6 +25,9 @@ END_RANGE_DB = 50.0
 END_WINDOW = 0.05
 # Beats the tempo is read over at a time.
 SPAN = 8
+# A tempo read faster than this is most likely the eighth notes taken for beats: the tracker
+# reads a 96 BPM library track at 192 (#169).
+DOUBLE_BPM = 160
 # The tracker of an index made without the beat model, which could not be downloaded.
 NO_TRACKER = "none"
 
@@ -56,6 +59,7 @@ def analyze(path: Path, license: dict, progress: Callable[[str], None]) -> dict:
         spect = np.zeros((0, beats.BANDS))
     beat_times = heard(beat_times, stereo, RATE)
     downbeat_times = heard(downbeat_times, stereo, RATE)
+    beat_times = folded(beat_times, downbeat_times)
     progress("measuring loudness and sections")
     per_second = loudness.measure(stereo, RATE)["short_term"]
     result = {
@@ -97,6 +101,22 @@ def tempo(beat_times: np.ndarray, downbeat_times: np.ndarray) -> dict:
         )
         per_bar = counts.most_common(1)[0][0] or None
     return {"bpm": round(bpm, 3) if bpm else None, "beats_per_bar": per_bar}
+
+
+def folded(beat_times: np.ndarray, downbeat_times: np.ndarray) -> np.ndarray:
+    """The beats at half the tempo when they read faster than DOUBLE_BPM and a bar holds an even
+    number of them: every other beat, counted from each downbeat, so every downbeat stays on a
+    beat. Otherwise the beats as they are."""
+    read = tempo(beat_times, downbeat_times)
+    per_bar = read["beats_per_bar"]
+    if not read["bpm"] or read["bpm"] <= DOUBLE_BPM or not per_bar or per_bar % 2:
+        return beat_times
+    # Each beat's count from the downbeat that starts its bar; a pickup counts back from the
+    # first downbeat.
+    first = np.searchsorted(beat_times, downbeat_times - 0.01)
+    bar = np.searchsorted(downbeat_times - 0.01, beat_times, side="right") - 1
+    count = np.arange(len(beat_times)) - first[np.maximum(bar, 0)]
+    return beat_times[count % 2 == 0]
 
 
 def sections(
