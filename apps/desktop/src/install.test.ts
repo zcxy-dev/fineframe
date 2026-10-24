@@ -169,7 +169,8 @@ test("the Windows launcher runs an app whose paths hold % and &, and says when i
       `fineframe: the Fineframe app is not at ${gone}. Install it or open it once, and it sets this command up again.`,
     );
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    // Windows can hold the copied binary for a moment after it exits (EBUSY).
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });
 
