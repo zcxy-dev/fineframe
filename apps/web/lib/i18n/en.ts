@@ -636,6 +636,7 @@ export const en = {
       },
       play: (title: string) => `Preview ${title}`,
       stop: (title: string) => `Stop ${title}`,
+      previewFailed: "The preview could not play. Check the connection and try again.",
       use: "Use",
       using: "In use",
       help: "Another track is fitted to this cut and only renders again: no new plan, no Claude cost.",

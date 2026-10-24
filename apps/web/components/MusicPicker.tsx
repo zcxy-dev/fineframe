@@ -1,8 +1,9 @@
 "use client";
 
-import { Pause, Play } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { LoaderCircle, Pause, Play } from "lucide-react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import type { EditView } from "../lib/jobs.ts";
+import { previewAfter } from "../lib/preview.ts";
 import { formatClock } from "../lib/settings.ts";
 import { cn, HELP, LABEL, LIST } from "../lib/styles.ts";
 import { useT } from "./I18n.tsx";
@@ -21,8 +22,9 @@ export interface LibraryEntry {
 
 const MOODS = ["calm", "upbeat", "emotional", "corporate", "energetic"] as const;
 
-/** The music library in the re-edit panel: a mood at a time, each track with a preview, and the
- * one chosen to swap in. */
+/** The music library in the re-edit panel: a mood at a time, each track with a preview, which
+ * shows it loads while the track downloads and says so when it cannot play, and the one chosen
+ * to swap in. */
 export function MusicPicker({
   current,
   chosen,
@@ -39,7 +41,7 @@ export function MusicPicker({
   const words = t.reedit.library;
   const [tracks, setTracks] = useState<LibraryEntry[] | null>(null);
   const [mood, setMood] = useState<LibraryEntry["mood"] | null>(null);
-  const [playing, setPlaying] = useState<string | null>(null);
+  const [preview, dispatch] = useReducer(previewAfter, null);
   const audio = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -59,24 +61,33 @@ export function MusicPicker({
   const own = tracks.find((track) => track.id === current?.track);
   const shown = mood ?? tracks.find((track) => track.id === chosen)?.mood ?? own?.mood ?? "calm";
 
-  const preview = (track: LibraryEntry) => {
+  const toggle = (track: LibraryEntry) => {
     const player = audio.current;
     if (!player) return;
-    if (playing === track.id) {
+    const click = { type: "click", track: track.id } as const;
+    dispatch(click);
+    if (!previewAfter(preview, click)) {
       player.pause();
-      setPlaying(null);
       return;
     }
     player.src = `/api/music/${encodeURIComponent(track.id)}`;
-    void player.play().catch(() => setPlaying(null));
-    setPlaying(track.id);
+    // A play cut short by the next track's load is not a failure.
+    void player.play().catch((error: Error) => {
+      if (error.name !== "AbortError") dispatch({ type: "failed", track: track.id });
+    });
   };
 
   return (
     <div className="flex flex-col gap-2.5">
       <span className={LABEL}>{words.title}</span>
       {/* biome-ignore lint/a11y/useMediaCaption: a music preview has no words to caption. */}
-      <audio ref={audio} onEnded={() => setPlaying(null)} onPause={() => setPlaying(null)} />
+      <audio
+        ref={audio}
+        onPlaying={() => dispatch({ type: "playing" })}
+        onEnded={() => dispatch({ type: "stopped" })}
+        onPause={() => dispatch({ type: "stopped" })}
+        onError={() => dispatch({ type: "failed" })}
+      />
       <Segments
         className="flex-wrap"
         options={MOODS.map((each) => ({ value: each, label: words.moods[each] }))}
@@ -88,6 +99,8 @@ export function MusicPicker({
           .filter((track) => track.mood === shown)
           .map((track) => {
             const using = chosen === undefined ? current?.track === track.id : chosen === track.id;
+            const state = preview?.track === track.id ? preview.state : null;
+            const busy = state === "loading" || state === "playing";
             return (
               <li
                 key={track.id}
@@ -100,13 +113,14 @@ export function MusicPicker({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className={cn(playing === track.id && "text-primary")}
-                  aria-label={
-                    playing === track.id ? words.stop(track.title) : words.play(track.title)
-                  }
-                  onClick={() => preview(track)}
+                  className={cn(busy && "text-primary")}
+                  aria-label={busy ? words.stop(track.title) : words.play(track.title)}
+                  aria-busy={state === "loading"}
+                  onClick={() => toggle(track)}
                 >
-                  {playing === track.id ? (
+                  {state === "loading" ? (
+                    <LoaderCircle className="animate-spin" aria-hidden="true" />
+                  ) : state === "playing" ? (
                     <Pause aria-hidden="true" />
                   ) : (
                     <Play aria-hidden="true" />
@@ -117,6 +131,11 @@ export function MusicPicker({
                   <span className="truncate text-xs text-muted-foreground tabular-nums">
                     {`${track.artist} · ${formatClock(track.seconds)}${track.bpm ? ` · ${Math.round(track.bpm)} BPM` : ""}`}
                   </span>
+                  {state === "failed" && (
+                    <span className="text-xs text-destructive" role="alert">
+                      {words.previewFailed}
+                    </span>
+                  )}
                 </span>
                 {using ? (
                   <span className="text-xs text-steel">{words.using}</span>

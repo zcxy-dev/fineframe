@@ -601,6 +601,7 @@ export const zhTW: Messages = {
       },
       play: (title) => `試聽 ${title}`,
       stop: (title) => `停止 ${title}`,
+      previewFailed: "無法播放試聽，請檢查網路連線後再試一次。",
       use: "使用",
       using: "使用中",
       help: "換成另一首會配合現在的剪接重新對拍，只需重新輸出：不必重新規劃，也沒有 Claude 費用。",

@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { catalogTracks } from "@video-editor/engine/library";
 import type { EditView, Job, ProjectSummary } from "../../../lib/jobs.ts";
 
 const root = await mkdtemp(join(tmpdir(), "web-jobs-"));
@@ -302,6 +303,8 @@ test("an edit: files streamed in, one edit at a time, live progress, then the do
     (await (await jobRoute.GET(new Request(url), ctx({ id: second.id }))).json()) as Job;
   while ((await latest()).status === "running") await new Promise((done) => setTimeout(done, 20));
   assert.equal((await latest()).result?.captions, false);
+  // Given no track, it plays one of the library's, which the page names by its title.
+  assert.deepEqual((await latest()).result?.music, [catalogTracks()[0]?.title]);
   const missing = await videoRoute.GET(new Request(`${url}/nope/video`), ctx({ id: "nope" }));
   assert.equal(missing.status, 404);
 });
