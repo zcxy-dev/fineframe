@@ -1,6 +1,6 @@
 [project]
 name = "vework"
-version = "0.6.1"
+version = "0.6.2"
 description = "Analysis worker for automatic video editing: probe, shot transitions, speech, timed transcripts, loudness, audio events, faces and who speaks"
 readme = "README.md"
 license = "LicenseRef-Proprietary"
