@@ -12,10 +12,10 @@ const FIND_PER_MINUTE = 0.0045;
  * video, as a range. The plan reads every transcript and writes more decisions for a longer
  * edit; with rich visuals, Claude writes the edit's motion graphics, more for a longer edit; the
  * review checks each cut, and a longer edit has more of them. Fitted to the measurements in
- * packages/engine/MEASUREMENTS.md: a first plan of 7 minutes of footage cost $0.06 for 30 s,
- * $0.07 for 1 min and $0.12 for 5 min, and the graphics $0.14 to $0.30 for a 30 s edit, $0.21 to
- * $0.54 for 1 min, $0.63 and $0.74 for 3 min and $0.79 and $1.00 for 5 min. Edits much longer than
- * those are not measured, so the range is wide.
+ * packages/engine/MEASUREMENTS.md: the plan of 7 minutes of footage, which lists the music
+ * library's 40 tracks, cost $0.10 for 30 s, $0.08 for 1 min and $0.20 for 5 min, and the graphics
+ * $0.14 to $0.30 for a 30 s edit, $0.21 to $0.54 for 1 min, $0.63 and $0.74 for 3 min and $0.79
+ * and $1.00 for 5 min. Edits much longer than those are not measured, so the range is wide.
  */
 export function estimateCost(
   footage: number,
@@ -32,7 +32,7 @@ export function estimateCost(
 
 /** One planning request for an edit of `length` seconds from `footage` seconds of video. */
 function planCost(footage: number, length: number): number {
-  return 0.045 + (0.002 * Math.max(0, footage)) / 60 + (0.012 * Math.max(0, length)) / 60;
+  return 0.05 + (0.002 * Math.max(0, footage)) / 60 + (0.018 * Math.max(0, length)) / 60;
 }
 
 /**
