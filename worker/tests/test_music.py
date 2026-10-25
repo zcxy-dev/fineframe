@@ -55,6 +55,16 @@ def test_beats_read_over_160_bpm_fold_to_every_other_one_from_each_downbeat():
     assert np.array_equal(music.folded(beats, beats[::3]), beats)
 
 
+def test_beats_read_slower_than_40_bpm_are_no_beat():
+    slow = np.arange(32) * 60 / 45
+    assert [len(times) for times in music.steady(slow, slow[::4])] == [32, 8]
+    accents = np.arange(32) * 60 / 35
+    assert [len(times) for times in music.steady(accents, accents[::4])] == [0, 0]
+    # A single beat has no tempo to read.
+    one = np.array([1.0])
+    assert [len(times) for times in music.steady(one, one)] == [1, 1]
+
+
 def test_sections_start_where_the_instruments_change():
     layout = ["kh"] * 8 + ["kshb"] * 12 + ["hb"] * 8
     spect = fake_spectrogram(layout)
@@ -172,3 +182,25 @@ def test_a_track_is_indexed_without_beats_when_the_beat_model_cannot_be_download
     assert index["tempo"] == {"bpm": None, "beats_per_bar": None}
     assert [(s["start"], s["end"]) for s in index["sections"]] == [(0.0, index["end"])]
     assert "no beats: the beat model could not be downloaded" in capsys.readouterr().err
+
+
+@pytest.mark.ml
+def test_accents_far_apart_are_no_steady_beat(tmp_path, monkeypatch):
+    # In music without a steady beat the tracker marks a few accents seconds apart: 11 in the
+    # 190 s of 'Infinite Wonder', which read 3 BPM with a beat to a bar (#218).
+    accents = np.array([2.0, 3.64, 5.36, 11.62, 30.72, 36.98, 47.3, 55.28])
+
+    def tracked(mono):
+        return accents, accents[[0, 2, 3, 4, 5, 6, 7]], np.zeros((len(mono) // beats.HOP, 128))
+
+    monkeypatch.setattr(beats, "track", tracked)
+    song, out = tmp_path / "song.wav", tmp_path / "song.music.json"
+    ffmpeg("-f", "lavfi", "-i", "sine=f=330:d=60", "-ac", "2", str(song))
+    cli.main(["analyze-music", str(song), "-o", str(out), "--license", "CC0 1.0"])
+    index = json.loads(out.read_text(encoding="utf-8"))
+    MusicIndex.model_validate(index, strict=True)
+    # The picker shows no tempo, and the planner fits the track from its start as one section.
+    assert index["tracker"] == f"beat_this {beats.MODEL}"
+    assert (index["beats"], index["downbeats"]) == ([], [])
+    assert index["tempo"] == {"bpm": None, "beats_per_bar": None}
+    assert [(s["start"], s["end"]) for s in index["sections"]] == [(0.0, index["end"])]
