@@ -98,20 +98,35 @@ export function indexName(
   return `${fingerprint.sha256}-${key}.index.json`;
 }
 
-/** Where each of vework's steps starts, as a share of its run on an 8-core CPU, measured on 1080p
- * interviews and the synthetic corpus: shots take about a fifth, faces an eighth, and
- * transcribing and aligning the rest. */
-const STEPS: [RegExp, AnalysisStep, (n: number) => number][] = [
+/** Where vework's steps start, as a share of its run, by where the speech is heard. */
+type Starts = Record<"speech" | "events" | "faces" | "denoise" | "transcribe" | "align", number>;
+
+/** With local speech, measured on an 8-core CPU on 1080p interviews and the synthetic corpus:
+ * shots take about a fifth of the run, faces an eighth, and transcribing and aligning the rest.
+ * With cloud speech, OpenRouter hears the speech in seconds, and shots take nearly half, faces
+ * and aligning the most of the rest, as the analysis measurements in
+ * packages/engine/MEASUREMENTS.md found. */
+const STARTS: Record<"local" | "cloud", Starts> = {
+  local: { speech: 0.2, events: 0.21, faces: 0.22, denoise: 0.34, transcribe: 0.35, align: 0.77 },
+  cloud: { speech: 0.46, events: 0.49, faces: 0.52, denoise: 0.66, transcribe: 0.69, align: 0.76 },
+};
+
+/** Each of vework's steps, and where it starts, `n` of the way through it. */
+const STEPS: [RegExp, AnalysisStep, (n: number, at: Starts) => number][] = [
   [/^probing/, "probe", () => 0],
-  [/^detecting shots(?: (\d+)%)?$/, "shots", (n) => 0.2 * n],
-  [/^finding speech/, "speech", () => 0.2],
-  [/^measuring loudness/, "loudness", () => 0.2],
-  [/^finding audio events/, "events", () => 0.21],
-  [/^finding faces/, "faces", () => 0.22],
-  [/^removing noise from speech/, "denoise", () => 0.34],
-  [/^transcribing (\d+)\/(\d+)/, "transcribe", (n) => 0.35 + 0.42 * n],
-  [/^correcting/, "correct", () => 0.77],
-  [/^aligning (\d+)\/(\d+)/, "align", (n) => 0.77 + 0.23 * n],
+  [/^detecting shots(?: (\d+)%)?$/, "shots", (n, at) => at.speech * n],
+  [/^finding speech/, "speech", (_, at) => at.speech],
+  [/^measuring loudness/, "loudness", (_, at) => at.speech],
+  [/^finding audio events/, "events", (_, at) => at.events],
+  [/^finding faces/, "faces", (_, at) => at.faces],
+  [/^removing noise from speech/, "denoise", (_, at) => at.denoise],
+  [
+    /^transcribing (\d+)\/(\d+)/,
+    "transcribe",
+    (n, at) => at.transcribe + (at.align - at.transcribe) * n,
+  ],
+  [/^correcting/, "correct", (_, at) => at.align],
+  [/^aligning (\d+)\/(\d+)/, "align", (n, at) => at.align + (1 - at.align) * n],
   // analyze-music, which takes seconds rather than minutes.
   [/^decoding/, "music", () => 0],
   [/^finding beats/, "music", () => 0.1],
@@ -156,7 +171,7 @@ export function analyze(
     extra.push("--glossary", options.glossary.path);
     if (options.asr !== "cloud") extra.push("--asr-context");
   }
-  return vework(worker, "analyze", file, index, extra, report, log);
+  return vework(worker, "analyze", file, index, extra, STARTS[options.asr ?? "local"], report, log);
 }
 
 /** The file's media index in `cache`, analysed only when no index of it by this worker with
@@ -205,7 +220,8 @@ export function analyzeMusic(
   const extra = ["--license", license.name];
   if (license.url) extra.push("--license-url", license.url);
   if (license.attribution) extra.push("--attribution", license.attribution);
-  return vework(worker, "analyze-music", file, index, extra, report, log);
+  // Its own steps start where they do whatever hears the speech.
+  return vework(worker, "analyze-music", file, index, extra, STARTS.local, report, log);
 }
 
 /** Whether the music index at `path` was made without the beat model: vework writes one with
@@ -232,6 +248,7 @@ async function vework(
   file: MediaFile,
   index: string,
   extra: readonly string[],
+  at: Starts,
   report: Report,
   log: (line: string) => void,
 ): Promise<void> {
@@ -268,7 +285,7 @@ async function vework(
       }
       // How far into the step: chunk n of `of` is starting, or n % is done.
       const [, n, of] = said.match(step[0]) ?? [];
-      const fraction = step[2](of ? (Number(n) - 1) / Number(of) : n ? Number(n) / 100 : 0);
+      const fraction = step[2](of ? (Number(n) - 1) / Number(of) : n ? Number(n) / 100 : 0, at);
       reached = fraction;
       on = step[1];
       report(fraction, said.charAt(0).toUpperCase() + said.slice(1), undefined, on);
