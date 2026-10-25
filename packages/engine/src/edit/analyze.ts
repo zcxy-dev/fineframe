@@ -311,16 +311,18 @@ async function vework(
           : spawnError,
       );
     });
+    // A failed analysis fails with its own error even when its folder cannot be removed; a whole
+    // one fails with the error of moving it into the cache or removing the folder.
     child.on("close", async (code, signal) => {
       if (failed) {
-        await rm(partial, REMOVE_HELD);
+        await rm(partial, REMOVE_HELD).catch(() => {});
         return;
       }
       if (code === 0) {
         await settle(partial, written, index).then(() => done(), fail);
         return;
       }
-      await rm(partial, REMOVE_HELD);
+      await rm(partial, REMOVE_HELD).catch(() => {});
       const why = error ?? stopped(lastLine, code, signal);
       fail(new EditError(`${file.given}: the analysis failed: ${why}`));
     });
