@@ -134,6 +134,67 @@ test("the glossary reaches vework only where it uses it, and keys the index only
   );
 });
 
+/** Seconds each step took in the three recordings analysed with cloud speech in
+ * packages/engine/MEASUREMENTS.md (analysis measurements): shots, faces, transcription and
+ * alignment as measured, the rest of each run split between the steps before faces and the
+ * denoising, two to one, as with local speech. */
+const CLOUD_RUNS: Record<string, [number, number, number, number, number, number, number]> = {
+  "Recording A": [152, 9, 9, 46, 9, 15, 69],
+  "Recording B": [135, 20, 21, 46, 20, 54, 119],
+  "Recording C": [403, 23, 22, 111, 23, 31, 176],
+};
+
+test("with cloud speech, the bar moves with the time the analysis's steps take", async (t) => {
+  const dir = await scratch(t, "cloud-pace-");
+  const source = join(dir, "talk.mp4");
+  await writeFile(source, "footage");
+  const file = { given: source, path: source, kind: "video" as const };
+  const quiet = () => {};
+  for (const [name, [shots, speech, events, faces, denoise, transcribe, align]] of Object.entries(
+    CLOUD_RUNS,
+  )) {
+    // Each line vework prints and the seconds until its next one; OpenRouter hears 10 chunks.
+    const lines: [string, number][] = [
+      ["probing", 0],
+      ["detecting shots", shots],
+      ["finding speech", speech],
+      ["finding audio events", events],
+      ["finding faces", faces],
+      ["removing noise from speech", denoise],
+      ...Array.from({ length: 10 }, (_, i): [string, number] => [
+        `transcribing ${i + 1}/10 (US$0.0000 so far)`,
+        transcribe / 10,
+      ]),
+      ...Array.from({ length: 5 }, (_, i): [string, number] => [`aligning ${i + 1}/5`, align / 5]),
+    ];
+    const script = join(dir, "vework.ts");
+    await writeFile(
+      script,
+      `import { writeFile } from "node:fs/promises";
+for (const line of ${JSON.stringify(lines.map(([line]) => line))}) {
+  process.stderr.write(\`vework: \${line}\\n\`);
+}
+await writeFile(process.argv[5] ?? "", "{}");
+`,
+    );
+    const worker: Worker = { command: [process.execPath, script], version: "test" };
+    const bar: number[] = [];
+    const report = (fraction: number) => bar.push(fraction);
+    const index = join(dir, `${name}.index.json`);
+    await analyze(worker, file, index, { correct: false, asr: "cloud" }, report, quiet);
+    assert.equal(bar.length, lines.length);
+    const total = lines.reduce((sum, [, seconds]) => sum + seconds, 0);
+    let elapsed = 0;
+    for (const [i, [line, seconds]] of lines.entries()) {
+      // Each line within 15 % of the run of the share of its time already spent, as near as
+      // footage at 30 or 60 fps, whose shots take a third to a half of the run, allows.
+      const off = (bar[i] ?? 0) - elapsed / total;
+      assert.ok(Math.abs(off) <= 0.15, `${name}: "${line}" at ${bar[i]}, ${off.toFixed(2)} off`);
+      elapsed += seconds;
+    }
+  }
+});
+
 test("an index analysed with the Mac's GPU is not reused for one asked of the CPU", (t) => {
   const worker: Worker = { command: ["vework"], version: "test" };
   const fingerprint = { sha256: "0".repeat(64), bytes: 7 };
