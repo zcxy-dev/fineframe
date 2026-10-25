@@ -2,6 +2,7 @@
 // (`--within`), on the synthetic talk said over and over, with a stand-in for vework and Claude.
 
 import assert from "node:assert/strict";
+import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -398,6 +399,61 @@ test("shorts that cannot be made, or cost past their cap, stop with the reason",
     "Made 1 shorts, not 2: stopped at the cost limit, as a short reached $1.20, over the $1 a short may",
   );
 });
+
+/** Stays in its working folder, a short's, until the edit's work folder in it has come and gone,
+ * then half a second more. */
+const HOLD = `const { existsSync } = require("node:fs");
+let seen = false;
+const wait = setInterval(() => {
+  if (existsSync(".edit.edit")) seen = true;
+  else if (seen) {
+    clearInterval(wait);
+    setTimeout(() => {}, 500);
+  }
+}, 20);`;
+const windows = {
+  skip: process.platform !== "win32" && "only Windows refuses to remove a folder a program runs in",
+};
+
+test(
+  "a refused short's folder goes though a program holds it a moment, as on Windows",
+  windows,
+  async (t) => {
+    const dir = await scratch(t, "shorts-held-");
+    const folder = await longTalk(dir);
+    const out = join(dir, "shorts");
+    const short = join(out, "01");
+    // A program in the short's folder as the short is refused, as one that just used its files
+    // can seem to be on Windows, which lets go a moment after the removal starts.
+    let holder: ChildProcess | undefined;
+    const { claude } = claudeFor([saying(1, "Expensive")]);
+    const holding: Claude = async (request) => {
+      if (request.purpose === "plan" && !holder) {
+        holder = spawn(process.execPath, ["-e", HOLD], { cwd: short, stdio: "ignore" });
+      }
+      return claude(request);
+    };
+    await assert.rejects(
+      editShorts({
+        inputs: [folder],
+        count: 1,
+        range: [15, 30],
+        aspect: "9:16",
+        out,
+        worker: vework,
+        cache: join(dir, "cache"),
+        visuals: "minimal",
+        claude: holding,
+      }),
+      (error: Error) => {
+        assert.match(error.message, /^Stopped at the cost limit after 0 shorts: /);
+        return true;
+      },
+    );
+    assert.ok(holder, "nothing held the short's folder");
+    assert.equal(existsSync(short), false);
+  },
+);
 
 test("finding the moments says how much footage it read, from the analysis", async (t) => {
   const dir = await scratch(t, "moments-");
