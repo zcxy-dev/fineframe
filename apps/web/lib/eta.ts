@@ -7,17 +7,19 @@ import type { Job, Stage } from "./jobs.ts";
 type Step = NonNullable<Job["progress"]>["step"];
 
 /** Too little of the analysis to say how fast it goes: its first half minute, or 2 % of the
- * bar. */
+ * bar, from the bar's first move. */
 const MIN_MILLISECONDS = 30_000;
 const MIN_FRACTION = 0.02;
 /** Where the bar is when the analysis ends, when every file needs it
  * (ANALYZE_SHARE in packages/engine/src/edit/edit.ts). */
 const ANALYSIS_END = 0.9;
 /** How long a new rate takes to move the estimate most of the way, in milliseconds, and how far
- * the finish may move for each millisecond since the last line: the bar moves in steps, some of
- * them minutes apart, and the time left should not jump with each. */
+ * the finish may move later and earlier for each millisecond since the last line: the bar moves
+ * in steps, some of them minutes apart, and the time left should not jump with each. It comes
+ * down faster than it goes up, so that one too high after a slow stretch catches up. */
 const SETTLE = 30_000;
-const SLEW = 0.5;
+const LATER = 0.5;
+const EARLIER = 1;
 
 /** Seconds the plan, the render and the check take after the analysis, for an edit of `length`
  * seconds: fitted to the measured edits (packages/engine/MEASUREMENTS.md), 41 to 72 s for a
@@ -27,19 +29,23 @@ export function afterAnalysis(length: number): number {
 }
 
 /**
- * Follows one edit and estimates when it finishes. The finish moves by at most half the time
- * since the last line, so the time left only counts down, at half to one and a half times the
- * clock's pace. Time while `downloading` (a model, which shows its own time left), or on an
- * analysis line that is none of the footage's steps (checking Claude, a first-use download such
- * as FFmpeg's, the analysis starting, the music's analysis), is not counted as the analysis's
- * work and moves the finish later by as long: on a first edit it can take minutes that say
- * nothing of the footage's pace.
+ * Follows one edit and estimates when it finishes. The finish moves later by at most half the
+ * time since the last line and earlier by at most as long, so the time left only counts down, at
+ * half to twice the clock's pace. Time while `downloading` (a model, which shows its own time
+ * left), or on an analysis line that is none of the footage's steps (checking Claude, a first-use
+ * download such as FFmpeg's, the analysis starting, the music's analysis), is not counted as the
+ * analysis's work and moves the finish later by as long: on a first edit it can take minutes that
+ * say nothing of the footage's pace. Nor is the time before the footage's steps first move the bar:
+ * the first step's model loads then, and shot detection's first 5 % can take several times as
+ * long as each 5 % after it.
  */
 export class Finish {
   readonly #after: number;
   #last: { at: number; fraction: number; paused: boolean } | undefined;
   #from = 0;
   #worked = 0;
+  /** Whether the footage's steps have moved the bar yet. */
+  #moving = false;
   /** When the stages after the analysis began. */
   #analysed: number | undefined;
   #finish: number | undefined;
@@ -66,7 +72,11 @@ export class Finish {
     if (last?.paused) {
       if (this.#finish !== undefined) this.#finish += elapsed;
     } else if (stage === "analyze") {
-      this.#worked += elapsed;
+      if (this.#moving) this.#worked += elapsed;
+      else if (fraction > this.#from) {
+        this.#moving = true;
+        this.#from = fraction;
+      }
     }
     this.#last = { at, fraction, paused };
     if (paused) return this.#finish;
@@ -83,8 +93,8 @@ export class Finish {
     if (this.#finish === undefined) this.#finish = measured;
     else {
       const weight = 1 - Math.exp(-elapsed / SETTLE);
-      const most = elapsed * SLEW;
-      this.#finish += Math.max(-most, Math.min(most, (measured - this.#finish) * weight));
+      const move = (measured - this.#finish) * weight;
+      this.#finish += Math.max(-elapsed * EARLIER, Math.min(elapsed * LATER, move));
     }
     return this.#finish;
   }

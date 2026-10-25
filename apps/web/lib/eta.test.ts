@@ -69,12 +69,13 @@ test("the time left counts down, never jumping, and nears the truth as the edit 
         const estimate = finish.update(at, fraction, stage, false, step);
         if (estimate === undefined) continue;
         if (previous) {
-          // The finish moves by at most half the time since the last line: the time left only
-          // goes down, at half to one and a half times the clock's pace.
-          const most = (at - previous.at) / 2;
+          // The finish moves later by at most half the time since the last line and earlier by
+          // at most as long: the time left only goes down, at half to twice the clock's pace.
+          const since = at - previous.at;
+          const moved = estimate - previous.estimate;
           assert.ok(
-            Math.abs(estimate - previous.estimate) <= most + 1e-6,
-            `${analysis} s run ${seed}: the finish moved ${(estimate - previous.estimate) / 1000} s`,
+            moved <= since / 2 + 1e-6 && moved >= -since - 1e-6,
+            `${analysis} s run ${seed}: the finish moved ${moved / 1000} s`,
           );
         }
         // Past half the edit, within a quarter of its length of the truth, as near as steps
@@ -114,6 +115,44 @@ test("a first edit's setup before the footage's steps is not counted at the anal
         `run ${seed}: ${(estimate - 100_000 - end) / 1000} s off at ${at / 1000} s`,
       );
     }
+  }
+});
+
+test("a slow start of the footage's first step is not taken as the analysis's pace", () => {
+  // Shot detection's first 5 % took 43 s, with its model loading, and each later 5 % 18 s, in a
+  // 30 s edit with cloud speech (#224's run 2); the steps after it go at that later pace, then the
+  // plan, the render and the check take what afterAnalysis says.
+  const share = (0.46 * 0.9) / 20;
+  const pace = share / 18_000;
+  const lines: [number, number, Stage, Step][] = [[0, 0, "analyze", "probe"]];
+  let at = 43_000;
+  for (let i = 1; i < 20; i++, at += 18_000) lines.push([at, i * share, "analyze", "shots"]);
+  const steps: [number, Step][] = [
+    [0.46, "speech"],
+    [0.49, "events"],
+    [0.52, "faces"],
+    [0.66, "denoise"],
+    [0.69, "transcribe"],
+    [0.76, "align"],
+  ];
+  let fraction = 19 * share;
+  for (const [start, step] of steps) {
+    at += (start * 0.9 - fraction) / pace;
+    fraction = start * 0.9;
+    lines.push([at, fraction, "analyze", step]);
+  }
+  at += (0.9 - fraction) / pace;
+  lines.push([at, 0.9, "plan", "align"]);
+  const end = at + afterAnalysis(30) * 1000;
+  const finish = new Finish(30);
+  for (const [at, fraction, stage, step] of lines) {
+    const estimate = finish.update(at, fraction, stage, false, step);
+    if (estimate === undefined || at < 60_000) continue;
+    // From the first minute on, within a quarter of the edit's time of the truth.
+    assert.ok(
+      Math.abs(estimate - end) < end / 4,
+      `${(estimate - end) / 1000} s off at ${at / 1000} s of ${end / 1000} s`,
+    );
   }
 });
 
