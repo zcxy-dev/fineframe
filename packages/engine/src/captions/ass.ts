@@ -340,6 +340,12 @@ export interface EmojiEvent {
 /** Room between a caption's text, or its plate, and its emoji, in ems. */
 const EMOJI_GAP = 0.15;
 
+/** Where the pen that draws a line's emoji after `row` starts, right of the frame's centre, in
+ * ems. */
+export function emojiPen(row: Row, preset: Preset): number {
+  return (row.width - preset.tracking) / 2 + (preset.plate?.padX ?? 0) + EMOJI_GAP;
+}
+
 /**
  * Where and when each line's emoji is drawn: at the end of the last row of the line's last page,
  * at the page's size, as the face would set it there, from the frame the line's last word is lit
@@ -360,14 +366,12 @@ export function placeEmoji(
     const widest = Math.max(...page.rows.map((row) => row.width));
     const k = geometry.fit !== undefined && widest > geometry.fit ? geometry.fit / widest : 1;
     const em = geometry.em * k;
-    const row = page.rows.at(-1) as Row;
-    const right = width / 2 + ((row.width - preset.tracking) * em) / 2;
     const baseline = (bottoms[p] as number) - em + metrics.emTop * em;
     const { image } = chosen;
     const scale = em / image.ppem;
     const w = Math.round(image.width * scale);
     const h = Math.round(image.height * scale);
-    const pen = right + ((preset.plate?.padX ?? 0) + EMOJI_GAP) * em;
+    const pen = width / 2 + emojiPen(page.rows.at(-1) as Row, preset) * em;
     return [
       {
         ...chosen,

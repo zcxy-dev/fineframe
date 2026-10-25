@@ -11,11 +11,11 @@ import {
 } from "@video-editor/schema";
 import type { BrandFace } from "../brand/kit.ts";
 import type { Timeline } from "../timeline.ts";
-import { type CaptionFace, type EmojiEvent, placeEmoji, writeAss } from "./ass.ts";
+import { type CaptionFace, type EmojiEvent, emojiPen, placeEmoji, writeAss } from "./ass.ts";
 import { type EmojiImage, emojiImage } from "./emoji.ts";
 import { faceZones, overlayZones, visualZones } from "./faces.ts";
 import { family, fontFile, type Metrics, metrics } from "./fonts.ts";
-import { layoutCaptions, type Page, rowText } from "./layout.ts";
+import { layoutCaptions, type Page, type Row, rowText } from "./layout.ts";
 import { placeBlocks } from "./place.ts";
 import {
   brandPreset,
@@ -58,11 +58,13 @@ type Placeable = Pick<Timeline, "main" | "broll" | "frames" | "frameTicks"> &
   Partial<Pick<Timeline, "graphics" | "overlays">>;
 
 /** The pages of `style`, in a brand kit's look when given, where each is drawn, and what drawing
- * them takes. */
+ * them takes. A line's last page also holds the emoji `emojiOf` gives the line, drawn after its
+ * last row. */
 async function place(
   project: Project,
   timeline: Placeable,
   style: DrawnStyle,
+  emojiOf: (line: number) => EmojiImage | undefined,
   brand?: CaptionBrand,
 ) {
   const { captions, output } = project as Project & { captions: Captions };
@@ -95,7 +97,11 @@ async function place(
     tail: secondsToTicks(TAIL / 1000),
     frames: timeline.frames,
   });
-  const blocks = pages.map((page) => {
+  const blocks = pages.map((page, p) => {
+    const image = pages[p + 1]?.line === page.line ? undefined : emojiOf(page.line);
+    const reach = image
+      ? emojiPen(page.rows.at(-1) as Row, chosen) + (image.left + image.width) / image.ppem
+      : 0;
     const widest = Math.max(...page.rows.map((row) => row.width));
     const height = 1 + (page.rows.length - 1) * LEADING + 2 * CLEARANCE;
     const shot = timeline.main.findLastIndex((clip) => clip.start <= page.start);
@@ -104,7 +110,7 @@ async function place(
       end: page.end,
       shot,
       left: output.width / 2 - (widest / 2 + CLEARANCE) * em,
-      right: output.width / 2 + (widest / 2 + CLEARANCE) * em,
+      right: output.width / 2 + (Math.max(widest / 2, reach) + CLEARANCE) * em,
       height: height * em,
     };
   });
@@ -153,13 +159,14 @@ export async function buildCaptions(
   if (!captions) return null;
   // Custom captions draw their own style; none draws nothing, and its SubRip copy is bold's.
   const style = captions.preset === "none" ? null : (brand?.custom?.style ?? captions.preset);
+  const emoji = captions.emoji ? await lineEmoji(captions) : new Map<number, LineEmoji>();
   const { chosen, fonts, face, em, pages, bottoms, fit } = await place(
     project,
     timeline,
     style ?? "bold",
+    (line) => emoji.get(line)?.image,
     style ? brand : undefined,
   );
-  const emoji = captions.emoji ? await lineEmoji(captions) : new Map<number, LineEmoji>();
   const geometry = {
     width: output.width,
     height: output.height,
@@ -201,14 +208,21 @@ async function lineEmoji(captions: Captions): Promise<Map<number, LineEmoji>> {
 
 /**
  * Where the project's captions may be drawn, in output pixels over output frames [start, end):
- * in each stretch, the box that holds the captions of every style there. The style changes with
- * a render alone, so a graphic keeps its text off all of them. Empty without captions.
+ * in each stretch, the box that holds the captions of every style there, with the emoji at the
+ * ends of their lines. The style and the emoji's switch change with a render alone, so a graphic
+ * keeps its text off all of them. Empty without captions.
  */
 export async function captionAreas(project: Project, timeline: Placeable): Promise<Box[]> {
   if (!project.captions) return [];
+  // An emoji the font lacks is never drawn: a render with the switch on fails on it instead.
+  const emoji = new Map<number, EmojiImage>();
+  for (const [i, line] of project.captions.lines.entries()) {
+    const image = line.emoji ? await emojiImage(line.emoji) : undefined;
+    if (image) emoji.set(i, image);
+  }
   const all: Box[] = [];
   for (const style of Object.keys(PRESETS) as DrawnStyle[]) {
-    all.push(...(await place(project, timeline, style)).boxes);
+    all.push(...(await place(project, timeline, style, (line) => emoji.get(line))).boxes);
   }
   const times = [...new Set(all.flatMap((box) => [box.start, box.end]))].sort((a, b) => a - b);
   const areas: Box[] = [];
