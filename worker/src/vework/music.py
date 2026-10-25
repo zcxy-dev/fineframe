@@ -28,6 +28,10 @@ SPAN = 8
 # A tempo read faster than this is most likely the eighth notes taken for beats: the tracker
 # reads a 96 BPM library track at 192 (#169).
 DOUBLE_BPM = 160
+# A tempo read slower than this is no beat: in music without one, such as sustained pads, the
+# tracker marks a few accents seconds apart. It read 'Infinite Wonder' at 3 BPM and 'Ice and
+# Snow' at 13, where the library's slowest beat is 60 (#218).
+MIN_BPM = 40
 # The tracker of an index made without the beat model, which could not be downloaded.
 NO_TRACKER = "none"
 
@@ -60,6 +64,7 @@ def analyze(path: Path, license: dict, progress: Callable[[str], None]) -> dict:
     beat_times = heard(beat_times, stereo, RATE)
     downbeat_times = heard(downbeat_times, stereo, RATE)
     beat_times = folded(beat_times, downbeat_times)
+    beat_times, downbeat_times = steady(beat_times, downbeat_times)
     progress("measuring loudness and sections")
     per_second = loudness.measure(stereo, RATE)["short_term"]
     result = {
@@ -117,6 +122,15 @@ def folded(beat_times: np.ndarray, downbeat_times: np.ndarray) -> np.ndarray:
     bar = np.searchsorted(downbeat_times - 0.01, beat_times, side="right") - 1
     count = np.arange(len(beat_times)) - first[np.maximum(bar, 0)]
     return beat_times[count % 2 == 0]
+
+
+def steady(beat_times: np.ndarray, downbeat_times: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """The beats and downbeats as they are, or none when the beats read slower than MIN_BPM: the
+    planner then fits the track from its start, as one without a bar grid."""
+    bpm = tempo(beat_times, downbeat_times)["bpm"]
+    if bpm and bpm < MIN_BPM:
+        return np.zeros(0), np.zeros(0)
+    return beat_times, downbeat_times
 
 
 def sections(
