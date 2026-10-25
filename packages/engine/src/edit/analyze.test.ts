@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
-import { cp, readFile, writeFile } from "node:fs/promises";
+import type { RmOptions } from "node:fs";
+import fs, { cp, readFile, writeFile } from "node:fs/promises";
+import { syncBuiltinESMExports } from "node:module";
 import { join } from "node:path";
 import { type TestContext, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { scratch } from "../testing.ts";
 import {
   type AnalysisOptions,
+  analyze,
   cachedIndex,
   indexName,
   type Worker,
@@ -144,4 +147,49 @@ test("an index analysed with the Mac's GPU is not reused for one asked of the CP
   const either = indexName(worker, fingerprint, options);
   process.env.VEWORK_DEVICE = "CPU";
   assert.notEqual(indexName(worker, fingerprint, options), either);
+});
+
+test("the analysis ends, failing, when its folder cannot be removed", async (t) => {
+  const dir = await scratch(t, "kept-");
+  const source = join(dir, "talk.mp4");
+  await writeFile(source, "footage");
+  process.env.FAKE_VEWORK_LOG = join(dir, "vework.jsonl");
+  // Every removal of vework's folder fails, as when a program still holds it past the retries.
+  const held = Object.assign(new Error("EBUSY: resource busy or locked"), { code: "EBUSY" });
+  const { rm } = fs;
+  const removal = t.mock.method(fs, "rm", (path: string, options?: RmOptions) =>
+    path.endsWith(".partial") ? Promise.reject(held) : rm(path, options),
+  );
+  syncBuiltinESMExports();
+  t.after(() => {
+    removal.mock.restore();
+    syncBuiltinESMExports();
+  });
+  const worker: Worker = {
+    command: [process.execPath, fileURLToPath(new URL("fixtures/vework.ts", import.meta.url))],
+    version: "test",
+  };
+  const file = { given: source, path: source, kind: "video" as const };
+  const quiet = () => {};
+  const index = join(dir, "talk.cache.json");
+  // vework's own error comes first: the stand-in fails on a file with no index beside it.
+  await assert.rejects(
+    analyze(worker, file, index, { correct: false }, quiet, quiet),
+    /talk\.mp4: the analysis failed: .*Invalid data found when processing input$/,
+  );
+  await assert.rejects(
+    analyze(
+      { command: ["no-such-program-for-vework"], version: "test" },
+      file,
+      index,
+      { correct: false },
+      quiet,
+      quiet,
+    ),
+    /no-such-program-for-vework is not installed or not on PATH/,
+  );
+  // Analysed whole, the removal's error is the failure.
+  await writeFile(join(dir, "talk.index.json"), "{}");
+  await assert.rejects(analyze(worker, file, index, { correct: false }, quiet, quiet), held);
+  assert.equal(removal.mock.callCount(), 3);
 });
