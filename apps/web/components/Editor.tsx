@@ -479,7 +479,7 @@ export function Editor() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-1.5 border-b bg-background px-4 max-sm:px-2">
+      <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-1.5 border-b bg-card px-4 max-sm:px-2">
         <span className="group/brand mr-auto inline-flex items-center gap-2.5 text-[17px] font-bold tracking-[-0.02em]">
           <Image
             src="/icon.svg"

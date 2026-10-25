@@ -392,12 +392,12 @@ export function BrandKits({ onClose }: { onClose: () => void }) {
                   <li key={each.id}>
                     <button
                       type="button"
-                      className="flex min-h-10 w-full items-center gap-2.5 rounded-lg border border-transparent px-3 text-left text-[13px] text-steel transition-colors hover:bg-raised hover:text-foreground aria-pressed:border-edge aria-pressed:bg-raised aria-pressed:font-semibold aria-pressed:text-foreground"
+                      className="flex min-h-10 w-full items-center gap-2.5 rounded-lg border-(length:--stroke) border-transparent px-3 text-left text-[13px] text-steel transition-colors hover:bg-raised hover:text-foreground aria-pressed:border-foreground aria-pressed:font-semibold aria-pressed:text-foreground"
                       aria-pressed={each.id === chosen}
                       onClick={() => setChosen(each.id)}
                     >
                       <span
-                        className="size-3.5 flex-none rounded-[4px] shadow-[inset_0_0_0_1px_rgb(255_255_255/0.2)]"
+                        className="size-3.5 flex-none rounded-[4px] shadow-[inset_0_0_0_1px_rgb(12_13_16/0.15)]"
                         style={{ background: each.brand.colors.primary }}
                       />
                       <span className="min-w-0 flex-1 truncate">{each.brand.name}</span>
@@ -541,7 +541,7 @@ const SUB = "text-xs text-steel";
 /** A colour well and its name. */
 const COLOUR = "flex items-center gap-2.5 text-[13px]";
 const SWATCH =
-  "h-7 w-9 flex-none cursor-pointer rounded-md border border-edge bg-well p-0.5 disabled:cursor-not-allowed disabled:opacity-50";
+  "h-7 w-9 flex-none cursor-pointer rounded-md border border-edge bg-card p-0.5 disabled:cursor-not-allowed disabled:opacity-50";
 /** A labelled slider and its value. */
 const RANGE =
   "grid grid-cols-[5.5em_minmax(0,1fr)_3.5em] items-center gap-2 text-[13px] text-steel";
@@ -637,7 +637,7 @@ function KitFields({
             </option>
           )}
         </NativeSelect>
-        <label className="cursor-pointer self-start rounded-sm text-[13px] font-medium text-steel underline decoration-edge underline-offset-[3px] hover:text-foreground hover:decoration-primary has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary">
+        <label className="cursor-pointer self-start rounded-sm text-[13px] font-medium text-steel underline decoration-edge underline-offset-[3px] hover:text-foreground hover:decoration-foreground has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring">
           <input
             type="file"
             accept=".ttf,.otf,font/ttf,font/otf"
@@ -703,7 +703,7 @@ function KitFields({
           <label
             className={cn(
               buttonVariants({ variant: "outline", size: "sm" }),
-              "has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary",
+              "has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring",
             )}
           >
             <input

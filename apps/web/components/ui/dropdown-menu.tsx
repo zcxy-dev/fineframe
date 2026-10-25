@@ -27,7 +27,7 @@ function DropdownMenuContent({
         sideOffset={sideOffset}
         align={align}
         className={cn(
-          "z-50 min-w-40 origin-(--radix-dropdown-menu-content-transform-origin) rounded-xl border border-edge bg-surface p-1.5 text-foreground shadow-[0_24px_48px_-16px_rgb(0_0_0/0.8)] duration-150 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 motion-reduce:animate-none",
+          "z-50 min-w-40 origin-(--radix-dropdown-menu-content-transform-origin) rounded-xl border bg-surface p-1.5 text-foreground shadow-[0_24px_48px_-20px_rgb(12_13_16/0.3),0_2px_6px_rgb(12_13_16/0.06)] duration-150 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 motion-reduce:animate-none",
           className,
         )}
         {...props}

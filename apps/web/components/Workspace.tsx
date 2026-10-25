@@ -33,7 +33,7 @@ export function Workspace({
       >
         <div className="min-h-0 flex-1 lg:overflow-y-auto">{panel}</div>
         {foot && (
-          <div className="flex shrink-0 flex-col gap-2.5 border-t bg-surface px-6 py-4 shadow-[0_-16px_32px_-16px_rgb(0_0_0/0.7)] max-lg:sticky max-lg:bottom-0 max-md:px-4">
+          <div className="flex shrink-0 flex-col gap-2.5 border-t bg-surface px-6 py-4 shadow-[0_-12px_24px_-16px_rgb(12_13_16/0.14)] max-lg:sticky max-lg:bottom-0 max-md:px-4">
             {foot}
           </div>
         )}

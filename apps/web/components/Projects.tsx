@@ -61,7 +61,7 @@ export function Projects({ onOpen }: { onOpen: (id: string) => void }) {
         {shown.map((project) => (
           <li
             key={project.id}
-            className="grid grid-cols-[32px_minmax(0,1fr)_auto_auto] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.025] max-sm:grid-cols-[32px_minmax(0,1fr)_auto]"
+            className="grid grid-cols-[32px_minmax(0,1fr)_auto_auto] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-accent max-sm:grid-cols-[32px_minmax(0,1fr)_auto]"
           >
             <span className={ICON_FRAME}>
               <Film aria-hidden="true" />

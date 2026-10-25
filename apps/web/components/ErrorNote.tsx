@@ -40,7 +40,7 @@ export function ErrorNote({
           <>
             <button
               type="button"
-              className="text-steel underline decoration-edge underline-offset-2 hover:text-foreground hover:decoration-primary"
+              className="text-steel underline decoration-edge underline-offset-2 hover:text-foreground hover:decoration-foreground"
               aria-expanded={open}
               aria-controls={id}
               onClick={() => setOpen(!open)}

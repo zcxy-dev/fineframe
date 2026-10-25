@@ -30,12 +30,12 @@ function useElapsed(start: number | undefined, end: number | undefined, running:
   return ((end ?? (running ? now : start)) - start) / 1000;
 }
 
-/** A thin bar: an amber line along a hairline track, for an upload, a download or a render. */
+/** A thin bar: an ink line along a hairline track, for an upload, a download or a render. */
 export function Bar({ fraction, className }: { fraction: number; className?: string }) {
   return (
-    <div className={cn("relative h-1 overflow-hidden rounded-full bg-white/8", className)}>
+    <div className={cn("relative h-1 overflow-hidden rounded-full bg-border", className)}>
       <div
-        className="absolute inset-y-0 left-0 max-w-full rounded-full bg-primary transition-[width] duration-700 ease-(--ease-cut)"
+        className="absolute inset-y-0 left-0 max-w-full rounded-full bg-foreground transition-[width] duration-700 ease-(--ease-cut)"
         style={{ width: `${Math.max(0, Math.min(1, fraction)) * 100}%` }}
       />
     </div>
@@ -99,7 +99,7 @@ export function RunView({ job }: { job: Job }) {
         </div>
       </div>
 
-      <Timeline fraction={fraction} running={running} stopped={stopped} label={words.progress} />
+      <Timeline fraction={fraction} stopped={stopped} label={words.progress} />
 
       <p className="min-h-[1.5em] text-sm font-medium [overflow-wrap:anywhere]" aria-live="polite">
         {current ? words.doing(words.stages[current].doing) : words.starting}
@@ -133,19 +133,19 @@ export function RunView({ job }: { job: Job }) {
               )}
               data-state={state}
             >
-              {/* The live stage's amber line along its top edge, drawn in as it starts. */}
+              {/* The live stage's ink line along its top edge, drawn in as it starts. */}
               <span
                 aria-hidden="true"
                 className={cn(
                   "absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 transition-transform duration-700 ease-(--ease-cut)",
-                  state === "active" && "scale-x-100 bg-primary",
+                  state === "active" && "scale-x-100 bg-foreground",
                   state === "failed" && "scale-x-100 bg-destructive",
                 )}
               />
               <span
                 className={cn(
                   "grid size-6 place-items-center rounded-md border border-edge text-xs font-semibold text-muted-foreground tabular-nums [&_svg]:size-3.5",
-                  state === "active" && "border-primary text-primary",
+                  state === "active" && "border-primary bg-primary text-primary-foreground",
                   state === "done" && "border-success/60 text-success",
                   state === "failed" && "border-destructive text-destructive",
                 )}
@@ -181,16 +181,14 @@ export function RunView({ job }: { job: Job }) {
 
 /**
  * The edit as a timeline building up: a ruler, and a track of clips that land one after another
- * as the edit gets further, with the amber playhead at its edge. A stopped edit's track steps back.
+ * as the edit gets further, with the ink playhead at its edge. A stopped edit's track steps back.
  */
 function Timeline({
   fraction,
-  running,
   stopped,
   label,
 }: {
   fraction: number;
-  running: boolean;
   stopped: boolean;
   label: string;
 }) {
@@ -213,7 +211,7 @@ function Timeline({
               // A new key when it fills, so the clip lands with its animation.
               // biome-ignore lint/suspicious/noArrayIndexKey: the clips are places on the track.
               key={`on-${i}`}
-              className="wave-keep h-full flex-1 origin-bottom animate-clip rounded-[3px] bg-raised shadow-[inset_0_1px_0_rgb(255_255_255/0.08)]"
+              className="wave-keep h-full flex-1 origin-bottom animate-clip rounded-[3px] bg-card"
             />
           ) : (
             <span
@@ -228,8 +226,7 @@ function Timeline({
         aria-hidden="true"
         className={cn(
           "absolute -top-1 bottom-0 w-0.5 -translate-x-1/2 rounded-full transition-[left] duration-700 ease-(--ease-cut) before:absolute before:-top-0.5 before:left-1/2 before:size-2.5 before:-translate-x-1/2 before:rotate-45 before:rounded-[2px]",
-          stopped ? "bg-destructive before:bg-destructive" : "bg-primary before:bg-primary",
-          running && "shadow-[0_0_12px_rgb(255_181_71/0.6)]",
+          stopped ? "bg-destructive before:bg-destructive" : "bg-foreground before:bg-primary",
         )}
         style={{ left: `${(filled / CLIPS) * 100}%` }}
       />

@@ -205,7 +205,7 @@ export function ReEdit({
     };
   }, [cuts, previewUrl]);
 
-  // The word being said where the player is, lit amber as a caption is, and kept in view while
+  // The word being said where the player is, lit on amber as a caption is, and kept in view while
   // the video plays.
   const now = playing.time * TICKS;
   const live = transcriptWords.findIndex((word) => word.start <= now && now < word.end);
@@ -487,7 +487,7 @@ export function ReEdit({
                         type="button"
                         className={cn(
                           "rounded-[4px] px-px text-[15px] text-foreground transition-colors duration-150 hover:bg-raised focus-visible:outline-offset-1",
-                          g === live && !state && "text-primary",
+                          g === live && !state && "bg-primary text-primary-foreground",
                           state === "selected" &&
                             "bg-foreground text-background hover:bg-foreground",
                           state === "cut" && "text-muted-foreground line-through",
@@ -935,7 +935,7 @@ export function ReEdit({
   // Apply, in the panel's foot whichever tab shows: the changes so far, or the new version
   // rendering.
   const foot = (
-    <div className="flex shrink-0 flex-col gap-3 border-t bg-surface px-6 py-4 shadow-[0_-16px_32px_-16px_rgb(0_0_0/0.7)] max-lg:sticky max-lg:bottom-0 max-md:px-4">
+    <div className="flex shrink-0 flex-col gap-3 border-t bg-surface px-6 py-4 shadow-[0_-12px_24px_-16px_rgb(12_13_16/0.14)] max-lg:sticky max-lg:bottom-0 max-md:px-4">
       {error && <ErrorNote message={error} fallback={words.fallback} />}
       {job.render?.error && (
         <ErrorNote message={job.render.error} fallback={words.renderFallback} />
@@ -980,7 +980,7 @@ export function ReEdit({
 
 /** The transcript pane under the player: its height on a wide screen, and a stack below. */
 const PANE =
-  "flex shrink-0 flex-col gap-2 border-t bg-background lg:h-[clamp(240px,36vh,340px)] max-lg:min-h-80";
+  "flex shrink-0 flex-col gap-2 border-t bg-card lg:h-[clamp(240px,36vh,340px)] max-lg:min-h-80";
 
 /** The player's time, in seconds, and whether it plays; kept current as it plays and seeks. */
 function usePlayback(video: RefObject<HTMLVideoElement | null>) {
@@ -1004,7 +1004,7 @@ const STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800];
 
 /**
  * The edit's length as a timeline ruler over its sound: the stretches asked to be cut, where the
- * cuts land, and the amber playhead where the player is. A click plays from there; the keyboard
+ * cuts land, and the ink playhead where the player is. A click plays from there; the keyboard
  * keeps the player's own controls and the transcript.
  */
 function Ruler({
@@ -1049,11 +1049,11 @@ function Ruler({
           </span>
         </span>
       ))}
-      <div className="wave-keep absolute inset-x-0 bottom-0 h-7 rounded-md bg-raised/70 opacity-80" />
+      <div className="wave-keep absolute inset-x-0 bottom-0 h-7 rounded-md bg-well" />
       {asked.map(([a, b]) => (
         <span
           key={`a${a}`}
-          className="absolute bottom-0 h-7 rounded-[3px] bg-white/18"
+          className="absolute bottom-0 h-7 rounded-[3px] bg-foreground/15"
           style={{ left: pct(a), width: pct(b - a) }}
         />
       ))}
@@ -1065,7 +1065,7 @@ function Ruler({
         />
       ))}
       <span
-        className="absolute top-3.5 bottom-0 w-0.5 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_10px_rgb(255_181_71/0.55)] transition-[left] duration-300 ease-linear before:absolute before:-top-1 before:left-1/2 before:size-2 before:-translate-x-1/2 before:rotate-45 before:rounded-[2px] before:bg-primary"
+        className="absolute top-3.5 bottom-0 w-0.5 -translate-x-1/2 rounded-full bg-foreground transition-[left] duration-300 ease-linear before:absolute before:-top-1 before:left-1/2 before:size-2.5 before:-translate-x-1/2 before:rotate-45 before:rounded-[2px] before:bg-primary before:ring-1 before:ring-foreground"
         style={{ left: pct(at) }}
       />
     </div>

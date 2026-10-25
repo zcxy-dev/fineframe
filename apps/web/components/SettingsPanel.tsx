@@ -267,7 +267,7 @@ export function SettingsPanel({
               <span className="mb-0.5 grid h-9 place-items-center">
                 <span
                   className={cn(
-                    "block rounded-[2px] border-[1.5px] border-muted-foreground transition-colors duration-150 group-has-checked:border-foreground group-has-checked:bg-white/10",
+                    "block rounded-[2px] border-[1.5px] border-muted-foreground transition-colors duration-150 group-has-checked:border-foreground group-has-checked:bg-foreground/10",
                     SHAPES[aspect],
                   )}
                 />

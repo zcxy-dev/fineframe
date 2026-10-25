@@ -19,10 +19,12 @@ export function Language() {
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger
         aria-label={`${t.header.language}: ${LOCALE_NAMES[locale]}`}
-        className="inline-flex h-8.5 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-steel transition-colors duration-150 outline-none hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary data-[state=open]:bg-accent data-[state=open]:text-foreground"
+        className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium whitespace-nowrap text-steel transition-colors duration-150 outline-none hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring data-[state=open]:bg-accent data-[state=open]:text-foreground"
       >
         <Globe className="size-4" aria-hidden="true" />
-        <span lang={locale}>{LOCALE_NAMES[locale]}</span>
+        <span lang={locale} className="max-sm:sr-only">
+          {LOCALE_NAMES[locale]}
+        </span>
         <ChevronDown
           className="size-3.5 transition-transform duration-200 in-data-[state=open]:rotate-180"
           aria-hidden="true"
@@ -37,7 +39,7 @@ export function Language() {
             onSelect={() => choose(each)}
           >
             <span className="flex-1">{LOCALE_NAMES[each]}</span>
-            {each === locale && <Check className="text-primary" aria-hidden="true" />}
+            {each === locale && <Check aria-hidden="true" />}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
