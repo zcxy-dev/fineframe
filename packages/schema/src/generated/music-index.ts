@@ -49,7 +49,7 @@ export interface MusicIndex {
   tracker: string;
   tempo: {
     /**
-     * Beats per minute from the median time over 8 beats; null with fewer than two beats.
+     * Beats per minute from the period the most beat intervals keep, read through missed beats and eighth notes taken for beats; null with fewer than two beats.
      */
     bpm: number | null;
     /**

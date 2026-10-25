@@ -23,8 +23,10 @@ NOVELTY = 0.25
 # Where the sound ends: the last 50 ms window within this many dB of the track's peak window.
 END_RANGE_DB = 50.0
 END_WINDOW = 0.05
-# Beats the tempo is read over at a time.
-SPAN = 8
+# A beat interval keeps a period within this ratio of it, or of its double, half and so on: about
+# twice the most the tracker's 20 ms frames move an interval at 160 BPM. Wider, the period's mean
+# takes in intervals an extra beat cuts short: at 15 %, 'Advertime' reads 123 BPM, not 120 (#223).
+KEEP = 0.1
 # A tempo read faster than this is most likely the eighth notes taken for beats: the tracker
 # reads a 96 BPM library track at 192 (#169).
 DOUBLE_BPM = 160
@@ -90,14 +92,18 @@ def analyze(path: Path, license: dict, progress: Callable[[str], None]) -> dict:
 
 
 def tempo(beat_times: np.ndarray, downbeat_times: np.ndarray) -> dict:
-    """Beats per minute from the median time over SPAN beats, and the most common bar length in
-    beats. One beat's interval is read to the tracker's 20 ms frames, 4 % of a beat at 128 BPM;
-    SPAN of them divide that error, while a missed or extra beat still moves only a few of the
-    spans the median is taken over."""
-    bpm = None
-    if len(beat_times) > 1:
-        span = min(SPAN, len(beat_times) - 1)
-        bpm = 60 * span / float(np.median(beat_times[span:] - beat_times[:-span]))
+    """Beats per minute from the period the most beat intervals keep, and the most common bar
+    length in beats.
+
+    The tracker misses beats in quiet passages, which reads them at double the period there, and
+    takes the eighth notes of a busy passage for beats, which reads them at half. So the period is
+    one of the `octaves` of the interval the most intervals keep: the one the most of them keep at
+    its own length, a tie going to the faster, leaving out those faster than DOUBLE_BPM, which are
+    eighth notes, unless every one is. Its mean interval reads it finer than the tracker's 20 ms
+    frames."""
+    found = octaves(beat_times)
+    beat = [(period, count) for period, count in found if 60 / period <= DOUBLE_BPM] or found
+    bpm = 60 / max(beat, key=lambda octave: octave[1])[0] if beat else None
     per_bar = None
     if len(downbeat_times) > 1:
         counts = Counter(
@@ -108,13 +114,44 @@ def tempo(beat_times: np.ndarray, downbeat_times: np.ndarray) -> dict:
     return {"bpm": round(bpm, 3) if bpm else None, "beats_per_bar": per_bar}
 
 
+def octaves(beat_times: np.ndarray) -> list[tuple[float, int]]:
+    """The period the most beat intervals keep, within KEEP of it or of a power of two times it:
+    each power of two times it that intervals keep, from the shortest, as their mean interval and
+    how many they are."""
+    intervals = np.diff(beat_times)
+    if not len(intervals):
+        return []
+    # Each interval's place within its octave, and how many lie within KEEP of it, across the
+    # octave's ends too.
+    octave = np.log2(intervals)
+    place = np.sort(octave % 1)
+    around = np.concatenate([place - 1, place, place + 1])
+    width = np.log2(1 + KEEP)
+    near = np.searchsorted(around, place + width, side="right") - np.searchsorted(
+        around, place - width
+    )
+    best = place[np.argmax(near)]
+    apart = (octave - best + 0.5) % 1 - 0.5
+    kept = np.abs(apart) <= width
+    power = np.round(octave - apart - best).astype(int)
+    found = []
+    for p in np.unique(power[kept]):
+        keep = kept & (power == p)
+        found.append((float(intervals[keep].mean()), int(keep.sum())))
+    return found
+
+
 def folded(beat_times: np.ndarray, downbeat_times: np.ndarray) -> np.ndarray:
-    """The beats at half the tempo when they read faster than DOUBLE_BPM and a bar holds an even
-    number of them: every other beat, counted from each downbeat, so every downbeat stays on a
-    beat. Otherwise the beats as they are."""
-    read = tempo(beat_times, downbeat_times)
-    per_bar = read["beats_per_bar"]
-    if not read["bpm"] or read["bpm"] <= DOUBLE_BPM or not per_bar or per_bar % 2:
+    """The beats at half the tempo when, for most of the time the period's intervals cover, they
+    read faster than DOUBLE_BPM, and a bar holds an even number of them: every other beat,
+    counted from each downbeat, so every downbeat stays on a beat. Otherwise the beats as they
+    are: a passage read at double time in a slower track keeps its eighth notes, where folding
+    would drop every other beat of the rest."""
+    found = octaves(beat_times)
+    fast = sum(period * count for period, count in found if 60 / period > DOUBLE_BPM)
+    covered = sum(period * count for period, count in found)
+    per_bar = tempo(beat_times, downbeat_times)["beats_per_bar"]
+    if fast <= covered / 2 or not per_bar or per_bar % 2:
         return beat_times
     # Each beat's count from the downbeat that starts its bar; a pickup counts back from the
     # first downbeat.

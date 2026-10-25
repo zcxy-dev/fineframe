@@ -41,6 +41,38 @@ def test_tempo_is_read_finer_than_the_trackers_frames():
     assert music.tempo(beats, beats[::4])["bpm"] == pytest.approx(128, rel=0.005)
 
 
+def frames(times: np.ndarray) -> np.ndarray:
+    """The times on the tracker's 20 ms frames."""
+    return np.round(times / 0.02) * 0.02
+
+
+def test_beats_missed_in_quiet_passages_leave_the_tempo_the_others_keep():
+    # As in 'Connecting Rainbows': an 89 BPM beat, read at half through a quiet passage and then
+    # missing one beat in five, which the median time over 8 beats read at 71 (#223).
+    kept = [*range(40), *range(40, 80, 2), *(n for n in range(80, 120) if n % 5)]
+    beats = frames(np.array(kept) * 60 / 89)
+    assert music.tempo(beats, beats[::3])["bpm"] == pytest.approx(89, rel=0.005)
+
+
+def test_a_passage_read_at_double_time_leaves_the_tempo_and_the_beats():
+    # As in 'Energizing': a 90 BPM beat whose eighth notes the tracker reads as beats through
+    # one passage, more of them than the beats around it, which the median time over 8 beats
+    # read at 180 and so folded to every other beat everywhere (#223).
+    beat = 60 / 90
+    beats = frames(
+        np.concatenate(
+            [
+                np.arange(30) * beat,
+                30 * beat + np.arange(96) / 2 * beat,
+                (78 + np.arange(30)) * beat,
+            ]
+        )
+    )
+    downbeats = beats[::4]
+    assert np.array_equal(music.folded(beats, downbeats), beats)
+    assert music.tempo(beats, downbeats)["bpm"] == pytest.approx(90, rel=0.005)
+
+
 def test_beats_read_over_160_bpm_fold_to_every_other_one_from_each_downbeat():
     # A 96 BPM track the tracker reads at 192, four of its eighth notes to a bar.
     beats = np.arange(64) * 60 / 192 + 0.04
