@@ -18,7 +18,7 @@
     "test": "node --test 'src/**/*.test.ts' 'scripts/**/*.test.ts'"
   },
   "devDependencies": {
-    "electron": "44.5.1",
+    "electron": "44.9.1",
     "electron-builder": "26.17.0",
     "playwright-core": "1.63.0"
   },
