@@ -89,12 +89,58 @@ def test_beats_read_over_160_bpm_fold_to_every_other_one_from_each_downbeat():
 
 def test_beats_read_slower_than_40_bpm_are_no_beat():
     slow = np.arange(32) * 60 / 45
-    assert [len(times) for times in music.steady(slow, slow[::4])] == [32, 8]
+    assert [len(times) for times in music.steady(slow, slow[::4], np.ones(8))] == [32, 8]
     accents = np.arange(32) * 60 / 35
-    assert [len(times) for times in music.steady(accents, accents[::4])] == [0, 0]
+    assert [len(times) for times in music.steady(accents, accents[::4], np.ones(8))] == [0, 0]
     # A single beat has no tempo to read.
     one = np.array([1.0])
-    assert [len(times) for times in music.steady(one, one)] == [1, 1]
+    assert [len(times) for times in music.steady(one, one, np.ones(1))] == [1, 1]
+
+
+def test_downbeats_inside_the_bars_are_dropped():
+    # As in 'Isolation Waltz': a 125 BPM beat with a downbeat every 6 beats, which the model also
+    # marks, less surely, on every beat of the quiet intro and halfway through some bars (#228).
+    beats = frames(np.arange(120) * 0.48)
+    marked = sorted({*range(24), *range(24, 120, 6), 27, 51, 75})
+    sureness = np.array([2.0 if n < 24 else 6.0 if n % 6 == 0 else 1.5 for n in marked])
+    kept, downbeats = music.steady(beats, beats[marked], sureness)
+    assert np.array_equal(kept, beats)
+    assert np.array_equal(downbeats, beats[::6])
+    assert music.tempo(kept, downbeats)["beats_per_bar"] == 6
+
+
+def test_the_bar_is_the_length_the_surest_downbeats_keep():
+    # As in 'Pond': a 120 BPM beat with an eighth note read as a beat in most bars, and a
+    # downbeat every 6 beats that the model marks surely, misses once, and marks less surely
+    # halfway through four bars and 2 beats into one, so more bars are 3 beats long than 6
+    # (#228).
+    quarters = np.arange(72) * 0.5
+    eighths = quarters[[4, 10, 16, 22, 28, 31, 49, 55, 61, 67]] + 0.25
+    beats = frames(np.sort(np.concatenate([quarters, eighths])))
+    bars = [n for n in range(0, 72, 6) if n != 36]
+    marked = sorted([*bars, 3, 9, 15, 45, 62])
+    sureness = np.array([6.0 if n in bars else 1.5 for n in marked])
+    kept, downbeats = music.steady(beats, frames(quarters[marked]), sureness)
+    assert np.array_equal(downbeats, frames(quarters[bars]))
+    # Most bars hold 7 of the tracker's beats, 6 of the tempo's.
+    assert music.tempo(kept, downbeats)["beats_per_bar"] == 6
+
+
+def test_bars_that_hold_keep_every_downbeat():
+    beats = frames(np.arange(64) * 0.5 + 0.3)
+    # A 4/4 track whose last bar ends short on its final hit, after three beats.
+    downbeats = beats[[*range(2, 60, 4), 61]]
+    sure = np.full(len(downbeats), 5.0)
+    assert np.array_equal(music.steady(beats, downbeats, sure)[1], downbeats)
+    # The model reads a beat twice, 80 ms apart, and marks both as a downbeat; the one it marks
+    # more surely stays, in 'Fireworks' the later of each such pair.
+    early = beats[30] - 0.08
+    doubled, twice = np.sort(np.append(beats, early)), np.sort(np.append(downbeats, early))
+    later_surer = np.where(twice == early, 2.0, 5.0)
+    assert np.array_equal(music.steady(doubled, twice, later_surer)[1], downbeats)
+    earlier_surer = np.where(twice == early, 8.0, 5.0)
+    swapped = np.where(downbeats == beats[30], early, downbeats)
+    assert np.array_equal(music.steady(doubled, twice, earlier_surer)[1], swapped)
 
 
 def test_sections_start_where_the_instruments_change():
@@ -223,7 +269,8 @@ def test_accents_far_apart_are_no_steady_beat(tmp_path, monkeypatch):
     accents = np.array([2.0, 3.64, 5.36, 11.62, 30.72, 36.98, 47.3, 55.28])
 
     def tracked(mono):
-        return accents, accents[[0, 2, 3, 4, 5, 6, 7]], np.zeros((len(mono) // beats.HOP, 128))
+        downbeats = accents[[0, 2, 3, 4, 5, 6, 7]]
+        return accents, downbeats, np.ones(7), np.zeros((len(mono) // beats.HOP, 128))
 
     monkeypatch.setattr(beats, "track", tracked)
     song, out = tmp_path / "song.wav", tmp_path / "song.music.json"

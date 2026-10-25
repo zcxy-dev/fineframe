@@ -56,17 +56,18 @@ def analyze(path: Path, license: dict, progress: Callable[[str], None]) -> dict:
     mono = audio.load(path, rate=beats.RATE, channels=2).mean(axis=1)
     tracker = f"beat_this {beats.MODEL}"
     try:
-        beat_times, downbeat_times, spect = beats.track(mono)
+        beat_times, downbeat_times, sureness, spect = beats.track(mono)
     except beats.Unavailable as error:
         # The planner fits a track without beats from its start, so the edit goes on (#155).
         print(f"vework: no beats: the beat model could not be downloaded: {error}", file=sys.stderr)
         tracker = NO_TRACKER
-        beat_times = downbeat_times = np.zeros(0)
+        beat_times = downbeat_times = sureness = np.zeros(0)
         spect = np.zeros((0, beats.BANDS))
     beat_times = heard(beat_times, stereo, RATE)
-    downbeat_times = heard(downbeat_times, stereo, RATE)
+    inside = np.isin(downbeat_times, heard(downbeat_times, stereo, RATE))
+    downbeat_times, sureness = downbeat_times[inside], sureness[inside]
     beat_times = folded(beat_times, downbeat_times)
-    beat_times, downbeat_times = steady(beat_times, downbeat_times)
+    beat_times, downbeat_times = steady(beat_times, downbeat_times, sureness)
     progress("measuring loudness and sections")
     per_second = loudness.measure(stereo, RATE)["short_term"]
     result = {
@@ -93,7 +94,7 @@ def analyze(path: Path, license: dict, progress: Callable[[str], None]) -> dict:
 
 def tempo(beat_times: np.ndarray, downbeat_times: np.ndarray) -> dict:
     """Beats per minute from the period the most beat intervals keep, and the most common bar
-    length in beats.
+    length in beats of that tempo, as `_counted`.
 
     The tracker misses beats in quiet passages, which reads them at double the period there, and
     takes the eighth notes of a busy passage for beats, which reads them at half. So the period is
@@ -105,12 +106,9 @@ def tempo(beat_times: np.ndarray, downbeat_times: np.ndarray) -> dict:
     beat = [(period, count) for period, count in found if 60 / period <= DOUBLE_BPM] or found
     bpm = 60 / max(beat, key=lambda octave: octave[1])[0] if beat else None
     per_bar = None
-    if len(downbeat_times) > 1:
-        counts = Counter(
-            int(np.sum((beat_times >= a - 0.01) & (beat_times < b - 0.01)))
-            for a, b in zip(downbeat_times[:-1], downbeat_times[1:], strict=True)
-        )
-        per_bar = counts.most_common(1)[0][0] or None
+    if bpm and len(downbeat_times) > 1:
+        lengths = np.round(np.diff(_counted(beat_times, downbeat_times, bpm))).astype(int)
+        per_bar = Counter(lengths.tolist()).most_common(1)[0][0] or None
     return {"bpm": round(bpm, 3) if bpm else None, "beats_per_bar": per_bar}
 
 
@@ -150,7 +148,11 @@ def folded(beat_times: np.ndarray, downbeat_times: np.ndarray) -> np.ndarray:
     found = octaves(beat_times)
     fast = sum(period * count for period, count in found if 60 / period > DOUBLE_BPM)
     covered = sum(period * count for period, count in found)
-    per_bar = tempo(beat_times, downbeat_times)["beats_per_bar"]
+    counts = Counter(
+        int(np.sum((beat_times >= a - 0.01) & (beat_times < b - 0.01)))
+        for a, b in zip(downbeat_times[:-1], downbeat_times[1:], strict=True)
+    )
+    per_bar = counts.most_common(1)[0][0] if counts else None
     if fast <= covered / 2 or not per_bar or per_bar % 2:
         return beat_times
     # Each beat's count from the downbeat that starts its bar; a pickup counts back from the
@@ -161,13 +163,67 @@ def folded(beat_times: np.ndarray, downbeat_times: np.ndarray) -> np.ndarray:
     return beat_times[count % 2 == 0]
 
 
-def steady(beat_times: np.ndarray, downbeat_times: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """The beats and downbeats as they are, or none when the beats read slower than MIN_BPM: the
-    planner then fits the track from its start, as one without a bar grid."""
+def steady(
+    beat_times: np.ndarray, downbeat_times: np.ndarray, sureness: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """The beats, and the downbeats of the `bars` that hold; or none when the beats read slower
+    than MIN_BPM: the planner then fits the track from its start, as one without a bar grid.
+    `sureness` is how surely the model marks each downbeat, as its logit."""
     bpm = tempo(beat_times, downbeat_times)["bpm"]
     if bpm and bpm < MIN_BPM:
         return np.zeros(0), np.zeros(0)
-    return beat_times, downbeat_times
+    return beat_times, bars(beat_times, downbeat_times, sureness, bpm)
+
+
+def bars(
+    beat_times: np.ndarray, downbeat_times: np.ndarray, sureness: np.ndarray, bpm: float | None
+) -> np.ndarray:
+    """The downbeats of the bars that hold. The model also marks downbeats inside bars, less
+    surely than the bars' own: on every beat of a quiet intro, halfway through a bar, an eighth
+    note before a downbeat (#228).
+
+    A bar's length is counted in beats of the tempo, as `_counted`. The bar the track keeps is
+    the length of two beats or more its bars have the most of, each counted by how surely its
+    weaker downbeat is marked, a tie going to the longer. A bar holds when it is a whole number
+    of those, as one a downbeat the model missed makes. The downbeats kept join the most bars
+    that hold less those that do not, a tie going to the one marked more surely; the last
+    stays, as a track can end on a short bar. Where every bar holds, every downbeat stays."""
+    count = len(downbeat_times)
+    if not bpm or count < 3:
+        return downbeat_times
+    at = _counted(beat_times, downbeat_times, bpm)
+    lengths = np.round(at[None, :] - at[:, None]).astype(int)
+    votes: dict[int, float] = {}
+    for k, n in enumerate(np.diag(lengths, 1).tolist()):
+        if n >= 2:
+            votes[n] = votes.get(n, 0.0) + min(sureness[k], sureness[k + 1])
+    if not votes:
+        return downbeat_times
+    bar = max(votes, key=lambda n: (votes[n], n))
+    holds = np.where((lengths > 0) & (lengths % bar == 0), 1, -1)
+    # The best score of the downbeats kept up to each one, and the one kept before it.
+    score = np.zeros(count, int)
+    before = np.full(count, -1)
+    for j in range(1, count):
+        options = score[:j] + holds[:j, j]
+        best = options.max()
+        if best >= 0:
+            tied = np.flatnonzero(options == best)
+            score[j], before[j] = best, tied[np.argmax(sureness[tied])]
+    kept = [count - 1]
+    while before[kept[-1]] >= 0:
+        kept.append(before[kept[-1]])
+    return downbeat_times[kept[::-1]]
+
+
+def _counted(beat_times: np.ndarray, downbeat_times: np.ndarray, bpm: float) -> np.ndarray:
+    """Where each downbeat falls in beats of `bpm` from the first beat: each beat interval
+    counts as the power of two times the period nearest it, so eighth notes read as beats and
+    beats missed in a quiet passage count as the beats they are."""
+    weights = 2.0 ** np.round(np.log2(np.diff(beat_times) * bpm / 60))
+    counted = np.concatenate([[0.0], np.cumsum(weights)])
+    at = np.searchsorted(beat_times, downbeat_times - 0.01)
+    return counted[np.minimum(at, len(counted) - 1)]
 
 
 def sections(
