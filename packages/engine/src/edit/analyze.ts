@@ -6,6 +6,7 @@ import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { MusicIndex, Source, StageProgress } from "@video-editor/schema";
+import { REMOVE_HELD } from "../download.ts";
 import { fingerprintOf } from "../sources.ts";
 import { EditError } from "./error.ts";
 import type { MediaFile } from "./inputs.ts";
@@ -312,14 +313,14 @@ async function vework(
     });
     child.on("close", async (code, signal) => {
       if (failed) {
-        await rm(partial, { recursive: true, force: true });
+        await rm(partial, REMOVE_HELD);
         return;
       }
       if (code === 0) {
         await settle(partial, written, index).then(() => done(), fail);
         return;
       }
-      await rm(partial, { recursive: true, force: true });
+      await rm(partial, REMOVE_HELD);
       const why = error ?? stopped(lastLine, code, signal);
       fail(new EditError(`${file.given}: the analysis failed: ${why}`));
     });
@@ -332,5 +333,5 @@ async function settle(partial: string, written: string, index: string): Promise<
     if (name !== basename(written)) await rename(join(partial, name), join(dirname(index), name));
   }
   await rename(written, index);
-  await rm(partial, { recursive: true, force: true });
+  await rm(partial, REMOVE_HELD);
 }

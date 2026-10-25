@@ -15,6 +15,7 @@ import {
 } from "@video-editor/schema";
 import { BrandError, loadKit, moveBrand, stageBrand } from "../brand/kit.ts";
 import type { CaptionStyle } from "../captions/presets.ts";
+import { REMOVE_HELD } from "../download.ts";
 import { ffmpeg, QUIET, run } from "../ffmpeg.ts";
 import { libraryMusic } from "../library.ts";
 import { fetchLink, isLink, ytDlp } from "../link.ts";
@@ -624,7 +625,7 @@ async function cutEdit(
       `${error.message}. The analysis is kept, so running the edit again starts at the plan`,
     );
   } finally {
-    await rm(work, { recursive: true, force: true });
+    await rm(work, REMOVE_HELD);
   }
 }
 
@@ -911,7 +912,7 @@ async function makeShorts(
         shortsAt + n * span,
       );
     } catch (error) {
-      await rm(join(folder, name), { recursive: true, force: true });
+      await rm(join(folder, name), REMOVE_HELD);
       if (error instanceof CostLimit) {
         stopped = error.message;
         break;

@@ -79,6 +79,16 @@ export async function removeOtherPins(kept: string, prefix: string): Promise<voi
   }
 }
 
+/** `rm` options for a folder whose files a program may have just used: Windows can hold a file a
+ * moment after its program ends, failing the removal with EBUSY, so it is tried again, 50 ms
+ * longer apart each time, for about 2.75 s in all. */
+export const REMOVE_HELD = {
+  recursive: true,
+  force: true,
+  maxRetries: 10,
+  retryDelay: 50,
+} as const;
+
 export async function exists(path: string): Promise<boolean> {
   try {
     await access(path);
