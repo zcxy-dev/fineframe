@@ -4,7 +4,6 @@ import { estimateCost, estimateShortsCost } from "@video-editor/engine/estimate"
 import {
   ArrowLeft,
   Captions,
-  Check,
   Download,
   FileText,
   KeyRound,
@@ -56,7 +55,6 @@ import { type Choices, chosenLength, type Machine, SettingsPanel } from "./Setti
 import { ShortsDone, ShortsGrid, ShortsKept, ShortText } from "./Shorts.tsx";
 import { UpdateNotice } from "./UpdateNotice.tsx";
 import { Button } from "./ui/button.tsx";
-import { TextAnimate } from "./ui/text-animate.tsx";
 import { Workspace } from "./Workspace.tsx";
 
 /** What /api/key says: which keys the server has, never the keys. */
@@ -503,7 +501,7 @@ export function Editor() {
           }}
         >
           <Stamp aria-hidden="true" />
-          <span className="max-sm:sr-only">{t.kits.menu}</span>
+          {t.kits.menu}
         </Button>
         <Language />
         {account?.gated && (
@@ -511,27 +509,26 @@ export function Editor() {
             {account.signedIn ? account.email : t.header.signIn}
           </Button>
         )}
-        {keySet !== null && (
-          <Button
-            type="button"
-            variant={keySet ? "outline" : "default"}
-            size="sm"
-            className="ml-1.5"
-            onClick={() => setAsking("anthropic")}
-          >
-            {keySet ? (
-              <>
-                <Check className="text-success" aria-hidden="true" />
-                {t.header.keySaved}
-              </>
-            ) : (
-              <>
-                <KeyRound aria-hidden="true" />
-                {t.header.addKey}
-              </>
-            )}
-          </Button>
-        )}
+        {keySet !== null &&
+          (keySet ? (
+            // Set: a quiet status, which opens the key to replace it.
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label={t.header.replaceKey}
+              onClick={() => setAsking("anthropic")}
+            >
+              <span className="size-2 rounded-full bg-success" aria-hidden="true" />
+              <span className="max-sm:hidden">{t.header.keySaved}</span>
+              <span className="sm:hidden">{t.header.keyShort}</span>
+            </Button>
+          ) : (
+            <Button type="button" size="sm" onClick={() => setAsking("anthropic")}>
+              <KeyRound aria-hidden="true" />
+              {t.header.addKey}
+            </Button>
+          ))}
       </header>
       <AccountDialog
         account={account}
@@ -659,15 +656,7 @@ export function Editor() {
         >
           <div className="flex flex-col gap-8 px-10 py-9 max-md:gap-6 max-md:px-4 max-md:py-6">
             <div className="flex flex-col gap-3">
-              <TextAnimate
-                as="h1"
-                by="word"
-                animation="caption"
-                startOnView={false}
-                className={TITLE}
-              >
-                {t.compose.title}
-              </TextAnimate>
+              <h1 className={TITLE}>{t.compose.title}</h1>
               <p className="max-w-[64ch] text-[15px] leading-relaxed text-pretty text-steel">
                 {t.compose.lede}
               </p>
@@ -709,6 +698,7 @@ export function Editor() {
           // A short of a run stopped or cancelled before it ended does not change.
           editable={status === "done"}
           head={<DoneHead job={one} onBack={() => setOpened(null)} />}
+          download={<DownloadButton job={one} />}
           result={
             <DoneFiles
               job={one}
@@ -726,6 +716,7 @@ export function Editor() {
           video={video}
           editable
           head={<DoneHead job={job} />}
+          download={<DownloadButton job={job} />}
           result={
             <DoneFiles job={job} onJob={update} onNew={() => setPhase({ kind: "compose" })} />
           }
@@ -860,7 +851,7 @@ function ExportButton({ job }: { job: Job }) {
   );
 }
 
-/** A finished edit's heading in the editor's panel, lit word by word as it opens: its title, or
+/** A finished edit's heading in the editor's panel: its title, or
  * a short's with a way back to the others, and its length and aspect. */
 function DoneHead({ job, onBack }: { job: Job; onBack?: () => void }) {
   const t = useT();
@@ -880,18 +871,22 @@ function DoneHead({ job, onBack }: { job: Job; onBack?: () => void }) {
           {t.shorts.back}
         </Button>
       )}
-      <TextAnimate
-        key={short?.title ?? t.done.ready}
-        as="h2"
-        by="word"
-        animation="caption"
-        startOnView={false}
-        className={PANEL_TITLE}
-      >
-        {short ? short.title : t.done.ready}
-      </TextAnimate>
+      <h2 className={PANEL_TITLE}>{short ? short.title : t.done.ready}</h2>
       <ResultSummary job={job} seconds={seconds} />
     </div>
+  );
+}
+
+/** The edit's MP4, the one thing a finished edit is for. */
+function DownloadButton({ job, className }: { job: Job; className?: string }) {
+  const t = useT();
+  return (
+    <Button asChild size="lg" className={cn("w-full", className)}>
+      <a href={jobApi(job, "video", { download: "" })} download>
+        <Download aria-hidden="true" />
+        {t.done.download}
+      </a>
+    </Button>
   );
 }
 
@@ -918,12 +913,8 @@ function DoneFiles({
   return (
     <>
       <div className={SECTION}>
-        <Button asChild size="lg">
-          <a href={jobApi(job, "video", download)} download>
-            <Download aria-hidden="true" />
-            {t.done.download}
-          </a>
-        </Button>
+        {/* Where the panes stack, it is under the player instead. */}
+        <DownloadButton job={job} className="max-lg:hidden" />
         {job.result?.captions && (
           <Button asChild variant="outline">
             <a href={jobApi(job, "captions", download)} download>

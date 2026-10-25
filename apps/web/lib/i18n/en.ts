@@ -14,75 +14,83 @@ export const SETUP_DOWNLOAD = "the analysis environment (Python, PyTorch and the
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-/** A date and time as the system writes them, unless the system writes Chinese. */
+/** A date and time to the minute, as the system writes them unless it writes Chinese:
+ * Oct 19, 2026, 1:47 PM. */
 function date(milliseconds: number): string {
   const system = Intl.DateTimeFormat().resolvedOptions().locale;
-  return new Date(milliseconds).toLocaleString(/^zh\b/i.test(system) ? "en-US" : undefined);
+  return new Date(milliseconds).toLocaleString(/^zh\b/i.test(system) ? "en-US" : undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 export const en = {
   date,
   units: { h: "h", min: "min", s: "s" },
   /** A list of parts, as in "1 video, 2 photos". */
+  /** What sits between the parts of a line of details. */
+  sep: " · ",
   list: ", ",
   dollars: { unknown: "unknown", under: "under $0.01" },
   meta: {
-    description: "Drop in footage, choose a length and an aspect, and get back a finished video.",
+    description:
+      "Add your footage, pick a length, a shape and a caption style, and get a finished video.",
   },
   header: {
     language: "Language",
-    keySaved: "API key saved · Replace",
-    addKey: "Add your API key",
+    keySaved: "Claude key added",
+    keyShort: "Key",
+    replaceKey: "Replace the Claude key",
+    addKey: "Add the Claude key",
     signIn: "Sign in",
   },
   compose: {
-    title: "Drop in footage. Get back a finished video.",
-    lede: "Cut to the length you choose, with the best takes kept, fillers and dead air removed, and captions to go with it.",
+    title: "New edit",
+    lede: "Add your footage and pick a length, a shape and a caption style. Fineframe does the cuts, captions and music.",
     settings: "Settings",
-    installing: "Setting up the analysis first",
-    setupFailed: "The analysis could not be set up",
+    installing: "Finishing the first-time setup",
+    setupFailed: "The first-time setup failed",
     addFootage: "Add footage to start",
-    addVideo: "Add at least one video: the edit is cut from video",
-    musicLicense: "Say under which licence you use the music",
-    refused: "The server refused the edit",
+    addVideo: "Add at least one video: photos and music go with it",
+    musicLicense: "Enter the music licence to start",
+    refused: "The server refused this edit",
     notStarted: "The edit did not start",
-    openFailed: "The project could not be opened",
+    openFailed: "This project could not be opened",
     startFallback: "The edit could not be started.",
     sending: (file: number, files: number) => `Sending footage · file ${file} of ${files}`,
     of: (done: string, total: string) => `${done} of ${total}`,
     cancel: "Cancel",
-    make: (length: string) => `Make the ${length} video`,
+    make: (length: string) => `Make a ${length} video`,
     makeVideo: "Make the video",
     makeShorts: (count: number) => `Make ${plural(count, "short", "shorts")}`,
-    needAnthropic: "Add your Anthropic API key to start",
-    needOpenRouter: "Add your OpenRouter API key to start",
+    needAnthropic: "Add the Claude key to start",
+    needOpenRouter: "Add the OpenRouter key to start",
     needAccount: "Sign in to Fineframe to start",
     needSubscription: "Subscribe to Fineframe to start",
-    estimate: (low: string, high: string) =>
-      `Claude will cost about ${low} to ${high} for this edit`,
+    estimate: (low: string, high: string) => `Claude costs about ${low}–${high} for this edit`,
     estimateShorts: (low: string, high: string) =>
-      `Claude will cost about ${low} to ${high} to find the moments and make each short`,
+      `Claude costs about ${low}–${high} to find the moments and make each short`,
     privacyCloud:
-      "Footage stays on this computer. OpenRouter hears the speech audio; Claude reads the transcripts and stills around each cut. No video file is uploaded.",
+      "Your footage stays on the computer running Fineframe. OpenRouter hears only the speech audio, and Claude reads only the transcript and the stills around each cut.",
     privacyLocal:
-      "Footage stays on the server that runs this page. Claude reads the transcripts and stills around each cut; no video or audio file is uploaded.",
+      "Your footage stays on the computer running Fineframe. Claude reads only the transcript and the stills around each cut; no video or audio is uploaded.",
     notSent: (name: string) => `${name} could not be sent`,
     notSentStatus: (name: string, status: number) => `${name} could not be sent (HTTP ${status})`,
   },
   setup: {
-    title: "Setting up the analysis",
-    failed: "The analysis could not be set up",
+    title: "First-time setup",
+    failed: "First-time setup failed",
     about:
-      "Only the first time: Python and the packages that analyse footage download and install on this computer. Add your keys and footage meanwhile.",
+      "Fineframe is installing what it needs to analyse footage. This happens once; add your keys and footage meanwhile.",
     fallback: "The download or the install stopped.",
     retry: "Try again",
     starting: "Starting…",
   },
   footage: {
     dropHere: "Drop footage here",
-    dropMore: "Drop more footage",
-    drop: "Drop video files or a whole folder",
-    hint: "Videos are cut into the edit; photos can appear over it as B-roll, and audio files are music for it.",
+    dropMore: "Add more",
+    drop: "Drop videos or a whole folder",
+    hint: "Videos are cut into the edit. Photos can show as B-roll, and audio files become the music.",
     chooseFiles: "Choose files",
     chooseFolder: "Choose a folder",
     title: "Footage",
@@ -105,107 +113,106 @@ export const en = {
     linkPlaceholder: "https://www.youtube.com/watch?v=…",
     addLink: "Add",
     linkHint:
-      "YouTube videos, one link or several. Instagram, TikTok, Facebook, X, Vimeo, Bilibili and other sites may work.",
+      "YouTube links work, one or several at once. Instagram, TikTok, Facebook, X, Vimeo, Bilibili and others may work too.",
     rights: "Only import videos you have the right to use.",
     reading: "Reading the link…",
-    fromLink: "Fetched when the edit starts",
+    fromLink: "Downloads when the edit starts",
     linkFailed: (url: string, why: string) => `${url}: ${why}`,
   },
   settings: {
     what: "What to make",
     whatChoices: { one: "One video", shorts: "Several shorts" },
     shortLength: "Length of each short",
-    shortLengthHelp: "Claude picks each short's length within the range, to fit its moment.",
-    count: "How many shorts",
+    shortLengthHelp: "Each short's length is set within this range to fit its moment.",
+    count: "Number of shorts",
     countHelp:
-      "Claude finds the moments worth posting, at most about one for each 2 minutes of footage, and makes the best ones, each from one stretch of the video.",
+      "Claude finds the moments worth posting, at most about one per 2 minutes of footage, and makes the best. Each short comes from one stretch of the video.",
     length: "Length",
-    range: (shortest: string, longest: string) => `${shortest} to ${longest}`,
+    range: (shortest: string, longest: string) => `${shortest}–${longest}`,
     custom: "Custom",
     customLabel: "Custom length",
     customPlaceholder: "90 s, 2:30, 1 h",
-    typeLength: "Type a length",
-    lengthExample: "Type a length such as 90 s, 2:30 or 1 h",
+    typeLength: "Enter a length",
+    lengthExample: "Enter a length, such as 90 s, 2:30 or 1 h",
     shortest: (length: string) => `The shortest edit is ${length}`,
     longest: (length: string) => `The longest edit is ${length}`,
     tooLong: (length: string) =>
-      `Longer than all of the footage (${length}); the edit can only keep what was said.`,
-    aspect: "Aspect",
+      `Longer than all your footage (${length}). The edit can only use what was said.`,
+    aspect: "Shape",
     aspects: {
-      "9:16": { name: "Vertical", hint: "9:16 · phones" },
-      "1:1": { name: "Square", hint: "1:1 · feeds" },
-      "16:9": { name: "Wide", hint: "16:9 · screens" },
+      "9:16": { name: "Vertical", hint: "9:16 · Reels" },
+      "1:1": { name: "Square", hint: "1:1 · Posts" },
+      "16:9": { name: "Wide", hint: "16:9 · YouTube" },
     },
     optional: "Optional",
-    instructions: "Tell Claude what you want",
+    instructions: "Notes for Claude",
     instructionsPlaceholder: "Focus on the product demo\nLeave out the small talk at the start",
     instructionsHelp: (max: number) =>
-      `What to keep, leave out or open with, in up to ${max} characters. Only for this edit: the next one starts empty.`,
+      `What to keep, cut or open with, up to ${max} characters. For this edit only.`,
     instructionsTooLong: (max: number, length: number) =>
-      `Tell Claude what you want in at most ${max} characters, not ${length}`,
-    style: "Style",
-    names: "People's names",
+      `Notes for Claude can be ${max} characters at most, not ${length}`,
+    style: "Look",
+    names: "Names",
     namesHelp:
-      "One per line, spelled as the captions should show them. Helps the speech model hear them, and a lower third can show them.",
+      "One per line, spelled as the captions should show them. They help the speech model, and a lower third can show them.",
     terms: "Terms",
     termsHelp:
-      "Brands, products and jargon, one per line. Only helps the speech model hear them; never shown as a name. Both lists are kept for your next edit.",
-    speech: "Speech",
+      "Brands, products and jargon, one per line. They only help the speech model. Both lists are kept for your next edit.",
+    speech: "Speech recognition",
     local: "On this computer",
     lowMemory: (gigabytes: number) =>
-      `This computer has ${gigabytes} GB of memory, and the speech model needs about 9 GB of it, so speech is heard on OpenRouter.`,
+      `This computer has ${gigabytes} GB of memory and the speech model needs about 9 GB, so OpenRouter hears the speech instead.`,
     localHelp:
-      "The most accurate, and nothing is sent; it needs about 9 GB of memory and downloads 3.4 GB the first time.",
+      "The most accurate, and nothing is sent. Needs about 9 GB of memory and a 3.4 GB download the first time.",
     cloudHelp:
-      "Qwen3-ASR hears the speech on OpenRouter with your OpenRouter key, for about US$0.03 an hour of footage. Only the speech audio is sent; the words are timed on this computer.",
-    addOpenRouter: "Add your OpenRouter key",
+      "Qwen3-ASR hears the speech on OpenRouter with your OpenRouter key, for about US$0.03 per hour of footage. Only the speech audio is sent; words are timed on this computer.",
+    addOpenRouter: "Add the OpenRouter key",
     visuals: "Visuals",
     visualsChoices: {
       rich: {
         name: "Rich",
-        help: "Claude adds visuals to the points the speaker makes: motion graphics written for this video, the web pages they name and stock footage, beside the speaker or full frame, with soft sound effects.",
+        help: "Claude adds visuals to the points the speaker makes: motion graphics written for this video, the web pages they mention and stock footage, beside the speaker or full frame, with soft sound effects.",
       },
-      minimal: { name: "Minimal", help: "Only the footage you dropped in, cut and captioned." },
+      minimal: { name: "Minimal", help: "Only your footage, cut and captioned." },
     },
-    stock: "Stock footage needs a free Pexels or Pixabay key; optional.",
-    fillers: "Filler removal",
+    stock: "Stock footage needs a free Pexels or Pixabay key (optional).",
+    fillers: "Filler words",
     fillersChoices: {
       natural: {
         name: "Natural",
-        help: "Cuts hesitations such as um, uh and 嗯, and words stuttered twice.",
+        help: "Cuts hesitations such as um, uh and 嗯, and words said twice.",
       },
       aggressive: {
-        name: "Aggressive",
-        help: "Also cuts words that are often verbal tics, such as like, you know, 然後 and 就是, where Claude finds they add nothing.",
+        name: "Thorough",
+        help: "Also cuts verbal tics such as like, you know, 然後 and 就是, where Claude finds they add nothing.",
       },
-      off: { name: "Off", help: "Keeps every word said." },
+      off: { name: "Off", help: "Keeps every word." },
     },
-    stockKey: (name: string, saved: boolean) =>
-      saved ? `${name} key saved · Replace` : `${name} key`,
-    advanced: "Advanced settings",
+    stockKey: (name: string, saved: boolean) => (saved ? `${name} key added` : `${name} key`),
+    advanced: "Advanced",
     quality: "Quality",
     qualities: {
-      best: { name: "Best", help: "Claude Opus plans the edit and judges the doubtful cuts." },
+      best: { name: "Best", help: "Claude Opus plans the edit and judges the unclear cuts." },
       economy: {
         name: "Economy",
-        help: "Claude Sonnet plans the edit and judges the doubtful cuts, for about half the cost.",
+        help: "Claude Sonnet plans the edit and judges the unclear cuts, at about half the cost.",
       },
     },
     correction: "Transcript correction",
     on: "On",
     off: "Off",
     correctionHelp:
-      "Claude reads each transcript with your names and terms and fixes what the speech model misheard, before its words are timed. Adds a Claude cost.",
+      "Claude checks each transcript against your names and terms and fixes what the speech model misheard, before words are timed. Adds to the Claude cost.",
     captionStyle: "Caption style",
     emoji: "Emoji",
     emojiHelp:
-      "Ends a caption line with the emoji Claude picked for it, where one fits. Claude picks them either way, so turning them on or off later only renders again, with no Claude cost.",
+      "Ends a caption line with an emoji Claude picks, where one fits. Turning them on or off later only renders again, with no Claude cost.",
     /** The four words a caption preview says, a number among them, and what goes between them. */
     sample: ["Edit", "in", "10", "minutes"],
     sampleGap: " ",
     license: "Music licence",
     licenseHelp:
-      "Use only music you have the right to use; this licence covers every track. Claude picks the track that fits, or none, and sets it under the voice.",
+      "Use only music you have the right to use; this licence covers every track. Claude picks the track that fits, or none, and mixes it under the voice.",
   },
   /** The looks, by the engine's ids, and the footage's own colour. */
   looks: {
@@ -216,7 +223,7 @@ export const en = {
       ]),
     ) as Record<LookId, { name: string; description: string }>),
     none: {
-      name: "None",
+      name: "Original",
       description: "No look: the footage's own colour, balanced and matched between cameras.",
     },
   },
@@ -224,45 +231,45 @@ export const en = {
   captions: {
     bold: {
       name: "Highlight",
-      description: "Heavy white type, highlighted word by word: the word being said turns amber.",
+      description: "Heavy white type; the word being said turns amber.",
     },
     creator: {
       name: "Bold",
-      description: "A few words at a time, big, in a dark box; numbers and English words in amber.",
+      description: "A few big words at a time in a dark box; numbers and English words in amber.",
     },
     minimal: { name: "Minimal", description: "Small white type, no highlight." },
     pop: { name: "Pop", description: "Each word pops in as it is said." },
     none: {
       name: "None",
-      description: "No captions on the video; the subtitle file (.srt) is still made.",
+      description: "No captions on the video. The subtitle file (.srt) is still made.",
     },
   } as Record<CaptionStyle, { name: string; description: string }>,
   /** The Brand kit page and the kit pickers. */
   kits: {
     menu: "Brand kits",
     title: "Brand kits",
-    lede: "Your logo, colours, fonts and captions, kept on this computer and applied to any edit. Changing an edit's kit only renders it again: no new plan, no Claude cost.",
+    lede: "Your logo, colours, fonts and captions, kept on this computer for any edit. Switching an edit's kit only renders it again, with no Claude cost.",
     back: "Back",
     kits: "Kits",
     isDefault: "Default",
-    newName: "New kit's name",
+    newName: "New kit name",
     untitled: "My brand",
     create: "New kit",
-    empty: "No brand kits yet. Name one on the right to start.",
+    empty: "No brand kits yet. Name one to start.",
     failed: "The brand kit could not be saved.",
     preview: "Preview",
     previewLabel: "A sample frame in this kit's look",
     previewHelp:
-      "A sample frame as an edit draws it: a caption, a name lower third and the logo. Motion graphics take the same colours and font.",
+      "A sample frame as an edit draws it: a caption, a name lower third and the logo. Motion graphics use the same colours and font.",
     sampleName: "Alex Lin",
     sampleRole: "Product designer",
     name: "Name",
-    makeDefault: "Use this kit for new edits",
+    makeDefault: "Use for new edits",
     coloursTitle: "Colours",
     colours: { primary: "Primary", secondary: "Secondary", accent: "Accent" },
     fromPrimary: "From the primary",
     coloursHelp:
-      "They replace amber in the motion graphics, the titles and the caption highlight. Text that would be hard to read on them turns black or white.",
+      "They replace the amber in motion graphics, titles and the caption highlight. Text that would be hard to read on them turns black or white.",
     graphicsFont: "Font for graphics and titles",
     captionsFont: "Font for captions",
     faceName: (_id: FaceId, name: string) => name,
@@ -274,7 +281,7 @@ export const en = {
     uploadLogo: "Upload a logo (PNG or SVG)",
     replaceLogo: "Replace the logo",
     removeLogo: "Remove",
-    watermark: "Show it as a watermark",
+    watermark: "Show as a watermark",
     corners: {
       "top-left": "Top left",
       "top-right": "Top right",
@@ -284,7 +291,7 @@ export const en = {
     size: "Size",
     opacity: "Opacity",
     logoHelp:
-      "The watermark stays in its corner through the whole video, under the captions, and steps aside while a graphic, a title, a name or a chapter it would cover shows.",
+      "The watermark stays in its corner under the captions, and steps aside while a graphic, title, name or chapter it would cover shows.",
     captions: "Custom captions",
     useCaptions: "Use custom captions",
     startsFrom: "Starts from",
@@ -299,9 +306,9 @@ export const en = {
     lines: "Lines",
     lineCount: (n: 1 | 2): string => (n === 1 ? "One" : "Two"),
     captionsHelp:
-      "An edit with this kit uses them as its caption style. Like other captions, they move off faces, graphics and titles.",
+      "An edit with this kit uses them as its caption style. Like other captions, they keep off faces, graphics and titles.",
     captionsOff:
-      "Off: an edit with this kit uses the caption style it picks, in the kit's colours and font.",
+      "Off: an edit with this kit uses its own caption style, in the kit's colours and font.",
     save: "Save",
     saved: "Saved",
     remove: "Delete kit",
@@ -310,7 +317,7 @@ export const en = {
     picker: "Brand kit",
     none: "None",
     edit: "Edit brand kits…",
-    pickerHelp: "Its logo, colours and fonts; nothing in it is sent to Claude.",
+    pickerHelp: "Adds its logo, colours and fonts. Nothing in it is sent to Claude.",
     captionsName: "Brand kit",
     captionsDescription: "The brand kit's custom captions.",
   },
@@ -318,7 +325,7 @@ export const en = {
     anthropic: {
       title: "Connect Claude",
       about:
-        "Claude plans each edit and checks its cuts with your Anthropic API key, billed to your Anthropic account. Create one at",
+        "Claude plans each edit and checks its cuts with your Anthropic API key, billed to your Anthropic account. Create a key at",
       placeholder: "sk-ant-…",
       /** What follows the site's link. */
       end: ".",
@@ -326,7 +333,7 @@ export const en = {
     openrouter: {
       title: "Connect OpenRouter",
       about:
-        "OpenRouter hears the speech with your OpenRouter API key, billed to your OpenRouter account at about US$0.03 an hour of footage. Create one at",
+        "OpenRouter hears the speech with your OpenRouter API key, billed to your OpenRouter account at about US$0.03 per hour of footage. Create a key at",
       placeholder: "sk-or-…",
       /** What follows the site's link. */
       end: ".",
@@ -334,7 +341,7 @@ export const en = {
     pexels: {
       title: "Connect Pexels",
       about:
-        "Optional: with your free Pexels API key, Claude can show stock footage from Pexels in the edit. Without it, the edit shows motion graphics and web pages instead. Get one at",
+        "Optional. With a free Pexels API key, Claude can show Pexels stock footage in the edit; without it, the edit shows motion graphics and web pages. Get a key at",
       placeholder: "Pexels API key",
       /** What follows the site's link. */
       end: ".",
@@ -342,12 +349,12 @@ export const en = {
     pixabay: {
       title: "Connect Pixabay",
       about:
-        "Optional: with your free Pixabay API key, Claude can show stock footage from Pixabay in the edit. Without it, the edit shows motion graphics and web pages instead. Get one at",
+        "Optional. With a free Pixabay API key, Claude can show Pixabay stock footage in the edit; without it, the edit shows motion graphics and web pages. Get a key at",
       placeholder: "Pixabay API key",
       /** What follows the site's link. */
       end: ".",
     },
-    replace: (name: string) => `Replace your ${name} API key`,
+    replace: (name: string) => `Replace the ${name} key`,
     key: "API key",
     notSaved: "The key could not be saved",
     fallback: "The key could not be checked.",
@@ -356,20 +363,20 @@ export const en = {
     checking: (name: string) => `Checking with ${name}…`,
     save: "Check and save",
     stored: (name: string) =>
-      `Saved on this computer in a file only your user can read. It is sent to ${name} and nowhere else, and this page never shows it again.`,
+      `Kept on this computer in a file only your user can read. It goes only to ${name}, and this page never shows it again.`,
   },
   /** The desktop app's account: signing in, the subscription, signing out. */
   account: {
     signInTitle: "Sign in to Fineframe",
     signInAbout:
-      "Making an edit needs a Fineframe account. Sign in on fineframe.app in your browser, then come back here.",
+      "Making an edit needs a Fineframe account. Sign in at fineframe.app in your browser, then come back here.",
     signIn: "Sign in with your browser",
     waiting: "Finish signing in in your browser…",
     notStarted: "The sign-in could not start",
     signedInAs: (email: string) => `Signed in as ${email}`,
     subscribeTitle: "Subscribe to make edits",
     subscribeAbout:
-      "This account has no subscription. Subscribe on fineframe.app, then check again. Rendering, opening earlier projects and downloads work without one.",
+      "This account has no subscription. Subscribe at fineframe.app, then check again. Rendering, earlier projects and downloads work without one.",
     subscribe: "Subscribe",
     checkAgain: "Check again",
     checking: "Checking…",
@@ -398,26 +405,21 @@ export const en = {
     running: "Making your edit",
     runningShorts: "Making your shorts",
     short: (n: number, of: number) => `Short ${n} of ${of}`,
-    stopped: "Stopped",
     from: (length: string, aspect: string, videos: number, photos: number) =>
       `${length} · ${aspect} · from ${plural(videos, "video", "videos")}${photos > 0 ? ` and ${plural(photos, "photo", "photos")}` : ""}`,
     shortsFrom: (count: number, range: string, aspect: string) =>
       `${plural(count, "short", "shorts")} of ${range} · ${aspect}`,
     elapsed: (clock: string) => `${clock} elapsed`,
     estimated: "Estimated from how fast the edit has gone so far",
-    approximate: (left: string) => `${left} (approximate)`,
-    starting: "Starting: ",
+    approximate: (left: string) => `${left} (estimated)`,
     doing: (stage: string) => `${stage}: `,
-    gettingReady: "getting ready",
+    gettingReady: "Getting ready",
+    /** The four parts of the bar, as the edit's stages. */
     stages: {
-      analyze: {
-        name: "Analyse",
-        doing: "Analysing",
-        what: "Shots, speech and words in each file",
-      },
-      plan: { name: "Plan", doing: "Planning", what: "The best takes, cut to the length" },
-      render: { name: "Render", doing: "Rendering", what: "Cuts, framing, colour and sound" },
-      check: { name: "Check", doing: "Checking", what: "Every cut reviewed and fixed" },
+      analyze: { name: "Transcribe", doing: "Transcribing" },
+      plan: { name: "Pick", doing: "Picking the best takes" },
+      render: { name: "Render", doing: "Rendering" },
+      check: { name: "Check", doing: "Checking every cut" },
     },
     steps: {
       ready: "Getting ready",
@@ -433,7 +435,7 @@ export const en = {
       correct: "Transcript correction",
       align: "Word timing",
     },
-    analyse: "Analyse",
+    analyse: "Analysis",
     musicFile: "Music: ",
     states: { active: ", running", done: ", done", failed: ", failed", pending: ", pending" },
     downloading: (name: string) => `Downloading ${name}`,
@@ -447,8 +449,7 @@ export const en = {
     firstTime: " · only the first time it is used",
     cancel: "Cancel",
     sure: "Stop the edit? Click again",
-    closeable:
-      "You can close this page: the edit keeps going, and the page shows it again when you come back.",
+    closeable: "You can close this page. The edit keeps going and shows here when you come back.",
   },
   eta: {
     underMinute: "Less than a minute left",
@@ -460,9 +461,9 @@ export const en = {
     ready: "Your edit is ready",
     captions: " · captions",
     musicSkipped:
-      "The music track Claude chose could not be downloaded, so this edit has no music. Pick one in the Music tab to add it.",
+      "The track Claude chose could not be downloaded, so this edit has no music. Pick one in the Music tab.",
     beatsSkipped:
-      "The beat model could not be downloaded, so your music plays from its start without following its beats. The next edit tries again.",
+      "The beat model could not be downloaded, so your music plays from its start without following the beat. The next edit tries again.",
     download: "Download MP4",
     downloadCaptions: "Download captions (SRT)",
     downloadCredits: "Download B-roll credits (TXT)",
@@ -473,7 +474,15 @@ export const en = {
       "A zip for Final Cut Pro, DaVinci Resolve or Premiere Pro, with the B-roll, music and graphics",
     exported: (kept: number) =>
       `The timelines play this project's footage, which Fineframe deletes once the project is not one of your ${kept} newest; after that, relink the footage to your own copy in your editing app.`,
-    another: "Make another edit",
+    another: "New edit",
+  },
+  player: {
+    play: "Play",
+    pause: "Pause",
+    seek: "Position in the video",
+    mute: "Mute",
+    unmute: "Unmute",
+    fullScreen: "Full screen",
   },
   shorts: {
     label: "The shorts",
@@ -503,12 +512,12 @@ export const en = {
     copied: "Copied",
   },
   failed: {
-    cancelled: "The edit was cancelled",
-    title: "The edit could not be finished",
+    cancelled: "Edit cancelled",
+    title: "The edit could not finish",
     wrong: "Something went wrong",
     fallback: "The edit stopped before it finished.",
     spent: (dollars: string) => `Claude cost ${dollars} before the edit stopped.`,
-    replaceKey: "Replace the API key",
+    replaceKey: "Replace the Claude key",
     replaceOpenRouter: "Replace the OpenRouter key",
     addCredit: "Add credit",
     retry: "Try again",
@@ -520,8 +529,8 @@ export const en = {
     target: (length: string) => `Target ${length}`,
     actual: (clock: string) => ` · Actual ${clock}`,
     each: (range: string) => `${range} each`,
-    aspect: "Aspect",
-    style: "Style",
+    aspect: "Shape",
+    style: "Look",
     captions: "Captions",
     brand: "Brand kit",
     speech: "Speech",
@@ -548,16 +557,17 @@ export const en = {
     title: "Projects",
     status: {
       uploading: "Not started",
-      running: "Running",
+      running: "In progress",
       done: "Done",
       error: "Failed",
       cancelled: "Cancelled",
     },
     meta: (projects: number, size: string, kept: number) =>
-      `${plural(projects, "project", "projects")} · ${size} on disk · the newest ${kept} finished keep their footage for editing again`,
+      `${plural(projects, "project", "projects")} · ${size} on disk · the ${kept} newest finished keep their footage for editing`,
     notDeleted: "The project could not be deleted",
     fallback: "The project could not be deleted.",
     untitled: "Untitled",
+    all: (n: number) => `Show all ${n}`,
     footageRemoved: " · footage removed",
     shorts: (n: number) => plural(n, "short", "shorts"),
     open: "Open",
@@ -569,25 +579,23 @@ export const en = {
     /** The editor panel's tabs, each a short name under its icon. */
     tabs: {
       result: "Result",
+      captions: "Captions",
       music: "Music",
       look: "Look",
-      captions: "Captions",
-      brand: "Brand",
-      text: "Text",
-      overlays: "Overlays",
+      graphics: "Graphics",
       replan: "Re-plan",
     },
     loadFallback: "This edit's changes could not be loaded.",
     loading: "Loading…",
     noFootage:
-      "This project's footage was deleted, so it cannot change; make a new edit from the footage",
+      "This project's footage was deleted, so it cannot change. Make a new edit from the footage",
     noChange: "Make a change first",
     notApplied: "The changes could not be applied",
     title: "Change the edit",
     version: (n: number, clock: string) => `Version ${n} · ${clock}`,
-    afterCuts: (clock: string) => ` · ${clock} after the cuts`,
+    afterCuts: " · after the cuts ",
     transcript: "Transcript",
-    help: "Click a word, then Shift-click another to select the words between. Delete them, or fix a single caption word. Each cut moves to a pause inside your selection, so no word is cut through; ✂ marks where it lands, and selected words a dotted line marks stay.",
+    help: "Click a word, then Shift-click another to select the words between. Delete them, or fix one caption word. Each cut moves to a pause inside your selection, so no word is cut through: ✂ marks where it lands, and a dotted line marks words it keeps.",
     keys: {
       play: "play or pause",
       move: "move between words, with",
@@ -624,7 +632,7 @@ export const en = {
     volume: "Volume",
     removeMusic: "Remove the music",
     noMusic: "This edit has no music.",
-    playing: (name: string) => `Playing ${name}.`,
+    playing: (name: string) => `Playing ${name}`,
     library: {
       title: "Music library",
       moods: {
@@ -639,25 +647,27 @@ export const en = {
       previewFailed: "The preview could not play. Check the connection and try again.",
       use: "Use",
       using: "In use",
-      help: "Another track is fitted to this cut and only renders again: no new plan, no Claude cost.",
+      help: "A new track is fitted to this cut and only renders again, with no Claude cost.",
       claim:
-        "If a platform claims a library track, it is CC0 public domain; dispute the claim with that licence.",
+        "Every library track is CC0 public domain. If a platform claims one, dispute it with that licence.",
     },
     look: "Look",
     captionStyle: "Caption style",
     emoji: "Emoji at the end of caption lines",
-    emojiHelp: "Only renders again: no new plan, no Claude cost.",
+    emojiHelp: "Only renders again, with no Claude cost.",
     brandKeep: (name: string) => `${name} (as made)`,
-    brandHelp: "Another kit, or none, only renders again: no new plan, no Claude cost.",
+    brandHelp: "Another kit, or none, only renders again, with no Claude cost.",
     overlays: "Overlays",
     keep: "Keep",
     remove: "Remove",
-    replanTitle: "Needs a re-plan",
+    replanTitle: "Plan it again",
     replanHelp:
-      "Reordering, putting removed parts back, a length more than 5 % off, another aspect or another of your own music tracks cannot be changed here: Claude plans the edit again from the same footage, whose analysis is kept, so it takes a minute or two and one more plan.",
-    replan: "Re-plan…",
+      "For what the other tabs cannot change: a new order, removed parts put back, a length more than 5 % off, another shape or another of your own tracks. Claude plans again from the same footage and analysis, in a minute or two, for one more plan's cost.",
+    unapplied: (n: number, version: number) =>
+      `${plural(n, "change", "changes")} not applied yet. A re-plan starts from version ${version} without ${n === 1 ? "it" : "them"}.`,
+    replanWait: "Wait for the version that is rendering to finish.",
     older:
-      "This edit was made with an earlier version: its motion-graphics cards and keyword pops are left out when it renders again. Re-plan it for the new motion graphics.",
+      "This edit was made with an earlier version, so its motion-graphics cards and keyword pops are left out when it renders again. Re-plan it for the new motion graphics.",
     fallback: "The changes could not be made.",
     renderFallback: "The new version could not be rendered.",
     rendering: (n: number, message: string) => `Rendering version ${n} · ${message}`,
@@ -687,20 +697,19 @@ export const en = {
   },
   replan: {
     notPlanned: "The edit could not be planned again",
-    help: "Claude decides the story order and what to keep again, so it may reorder, put back or leave out other parts than this version. It becomes a new version; this one stays in the list.",
+    help: "Claude decides the order and what to keep again, so the result may differ from this version in more than you asked. It becomes a new version; this one stays.",
     length: "Length",
-    aspect: "Aspect",
+    aspect: "Shape",
     music: "Music",
     auto: "Let Claude choose again",
     none: "No music",
-    instructions: "Tell Claude what to change",
+    instructions: "What to change",
     optional: "Optional",
     placeholder: "Open with the demo\nPut back the part about pricing\nEnd on the question",
     fallback: "The edit could not be planned again.",
     start: "Re-plan as a new version",
     stretch: (margin: number) =>
       `A short is planned again from its own stretch of the video and up to ${margin} s on each side.`,
-    cancel: "Cancel",
   },
   versions: {
     title: "Versions",

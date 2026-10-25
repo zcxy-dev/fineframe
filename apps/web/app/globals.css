@@ -91,13 +91,13 @@
     "Microsoft JhengHei", sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --ease-cut: cubic-bezier(0.16, 1, 0.3, 1);
-  --animate-clip: clip 500ms var(--ease-cut) both;
+  --animate-land: land 600ms var(--ease-cut) both;
 
-  /* A clip landing on the progress timeline as the edit gets that far. */
-  @keyframes clip {
+  /* A cut landing on the editor's ruler: its edges close in on the stretch it takes. */
+  @keyframes land {
     from {
       opacity: 0;
-      transform: scaleY(0.2);
+      transform: scaleX(1.8);
     }
   }
 }

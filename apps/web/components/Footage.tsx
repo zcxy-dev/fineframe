@@ -11,10 +11,10 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { type DragEvent, useId, useRef, useState } from "react";
+import { type DragEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { fromDrop, fromInput, type Picked } from "../lib/collect.ts";
 import { formatBytes, formatClock, type Role } from "../lib/settings.ts";
-import { cn, HELP, ICON_FRAME, LABEL, LIST, META, SLUG } from "../lib/styles.ts";
+import { cn, HELP, LABEL, META, SLUG } from "../lib/styles.ts";
 import { useT } from "./I18n.tsx";
 import { Button } from "./ui/button.tsx";
 import { Input } from "./ui/input.tsx";
@@ -53,11 +53,13 @@ interface Props {
   onClear: () => void;
 }
 
-const ROW =
-  "grid grid-cols-[32px_minmax(0,1fr)_32px] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-accent animate-in fade-in-0 slide-in-from-top-1 duration-300";
+/** A tile's picture: the footage's own frame, or an icon on graphite. */
+const FRAME =
+  "relative grid aspect-video place-items-center overflow-hidden rounded-xl bg-graphite text-white/70 [&>svg]:size-5";
 const NAME = "truncate text-[13px] font-medium";
 
-/** The drop zone and the link field, then the list of what was dropped and pasted. */
+/** The drop zone and the link field; once footage is in, a tile of each file and link, with a
+ * frame of each video and photo, beside a tile that takes more. */
 export function Footage({
   items,
   links,
@@ -85,6 +87,19 @@ export function Footage({
     setOver(false);
     onAdd(await fromDrop(event.dataTransfer.items));
   };
+  const dragging = {
+    onDragEnter: (event: DragEvent) => {
+      event.preventDefault();
+      depth.current += 1;
+      setOver(true);
+    },
+    onDragOver: (event: DragEvent) => event.preventDefault(),
+    onDragLeave: () => {
+      depth.current -= 1;
+      if (depth.current <= 0) setOver(false);
+    },
+    onDrop: drop,
+  };
   const addLinks = () => {
     if (!pasted.trim()) return;
     onAddLinks(pasted);
@@ -97,96 +112,203 @@ export function Footage({
     videos.reduce((sum, item) => sum + (item.duration ?? 0), 0) +
     links.reduce((sum, link) => sum + (link.video?.seconds ?? 0), 0);
   const compact = items.length + links.length > 0;
+  const pickers = (
+    <>
+      <input
+        ref={files}
+        type="file"
+        multiple
+        accept="video/*,image/*,audio/*,.mkv,.mts,.m2ts,.mxf"
+        hidden
+        onChange={(event) => {
+          if (event.target.files) onAdd(fromInput(event.target.files));
+          event.target.value = "";
+        }}
+      />
+      <input
+        ref={folder}
+        type="file"
+        hidden
+        {...{ webkitdirectory: "", directory: "" }}
+        onChange={(event) => {
+          if (event.target.files) onAdd(fromInput(event.target.files));
+          event.target.value = "";
+        }}
+      />
+    </>
+  );
+  const choose = (size: "sm" | "default") => (
+    <div className="flex flex-wrap justify-center gap-2">
+      <Button type="button" variant="outline" size={size} onClick={() => files.current?.click()}>
+        <Plus aria-hidden="true" />
+        {words.chooseFiles}
+      </Button>
+      <Button type="button" variant="outline" size={size} onClick={() => folder.current?.click()}>
+        <FolderOpen aria-hidden="true" />
+        {words.chooseFolder}
+      </Button>
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-6">
-      {/* The footage going in, in viewfinder corners that open out and darken while it is dragged
-          over. */}
-      <section
-        className={cn(
-          "corners flex items-center rounded-2xl border transition-[background-color,border-color] duration-300",
-          compact
-            ? "gap-3 bg-card px-4 py-3 max-sm:flex-wrap"
-            : "hatch min-h-72 flex-col justify-center gap-5 px-6 py-12 text-center max-sm:min-h-52",
-          over && "border-foreground/40 bg-primary/10",
-        )}
-        data-over={over}
-        aria-label={words.dropHere}
-        onDragEnter={(event) => {
-          event.preventDefault();
-          depth.current += 1;
-          setOver(true);
-        }}
-        onDragOver={(event) => event.preventDefault()}
-        onDragLeave={() => {
-          depth.current -= 1;
-          if (depth.current <= 0) setOver(false);
-        }}
-        onDrop={drop}
-      >
-        <div
+      {compact ? (
+        <section
+          className="flex flex-col gap-4 rounded-2xl border bg-card p-5 max-sm:p-4"
+          aria-label={words.title}
+          {...dragging}
+        >
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h2 className={SLUG}>{words.title}</h2>
+              <p className={cn(META, "mt-1")}>
+                {words.videos(videos.length + links.length)}
+                {photos > 0 && `${t.sep}${words.photos(photos)}`}
+                {music > 0 && `${t.sep}${words.tracks(music)}`}
+                {seconds > 0 && `${t.sep}${words.inAll(formatClock(seconds))}`}
+                {skipped > 0 && `${t.sep}${words.leftOut(skipped)}`}
+              </p>
+            </div>
+            <Button type="button" variant="link" size="inline" onClick={onClear}>
+              {words.clear}
+            </Button>
+          </div>
+          <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3 p-0">
+            {items.map((item) => (
+              <Tile
+                key={item.key}
+                name={item.path}
+                off={item.off}
+                remove={words.remove(item.path)}
+                onRemove={() => onRemove(item.key)}
+                frame={<Preview item={item} />}
+                meta={
+                  item.off ? (
+                    words.notUsed
+                  ) : (
+                    <>
+                      {item.use === "music" && `${words.music}${t.sep}`}
+                      {item.use !== "image" &&
+                        `${
+                          item.duration === undefined
+                            ? "…"
+                            : item.duration === null
+                              ? words.lengthUnknown
+                              : formatClock(item.duration)
+                        }${t.sep}`}
+                      {item.use === "image" && `${words.photo}${t.sep}`}
+                      {formatBytes(item.file.size)}
+                    </>
+                  )
+                }
+                action={
+                  item.use === "music" && (
+                    <button
+                      type="button"
+                      className="self-start text-xs text-steel underline decoration-edge underline-offset-2 hover:text-foreground hover:decoration-foreground"
+                      aria-label={
+                        item.off ? words.asMusicLabel(item.path) : words.notMusicLabel(item.path)
+                      }
+                      onClick={() => onToggle(item.key)}
+                    >
+                      {item.off ? words.asMusic : words.notMusic}
+                    </button>
+                  )
+                }
+              />
+            ))}
+            {links.map((link) => (
+              <Tile
+                key={link.url}
+                name={link.video?.title ?? link.url}
+                remove={words.remove(link.video?.title ?? link.url)}
+                onRemove={() => onRemoveLink(link.url)}
+                frame={
+                  <span className={FRAME}>
+                    <Link2 aria-hidden="true" />
+                  </span>
+                }
+                meta={
+                  link.video
+                    ? [
+                        link.video.site,
+                        link.video.seconds === null
+                          ? words.lengthUnknown
+                          : formatClock(link.video.seconds),
+                        words.fromLink,
+                      ]
+                        .filter(Boolean)
+                        .join(t.sep)
+                    : words.reading
+                }
+              />
+            ))}
+            {/* More footage, in viewfinder corners that open out and darken while it is dragged
+                over the card. */}
+            <li className="flex min-w-0 flex-col">
+              <button
+                type="button"
+                className={cn(
+                  "corners hatch grid aspect-video place-items-center rounded-xl border border-dashed border-edge text-steel transition-colors duration-300 hover:text-foreground",
+                  over && "border-foreground/40 bg-primary/10 text-foreground",
+                )}
+                data-over={over}
+                onClick={() => files.current?.click()}
+              >
+                <span className="flex flex-col items-center gap-1.5 text-[13px] font-semibold">
+                  <span
+                    className={cn(
+                      "grid size-8 place-items-center rounded-full border border-edge bg-card transition-[transform,background-color] duration-500 ease-(--ease-cut) [&_svg]:size-4",
+                      over && "-translate-y-1 border-primary bg-primary text-primary-foreground",
+                    )}
+                  >
+                    <Plus aria-hidden="true" />
+                  </span>
+                  {words.dropMore}
+                </span>
+              </button>
+              <Button
+                type="button"
+                variant="link"
+                size="inline"
+                className="mt-2 self-start text-xs"
+                onClick={() => folder.current?.click()}
+              >
+                <FolderOpen aria-hidden="true" />
+                {words.chooseFolder}
+              </Button>
+            </li>
+          </ul>
+          {pickers}
+        </section>
+      ) : (
+        // The footage going in, in viewfinder corners that open out and darken while it is
+        // dragged over.
+        <section
           className={cn(
-            "grid shrink-0 place-items-center rounded-full border border-edge bg-card text-steel transition-[color,transform,border-color] duration-500 ease-(--ease-cut)",
-            compact ? "size-9 [&_svg]:size-4" : "size-14 [&_svg]:size-5.5",
-            over && "-translate-y-1 border-primary bg-primary text-primary-foreground",
+            "corners hatch flex min-h-72 flex-col items-center justify-center gap-5 rounded-2xl border px-6 py-12 text-center transition-[background-color,border-color] duration-300 max-sm:min-h-52",
+            over && "border-foreground/40 bg-primary/10",
           )}
+          data-over={over}
+          aria-label={words.dropHere}
+          {...dragging}
         >
-          <Upload aria-hidden="true" />
-        </div>
-        <div
-          className={cn("flex flex-col gap-1.5", compact ? "flex-1 items-start" : "items-center")}
-        >
-          <p
-            className={cn("font-semibold", compact ? "text-[13px]" : "text-lg tracking-[-0.01em]")}
+          <div
+            className={cn(
+              "grid size-14 shrink-0 place-items-center rounded-full border border-edge bg-card text-steel transition-[color,transform,border-color] duration-500 ease-(--ease-cut) [&_svg]:size-5.5",
+              over && "-translate-y-1 border-primary bg-primary text-primary-foreground",
+            )}
           >
-            {compact ? words.dropMore : words.drop}
-          </p>
-          {!compact && <p className="max-w-[48ch] text-[13px] text-steel">{words.hint}</p>}
-        </div>
-        <div className={cn("flex flex-wrap justify-center gap-2", compact && "max-sm:w-full")}>
-          <Button
-            type="button"
-            variant="outline"
-            size={compact ? "sm" : "default"}
-            className="max-sm:flex-1"
-            onClick={() => files.current?.click()}
-          >
-            <Plus aria-hidden="true" />
-            {words.chooseFiles}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size={compact ? "sm" : "default"}
-            className="max-sm:flex-1"
-            onClick={() => folder.current?.click()}
-          >
-            <FolderOpen aria-hidden="true" />
-            {words.chooseFolder}
-          </Button>
-        </div>
-        <input
-          ref={files}
-          type="file"
-          multiple
-          accept="video/*,image/*,audio/*,.mkv,.mts,.m2ts,.mxf"
-          hidden
-          onChange={(event) => {
-            if (event.target.files) onAdd(fromInput(event.target.files));
-            event.target.value = "";
-          }}
-        />
-        <input
-          ref={folder}
-          type="file"
-          hidden
-          {...{ webkitdirectory: "", directory: "" }}
-          onChange={(event) => {
-            if (event.target.files) onAdd(fromInput(event.target.files));
-            event.target.value = "";
-          }}
-        />
-      </section>
+            <Upload aria-hidden="true" />
+          </div>
+          <div className="flex flex-col items-center gap-1.5">
+            <p className="text-lg font-semibold tracking-[-0.01em]">{words.drop}</p>
+            <p className="max-w-[48ch] text-[13px] text-steel">{words.hint}</p>
+          </div>
+          {choose("default")}
+          {pickers}
+        </section>
+      )}
 
       <div className="flex flex-col gap-2">
         <label className={LABEL} htmlFor={`${id}-link`}>
@@ -226,131 +348,96 @@ export function Footage({
           </p>
         )}
         <p className={HELP} id={`${id}-link-hint`}>
-          {words.linkHint}
+          {words.linkHint} {words.rights}
         </p>
-        <p className="text-xs leading-relaxed text-steel">{words.rights}</p>
       </div>
-
-      {compact && (
-        <section className="flex flex-col gap-3 animate-in fade-in-0 duration-300">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <h2 className={SLUG}>{words.title}</h2>
-              <p className={cn(META, "mt-1")}>
-                {words.videos(videos.length + links.length)}
-                {photos > 0 && ` · ${words.photos(photos)}`}
-                {music > 0 && ` · ${words.tracks(music)}`}
-                {seconds > 0 && ` · ${words.inAll(formatClock(seconds))}`}
-                {skipped > 0 && ` · ${words.leftOut(skipped)}`}
-              </p>
-            </div>
-            <Button type="button" variant="link" size="inline" onClick={onClear}>
-              {words.clear}
-            </Button>
-          </div>
-          <ul className={cn(LIST, "max-h-[420px] overflow-y-auto")}>
-            {items.map((item) => (
-              <li key={item.key} className={ROW}>
-                <span className={cn(ICON_FRAME, item.off && "text-muted-foreground")}>
-                  {item.use === "video" ? (
-                    <Film aria-hidden="true" />
-                  ) : item.use === "image" ? (
-                    <ImageIcon aria-hidden="true" />
-                  ) : (
-                    <Music2 aria-hidden="true" />
-                  )}
-                </span>
-                <span className="flex min-w-0 flex-col">
-                  <span className={cn(NAME, item.off && "text-muted-foreground")} title={item.path}>
-                    {item.path}
-                  </span>
-                  <span className={META}>
-                    {item.off ? (
-                      <span className="text-steel">{words.notUsed}</span>
-                    ) : (
-                      <>
-                        {item.use === "music" && `${words.music} · `}
-                        {item.use !== "image" && (
-                          <>
-                            {item.duration === undefined
-                              ? "…"
-                              : item.duration === null
-                                ? words.lengthUnknown
-                                : formatClock(item.duration)}
-                            {" · "}
-                          </>
-                        )}
-                        {item.use === "image" && `${words.photo} · `}
-                        {formatBytes(item.file.size)}
-                      </>
-                    )}
-                    {item.use === "music" && (
-                      <>
-                        {" · "}
-                        <button
-                          type="button"
-                          className="text-steel underline decoration-edge underline-offset-2 hover:text-foreground hover:decoration-foreground"
-                          aria-label={
-                            item.off
-                              ? words.asMusicLabel(item.path)
-                              : words.notMusicLabel(item.path)
-                          }
-                          onClick={() => onToggle(item.key)}
-                        >
-                          {item.off ? words.asMusic : words.notMusic}
-                        </button>
-                      </>
-                    )}
-                  </span>
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={words.remove(item.path)}
-                  onClick={() => onRemove(item.key)}
-                >
-                  <X aria-hidden="true" />
-                </Button>
-              </li>
-            ))}
-            {links.map((link) => (
-              <li key={link.url} className={ROW}>
-                <span className={ICON_FRAME}>
-                  <Link2 aria-hidden="true" />
-                </span>
-                <span className="flex min-w-0 flex-col">
-                  <span className={NAME} title={link.url}>
-                    {link.video?.title ?? link.url}
-                  </span>
-                  <span className={META}>
-                    {link.video
-                      ? [
-                          link.video.site,
-                          link.video.seconds === null
-                            ? words.lengthUnknown
-                            : formatClock(link.video.seconds),
-                          words.fromLink,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")
-                      : words.reading}
-                  </span>
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={words.remove(link.video?.title ?? link.url)}
-                  onClick={() => onRemoveLink(link.url)}
-                >
-                  <X aria-hidden="true" />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
     </div>
+  );
+}
+
+/** One file or link: its frame, name and details, and a button that takes it out. */
+function Tile({
+  name,
+  meta,
+  frame,
+  action,
+  off = false,
+  remove,
+  onRemove,
+}: {
+  name: string;
+  meta: ReactNode;
+  frame: ReactNode;
+  action?: ReactNode;
+  off?: boolean | undefined;
+  remove: string;
+  onRemove: () => void;
+}) {
+  return (
+    <li className="relative flex min-w-0 flex-col gap-1.5 animate-in fade-in-0 zoom-in-[0.97] duration-300">
+      <div className={cn("transition-opacity", off && "opacity-40")}>{frame}</div>
+      <span className={cn(NAME, off && "text-muted-foreground")} title={name}>
+        {name}
+      </span>
+      <span className={cn(META, "-mt-1 truncate")}>{meta}</span>
+      {action}
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="absolute top-1.5 right-1.5 size-7 border-transparent bg-card/90"
+        aria-label={remove}
+        onClick={onRemove}
+      >
+        <X aria-hidden="true" />
+      </Button>
+    </li>
+  );
+}
+
+/** A frame of a video or a photo, read from the file in the browser; an icon for music, or for a
+ * file the browser cannot show. */
+function Preview({ item }: { item: Item }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const { file, use } = item;
+  // One address for the file, kept while its length is read and the tile renders again.
+  useEffect(() => {
+    if (use === "music") return;
+    const made = URL.createObjectURL(file);
+    setUrl(made);
+    return () => URL.revokeObjectURL(made);
+  }, [file, use]);
+  const icon = item.use === "music" ? <Music2 /> : item.use === "image" ? <ImageIcon /> : <Film />;
+  return (
+    <span className={FRAME} aria-hidden="true">
+      {icon}
+      {url &&
+        !failed &&
+        (item.use === "image" ? (
+          // biome-ignore lint/performance/noImgElement: the dropped file itself, from the browser.
+          <img
+            src={url}
+            alt=""
+            className="absolute inset-0 size-full object-cover"
+            onError={() => setFailed(true)}
+          />
+        ) : (
+          <video
+            // A moment in, so the tile shows a frame rather than the first black one.
+            src={`${url}#t=1`}
+            className="absolute inset-0 size-full object-cover"
+            muted
+            playsInline
+            preload="metadata"
+            onError={() => setFailed(true)}
+          />
+        ))}
+      {item.use === "video" && item.duration ? (
+        <span className="absolute bottom-1.5 left-1.5 rounded-md bg-graphite/80 px-1.5 py-0.5 text-[11px] font-semibold text-white tabular-nums">
+          {formatClock(item.duration)}
+        </span>
+      ) : null}
+    </span>
   );
 }

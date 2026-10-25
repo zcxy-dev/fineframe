@@ -2,18 +2,7 @@
 
 import { CAPTION_STYLES, type CaptionStyle } from "@video-editor/engine/captions";
 import { lookIds } from "@video-editor/engine/looks";
-import {
-  Captions,
-  Clapperboard,
-  Contrast,
-  Layers,
-  Music2,
-  Scissors,
-  Stamp,
-  Type,
-  Undo2,
-  WandSparkles,
-} from "lucide-react";
+import { Scissors, Undo2 } from "lucide-react";
 import {
   Fragment,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -30,7 +19,18 @@ import { overlayLabel, progressText } from "../lib/i18n/program.ts";
 import type { EditView, Job } from "../lib/jobs.ts";
 import { formatClock, formatDollars } from "../lib/settings.ts";
 import { jobApi } from "../lib/shorts.ts";
-import { CHECK, CHOICE, cn, HELP, LABEL, LIST, META, SECTION, SLUG } from "../lib/styles.ts";
+import {
+  CHECK,
+  CHOICE,
+  cn,
+  HELP,
+  LABEL,
+  LIST,
+  META,
+  SECTION,
+  SLUG,
+  WARNING,
+} from "../lib/styles.ts";
 import { dollarsOf } from "../lib/summary.ts";
 import { spacedWords } from "../lib/transcript.ts";
 import type { PageRevision } from "../lib/versions.ts";
@@ -45,6 +45,7 @@ import { Bar } from "./RunView.tsx";
 import { Segments } from "./Segments.tsx";
 import { Button } from "./ui/button.tsx";
 import { Input, NativeSelect } from "./ui/input.tsx";
+import { NumberTicker } from "./ui/number-ticker.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs.tsx";
 
 /** Ticks in a second, as project.json counts time. */
@@ -91,6 +92,7 @@ export function ReEdit({
   video,
   head,
   result,
+  download,
   editable,
 }: {
   job: Job;
@@ -100,6 +102,8 @@ export function ReEdit({
   video: RefObject<HTMLVideoElement | null>;
   /** The panel's heading over its tabs: what the edit is. */
   head: ReactNode;
+  /** The download, right under the player where the panes stack, as on a phone. */
+  download: ReactNode;
   /** The Result tab: the downloads, the versions and the edit's details. */
   result: ReactNode;
   editable: boolean;
@@ -107,7 +111,7 @@ export function ReEdit({
   const t = useT();
   const words = t.reedit;
   const [view, setView] = useState<EditView | null>(null);
-  const [replanning, setReplanning] = useState(false);
+  const [tab, setTab] = useState("result");
   const [draft, setDraft] = useState<Draft>(EMPTY);
   // The drafts before each change, for Ctrl+Z.
   const [history, setHistory] = useState<Draft[]>([]);
@@ -224,6 +228,7 @@ export function ReEdit({
     <main className="grid lg:h-[calc(100dvh-3.5rem)] lg:grid-cols-[minmax(0,1fr)_400px]">
       <div className="flex min-h-0 min-w-0 flex-col">
         <Player job={job} video={video} />
+        <div className="border-t bg-card px-4 py-3 lg:hidden">{download}</div>
         {main}
       </div>
       <aside
@@ -408,7 +413,12 @@ export function ReEdit({
           <h2 className={SLUG}>{words.transcript}</h2>
           <p className={cn(META, "truncate")}>
             {words.version(view.version, formatClock(view.length / TICKS))}
-            {landed && words.afterCuts(formatClock(landed.length / TICKS))}
+            {landed && (
+              <>
+                {words.afterCuts}
+                <NumberTicker value={landed.length / TICKS} format={formatClock} />
+              </>
+            )}
           </p>
         </div>
         <p className="flex min-w-0 flex-wrap justify-end gap-x-4 gap-y-1 text-xs text-muted-foreground max-xl:hidden [&>span]:inline-flex [&>span]:items-center [&>span]:gap-1 [&>span]:whitespace-nowrap">
@@ -454,7 +464,12 @@ export function ReEdit({
             onKeyDown={onTranscriptKey}
           >
             {view.lines.map((line, l) => (
-              <p key={line.words[0]?.start ?? line.text} className="leading-[1.95]">
+              <p
+                key={line.words[0]?.start ?? line.text}
+                // The lines come in one after another, as captions do, when it first shows.
+                className="leading-[1.95] animate-in fill-mode-backwards fade-in-0 slide-in-from-bottom-1 duration-500"
+                style={{ animationDelay: `${Math.min(l, 12) * 45}ms` }}
+              >
                 {line.words.map((_, w) => {
                   const g = (offsets[l] ?? 0) + w;
                   const word = transcriptWords[g] as Word;
@@ -486,15 +501,16 @@ export function ReEdit({
                       <button
                         type="button"
                         className={cn(
-                          "rounded-[4px] px-px text-[15px] text-foreground transition-colors duration-150 hover:bg-raised focus-visible:outline-offset-1",
+                          // A line struck through a word to cut draws across it.
+                          "rounded-[4px] bg-[linear-gradient(currentColor,currentColor)] bg-[length:0%_1.5px] bg-[position:0_58%] bg-no-repeat px-px text-[15px] text-foreground transition-[color,background-color,background-size] duration-300 ease-(--ease-cut) hover:bg-raised focus-visible:outline-offset-1",
                           g === live && !state && "bg-primary text-primary-foreground",
                           state === "selected" &&
                             "bg-foreground text-background hover:bg-foreground",
-                          state === "cut" && "text-muted-foreground line-through",
+                          state === "cut" && "bg-[length:100%_1.5px] text-muted-foreground",
                           state === "kept" &&
                             "underline decoration-muted-foreground decoration-dotted underline-offset-[3px]",
                           state === "gone" &&
-                            "bg-destructive/15 text-destructive line-through hover:bg-destructive/20",
+                            "bg-destructive/15 bg-[length:100%_1.5px] text-destructive hover:bg-destructive/20",
                           state === "fixed" &&
                             "underline decoration-success underline-offset-[3px]",
                         )}
@@ -622,33 +638,87 @@ export function ReEdit({
   );
 
   const tabs = [
-    { value: "result", icon: Clapperboard, label: words.tabs.result, show: true },
-    { value: "music", icon: Music2, label: words.tabs.music, show: true },
-    { value: "look", icon: Contrast, label: words.tabs.look, show: true },
-    { value: "captions", icon: Captions, label: words.tabs.captions, show: Boolean(view.captions) },
-    { value: "brand", icon: Stamp, label: words.tabs.brand, show: true },
-    { value: "text", icon: Type, label: words.tabs.text, show: view.titles.length > 0 },
+    { value: "result", label: words.tabs.result, show: true },
+    { value: "captions", label: words.tabs.captions, show: Boolean(view.captions) },
+    { value: "music", label: words.tabs.music, show: true },
+    { value: "look", label: words.tabs.look, show: true },
     {
-      value: "overlays",
-      icon: Layers,
-      label: words.tabs.overlays,
-      show: view.removables.length > 0,
+      value: "graphics",
+      label: words.tabs.graphics,
+      show: view.titles.length > 0 || view.removables.length > 0,
     },
-    { value: "replan", icon: WandSparkles, label: words.tabs.replan, show: true },
-  ].filter((tab) => tab.show);
+    { value: "replan", label: words.tabs.replan, show: true },
+  ].filter((each) => each.show);
 
   const panel = (
-    <Tabs defaultValue="result" className="min-h-0 flex-1">
+    <Tabs value={tab} onValueChange={setTab} className="min-h-0 flex-1">
       <TabsList aria-label={words.label}>
-        {tabs.map(({ value, icon: Icon, label }) => (
+        {tabs.map(({ value, label }) => (
           <TabsTrigger key={value} value={value}>
-            <Icon aria-hidden="true" />
             {label}
           </TabsTrigger>
         ))}
       </TabsList>
 
       <TabsContent value="result">{result}</TabsContent>
+
+      {view.captions && (
+        <TabsContent value="captions">
+          <div className={SECTION}>
+            <h3 className={SLUG}>{words.captionStyle}</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {brandCaptions && (
+                <button
+                  type="button"
+                  className={cn(CHOICE, "gap-1.5 p-1.5 pb-2 text-[13px] font-medium")}
+                  aria-pressed={shownCaptions === "brand"}
+                  onClick={() => {
+                    const { captions: _, ...rest } = draft;
+                    change(rest);
+                  }}
+                >
+                  {chosenKit ? (
+                    <KitCaptionPreview kit={chosenKit} />
+                  ) : (
+                    <CaptionPreview style="bold" />
+                  )}
+                  {t.kits.captionsName}
+                </button>
+              )}
+              {CAPTION_STYLES.map((style) => (
+                <button
+                  key={style}
+                  type="button"
+                  className={cn(CHOICE, "gap-1.5 p-1.5 pb-2 text-[13px] font-medium")}
+                  aria-pressed={shownCaptions === style}
+                  onClick={() => {
+                    const { captions: _, ...rest } = draft;
+                    const unchanged =
+                      style === view.captions && !view.brand?.captions && draft.kit === undefined;
+                    change(unchanged ? rest : { ...draft, captions: style });
+                  }}
+                >
+                  <CaptionPreview style={style} />
+                  {t.captions[style].name}
+                </button>
+              ))}
+            </div>
+            <label className={CHECK}>
+              <input
+                type="checkbox"
+                checked={draft.emoji ?? view.emoji}
+                onChange={(event) => {
+                  const { emoji: _, ...rest } = draft;
+                  const emoji = event.target.checked;
+                  change(emoji === view.emoji ? rest : { ...draft, emoji });
+                }}
+              />
+              {words.emoji}
+            </label>
+            <p className={HELP}>{words.emojiHelp}</p>
+          </div>
+        </TabsContent>
+      )}
 
       <TabsContent value="music">
         <div className={SECTION}>
@@ -729,68 +799,7 @@ export function ReEdit({
             {t.looks[(draft.look ?? view.look) as keyof Messages["looks"]]?.description}
           </p>
         </div>
-      </TabsContent>
-
-      {view.captions && (
-        <TabsContent value="captions">
-          <div className={SECTION}>
-            <h3 className={SLUG}>{words.captionStyle}</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {brandCaptions && (
-                <button
-                  type="button"
-                  className={cn(CHOICE, "gap-1.5 p-1.5 pb-2 text-[13px] font-medium")}
-                  aria-pressed={shownCaptions === "brand"}
-                  onClick={() => {
-                    const { captions: _, ...rest } = draft;
-                    change(rest);
-                  }}
-                >
-                  {chosenKit ? (
-                    <KitCaptionPreview kit={chosenKit} />
-                  ) : (
-                    <CaptionPreview style="bold" />
-                  )}
-                  {t.kits.captionsName}
-                </button>
-              )}
-              {CAPTION_STYLES.map((style) => (
-                <button
-                  key={style}
-                  type="button"
-                  className={cn(CHOICE, "gap-1.5 p-1.5 pb-2 text-[13px] font-medium")}
-                  aria-pressed={shownCaptions === style}
-                  onClick={() => {
-                    const { captions: _, ...rest } = draft;
-                    const unchanged =
-                      style === view.captions && !view.brand?.captions && draft.kit === undefined;
-                    change(unchanged ? rest : { ...draft, captions: style });
-                  }}
-                >
-                  <CaptionPreview style={style} />
-                  {t.captions[style].name}
-                </button>
-              ))}
-            </div>
-            <label className={CHECK}>
-              <input
-                type="checkbox"
-                checked={draft.emoji ?? view.emoji}
-                onChange={(event) => {
-                  const { emoji: _, ...rest } = draft;
-                  const emoji = event.target.checked;
-                  change(emoji === view.emoji ? rest : { ...draft, emoji });
-                }}
-              />
-              {words.emoji}
-            </label>
-            <p className={HELP}>{words.emojiHelp}</p>
-          </div>
-        </TabsContent>
-      )}
-
-      <TabsContent value="brand">
-        <div className={SECTION}>
+        <div className={cn(SECTION, "border-t")}>
           <h3 className={SLUG}>{t.kits.picker}</h3>
           <NativeSelect
             aria-label={t.kits.picker}
@@ -821,111 +830,103 @@ export function ReEdit({
         </div>
       </TabsContent>
 
-      {view.titles.length > 0 && (
-        <TabsContent value="text">
-          <div className={SECTION}>
-            <h3 className={SLUG}>{words.titles}</h3>
-            {view.titles.map((title) => (
-              <div key={title.index} className="flex flex-col gap-3">
-                {Object.entries(title.limits).map(([name, limit]) => (
-                  <div key={name} className="flex flex-col gap-2">
-                    <label className={LABEL} htmlFor={`${job.id}-title-${title.index}-${name}`}>
-                      {title.template === "title" ? "" : words.lowerThird}
-                      {words.params[name] ?? name}
-                    </label>
-                    <Input
-                      id={`${job.id}-title-${title.index}-${name}`}
-                      maxLength={limit}
-                      value={draft.titles[title.index]?.[name] ?? title.params[name] ?? ""}
-                      onChange={(event) => {
-                        const params = {
-                          ...draft.titles[title.index],
-                          [name]: event.target.value,
-                        };
-                        if (event.target.value === (title.params[name] ?? "")) delete params[name];
-                        const titles = { ...draft.titles, [title.index]: params };
-                        if (Object.keys(params).length === 0) delete titles[title.index];
-                        change({ ...draft, titles });
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </TabsContent>
-      )}
-
-      {view.removables.length > 0 && (
-        <TabsContent value="overlays">
-          <div className={SECTION}>
-            <h3 className={SLUG}>{words.overlays}</h3>
-            <ul className={LIST}>
-              {view.removables.map((item) => {
-                const id = `${item.kind}:${item.index}`;
-                const removed = draft.remove.includes(id);
-                return (
-                  <li
-                    key={id}
-                    className="grid grid-cols-[3.5em_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-[13px]"
-                  >
-                    <button
-                      type="button"
-                      className="text-left text-xs text-muted-foreground tabular-nums hover:text-foreground"
-                      onClick={() => {
-                        const player = video.current;
-                        if (player) player.currentTime = item.start / TICKS;
-                      }}
+      {(view.titles.length > 0 || view.removables.length > 0) && (
+        <TabsContent value="graphics">
+          {view.titles.length > 0 && (
+            <div className={SECTION}>
+              <h3 className={SLUG}>{words.titles}</h3>
+              {view.titles.map((title) => (
+                <div key={title.index} className="flex flex-col gap-3">
+                  {Object.entries(title.limits).map(([name, limit]) => (
+                    <div key={name} className="flex flex-col gap-2">
+                      <label className={LABEL} htmlFor={`${job.id}-title-${title.index}-${name}`}>
+                        {title.template === "title" ? "" : words.lowerThird}
+                        {words.params[name] ?? name}
+                      </label>
+                      <Input
+                        id={`${job.id}-title-${title.index}-${name}`}
+                        maxLength={limit}
+                        value={draft.titles[title.index]?.[name] ?? title.params[name] ?? ""}
+                        onChange={(event) => {
+                          const params = {
+                            ...draft.titles[title.index],
+                            [name]: event.target.value,
+                          };
+                          if (event.target.value === (title.params[name] ?? ""))
+                            delete params[name];
+                          const titles = { ...draft.titles, [title.index]: params };
+                          if (Object.keys(params).length === 0) delete titles[title.index];
+                          change({ ...draft, titles });
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+          {view.removables.length > 0 && (
+            <div className={cn(SECTION, view.titles.length > 0 && "border-t")}>
+              <h3 className={SLUG}>{words.overlays}</h3>
+              <ul className={LIST}>
+                {view.removables.map((item) => {
+                  const id = `${item.kind}:${item.index}`;
+                  const removed = draft.remove.includes(id);
+                  return (
+                    <li
+                      key={id}
+                      className="grid grid-cols-[3.5em_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-[13px]"
                     >
-                      {formatClock(item.start / TICKS)}
-                    </button>
-                    <span
-                      className={cn("truncate", removed && "text-muted-foreground line-through")}
-                    >
-                      {overlayLabel(item.label, t)}
-                    </span>
-                    <Button
-                      type="button"
-                      variant={removed ? "outline" : "ghost"}
-                      size="sm"
-                      className="h-7"
-                      onClick={() =>
-                        change({
-                          ...draft,
-                          remove: removed
-                            ? draft.remove.filter((each) => each !== id)
-                            : [...draft.remove, id],
-                        })
-                      }
-                    >
-                      {removed ? words.keep : words.remove}
-                    </Button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+                      <button
+                        type="button"
+                        className="text-left text-xs text-muted-foreground tabular-nums hover:text-foreground"
+                        onClick={() => {
+                          const player = video.current;
+                          if (player) player.currentTime = item.start / TICKS;
+                        }}
+                      >
+                        {formatClock(item.start / TICKS)}
+                      </button>
+                      <span
+                        className={cn("truncate", removed && "text-muted-foreground line-through")}
+                      >
+                        {overlayLabel(item.label, t)}
+                      </span>
+                      <Button
+                        type="button"
+                        variant={removed ? "outline" : "ghost"}
+                        size="sm"
+                        className="h-7"
+                        onClick={() =>
+                          change({
+                            ...draft,
+                            remove: removed
+                              ? draft.remove.filter((each) => each !== id)
+                              : [...draft.remove, id],
+                          })
+                        }
+                      >
+                        {removed ? words.keep : words.remove}
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </TabsContent>
       )}
 
       <TabsContent value="replan">
         <div className={SECTION}>
           <h3 className={SLUG}>{words.replanTitle}</h3>
-          {!replanning && <p className={HELP}>{words.replanHelp}</p>}
+          <p className={HELP}>{words.replanHelp}</p>
           {view.older && <p className={HELP}>{words.older}</p>}
-          {replanning ? (
-            <Replan job={job} onJob={onJob} onClose={() => setReplanning(false)} />
+          {count > 0 && <p className={WARNING}>{words.unapplied(count, current)}</p>}
+          {view.footage && !rendering ? (
+            <Replan job={job} onJob={onJob} />
           ) : (
-            <Button
-              type="button"
-              variant="outline"
-              className="self-start"
-              onClick={() => setReplanning(true)}
-              disabled={!view.footage || rendering !== null}
-            >
-              <WandSparkles aria-hidden="true" />
-              {words.replan}
-            </Button>
+            <p className={HELP}>{view.footage ? words.replanWait : words.noFootage}</p>
           )}
         </div>
       </TabsContent>
@@ -975,7 +976,12 @@ export function ReEdit({
     </div>
   );
 
-  return layout(transcriptPane, panel, foot);
+  // Re-plan has its own action, so Apply leaves the foot while it shows, unless a version renders.
+  return layout(
+    transcriptPane,
+    panel,
+    tab !== "replan" || rendering || job.render?.error ? foot : null,
+  );
 }
 
 /** The transcript pane under the player: its height on a wide screen, and a stack below. */
@@ -1060,7 +1066,7 @@ function Ruler({
       {landed.map(([a, b]) => (
         <span
           key={`l${a}`}
-          className="absolute bottom-0 h-7 rounded-[3px] border-x-2 border-destructive bg-destructive/35 animate-in fade-in-0 duration-300"
+          className="absolute bottom-0 h-7 rounded-[3px] border-x-2 border-destructive bg-destructive/35 animate-land"
           style={{ left: pct(a), width: pct(b - a) }}
         />
       ))}
@@ -1136,9 +1142,9 @@ export function Versions({ job, onJob }: { job: Job; onJob: (job: Job) => void }
               </span>
               <span className={META}>
                 {t.date(version.created)}
-                {version.seconds !== undefined && ` · ${formatClock(version.seconds)}`}
-                {version.claude && ` · Claude ${formatDollars(dollarsOf(version.claude), t)}`}
-                {" · "}
+                {version.seconds !== undefined && `${t.sep}${formatClock(version.seconds)}`}
+                {version.claude && `${t.sep}Claude ${formatDollars(dollarsOf(version.claude), t)}`}
+                {t.sep}
                 {/* The first is the edit itself, whichever language its record was made in; a
                     later one from before the summaries in each language has only the English. */}
                 {version.n === 1

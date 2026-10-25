@@ -123,7 +123,7 @@ Each brand logo is its owner's trademark ([notes](#icons-and-logos)): a graphic 
 `apps/web/components/ui/` holds components copied from these projects and changed for the page:
 
 - from [shadcn/ui](https://ui.shadcn.com) (MIT, Copyright (c) 2023 shadcn): `button`, `input` (with its textarea and native select), `tabs`, `dialog`, `dropdown-menu`;
-- from [Magic UI](https://magicui.design) (MIT, Copyright (c) Magic UI): `text-animate`, `number-ticker`.
+- from [Magic UI](https://magicui.design) (MIT, Copyright (c) Magic UI): `number-ticker`.
 
 ## Notes
 

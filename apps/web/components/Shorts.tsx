@@ -50,7 +50,9 @@ export function ShortsGrid({ job, onOpen }: { job: Job; onOpen: (folder: string)
       <div>
         <h2 className={SLUG}>{words.title(shorts.length)}</h2>
         <p className={cn(META, "mt-1")}>
-          {running ? words.making(shorts.length, of) : range} · {job.settings.aspect}
+          {running ? words.making(shorts.length, of) : range}
+          {t.sep}
+          {job.settings.aspect}
         </p>
       </div>
       <ol className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-x-5 gap-y-6 p-0">
@@ -83,9 +85,10 @@ export function ShortsGrid({ job, onOpen }: { job: Job; onOpen: (folder: string)
                   {i + 1}. {short.title}
                 </span>
                 <span className={META}>
-                  {formatClock(seconds)} ·{" "}
+                  {formatClock(seconds)}
+                  {t.sep}
                   {words.stretch(formatClock(short.start), formatClock(short.end))}
-                  {files.size > 1 && ` · ${short.source.split("/").at(-1)}`}
+                  {files.size > 1 && `${t.sep}${short.source.split("/").at(-1)}`}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -142,7 +145,9 @@ export function ShortsDone({ job }: { job: Job }) {
       <div>
         <h2 className={PANEL_TITLE}>{words.title(job.shorts?.length ?? 0)}</h2>
         <p className="mt-1 text-[13px] text-steel tabular-nums">
-          {range} · {job.settings.aspect}
+          {range}
+          {t.sep}
+          {job.settings.aspect}
         </p>
       </div>
       {fewer && (

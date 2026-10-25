@@ -7,7 +7,7 @@ export { cn } from "cn";
 export const SLUG =
   "text-[11px] leading-snug font-semibold tracking-[0.1em] text-steel uppercase lang-zh:text-xs lang-zh:tracking-[0.16em]";
 
-/** A screen's title, lit word by word as it opens. */
+/** A screen's title. */
 export const TITLE = "display text-[clamp(26px,2.6vw,36px)] leading-[1.08]";
 
 /** A panel's title. */
@@ -51,7 +51,3 @@ export const LIST = "m-0 list-none divide-y overflow-hidden rounded-xl border bg
 
 /** The sections of a docked panel, divided by hairlines. */
 export const SECTION = "flex flex-col gap-3 px-6 py-5 max-md:px-4";
-
-/** The square frame of a file's icon in a list. */
-export const ICON_FRAME =
-  "grid size-8 shrink-0 place-items-center rounded-lg bg-well text-steel [&_svg]:size-4";

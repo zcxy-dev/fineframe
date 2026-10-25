@@ -129,7 +129,7 @@ export function MusicPicker({
                 <span className="flex min-w-0 flex-col">
                   <span className={cn("truncate", using && "font-semibold")}>{track.title}</span>
                   <span className="truncate text-xs text-muted-foreground tabular-nums">
-                    {`${track.artist} · ${formatClock(track.seconds)}${track.bpm ? ` · ${Math.round(track.bpm)} BPM` : ""}`}
+                    {`${track.artist}${t.sep}${formatClock(track.seconds)}${track.bpm ? `${t.sep}${Math.round(track.bpm)} BPM` : ""}`}
                   </span>
                   {state === "failed" && (
                     <span className="flex items-center gap-1 text-xs text-foreground" role="alert">

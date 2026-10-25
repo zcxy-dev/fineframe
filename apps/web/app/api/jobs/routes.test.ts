@@ -139,7 +139,7 @@ test("bad input is refused, saying why", async () => {
     [
       { settings: { ...settings, instructions: "x".repeat(2001) } },
       video,
-      /Tell Claude what you want in at most 2000 characters, not 2001/,
+      /Notes for Claude can be 2000 characters at most, not 2001/,
     ],
     [{ settings }, [], /Drop some footage/],
   ];
