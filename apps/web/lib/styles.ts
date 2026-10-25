@@ -2,7 +2,7 @@
 
 export { cn } from "cn";
 
-/** A pane section's heading: small caps in steel. Chinese has no capitals: it is set a little
+/** A pane section's heading: small caps in ink grey. Chinese has no capitals: it is set a little
  * larger and wider instead. Field labels are never set this way. */
 export const SLUG =
   "text-[11px] leading-snug font-semibold tracking-[0.1em] text-steel uppercase lang-zh:text-xs lang-zh:tracking-[0.16em]";
@@ -30,15 +30,15 @@ export const WARNING =
 /** Data: lengths, sizes, times and costs. */
 export const META = "text-xs text-muted-foreground tabular-nums";
 
-/** Options joined as one segmented control; the chosen one is steel, never amber. */
-export const SEGMENTS = "flex w-full gap-0.5 rounded-[10px] border bg-well p-0.5";
+/** Options as a row of pills; the chosen one is filled in ink, never amber. */
+export const SEGMENTS = "flex w-full flex-wrap gap-1.5";
 export const SEGMENT =
-  "h-8 min-w-0 flex-auto rounded-lg px-2 text-[13px] font-medium whitespace-nowrap text-steel tabular-nums transition-[background-color,color,box-shadow] duration-150 hover:bg-white/5 hover:text-foreground focus-visible:outline-offset-0 aria-pressed:bg-raised aria-pressed:font-semibold aria-pressed:text-foreground aria-pressed:shadow-[inset_0_0_0_1px_var(--edge),0_1px_2px_rgb(0_0_0/0.4)]";
+  "h-8 min-w-0 rounded-full border-(length:--stroke) border-border bg-card px-3.5 text-[13px] font-medium whitespace-nowrap text-foreground tabular-nums transition-[background-color,border-color,color] duration-150 hover:border-foreground/40 aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:font-semibold aria-pressed:text-background";
 
 /** A card that shows a choice, such as an aspect or a caption style: the chosen one is framed in
- * steel and raised. */
+ * ink. */
 export const CHOICE =
-  "relative flex cursor-pointer flex-col items-center rounded-xl border bg-well transition-[border-color,background-color] duration-150 hover:border-edge has-checked:border-foreground/70 has-checked:bg-raised has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary aria-pressed:border-foreground/70 aria-pressed:bg-raised";
+  "relative flex cursor-pointer flex-col items-center rounded-xl border-(length:--stroke) border-border bg-card transition-[border-color,box-shadow] duration-150 hover:border-foreground/40 has-checked:border-foreground has-checked:shadow-[inset_0_0_0_1px_var(--foreground)] has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring aria-pressed:border-foreground aria-pressed:shadow-[inset_0_0_0_1px_var(--foreground)]";
 
 /** A radio read by assistive tech and the keyboard, while its card shows its state. */
 export const HIDDEN_RADIO = "pointer-events-none absolute size-px opacity-0";
@@ -54,4 +54,4 @@ export const SECTION = "flex flex-col gap-3 px-6 py-5 max-md:px-4";
 
 /** The square frame of a file's icon in a list. */
 export const ICON_FRAME =
-  "grid size-8 shrink-0 place-items-center rounded-lg border bg-well text-steel [&_svg]:size-4";
+  "grid size-8 shrink-0 place-items-center rounded-lg bg-well text-steel [&_svg]:size-4";

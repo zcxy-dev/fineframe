@@ -24,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: "Fineframe", description: MESSAGES[await pageLocale()].meta.description };
 }
 
-export const viewport: Viewport = { themeColor: BACKGROUND, colorScheme: "dark" };
+export const viewport: Viewport = { themeColor: BACKGROUND, colorScheme: "light" };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const locale = await pageLocale();

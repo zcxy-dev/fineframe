@@ -33,10 +33,10 @@ export function UpdateNotice() {
   if (!update || dismissed) return null;
   return (
     <div
-      className="fixed bottom-4 left-4 z-40 flex max-w-[calc(100vw-2rem)] animate-in items-center gap-3 rounded-xl border border-edge bg-surface py-2 pr-3 pl-3.5 text-[13px] shadow-[0_24px_48px_-16px_rgb(0_0_0/0.8)] duration-500 fade-in-0 slide-in-from-bottom-2"
+      className="fixed bottom-4 left-4 z-40 flex max-w-[calc(100vw-2rem)] animate-in items-center gap-3 rounded-xl border bg-surface py-2 pr-3 pl-3.5 text-[13px] shadow-[0_24px_48px_-20px_rgb(12_13_16/0.3),0_2px_6px_rgb(12_13_16/0.06)] duration-500 fade-in-0 slide-in-from-bottom-2"
       role="status"
     >
-      <ArrowDownToLine className="size-4 shrink-0 text-primary" aria-hidden="true" />
+      <ArrowDownToLine className="size-4 shrink-0" aria-hidden="true" />
       <span>
         {update.kind === "ready"
           ? t.update.ready(update.version)

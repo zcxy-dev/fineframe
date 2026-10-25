@@ -1,6 +1,6 @@
 "use client";
 
-import { LoaderCircle, Pause, Play } from "lucide-react";
+import { LoaderCircle, Pause, Play, TriangleAlert } from "lucide-react";
 import { useEffect, useReducer, useRef, useState } from "react";
 import type { EditView } from "../lib/jobs.ts";
 import { previewAfter } from "../lib/preview.ts";
@@ -105,7 +105,7 @@ export function MusicPicker({
               <li
                 key={track.id}
                 className={cn(
-                  "grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-2.5 py-1.5 pr-3 pl-1.5 text-[13px] transition-colors hover:bg-white/[0.025]",
+                  "grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-2.5 py-1.5 pr-3 pl-1.5 text-[13px] transition-colors hover:bg-accent",
                   using && "bg-raised",
                 )}
               >
@@ -113,7 +113,7 @@ export function MusicPicker({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className={cn(busy && "text-primary")}
+                  className={cn(busy && "bg-primary text-primary-foreground hover:bg-amber-hover")}
                   aria-label={busy ? words.stop(track.title) : words.play(track.title)}
                   aria-busy={state === "loading"}
                   onClick={() => toggle(track)}
@@ -132,7 +132,11 @@ export function MusicPicker({
                     {`${track.artist} · ${formatClock(track.seconds)}${track.bpm ? ` · ${Math.round(track.bpm)} BPM` : ""}`}
                   </span>
                   {state === "failed" && (
-                    <span className="text-xs text-destructive" role="alert">
+                    <span className="flex items-center gap-1 text-xs text-foreground" role="alert">
+                      <TriangleAlert
+                        className="size-3 shrink-0 text-destructive"
+                        aria-hidden="true"
+                      />
                       {words.previewFailed}
                     </span>
                   )}

@@ -95,10 +95,6 @@ interface TextAnimateProps extends Omit<MotionProps, "children"> {
    * The element's id
    */
   id?: string;
-  /**
-   * The colour a word settles to after the caption preset lights it amber
-   */
-  litColor?: string;
 }
 
 const SEGMENTER = new Intl.Segmenter("zh-Hant", { granularity: "word" });
@@ -158,7 +154,7 @@ const defaultItemAnimationVariants: Record<
   AnimationVariant,
   { container: Variants; item: Variants }
 > = {
-  // A word lights up as the app's captions do: amber for a moment, then steel.
+  // A word comes in as the app's captions do, one after another.
   caption: {
     container: {
       hidden: { opacity: 1 },
@@ -166,16 +162,7 @@ const defaultItemAnimationVariants: Record<
     },
     item: {
       hidden: { opacity: 0.14, y: "0.18em" },
-      show: (color: string) => ({
-        opacity: 1,
-        y: 0,
-        color: ["#ffb547", color],
-        transition: {
-          duration: 0.9,
-          ease: [0.16, 1, 0.3, 1],
-          color: { duration: 0.9, times: [0.35, 1] },
-        },
-      }),
+      show: { opacity: 1, y: 0, transition: { duration: 0.9, ease: [0.16, 1, 0.3, 1] } },
     },
   },
   fadeIn: {
@@ -385,7 +372,6 @@ const TextAnimateBase = ({
   by = "word",
   animation = "fadeIn",
   accessible = true,
-  litColor = "#f2f3f5",
   ...props
 }: TextAnimateProps) => {
   const reduce = useReducedMotion();
@@ -456,7 +442,7 @@ const TextAnimateBase = ({
     <motion.span
       key={`${by}-${text}-${i}`}
       variants={finalVariants.item}
-      custom={animation === "caption" ? litColor : i * staggerTimings[by]}
+      custom={i * staggerTimings[by]}
       className={cn(by === "line" ? "block" : "inline-block whitespace-pre", segmentClassName)}
       aria-hidden={accessible ? true : undefined}
     >

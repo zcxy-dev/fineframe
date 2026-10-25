@@ -22,13 +22,8 @@ export function Player({ job, video }: { job: Job; video: RefObject<HTMLVideoEle
       className="relative grid min-h-0 flex-1 place-items-center overflow-hidden bg-well p-8 [container-type:size] max-lg:h-[min(72vh,620px)] max-lg:flex-none max-md:p-5"
       aria-label={t.done.player}
     >
-      {/* A faint pool of light behind the picture, as on a monitor in a dark room. */}
       <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_55%_at_50%_45%,rgb(255_255_255/0.035),transparent_70%)]"
-      />
-      <div
-        className="viewfinder relative animate-in fade-in-0 zoom-in-[0.98] duration-700 [--cc:rgb(255_255_255/0.4)] [--inset:-12px]"
+        className="viewfinder relative animate-in fade-in-0 zoom-in-[0.98] duration-700 [--inset:-12px]"
         style={{
           aspectRatio: String(ratio),
           width: `min(100cqw, calc(100cqh * ${ratio}))`,
@@ -37,7 +32,7 @@ export function Player({ job, video }: { job: Job; video: RefObject<HTMLVideoEle
         {/* biome-ignore lint/a11y/useMediaCaption: the captions are burned into the picture. */}
         <video
           ref={video}
-          className="block size-full rounded-md bg-black shadow-[0_30px_80px_-30px_rgb(0_0_0/0.9)]"
+          className="block size-full rounded-xl bg-black shadow-[0_40px_80px_-36px_rgb(12_13_16/0.42),0_2px_8px_rgb(12_13_16/0.06)]"
           src={jobApi(job, "video", { v: job.current ?? 1 })}
           controls
           playsInline

@@ -1,6 +1,16 @@
 "use client";
 
-import { Film, FolderOpen, ImageIcon, Link2, Music2, Plus, Upload, X } from "lucide-react";
+import {
+  Film,
+  FolderOpen,
+  ImageIcon,
+  Link2,
+  Music2,
+  Plus,
+  TriangleAlert,
+  Upload,
+  X,
+} from "lucide-react";
 import { type DragEvent, useId, useRef, useState } from "react";
 import { fromDrop, fromInput, type Picked } from "../lib/collect.ts";
 import { formatBytes, formatClock, type Role } from "../lib/settings.ts";
@@ -44,7 +54,7 @@ interface Props {
 }
 
 const ROW =
-  "grid grid-cols-[32px_minmax(0,1fr)_32px] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.025] animate-in fade-in-0 slide-in-from-top-1 duration-300";
+  "grid grid-cols-[32px_minmax(0,1fr)_32px] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-accent animate-in fade-in-0 slide-in-from-top-1 duration-300";
 const NAME = "truncate text-[13px] font-medium";
 
 /** The drop zone and the link field, then the list of what was dropped and pasted. */
@@ -90,15 +100,15 @@ export function Footage({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* The footage going in, in viewfinder corners that open out and turn amber while it is
-          dragged over. */}
+      {/* The footage going in, in viewfinder corners that open out and darken while it is dragged
+          over. */}
       <section
         className={cn(
           "corners flex items-center rounded-2xl border transition-[background-color,border-color] duration-300",
           compact
             ? "gap-3 bg-card px-4 py-3 max-sm:flex-wrap"
             : "hatch min-h-72 flex-col justify-center gap-5 px-6 py-12 text-center max-sm:min-h-52",
-          over && "border-primary/40 bg-primary/[0.04]",
+          over && "border-foreground/40 bg-primary/10",
         )}
         data-over={over}
         aria-label={words.dropHere}
@@ -116,9 +126,9 @@ export function Footage({
       >
         <div
           className={cn(
-            "grid shrink-0 place-items-center rounded-full border border-edge bg-background text-steel transition-[color,transform,border-color] duration-500 ease-(--ease-cut)",
+            "grid shrink-0 place-items-center rounded-full border border-edge bg-card text-steel transition-[color,transform,border-color] duration-500 ease-(--ease-cut)",
             compact ? "size-9 [&_svg]:size-4" : "size-14 [&_svg]:size-5.5",
-            over && "-translate-y-1 border-primary/60 text-primary",
+            over && "-translate-y-1 border-primary bg-primary text-primary-foreground",
           )}
         >
           <Upload aria-hidden="true" />
@@ -205,9 +215,13 @@ export function Footage({
         </div>
         {linkError && (
           <p
-            className="text-xs leading-relaxed text-destructive [overflow-wrap:anywhere]"
+            className="flex gap-1.5 text-xs leading-relaxed text-foreground [overflow-wrap:anywhere]"
             role="alert"
           >
+            <TriangleAlert
+              className="mt-0.5 size-3.5 shrink-0 text-destructive"
+              aria-hidden="true"
+            />
             {linkError}
           </p>
         )}
@@ -275,7 +289,7 @@ export function Footage({
                         {" · "}
                         <button
                           type="button"
-                          className="text-steel underline decoration-edge underline-offset-2 hover:text-foreground hover:decoration-primary"
+                          className="text-steel underline decoration-edge underline-offset-2 hover:text-foreground hover:decoration-foreground"
                           aria-label={
                             item.off
                               ? words.asMusicLabel(item.path)
