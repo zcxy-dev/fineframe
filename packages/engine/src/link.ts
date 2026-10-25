@@ -5,7 +5,7 @@ import { rmSync } from "node:fs";
 import { link, mkdir, readdir, rename, rm, stat } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { createInterface } from "node:readline";
-import { cacheDir, type DownloadProgress, exists, pinnedFile } from "./download.ts";
+import { cacheDir, type DownloadProgress, exists, pinnedFile, REMOVE_HELD } from "./download.ts";
 import { ffmpeg } from "./ffmpeg.ts";
 
 /** Where the latest yt-dlp release's files are; each asset's URL redirects to its tagged one. */
@@ -308,7 +308,7 @@ export async function fetchLink(
     return { path, video };
   } finally {
     // What yt-dlp ran, such as FFmpeg, may still be ending.
-    await rm(work, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    await rm(work, REMOVE_HELD);
     working.delete(work);
   }
 }
@@ -348,7 +348,7 @@ const working = new Set<string>();
 function cleanUp(): void {
   for (const stop of running) stop();
   for (const work of working) {
-    rmSync(work, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    rmSync(work, REMOVE_HELD);
   }
 }
 
