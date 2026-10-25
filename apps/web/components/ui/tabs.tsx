@@ -4,8 +4,8 @@ import { cn } from "cn";
 import { Tabs as TabsPrimitive } from "radix-ui";
 import type * as React from "react";
 
-// shadcn/ui's tabs in their line style, restyled to direction A: each tab an icon over its name,
-// the chosen one in ink with an ink line under it.
+// shadcn/ui's tabs in their line style, restyled to direction A: each tab its name, the chosen one
+// in ink with an ink line under it.
 
 function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Root>) {
   return (
@@ -21,7 +21,10 @@ function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimi
   return (
     <TabsPrimitive.List
       data-slot="tabs-list"
-      className={cn("flex shrink-0 items-stretch border-b px-2", className)}
+      className={cn(
+        "flex shrink-0 items-stretch overflow-x-auto border-b px-4 [scrollbar-width:none] max-md:px-2",
+        className,
+      )}
       {...props}
     />
   );
@@ -32,8 +35,8 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "relative flex min-w-0 flex-1 flex-col items-center gap-1 px-1 pt-2.5 pb-2 text-[11px] leading-none font-medium whitespace-nowrap text-muted-foreground transition-colors duration-150 outline-none hover:text-foreground focus-visible:rounded-md focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring data-active:text-foreground [&_svg]:size-4.5 [&_svg]:shrink-0",
-        "after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:origin-center after:scale-x-0 after:rounded-full after:bg-foreground after:transition-transform after:duration-300 after:ease-(--ease-cut) data-active:after:scale-x-100",
+        "relative flex min-w-fit flex-1 items-center justify-center px-1.5 py-3.5 text-[13px] leading-none font-medium whitespace-nowrap text-muted-foreground transition-colors duration-150 outline-none hover:text-foreground focus-visible:rounded-md focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring data-active:font-semibold data-active:text-foreground",
+        "after:absolute after:inset-x-1.5 after:bottom-0 after:h-0.5 after:origin-center after:scale-x-0 after:rounded-full after:bg-foreground after:transition-transform after:duration-300 after:ease-(--ease-cut) data-active:after:scale-x-100",
         className,
       )}
       {...props}

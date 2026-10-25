@@ -14,7 +14,6 @@ import { useT } from "./I18n.tsx";
 import { Segments } from "./Segments.tsx";
 import { Button, buttonVariants } from "./ui/button.tsx";
 import { Input, NativeSelect } from "./ui/input.tsx";
-import { TextAnimate } from "./ui/text-animate.tsx";
 import { Workspace } from "./Workspace.tsx";
 
 /** A brand kit as the server keeps it. */
@@ -498,9 +497,7 @@ export function BrandKits({ onClose }: { onClose: () => void }) {
             <ArrowLeft aria-hidden="true" />
             {words.back}
           </Button>
-          <TextAnimate as="h1" by="word" animation="caption" startOnView={false} className={TITLE}>
-            {words.title}
-          </TextAnimate>
+          <h1 className={TITLE}>{words.title}</h1>
           <p className="max-w-[64ch] text-sm leading-relaxed text-steel">{words.lede}</p>
         </div>
         {kit && draft ? (

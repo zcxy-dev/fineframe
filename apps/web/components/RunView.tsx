@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, TriangleAlert } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatEstimate } from "../lib/eta.ts";
 import type { Messages } from "../lib/i18n/messages.ts";
 import { downloadName, progressText } from "../lib/i18n/program.ts";
@@ -11,12 +11,8 @@ import { analysisSteps } from "../lib/steps.ts";
 import { cn, HELP, META, SLUG, TITLE } from "../lib/styles.ts";
 import { useT } from "./I18n.tsx";
 import { NumberTicker } from "./ui/number-ticker.tsx";
-import { TextAnimate } from "./ui/text-animate.tsx";
 
 const ORDER: Stage[] = ["analyze", "plan", "render", "check"];
-
-/** How many clips the progress timeline is built of. */
-const CLIPS = 48;
 
 /** Seconds since `start`, kept current while `running`. */
 function useElapsed(start: number | undefined, end: number | undefined, running: boolean) {
@@ -42,7 +38,51 @@ export function Bar({ fraction, className }: { fraction: number; className?: str
   );
 }
 
-/** The edit as it runs: its stages, how far along it is and what it is doing. */
+/** The bar's share of each stage after the analysis, as the edit splits it
+ * (packages/engine/src/edit/edit.ts), and the analysis's when no file was analysed before. */
+const SHARES: Record<Exclude<Stage, "analyze">, number> = { plan: 0.3, render: 0.3, check: 0.4 };
+const ANALYZE_SHARE = 0.9;
+/** How many status lines the run prints before the oldest scrolls away. */
+const LINES = 4;
+
+/** The shares of the stages after the analysis that come before `stage`. */
+const sharesBefore = (stage: Stage) =>
+  ORDER.slice(1, ORDER.indexOf(stage)).reduce(
+    (sum, each) => sum + SHARES[each as keyof typeof SHARES],
+    0,
+  );
+
+/** Where on the bar the analysis ended, for a page that opens after it: the latest end the bar
+ * allows, so the live stage's part starts empty and only ever grows. */
+function latestAnalysisEnd(stage: Stage, fraction: number): number {
+  const before = sharesBefore(stage);
+  return Math.min(ANALYZE_SHARE, Math.max(0, (fraction - before) / (1 - before)));
+}
+
+/** How full the live stage's part of the bar is, from where the whole bar is and where the
+ * analysis ended on it. */
+function stageFill(stage: Stage, fraction: number, analysed: number): number {
+  if (stage === "analyze") return Math.min(1, fraction / ANALYZE_SHARE);
+  const rest = 1 - analysed;
+  const from = analysed + rest * sharesBefore(stage);
+  return Math.max(0, Math.min(1, (fraction - from) / (rest * SHARES[stage])));
+}
+
+/** The status lines as they come, newest last, a few at a time. */
+function useLines(message: string | undefined): string[] {
+  const [lines, setLines] = useState<string[]>([]);
+  useEffect(() => {
+    if (!message) return;
+    setLines((current) =>
+      current.at(-1) === message ? current : [...current, message].slice(-LINES),
+    );
+  }, [message]);
+  return lines;
+}
+
+/** The edit as it runs: its four stages as one bar, how far along it is and each thing it does,
+ * printed as it does it. A stopped edit's bar stays where it stopped, under the failure's own
+ * heading. */
 export function RunView({ job }: { job: Job }) {
   const t = useT();
   const words = t.run;
@@ -55,26 +95,35 @@ export function RunView({ job }: { job: Job }) {
   const photos = job.files.filter((file) => file.use === "image").length;
   const { shorts } = job.settings;
   const short = job.progress?.short;
-  const stopped = job.status === "error" || job.status === "cancelled";
+  // Where the analysis ended on the bar: where it stood when the plan started, as seen here, or
+  // the latest end it allows when the page opened later.
+  const analysed = useRef<number | undefined>(undefined);
+  const seen = useRef(current);
+  if (current && current !== "analyze" && analysed.current === undefined) {
+    analysed.current = seen.current === "analyze" ? fraction : latestAnalysisEnd(current, fraction);
+  }
+  seen.current = current;
+  const said = job.progress?.message
+    ? [
+        short && words.short(short.n, short.of),
+        job.progress.file,
+        progressText(job.progress.message, t),
+      ]
+        .filter(Boolean)
+        .join(" — ")
+    : undefined;
+  const lines = useLines(running ? said : undefined);
 
   return (
     <section
-      className="flex flex-col gap-7 px-10 py-9 max-md:px-4 max-md:py-6"
+      className="flex flex-col gap-8 px-10 py-9 max-md:px-4 max-md:py-6"
       aria-label={words.progress}
     >
       <div className="flex items-end justify-between gap-6 max-sm:flex-col max-sm:items-start">
         <div className="min-w-0">
-          <TextAnimate
-            key={running ? "running" : "stopped"}
-            as="h2"
-            by="word"
-            animation="caption"
-            startOnView={false}
-            className={TITLE}
-          >
-            {running ? (shorts ? words.runningShorts : words.running) : words.stopped}
-          </TextAnimate>
-          <p className="mt-2 text-sm text-steel tabular-nums">
+          {/* A stopped edit is headed by its failure, in the panel. */}
+          {running && <h2 className={TITLE}>{shorts ? words.runningShorts : words.running}</h2>}
+          <p className={cn("text-sm text-steel tabular-nums", running && "mt-2")}>
             {shorts
               ? words.shortsFrom(
                   shorts.count,
@@ -99,138 +148,77 @@ export function RunView({ job }: { job: Job }) {
         </div>
       </div>
 
-      <Timeline fraction={fraction} stopped={stopped} label={words.progress} />
-
-      <p className="min-h-[1.5em] text-sm font-medium [overflow-wrap:anywhere]" aria-live="polite">
-        {current ? words.doing(words.stages[current].doing) : words.starting}
-        <span className="font-normal text-steel">
-          {short && `${words.short(short.n, short.of)} — `}
-          {job.progress?.file && `${job.progress.file} — `}
-          {job.progress?.message ? progressText(job.progress.message, t) : words.gettingReady}
-        </span>
-      </p>
-
-      {job.download && running && <DownloadView download={job.download} />}
-
       <ol
-        className={cn(
-          "m-0 grid list-none grid-cols-4 gap-px overflow-hidden rounded-xl border bg-border p-0 max-lg:grid-cols-2 max-sm:grid-cols-1",
-          stopped && "opacity-60",
-        )}
+        className="m-0 grid list-none grid-cols-4 gap-1.5 p-0"
+        role="progressbar"
+        aria-label={words.progress}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
       >
         {ORDER.map((stage, i) => {
           const times = job.stages[stage];
           const active = stage === current && running;
           const done = Boolean(times?.end) || (current && ORDER.indexOf(current) > i);
           const failed = stage === current && job.status === "error";
-          const state = active ? "active" : failed ? "failed" : done ? "done" : "pending";
+          const fill = done
+            ? 1
+            : stage === current
+              ? stageFill(stage, fraction, analysed.current ?? 0)
+              : 0;
           return (
-            <li
-              key={stage}
-              className={cn(
-                "relative flex flex-col gap-2.5 bg-card px-4 pt-3.5 pb-4 transition-colors duration-500",
-                state === "active" && "bg-surface",
-              )}
-              data-state={state}
-            >
-              {/* The live stage's ink line along its top edge, drawn in as it starts. */}
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 transition-transform duration-700 ease-(--ease-cut)",
-                  state === "active" && "scale-x-100 bg-foreground",
-                  state === "failed" && "scale-x-100 bg-destructive",
-                )}
-              />
-              <span
-                className={cn(
-                  "grid size-6 place-items-center rounded-md border border-edge text-xs font-semibold text-muted-foreground tabular-nums [&_svg]:size-3.5",
-                  state === "active" && "border-primary bg-primary text-primary-foreground",
-                  state === "done" && "border-success/60 text-success",
-                  state === "failed" && "border-destructive text-destructive",
-                )}
-              >
-                {state === "done" ? (
-                  <Check aria-hidden="true" />
-                ) : state === "failed" ? (
-                  <TriangleAlert aria-hidden="true" />
-                ) : (
-                  i + 1
-                )}
-              </span>
-              <span className="flex flex-col gap-0.5">
+            <li key={stage} className="flex min-w-0 flex-col gap-2">
+              <span className="relative h-1.5 overflow-hidden rounded-full bg-border">
                 <span
-                  className={cn("text-[13px] font-semibold", state === "pending" && "text-steel")}
+                  className={cn(
+                    "absolute inset-y-0 left-0 w-full origin-left rounded-full transition-transform duration-700 ease-(--ease-cut)",
+                    failed ? "bg-destructive" : "bg-foreground",
+                  )}
+                  style={{ transform: `scaleX(${fill})` }}
+                />
+              </span>
+              <span className="flex min-w-0 items-baseline justify-between gap-2 max-sm:flex-col max-sm:gap-0">
+                <span
+                  className={cn(
+                    "truncate text-[13px] font-semibold",
+                    !active && !done && "text-muted-foreground",
+                    failed && "text-destructive",
+                  )}
                 >
                   {words.stages[stage].name}
                 </span>
-                <span className="text-xs leading-snug text-muted-foreground">
-                  {words.stages[stage].what}
-                </span>
+                <StageTime start={times?.start} end={times?.end} running={active} />
               </span>
-              <StageTime start={times?.start} end={times?.end} running={active} />
             </li>
           );
         })}
       </ol>
 
-      <AnalysisSteps job={job} />
-    </section>
-  );
-}
+      {running && (
+        <div className="flex flex-col gap-1" aria-live="polite">
+          {/* What the edit is doing, printed as it does it; the latest line is in ink. */}
+          {(lines.length ? lines : [words.gettingReady]).map((line, i, all) => (
+            <p
+              // biome-ignore lint/suspicious/noArrayIndexKey: a line keeps its place from the end.
+              key={`${line}-${all.length - i}`}
+              className={cn(
+                "text-sm [overflow-wrap:anywhere] animate-in fade-in-0 slide-in-from-bottom-1 duration-300",
+                i === all.length - 1 ? "font-medium text-foreground" : "text-muted-foreground",
+              )}
+            >
+              {i === all.length - 1 && current && (
+                <span className="font-semibold">{words.doing(words.stages[current].doing)}</span>
+              )}
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
 
-/**
- * The edit as a timeline building up: a ruler, and a track of clips that land one after another
- * as the edit gets further, with the ink playhead at its edge. A stopped edit's track steps back.
- */
-function Timeline({
-  fraction,
-  stopped,
-  label,
-}: {
-  fraction: number;
-  stopped: boolean;
-  label: string;
-}) {
-  const percent = Math.floor(fraction * 100);
-  const filled = Math.floor(Math.max(0, Math.min(1, fraction)) * CLIPS);
-  return (
-    <div
-      className={cn("relative", stopped && "opacity-60")}
-      role="progressbar"
-      aria-label={label}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={percent}
-    >
-      <div className="ruler h-3" aria-hidden="true" />
-      <div className="mt-1.5 flex h-12 gap-[3px]" aria-hidden="true">
-        {Array.from({ length: CLIPS }, (_, i) =>
-          i < filled ? (
-            <span
-              // A new key when it fills, so the clip lands with its animation.
-              // biome-ignore lint/suspicious/noArrayIndexKey: the clips are places on the track.
-              key={`on-${i}`}
-              className="wave-keep h-full flex-1 origin-bottom animate-clip rounded-[3px] bg-card"
-            />
-          ) : (
-            <span
-              // biome-ignore lint/suspicious/noArrayIndexKey: the clips are places on the track.
-              key={`off-${i}`}
-              className="wave-dim h-full flex-1 rounded-[3px] opacity-50"
-            />
-          ),
-        )}
-      </div>
-      <span
-        aria-hidden="true"
-        className={cn(
-          "absolute -top-1 bottom-0 w-0.5 -translate-x-1/2 rounded-full transition-[left] duration-700 ease-(--ease-cut) before:absolute before:-top-0.5 before:left-1/2 before:size-2.5 before:-translate-x-1/2 before:rotate-45 before:rounded-[2px]",
-          stopped ? "bg-destructive before:bg-destructive" : "bg-foreground before:bg-primary",
-        )}
-        style={{ left: `${(filled / CLIPS) * 100}%` }}
-      />
-    </div>
+      {job.download && running && <DownloadView download={job.download} />}
+
+      {(current === "analyze" || current === undefined) && <AnalysisSteps job={job} />}
+    </section>
   );
 }
 

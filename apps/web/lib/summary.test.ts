@@ -49,8 +49,8 @@ const row = (rows: [string, string][], name: string) => rows.find(([each]) => ea
 test("the summary is the shown version's: its length, aspect, look, captions and cost", () => {
   const replanned = summaryRows(job(3));
   assert.equal(row(replanned, "Length"), "Target 30 s");
-  assert.equal(row(replanned, "Aspect"), "1:1");
-  assert.equal(row(replanned, "Style"), "Film");
+  assert.equal(row(replanned, "Shape"), "1:1");
+  assert.equal(row(replanned, "Look"), "Film");
   assert.equal(row(replanned, "Captions"), "Bold");
   assert.equal(row(replanned, "Claude, planning"), "$0.10");
   assert.equal(row(replanned, "Claude, checking cuts"), "$0.02");
@@ -59,8 +59,8 @@ test("the summary is the shown version's: its length, aspect, look, captions and
 
   // A change made without a plan cost nothing.
   const reedited = summaryRows(job(2));
-  assert.equal(row(reedited, "Aspect"), "9:16");
-  assert.equal(row(reedited, "Style"), "Film");
+  assert.equal(row(reedited, "Shape"), "9:16");
+  assert.equal(row(reedited, "Look"), "Film");
   // A caption preset 0.4.0 had and this version does not renders, and is named, as bold.
   assert.equal(row(reedited, "Captions"), "Highlight");
   assert.equal(row(reedited, "Claude, planning"), undefined);
@@ -68,7 +68,7 @@ test("the summary is the shown version's: its length, aspect, look, captions and
 
   const first = summaryRows(job(1));
   assert.equal(row(first, "Length"), "Target 1 min");
-  assert.equal(row(first, "Style"), "Warm");
+  assert.equal(row(first, "Look"), "Warm");
   assert.equal(row(first, "Captions"), "Highlight");
   assert.equal(row(first, "Claude, planning"), "$0.19");
 

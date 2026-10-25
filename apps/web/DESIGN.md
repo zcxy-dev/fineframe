@@ -68,7 +68,7 @@ The components are styled with Tailwind CSS utilities, as the website's are. `ap
 
 - **Ground and paper:** the main pane sits on the light ground (#f3f4f6 `background`, also `well` under the player, the transcript and small frames); the top bar, the docked panel, lists, fields, dialogs and menus are white (`card`, `surface`), divided by the line (#dfe2e7 `border`) and, where a control needs a firmer edge, steel (#c9cdd3 `edge`, `input`). Hover is a 5 % ink wash (`accent`) or #eceef1 (`raised`).
 - **Ink** text in three steps (#0c0d10 `foreground`, #3d424b `steel`, #5d636d `muted-foreground`), each at least 5:1 on the ground and on white. Focus rings, progress, playheads and a chosen option are ink.
-- **Amber** (#ffb547, `primary`) is a fill with ink on it, never a line or text on white, where it would not read: the primary action, the word being said, the active step and the selection. A chosen option is ink, never amber.
+- **Amber** (#ffb547, `primary`) is a fill with ink on it, never a line or text on white, where it would not read: the primary action, the word being said, the selection and footage dragged over the drop zone. A chosen option is ink, never amber.
 - **Graphite** (#16181c) is the dark ground the caption previews sit on; video sits on black. The caption previews keep the captions' own colours, which belong to the video, as the brand kit's sample frame does.
 - **Cut** (#d4472f, `destructive`) for errors and cuts that land, as icons, marks and fills; error text itself is ink. **Success** (#1e7a4c) for finished steps and a fixed caption word.
 
@@ -78,9 +78,11 @@ One family for every script, as on the website: Geist (variable) for Latin text 
 
 ## Layout
 
-- **Top bar** (56 px, white): the icon and the name, "Brand kits", the language menu (`components/Language.tsx`: a globe with the page's language, opening the languages, as on the website), the account in the desktop app, and the key.
-- **Workspace** (`components/Workspace.tsx`): the work in the main pane, a 400 px white panel on the right with its own scroll and its action pinned at its foot. The start screen puts the footage and the projects in the main pane and the settings in the panel, with "Make the video" at its foot; a running edit puts its progress in the main pane and its details and Cancel in the panel; a failed one its reason and next steps in the panel. Brand kits put the sample frame in the main pane and the kits in the panel, with Save at its foot.
-- **Editor** (`components/ReEdit.tsx`), for a finished edit: the player in the middle of the ground, as large as the stage allows; the transcript under it on white as a timeline, a ruler over the edit's sound with the cuts asked for, where they land, and the ink playhead, then the words, the one being said on amber; and on the right a panel whose heading names the edit, with tabs for its result (downloads, export, versions, details), music, look, captions, brand kit, the title and lower thirds and the overlays when the edit has them, and re-plan. "Apply" stays at the panel's foot whichever tab shows, saying what it will render, or the new version's progress.
+- **Top bar** (56 px, white): the icon and the name, "Brand kits", the language menu (`components/Language.tsx`: a globe with the page's language, opening the languages, as on the website; on a phone the globe alone), the account in the desktop app, and the key: a quiet status with a green dot once it is added ("Key" on a phone), an amber button until then.
+- **Workspace** (`components/Workspace.tsx`): the work in the main pane, a 400 px white panel on the right with its own scroll and its action pinned at its foot. The start screen puts the footage and the projects in the main pane and the settings in the panel, with "Make a 1 min video" at its foot; a running edit puts its progress in the main pane and its details and Cancel in the panel; a failed one its reason and next steps in the panel, under the screen's one heading.
+- **Start** (`components/SettingsPanel.tsx`, `components/Footage.tsx`, `components/Projects.tsx`): the panel asks the three things a newcomer chooses first, length, shape and caption style, and keeps the rest under Advanced, collapsed. The footage shows as tiles, each with a frame of its own video or photo, beside a tile that takes more; the projects as rows with a frame of each finished video, their status when it is not done, and the date to the minute.
+- **Progress** (`components/RunView.tsx`): one bar in four parts, transcribe, pick, render and check, each filling as its stage goes and turning red where an edit failed; under it, each thing the edit does, printed as it does it, the latest in ink. Brand kits put the sample frame in the main pane and the kits in the panel, with Save at its foot.
+- **Editor** (`components/ReEdit.tsx`), for a finished edit: the player in the middle of the ground, as large as the stage allows, with the app's own controls under it (play, the time, a scrubber, sound and full screen); the transcript under it on white as a timeline, a ruler over the edit's sound with the cuts asked for, where they land, and the ink playhead, then the words, the one being said on amber; and on the right a panel whose heading names the edit, with text tabs for its result (downloads, export, versions, details), captions, music, look (with the brand kit), graphics (the title, lower thirds and overlays) when the edit has them, and re-plan. "Apply" stays at the panel's foot on every tab but re-plan, whose own button is its one action, saying what it will render, or the new version's progress. Where the panes stack, the download sits right under the player.
 - Below 1024 px the panes stack, the panel after the work; a failed edit's panel comes first.
 
 ## Shapes and depth
@@ -97,18 +99,19 @@ Four L-shaped corners, the shape of the icon, drawn in the 1.5 px stroke. `corne
 
 ## Motion
 
-Motion (`motion`) and tw-animate-css run it, quieter than the website's:
+Motion (`motion`) and tw-animate-css run it, and it moves only what is real work, never text for its own sake:
 
-- **Titles** come in word by word as captions do (Magic UI's `text-animate`, its `caption` preset).
-- **Progress:** the run's timeline builds up clip by clip as the edit gets further, with the ink playhead at its edge; the percentage counts on (Magic UI's `number-ticker`); the live stage's ink line draws in along its top; bars fill smoothly.
-- **Transitions:** panels, lists, errors and dialogs fade and rise into place; tabs underline in ink.
+- **Progress:** the four parts of the bar fill as the stages go; each status line comes in under the last as the edit prints it; the percentage counts on (Magic UI's `number-ticker`).
+- **Cuts:** a word marked to cut is struck through from left to right; where a cut lands, its stretch closes in on the ruler (`animate-land`), and the length after the cuts counts down to its new value.
+- **Captions:** the transcript's lines come in one after another when it first shows, as captions do, and the word being said is lit on amber as the video plays; the caption previews play their style.
+- **Transitions:** tiles, lists, errors and dialogs fade into place; tabs underline in ink.
 - **Feedback:** buttons lift a pixel; the drop zone's corners open out and darken.
-- Under `prefers-reduced-motion` nothing moves: titles stand, numbers are written, the caption previews hold one frame.
+- Under `prefers-reduced-motion` nothing moves: bars and numbers are written, words are struck at once, the caption previews hold one frame.
 
 ## Do's and Don'ts
 
 - Do use the tokens and the shared class lists; restyle any new shadcn/ui or Magic UI component to them before it ships.
-- Do keep amber to fills with ink on them: the action, the word being said, the active step and the selection.
+- Do keep amber to fills with ink on them: the action, the word being said, the selection and footage dragged over.
 - Do show a chosen option in ink: a filled pill, an ink-framed card, an ink tick.
 - Don't set field labels or values in caps; slugs head pane sections only.
 - Don't add glows, gradients, film grain or decoration that moves while someone works.

@@ -496,7 +496,7 @@ async function makeEdit(): Promise<string[]> {
   await shot(page, "1-first-run");
   await page.getByPlaceholder("sk-ant-…").fill("sk-ant-smoke-test");
   await page.getByRole("button", { name: "Check and save" }).click();
-  await page.getByRole("button", { name: /API key saved/ }).waitFor();
+  await page.getByRole("button", { name: "Replace the Claude key" }).waitFor();
 
   const machine = await api<{ memory: number; asr: string }>("/api/setup");
   say(`${(machine.memory / 1024 ** 3).toFixed(0)} GB of memory: speech defaults to ${machine.asr}`);
@@ -505,23 +505,25 @@ async function makeEdit(): Promise<string[]> {
     await shot(page, "2-setting-up");
   }
   await page
-    .getByText("Setting up the analysis first")
+    .getByText("Finishing the first-time setup")
     .waitFor({ state: "hidden", timeout: 1_800_000 });
   const setup = await api<{ state: string; error?: string }>("/api/setup");
   if (setup.state !== "ready") throw new Error(`The analysis did not set up: ${setup.error}`);
   say("the analysis is set up");
 
-  // Cloud speech, with its key, so the edit runs on any runner's memory.
+  // Cloud speech, with its key, so the edit runs on any runner's memory. It is an advanced
+  // setting.
+  await page.getByText("Advanced", { exact: true }).click();
   await page.getByRole("button", { name: "OpenRouter", exact: true }).click();
-  await page.getByRole("button", { name: "Add your OpenRouter key" }).click();
+  await page.getByRole("button", { name: "Add the OpenRouter key" }).click();
   await page.getByPlaceholder("sk-or-…").fill("sk-or-smoke-test");
   await page.getByRole("button", { name: "Check and save" }).click();
-  await page.getByRole("button", { name: "Add your OpenRouter key" }).waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: "Add the OpenRouter key" }).waitFor({ state: "hidden" });
 
   await page.locator("input[type=file][multiple]").setInputFiles(clip);
   await page.getByRole("button", { name: `${LENGTH} s`, exact: true }).click();
   await shot(page, "3-ready-to-edit");
-  await page.getByRole("button", { name: `Make the ${LENGTH} s video` }).click();
+  await page.getByRole("button", { name: `Make a ${LENGTH} s video` }).click();
   await page.getByRole("heading", { name: "Making your edit" }).waitFor({ timeout: 120_000 });
   const following = new AbortController();
   void follow((await api<{ id: string }>("/api/jobs/latest")).id, following.signal);
@@ -535,7 +537,7 @@ async function makeEdit(): Promise<string[]> {
     await shot(page, "4-editing");
   }
   const done = page.getByRole("heading", { name: "Your edit is ready" });
-  const failed = page.getByRole("heading", { name: "The edit could not be finished" });
+  const failed = page.getByRole("heading", { name: "The edit could not finish" });
   await done.or(failed).waitFor({ timeout: 2_400_000 });
   clearInterval(watching);
   following.abort();

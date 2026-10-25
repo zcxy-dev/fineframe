@@ -5,17 +5,21 @@ import { useCallback, useEffect, useState } from "react";
 import type { ProjectSummary } from "../lib/jobs.ts";
 import { FOOTAGE_KEPT } from "../lib/retention.ts";
 import { formatBytes, formatLength } from "../lib/settings.ts";
-import { cn, ICON_FRAME, LIST, META, SLUG } from "../lib/styles.ts";
+import { cn, LIST, META, SLUG } from "../lib/styles.ts";
 import { ErrorNote } from "./ErrorNote.tsx";
 import { useT } from "./I18n.tsx";
 import { Button } from "./ui/button.tsx";
 
-/** Earlier edits, to open again or delete, with the disk space each takes. */
+/** How many projects show before the rest are asked for. */
+const FIRST = 5;
+
+/** Earlier edits, newest first, to open again or delete, with the disk space each takes. */
 export function Projects({ onOpen }: { onOpen: (id: string) => void }) {
   const t = useT();
   const words = t.projects;
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [all, setAll] = useState(false);
   // The project whose Delete was clicked once, asking for a second click.
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -58,24 +62,43 @@ export function Projects({ onOpen }: { onOpen: (id: string) => void }) {
       </div>
       {error && <ErrorNote message={error} fallback={words.fallback} />}
       <ul className={LIST}>
-        {shown.map((project) => (
+        {(all ? shown : shown.slice(0, FIRST)).map((project) => (
           <li
             key={project.id}
-            className="grid grid-cols-[32px_minmax(0,1fr)_auto_auto] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-accent max-sm:grid-cols-[32px_minmax(0,1fr)_auto]"
+            className="grid grid-cols-[72px_minmax(0,1fr)_auto_auto] items-center gap-3 px-3 py-2.5 transition-colors hover:bg-accent max-sm:grid-cols-[72px_minmax(0,1fr)_auto]"
           >
-            <span className={ICON_FRAME}>
-              <Film aria-hidden="true" />
-            </span>
-            <span className="flex min-w-0 flex-col max-sm:col-span-2">
-              <span className="truncate text-[13px] font-medium" title={project.name}>
-                {project.name || words.untitled}
+            <Thumb project={project} />
+            <span className="flex min-w-0 flex-col gap-0.5 max-sm:col-span-2">
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-[13px] font-medium" title={project.name}>
+                  {project.name || words.untitled}
+                </span>
+                {project.status !== "done" && (
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-full border px-2 text-[11px] leading-5 font-semibold",
+                      project.status === "error" && "border-destructive/40 text-destructive",
+                    )}
+                  >
+                    {words.status[project.status]}
+                  </span>
+                )}
               </span>
               <span className={META}>
-                {t.date(project.created)} ·{" "}
-                {project.shorts === undefined
-                  ? formatLength(project.length, t)
-                  : words.shorts(project.shorts)}{" "}
-                · {project.aspect} · {words.status[project.status]} · {formatBytes(project.bytes)}
+                {[
+                  t.date(project.created),
+                  project.shorts === undefined
+                    ? formatLength(project.length, t)
+                    : words.shorts(project.shorts),
+                  project.aspect,
+                  formatBytes(project.bytes),
+                ].map((part, i) => (
+                  // Each detail on one line, a number with its unit.
+                  <span key={part} className="whitespace-nowrap">
+                    {i > 0 && t.sep}
+                    {part}
+                  </span>
+                ))}
                 {project.status === "done" && !project.footage && words.footageRemoved}
               </span>
             </span>
@@ -102,6 +125,42 @@ export function Projects({ onOpen }: { onOpen: (id: string) => void }) {
           </li>
         ))}
       </ul>
+      {!all && shown.length > FIRST && (
+        <Button
+          type="button"
+          variant="link"
+          size="inline"
+          className="self-start"
+          onClick={() => setAll(true)}
+        >
+          {words.all(shown.length)}
+        </Button>
+      )}
     </section>
+  );
+}
+
+/** A frame of the finished video, so projects of the same footage tell apart; an icon for one
+ * without a video of its own. */
+function Thumb({ project }: { project: ProjectSummary }) {
+  const [failed, setFailed] = useState(false);
+  const video = project.status === "done" && project.shorts === undefined && !failed;
+  return (
+    <span
+      className="relative grid aspect-video place-items-center overflow-hidden rounded-lg bg-graphite text-white/70 [&>svg]:size-4"
+      aria-hidden="true"
+    >
+      <Film />
+      {video && (
+        <video
+          src={`/api/jobs/${project.id}/video#t=1`}
+          className="absolute inset-0 size-full object-cover"
+          muted
+          playsInline
+          preload="metadata"
+          onError={() => setFailed(true)}
+        />
+      )}
+    </span>
   );
 }

@@ -15,15 +15,7 @@ const LENGTHS = [15, 30, 60, 180, 600];
 const ASPECTS = ["9:16", "1:1", "16:9"] as const;
 
 /** Plans the edit again from the same footage, as a new version. */
-export function Replan({
-  job,
-  onJob,
-  onClose,
-}: {
-  job: Job;
-  onJob: (job: Job) => void;
-  onClose: () => void;
-}) {
+export function Replan({ job, onJob }: { job: Job; onJob: (job: Job) => void }) {
   const t = useT();
   const words = t.replan;
   const id = useId();
@@ -51,13 +43,10 @@ export function Replan({
     const body = (await response.json().catch(() => ({}))) as Job & { error?: string };
     setSending(false);
     if (!response.ok) setError(body.error ?? words.notPlanned);
-    else {
-      onJob(body);
-      onClose();
-    }
+    else onJob(body);
   };
   return (
-    <div className="flex flex-col gap-4 animate-in fade-in-0 slide-in-from-top-1 duration-300">
+    <div className="flex flex-col gap-4">
       <p className={HELP}>
         {words.help}
         {job.short && ` ${words.stretch(REPLAN_MARGIN)}`}
@@ -111,14 +100,9 @@ export function Replan({
         />
       </div>
       {error && <ErrorNote message={error} fallback={words.fallback} />}
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" disabled={sending} onClick={() => void start()}>
-          {words.start}
-        </Button>
-        <Button type="button" variant="link" size="inline" onClick={onClose}>
-          {words.cancel}
-        </Button>
-      </div>
+      <Button type="button" className="self-start" disabled={sending} onClick={() => void start()}>
+        {words.start}
+      </Button>
     </div>
   );
 }
