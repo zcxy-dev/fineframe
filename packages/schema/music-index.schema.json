@@ -71,7 +71,7 @@
       "additionalProperties": false,
       "properties": {
         "bpm": {
-          "description": "Beats per minute from the median time over 8 beats; null with fewer than two beats.",
+          "description": "Beats per minute from the period the most beat intervals keep, read through missed beats and eighth notes taken for beats; null with fewer than two beats.",
           "type": ["number", "null"],
           "exclusiveMinimum": 0
         },
