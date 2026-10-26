@@ -34,7 +34,7 @@ class Tempo(BaseModel):
     beats_per_bar: Annotated[
         int | None,
         Field(
-            description="The most common number of beats from one downbeat to the next; null with fewer than two downbeats.",
+            description="The most common number of beats at the tempo from one downbeat to the next, an eighth note the tracker took for a beat counting as half; null with fewer than two downbeats.",
             ge=1,
         ),
     ]

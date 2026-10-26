@@ -53,7 +53,7 @@ export interface MusicIndex {
      */
     bpm: number | null;
     /**
-     * The most common number of beats from one downbeat to the next; null with fewer than two downbeats.
+     * The most common number of beats at the tempo from one downbeat to the next, an eighth note the tracker took for a beat counting as half; null with fewer than two downbeats.
      */
     beats_per_bar: number | null;
   };

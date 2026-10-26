@@ -36,6 +36,10 @@ WINDOW = 1500
 # Frames at either end of a window whose predictions are thrown away: next to a window's edge
 # the model hears too little of the music around them.
 EDGE = 6
+# Frames on either side of a downbeat that its logit's peak is looked for in: the peak picking's
+# own reach. It moves each downbeat to the nearest beat, and 99 % of the library's stay this close
+# to their peak.
+PEAK = 3
 
 
 class Unavailable(RuntimeError):
@@ -80,8 +84,9 @@ def spectrogram(mono: np.ndarray):
     return torch.log1p(1000 * mel).T
 
 
-def track(mono: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Beat and downbeat times in seconds, and the spectrogram they were found in, as numpy
+def track(mono: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Beat and downbeat times in seconds, how surely the model marks each downbeat (its
+    highest downbeat logit within PEAK frames), and the spectrogram they were found in, as numpy
     (frames x BANDS), from mono audio at RATE."""
     import torch
     from beat_this.model.postprocessor import Postprocessor
@@ -90,7 +95,10 @@ def track(mono: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     with torch.inference_mode():
         beat, downbeat = activations(spect, _model())
     beats, downbeats = Postprocessor(type="minimal", fps=FPS)(beat, downbeat)
-    return np.asarray(beats, float), np.asarray(downbeats, float), spect.numpy()
+    logits = downbeat.numpy()
+    frames = np.round(np.asarray(downbeats) * FPS).astype(int)
+    sureness = [logits[max(0, f - PEAK) : f + PEAK + 1].max() for f in frames]
+    return np.asarray(beats, float), np.asarray(downbeats, float), np.array(sureness), spect.numpy()
 
 
 def activations(spect, model):

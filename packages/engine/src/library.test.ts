@@ -137,7 +137,7 @@ test("a swap opens on the track's loudest section and moves B-roll edges onto it
   const beats = outputBeats(music, index);
   const beat = beats[1] as number;
   const start = onFrame(beat) + 3 * frame;
-  const still = { source: "still", in: 0, out: 2 * SECOND + 2 * frame, start };
+  const still = { source: "still", in: 0, out: 1.5 * SECOND + 2 * frame, start };
   assert.ok((beats.at(-1) as number) * SECOND > start + still.out);
   const edit = project(plain.main, { broll: [still] });
   edit.sources.push({
