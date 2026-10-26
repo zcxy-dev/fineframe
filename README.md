@@ -140,16 +140,16 @@ The [`video-editor` skill](skills/video-editor/SKILL.md) teaches Claude Code, Co
 
 **With the desktop app:** choose "Install Command Line Tool…" and "Install Agent Skill…" in its menu (the Fineframe menu on macOS, File on Windows and Linux). The first puts a `fineframe` command on your PATH: `fineframe edit` and `fineframe render` take the same options as `pnpm edit` and `pnpm render`, and run with the app's own runtime and the keys saved in it, with no Node or clone; `fineframe edit` needs the account signed in in the app. The second copies the skill into `~/.claude/skills/video-editor` for Claude Code and `~/.agents/skills/video-editor` for Codex. Each dialog says where it installed and how to remove it. The app updates the command and the skill it installed when it updates itself.
 
-**From a clone,** for working on the editor: set it up as in the [quick start](#quick-start), then link the skill into your agent's skills folder from the clone:
+**From a clone,** for working on the editor: set it up as in the [quick start](#quick-start). The skill is the folder [`skills/video-editor`](skills/video-editor/SKILL.md); link it into the clone's own skills folder, so nothing outside the clone changes:
 
 ```bash
 # Claude Code
-mkdir -p ~/.claude/skills && ln -s "$PWD/skills/video-editor" ~/.claude/skills/video-editor
-# Codex
-mkdir -p ~/.agents/skills && ln -s "$PWD/skills/video-editor" ~/.agents/skills/video-editor
+mkdir -p .claude/skills && ln -s ../../skills/video-editor .claude/skills/video-editor
+# Codex and other agents that read .agents/skills
+mkdir -p .agents/skills && ln -s ../../skills/video-editor .agents/skills/video-editor
 ```
 
-Start a new session and ask it to edit a folder of footage, or to change an edit you made. A `git pull` in the clone updates the skill with the editor.
+Start a new session in the clone and ask it to edit a folder of footage, or to change an edit you made. A `git pull` updates the skill with the editor.
 
 ## Contributing
 
