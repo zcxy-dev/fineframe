@@ -54,8 +54,8 @@ bench/corpus/real-*/
 *.key
 
 # Links to skills/video-editor that the README has you make in your clone.
-.claude/skills/
-.agents/skills/
+/.claude/skills/video-editor
+/.agents/skills/video-editor
 
 # Editor and OS files.
 .DS_Store
