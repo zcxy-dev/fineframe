@@ -179,7 +179,7 @@ jobs:
       - name: Upload the installers and the update feed to Cloudflare R2
         run: |
           if [ -z "$R2_ACCOUNT_ID" ] || [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$R2_BUCKET" ]; then
-            echo "::error::The R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET secrets are not all set"
+            echo "::error::The CLOUDFLARE_ACCOUNT_ID variable and the R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET secrets are not all set"
             exit 1
           fi
           version=${GITHUB_REF_NAME#v}
@@ -197,7 +197,7 @@ jobs:
           aws s3 cp feed/ "s3://$R2_BUCKET/" --recursive --exclude "*" --include "latest*.yml" \
             --cache-control no-cache "${r2[@]}"
         env:
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
