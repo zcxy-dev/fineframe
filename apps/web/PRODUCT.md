@@ -19,6 +19,7 @@ The edit is made end to end with no timeline to touch: analysis, planning, rende
 - The web page (`apps/web`) is the one interface; the desktop app (`apps/desktop`) runs the same page in an Electron window on Apple silicon Macs, Windows and Linux.
 - A run takes minutes: the page shows progress through analyse, plan, render and check, then the result with its files.
 - The person brings their own Anthropic API key, entered on the page.
+- The desktop app asks for a signed-in Fineframe account before an edit (free during the public beta).
 
 ## Capabilities and Constraints
 - Inputs: video, audio, images and music files; settings for length, aspect ratio, visuals and names.
