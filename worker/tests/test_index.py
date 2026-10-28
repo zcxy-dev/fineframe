@@ -150,7 +150,7 @@ def test_a_cloud_index_records_the_model_and_what_it_cost(talking_video, monkeyp
     monkeypatch.setattr(denoise, "enhance", lambda samples, in_place: samples)
     monkeypatch.setattr(transcribe, "_models", lambda model: pytest.fail("speech model loaded"))
     align = lambda wav, text: [(c, 0.2 * i, 0.2 * (i + 1)) for i, c in enumerate(text)]  # noqa: E731
-    monkeypatch.setattr(transcribe, "_aligner", lambda half, apple_gpu: align)
+    monkeypatch.setattr(transcribe, "_aligner", lambda half: align)
     monkeypatch.setattr(openrouter.Client, "check", lambda self: None)
 
     def recognize(self, wavs, progress):
