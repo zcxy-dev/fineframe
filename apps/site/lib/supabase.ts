@@ -54,9 +54,17 @@ export function entitled(row: Subscription | null, now = new Date()): boolean {
  * Where to go after signing in: the page's `?next=` when it is a path on this site, else the
  * account page.
  */
-export function nextPath(locale: Locale): string {
-  const next = new URLSearchParams(window.location.search).get("next");
-  return next?.startsWith("/") && !next.startsWith("//") ? next : href(locale, "/account/");
+export function nextPath(
+  locale: Locale,
+  { search, origin }: Pick<Location, "search" | "origin"> = window.location,
+): string {
+  const next = new URLSearchParams(search).get("next");
+  if (next?.startsWith("/")) {
+    // Parsed as the browser will go there: it reads `/\host` and `/<tab>/host` as another site.
+    const url = new URL(next, origin);
+    if (url.origin === origin) return url.pathname + url.search + url.hash;
+  }
+  return href(locale, "/account/");
 }
 
 /** The sign-in page, which comes back to `next` after. */
