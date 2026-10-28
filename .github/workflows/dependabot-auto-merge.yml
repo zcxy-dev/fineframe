@@ -1,6 +1,7 @@
 # Every Dependabot update that is not a major version merges itself once the required checks
-# pass, except GitHub Actions updates (which edit workflows). Those and major updates stay open
-# for review (owner decision 2026-10-18).
+# pass, except GitHub Actions updates (which edit workflows) and updates that change the website
+# (a merge there deploys fineframe.app). Those and major updates stay open for review (owner
+# decision 2026-10-18).
 name: Dependabot auto-merge
 
 on: pull_request
@@ -18,10 +19,18 @@ jobs:
     steps:
       - id: metadata
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+      - id: site
+        run: |
+          if gh pr diff "$PR_URL" --name-only | grep -q '^apps/site/'; then
+            echo changed=true >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ github.token }}
       # A merge made with GITHUB_TOKEN starts no workflow on main; the App's token does,
       # so main's CI runs on Dependabot updates too.
       - id: app-token
-        if: steps.metadata.outputs.update-type != 'version-update:semver-major' && steps.metadata.outputs.package-ecosystem != 'github_actions'
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major' && steps.metadata.outputs.package-ecosystem != 'github_actions' && steps.site.outputs.changed != 'true'
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: Iv23liGHSk5KypxJ5KoF

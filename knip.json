@@ -1,7 +1,11 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
-    "packages/*": { "entry": ["scripts/*.ts"] }
+    "packages/*": { "entry": ["scripts/*.ts"] },
+    "apps/site": {
+      "ignore": ["supabase/**"],
+      "ignoreDependencies": ["@expo-google-fonts/noto-sans-tc", "@fontsource-variable/geist"]
+    }
   },
   "ignore": ["packages/schema/src/generated/**"],
   "ignoreBinaries": ["uv", "osascript"]

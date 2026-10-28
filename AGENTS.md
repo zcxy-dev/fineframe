@@ -1,6 +1,6 @@
 # Fineframe
 
-Automatic video editor: footage and a target length in, a finished cut with captions out. A pnpm workspace (web page, Electron desktop app, planner and renderer) plus two `uv` projects: `worker/` (analysis) and `bench/` (benchmark). Public repository.
+Automatic video editor: footage and a target length in, a finished cut with captions out. A pnpm workspace (web page, Electron desktop app, planner and renderer, and the fineframe.app website in `apps/site`) plus two `uv` projects: `worker/` (analysis) and `bench/` (benchmark). Public repository.
 
 ## Commands
 - Dev: `mise run start` (port 3000; `PORT=3001 mise run start` if taken)
@@ -8,7 +8,7 @@ Automatic video editor: footage and a target length in, a finished cut with capt
 - What CI skips (the worker's `big` ml tests, the `synth` extra, Chrome for HyperFrames and web capture, tests that call the Claude API) is in [CONTRIBUTING.md](CONTRIBUTING.md#setup).
 
 ## Release
-- A merge to `main` never deploys; releasing needs a yes first. A release is the tag `v<version>`, where the version is `apps/desktop/package.json`'s: `desktop.yml` builds the installers and uploads them with the update feed to Cloudflare R2, served at downloads.fineframe.app. Installers never go to GitHub releases. The bucket also serves the music library (`music/v1/`), the Beat This! checkpoint (`models/`), the benchmark corpus (`corpus/`) and the README's example media (`examples/`); the GitHub releases `v0.2.0` and `corpus-synthetic-seed0-v1` and `zcxy-dev/fineframe-music` hold old copies only.
+- A merge to `main` never deploys the app; releasing needs a yes first. A merge that changes `apps/site/` deploys fineframe.app: work there follows [apps/site/AGENTS.md](apps/site/AGENTS.md). A release is the tag `v<version>`, where the version is `apps/desktop/package.json`'s: `desktop.yml` builds the installers and uploads them with the update feed to Cloudflare R2, served at downloads.fineframe.app. Installers never go to GitHub releases. The bucket also serves the music library (`music/v1/`), the Beat This! checkpoint (`models/`), the benchmark corpus (`corpus/`) and the README's example media (`examples/`); the GitHub releases `v0.2.0` and `corpus-synthetic-seed0-v1` and `zcxy-dev/fineframe-music` hold old copies only.
 - Version PR: the same version in the five workspace `package.json` files and in `worker/pyproject.toml` and `bench/pyproject.toml` (then `uv lock` in each); merge it, then push an annotated `v<version>` tag.
 - Health: `https://downloads.fineframe.app/latest-mac.yml` (and `latest.yml`, `latest-linux.yml`) reports the released `version`; compare an installer with `SHA256SUMS` there. It names no commit.
 - Preview for user-visible changes: the desktop app from the PR's `installer-*` artifact of the `desktop` run; the web page as in the global rules.
