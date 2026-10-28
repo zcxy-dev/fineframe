@@ -56,7 +56,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+      # A Node download that takes over five minutes gives up and the install runs again from a
+      # mirror, as in ci.yml's `platforms` job.
+      - id: mise
+        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        continue-on-error: true
+        env:
+          MISE_HTTP_DOWNLOAD_TIMEOUT: 5m
+        with:
+          cache: false
+      - if: steps.mise.outcome == 'failure'
+        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        env:
+          MISE_HTTP_DOWNLOAD_TIMEOUT: 10m
+          MISE_NODE_MIRROR_URL: https://cdn.npmmirror.com/binaries/node/
         with:
           cache: false
       # The smoke test speaks its clip with the system's voice: `say` on macOS, .NET's speech
