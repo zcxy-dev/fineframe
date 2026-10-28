@@ -434,8 +434,8 @@ def transcribe_chunks(
 
 
 def _models(asr_model: str | None):
-    """The speech model and the aligner, as two functions, each on the Mac's GPU until it fails
-    there (`gpu.Fallback`).
+    """The speech model and the aligner, as two functions: the speech model on the Mac's GPU
+    until it fails there (`gpu.Fallback`), the aligner on the CPU.
 
     `recognize(wav, context)` returns the text heard and its language (None when it heard none);
     `align(wav, text)` returns each aligner token with its start and end in `wav`.
@@ -448,15 +448,12 @@ def _models(asr_model: str | None):
     return recognize, _aligner_function()
 
 
-def _aligner_function(half: bool = False) -> gpu.Fallback:
-    """The aligner on the Mac's GPU until it fails there or times no token, then on the CPU."""
-
-    def timed(items: list[tuple[str, float, float]]) -> bool:
-        return gpu.finite([t for _, start, end in items for t in (start, end)])
-
-    return gpu.Fallback(
-        "aligner", lambda on: _aligner(half, on), timed, release=lambda: _aligner.cache_clear()
-    )
+def _aligner_function(
+    half: bool = False,
+) -> Callable[[np.ndarray, str], list[tuple[str, float, float]]]:
+    """The aligner, loaded on its first call, on the CPU on a Mac too: the editor cuts by its
+    timings, and on Apple silicon's GPU they were never checked against the CPU's (#152)."""
+    return lambda wav, text: _aligner(half)(wav, text)
 
 
 @cache
@@ -516,18 +513,15 @@ def _recognizer(asr_model: str | None, apple_gpu: bool = False):
 
 
 @cache
-def _aligner(half: bool = False, apple_gpu: bool = False):
-    """The aligner as a function, on the Mac's GPU with `apple_gpu`. `half` runs it in bfloat16
-    on a CPU too, which more than halves its memory and times words as well on the synthetic
-    corpus ("Cloud speech" in the worker README); runs with the local speech model keep it in
-    float32, as they were measured."""
-    device, dtype = _device(apple_gpu)
+def _aligner(half: bool = False):
+    """The aligner as a function, on the CPU. `half` runs it in bfloat16, which more than halves
+    its memory and times words as well on the synthetic corpus ("Cloud speech" in the worker
+    README); runs with the local speech model keep it in float32, as they were measured."""
+    device, dtype = _device()
     import torch
     from transformers import AutoModelForTokenClassification
 
-    aligner, aligner_processor = _load(
-        AutoModelForTokenClassification, ALIGNER_MODEL, half, apple_gpu
-    )
+    aligner, aligner_processor = _load(AutoModelForTokenClassification, ALIGNER_MODEL, half)
     dtype = torch.bfloat16 if half else dtype
 
     @torch.inference_mode()

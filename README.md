@@ -130,7 +130,7 @@ The [media index format](packages/schema/media-index.schema.json) is defined wit
 | Qwen3-ASR-1.7B | 5.9 GB | ~14× the clip's length | ~14 GB |
 | `--asr cloud` | 1.8 GB (the aligner) | ~0.5× the clip's length, with OpenRouter responding quickly | ~3.3 GB |
 
-Weight sizes include the aligner. `vework` uses 1.7B with a CUDA GPU and 0.6B otherwise; `--asr-model` overrides that. With `--asr cloud` (`pnpm edit --asr cloud`), OpenRouter hears the speech and only the aligner runs here. The key goes in `.env` as `OPENROUTER_API_KEY` ([cloud speech](worker/README.md#cloud-speech)). On Linux and Windows, the lockfile installs a CPU-only PyTorch, so the models run on the CPU there. On a Mac with Apple silicon they run on its GPU, each falling back to the CPU by itself ([Apple silicon](worker/README.md#apple-silicon)).
+Weight sizes include the aligner. `vework` uses 1.7B with a CUDA GPU and 0.6B otherwise; `--asr-model` overrides that. With `--asr cloud` (`pnpm edit --asr cloud`), OpenRouter hears the speech and only the aligner runs here. The key goes in `.env` as `OPENROUTER_API_KEY` ([cloud speech](worker/README.md#cloud-speech)). On Linux and Windows, the lockfile installs a CPU-only PyTorch, so the models run on the CPU there. On a Mac with Apple silicon the speech model runs on its GPU, falling back to the CPU by itself, and the aligner on the CPU ([Apple silicon](worker/README.md#apple-silicon)).
 
 To plan or render on its own, see [`packages/engine`](packages/engine/). To score outputs against ground truth, see [`bench/`](bench/).
 

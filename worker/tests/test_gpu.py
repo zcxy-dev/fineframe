@@ -133,7 +133,7 @@ def test_a_speech_model_that_hears_nothing_on_the_gpu_hears_it_all_again_on_the_
 
     monkeypatch.setattr(transcribe, "_recognizer", recognizer)
     timed = [("大", 0.1, 0.3), ("家", 0.3, 0.5)]
-    aligner = functools.cache(lambda half, on: Model(timed, on))
+    aligner = functools.cache(lambda half: Model(timed, False))
     monkeypatch.setattr(transcribe, "_aligner", aligner)
     steps = []
     samples = np.zeros(16_000, np.float32)
@@ -149,21 +149,24 @@ def test_a_speech_model_that_hears_nothing_on_the_gpu_hears_it_all_again_on_the_
     assert [model() is not None for model in loaded] == [False, True]
 
 
-def test_an_aligner_that_fails_on_the_gpu_lets_its_gpu_copy_go(monkeypatch):
+@pytest.mark.ml
+def test_the_aligner_runs_on_the_cpu_on_a_mac_too(monkeypatch, capsys):
+    # The editor cuts by its timings, and on the Mac's GPU they were never checked (#152).
     on_mac_gpu(monkeypatch)
-    loaded = []
+    devices = []
 
-    @functools.cache
-    def aligner(half, on):
-        found = Model([("a", float("nan"), 0.1)] if on else [("a", 0.0, 0.1)], on)
-        loaded.append(weakref.ref(found))
-        return found
+    def device(apple_gpu=False):
+        devices.append(apple_gpu)
+        return "cpu", None
 
-    monkeypatch.setattr(transcribe, "_aligner", aligner)
-    align = transcribe._aligner_function()
-    assert align(None, "a") == [("a", 0.0, 0.1)]
-    gc.collect()
-    assert [model() is not None for model in loaded] == [False, True]
+    monkeypatch.setattr(transcribe, "_device", device)
+    monkeypatch.setattr(transcribe, "_load", lambda *args: (None, None))
+    transcribe._aligner.cache_clear()
+    transcribe._aligner_function()
+    assert devices == []  # loaded on its first call, not before
+    transcribe._aligner(True)
+    transcribe._aligner.cache_clear()
+    assert devices == [False] and said(capsys) == []
 
 
 @pytest.fixture
@@ -239,7 +242,7 @@ def spoken_video(tmp_path):
 @pytest.mark.ml
 def test_an_analysis_on_the_mac_says_where_each_step_ran(mac_gpu, spoken_video, tmp_path, capsys):
     # The words come from a stand-in for cloud speech, so the aligner is the only speech model;
-    # its timings, from the GPU or from the CPU after it, are what the editor cuts by.
+    # its timings, from the CPU, are what the editor cuts by.
     text = "Hello everyone. Today we look at a new camera."
     cloud = SimpleNamespace(
         recognize=lambda wavs, progress: [(text, "English")] + [("", None)] * (len(wavs) - 1),
@@ -254,13 +257,10 @@ def test_an_analysis_on_the_mac_says_where_each_step_ran(mac_gpu, spoken_video, 
         "shot detection: decoding video with VideoToolbox",
         "faces: decoding video with VideoToolbox",
         "denoising: on the GPU (Core ML)",
-        "aligner: on the GPU (MPS)",
     ):
         assert f"vework: {line}" in lines
-    # Only the aligner may fail on the GPU: MPS cannot build its bfloat16 matrix kernels on CI's
-    # virtualised M1. Its words are then timed on the CPU.
-    failed = [line for line in lines if "failed" in line]
-    assert all(line.startswith("vework: aligner: failed on the GPU (") for line in failed)
+    # The aligner runs on the CPU (#152), so it says nothing, and no step fails on the GPU.
+    assert not [line for line in lines if "aligner" in line or "failed" in line]
     words = found["transcript"]["words"]
     print(" ".join(f"{w['text']}@{w['start']}-{w['end']}" for w in words))
     assert [w["text"] for w in words][:2] == ["Hello", "everyone."]

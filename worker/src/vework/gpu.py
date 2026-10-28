@@ -1,8 +1,8 @@
 """Apple silicon's GPU for the analysis, with the CPU behind it.
 
-On a Mac whose GPU PyTorch can use (MPS), shot detection, the speech model and the aligner run
-there, the denoiser runs through ONNX Runtime's Core ML provider, and shot detection and faces
-decode video with VideoToolbox. A step that fails there, or whose output is NaN or empty, runs
+On a Mac whose GPU PyTorch can use (MPS), shot detection and the speech model run there, the
+denoiser runs through ONNX Runtime's Core ML provider, and shot detection and faces decode video
+with VideoToolbox. A step that fails there, or whose output is NaN or empty, runs
 again on the CPU by itself, and says so. Everywhere else every step runs as it did.
 
 Where each step runs is a `vework:` line on stderr, as downloads are: the engine keeps such lines
