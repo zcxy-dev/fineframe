@@ -71,7 +71,7 @@ def test_the_checkpoint_comes_from_the_second_source_when_the_first_fails(tmp_pa
     asked = failing_host(monkeypatch, tmp_path, "cloud.cp.jku.at")
     path = beats._checkpoint()
     assert path.read_bytes() == b"a stand-in checkpoint"
-    assert len(asked) == 2 and "zcxy-dev/fineframe-music" in asked[1]
+    assert len(asked) == 2 and "downloads.fineframe.app" in asked[1]
 
 
 def test_a_checkpoint_no_source_gives_is_unavailable(tmp_path, monkeypatch):
