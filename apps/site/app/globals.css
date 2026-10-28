@@ -1,0 +1,220 @@
+@import "tailwindcss";
+/* Geist and Noto Sans TC, cut to the site's characters by scripts/fonts.ts, which writes their
+   rules. */
+@import "./fonts.generated.css";
+
+/* `lang-zh:` styles a Chinese page. */
+@custom-variant lang-zh (&:lang(zh-Hant-TW));
+
+/* The visitor's device, which the head script (lib/device.ts) sets on <html> as
+   `data-device` before the first paint. An element's `data-show` lists the devices it is
+   for, `any` where the device is not known; `computer:` styles a page on a Mac, Windows or
+   Linux computer. */
+:root:not([data-device]) [data-show]:not([data-show~="any"]),
+:root[data-device="mac"] [data-show]:not([data-show~="mac"]),
+:root[data-device="windows"] [data-show]:not([data-show~="windows"]),
+:root[data-device="linux"] [data-show]:not([data-show~="linux"]),
+:root[data-device="mobile"] [data-show]:not([data-show~="mobile"]) {
+  display: none;
+}
+@custom-variant computer {
+  :root:is([data-device="mac"], [data-device="windows"], [data-device="linux"]) & {
+    @slot;
+  }
+}
+
+/* The feed: a light ground, ink type and bold cards of amber, graphite and steel, the
+   colours of the app's icon. One token set for the site and the app (DESIGN.md). Pages are
+   styled with Tailwind's utilities; this file holds the tokens, the fonts and the type rules
+   a utility cannot say. The home page's moving parts are in components/home/home.css. */
+
+:root {
+  color-scheme: light;
+  --ground: #f3f4f6;
+  --paper: #ffffff;
+  --ink: #0c0d10;
+  --ink-2: #3d424b;
+  --ink-3: #5d636d;
+  --line: #dfe2e7;
+  --amber: #ffb547;
+  --amber-hover: #ffc46d;
+  --amber-ink: #3a2a0c;
+  --steel: #c9cdd3;
+  --steel-ink: #262a31;
+  --graphite: #16181c;
+  --on-dark: #f2f3f5;
+  --on-dark-2: #b4b9c1;
+  --cut: #d4472f;
+  --r-card: 24px;
+  --stroke: 1.5px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --gutter: clamp(16px, 4vw, 32px);
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-amber: var(--amber);
+  --color-amber-hover: var(--amber-hover);
+  --color-amber-ink: var(--amber-ink);
+  --color-steel: var(--steel);
+  --color-steel-ink: var(--steel-ink);
+  --color-graphite: var(--graphite);
+  --color-on-dark: var(--on-dark);
+  --color-on-dark-2: var(--on-dark-2);
+  --color-cut: var(--cut);
+  --radius-card: var(--r-card);
+  --ease-out: var(--ease);
+  /* Geist sets Latin text and numbers; Noto Sans TC, Chinese. Chinese headings put Noto Sans
+     TC first, so their Latin words match its weight. */
+  --font-sans:
+    "Geist Variable", "Noto Sans TC", system-ui, -apple-system, "Segoe UI", "PingFang TC",
+    "Microsoft JhengHei", sans-serif;
+  --font-display: "Geist Variable", "Noto Sans TC", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@layer base {
+  * {
+    @apply border-line;
+  }
+
+  html {
+    @apply bg-ground font-sans;
+    -webkit-font-smoothing: antialiased;
+    text-size-adjust: 100%;
+    scroll-behavior: smooth;
+    scroll-padding-top: 84px;
+  }
+
+  body {
+    @apply flex min-h-screen flex-col bg-ground text-ink;
+    font-size: 17px;
+    line-height: 1.65;
+    overflow-x: clip;
+  }
+
+  body:lang(zh-Hant-TW) {
+    line-height: 1.8;
+    letter-spacing: 0.02em;
+  }
+
+  @media (max-width: 640px) {
+    body {
+      font-size: 16px;
+    }
+  }
+
+  /* An English page names Chinese only in its language links, which the system's font
+     sets rather than the whole Noto Sans TC download. */
+  html:lang(en) a[hreflang] {
+    font-family: system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+  }
+
+  ::selection {
+    @apply bg-amber text-ink;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: underline 1px;
+    text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+    text-underline-offset: 3px;
+    transition: text-decoration-color 150ms;
+  }
+
+  a:hover {
+    text-decoration-color: currentColor;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+
+  b,
+  strong {
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  code {
+    @apply rounded-md border bg-paper px-1.5 py-0.5 font-mono text-[0.88em] leading-none whitespace-nowrap;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+
+  /* Headings: Geist 700 in English, Noto Sans TC Black in Chinese, with half-width
+     punctuation. They never take punctuation of their own (content.test.ts). */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+  }
+
+  :lang(zh-Hant-TW) :is(h1, h2, h3) {
+    font-family: "Noto Sans TC", "Geist Variable", sans-serif;
+    font-weight: 900;
+    letter-spacing: 0.01em;
+    font-feature-settings: "palt";
+  }
+
+  /* Chinese breaks only between phrases (lib/typeset.ts): each phrase is a `.w`, with a
+     `<wbr>` between, and a heading's lines are `.ln`, broken only where written. Text takes no
+     `text-wrap: pretty`: WebKit draws some Chinese lines twice with it, and the pages keep
+     their last lines whole themselves. */
+  :lang(zh-Hant-TW) :is(p, li, dd, figcaption, summary, label) {
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    /* Holding still wins over every component's motion. */
+    *,
+    *::before,
+    *::after {
+      /* biome-ignore lint/complexity/noImportantStyles: it must win over every component. */
+      transition: none !important;
+      /* biome-ignore lint/complexity/noImportantStyles: it must win over every component. */
+      animation: none !important;
+    }
+  }
+}
+
+@utility w {
+  white-space: nowrap;
+}
+
+@utility ln {
+  display: block;
+
+  &:lang(zh-Hant-TW) {
+    white-space: nowrap;
+  }
+}
+
+/* The page's column: 1240 px, 1360 px on very wide screens, inside the gutter. */
+@utility wrap {
+  width: min(1240px, 100% - 2 * var(--gutter));
+  margin-inline: auto;
+
+  @media (min-width: 1800px) {
+    width: 1360px;
+  }
+}

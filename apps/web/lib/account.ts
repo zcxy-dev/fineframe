@@ -1,5 +1,5 @@
 // The desktop app's account, as the website's entitlement contract (ENTITLEMENT.md in
-// zcxy-dev/fineframe-site) describes it: signing in through the website in the browser (Supabase
+// apps/site) describes it: signing in through the website in the browser (Supabase
 // Auth's OAuth 2.1 server, a public client with PKCE, redirected to a port on this computer's
 // loopback address), the session kept in a file only its owner can read beside the API keys, and
 // whether it may edit: always during the free beta, while Supabase's `billing_enabled` switch is

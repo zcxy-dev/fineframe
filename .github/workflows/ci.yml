@@ -86,6 +86,15 @@ jobs:
           pnpm typecheck
           pnpm test
           pnpm check-gen
+      # Cloudflare Pages builds and deploys the website by itself (apps/site/DEPLOY.md); this only
+      # says it still builds. `next build` stops without the public Supabase values, so the local
+      # stack's URL and a marker stand in.
+      - name: Build the website
+        run: pnpm --filter @video-editor/site build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-build-only
+          NEXT_TELEMETRY_DISABLED: "1"
 
   # The renderer on macOS (Apple silicon) and on Windows, with each one's pinned
   # FFmpeg: the engine tests, then a synthetic edit scored by vebench, and the worker's models: on
