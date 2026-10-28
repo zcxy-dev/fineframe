@@ -10,7 +10,7 @@ The site is a static export: `pnpm build` writes it to `out/`, and Cloudflare Pa
 
    | Field | Value |
    |---|---|
-   | Project name | `fineframe-website` |
+   | Project name | `fineframe` |
    | Production branch | `main` |
    | Framework preset | None |
    | Build command | `pnpm install --frozen-lockfile --filter @video-editor/site && pnpm build` |
