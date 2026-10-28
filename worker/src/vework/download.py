@@ -36,7 +36,9 @@ class _Reporter:
 
 def url(address: str, name: str, timeout: float = 60) -> bytes:
     """The file at `address`, reporting its bytes when the server says how many there are."""
-    with urllib.request.urlopen(address, timeout=timeout) as response:
+    # Cloudflare, in front of downloads.fineframe.app, answers 403 to the default Python-urllib.
+    request = urllib.request.Request(address, headers={"User-Agent": "vework"})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
         total = int(response.headers.get("Content-Length") or 0)
         reporter = _Reporter(name, total) if total else None
         chunks, done = [], 0

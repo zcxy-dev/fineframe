@@ -1,7 +1,7 @@
 // The built-in music library: CC0 tracks an edit plays when the user gives none. The repository
 // keeps each track's tags and its music index (assets/music/), so Claude picks a track and the
-// planner fits it without the audio; the audio is downloaded on its first use, from the
-// fineframe-music repository's release, and checked against its SHA-256.
+// planner fits it without the audio; the audio is downloaded on its first use, from
+// downloads.fineframe.app, and checked against its SHA-256.
 
 import { readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";

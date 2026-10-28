@@ -11,7 +11,7 @@ The project's own code is proprietary, all rights reserved ([LICENSE](LICENSE)).
 | [Qwen3-ASR-0.6B-hf, Qwen3-ASR-1.7B-hf](https://huggingface.co/Qwen/Qwen3-ASR-0.6B-hf) and [Qwen3-ForcedAligner-0.6B-hf](https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B-hf) | Apache-2.0 | Hugging Face, pinned revision; worker `ml` group |
 | [CED-Base](https://huggingface.co/mispeech/ced-base), ONNX export | Apache-2.0 on its model card (see [notes](#ced-base)) | Hugging Face, pinned revision; worker `ml` group |
 | [YuNet](https://huggingface.co/opencv/face_detection_yunet) (`face_detection_yunet_2023mar.onnx`) | MIT | Hugging Face, pinned revision and SHA-256; worker `ml` group |
-| [Beat This!](https://github.com/CPJKU/beat_this) `final0` checkpoint | MIT | JKU Linz's file server, or its copy on the [fineframe-music](https://github.com/zcxy-dev/fineframe-music#beat-this-checkpoint) release, SHA-256 checked; worker `ml` group |
+| [Beat This!](https://github.com/CPJKU/beat_this) `final0` checkpoint | MIT | JKU Linz's file server, or its copy on `downloads.fineframe.app`, SHA-256 checked; worker `ml` group |
 | [DeepFilterNet3](https://github.com/Rikorose/DeepFilterNet) ONNX export | MIT OR Apache-2.0 | GitHub, pinned commit and SHA-256; worker `ml` group |
 | [Noto Sans CJK TC](https://github.com/notofonts/noto-cjk) Bold and Black | OFL-1.1 | GitHub, pinned commit and SHA-256; renderer, for captions |
 | [Noto Color Emoji](https://github.com/googlefonts/noto-emoji) | OFL-1.1 | GitHub, pinned commit and SHA-256; renderer, for caption emoji |
@@ -27,7 +27,7 @@ The project's own code is proprietary, all rights reserved ([LICENSE](LICENSE)).
 | ffprobe static builds from [@ffprobe-installer](https://github.com/SavageCore/node-ffprobe-installer)'s npm packages: 5.2.0 on Linux, 5.0.1 on Apple silicon, 5.1.0 on Windows | GPL-3.0 (Linux, Windows), LGPL-2.1 (macOS), as each package states | npm registry tarball, SHA-256 checked; renderer, on the first effect render, run as a separate program by HyperFrames (see [notes](#ffmpeg)) |
 | [CPython](https://www.python.org) builds from [python-build-standalone](https://github.com/astral-sh/python-build-standalone) | PSF-2.0, with the licences of the libraries each build includes | Desktop app only: installed by uv into the app's folder on its first start |
 | Chrome Headless Shell ([Chromium](https://www.chromium.org)) | Chromium's BSD-3-Clause licence and the third-party licences it lists; Google's build also refers to the Chrome terms of service | Google's [Chrome for Testing](https://github.com/GoogleChromeLabs/chrome-for-testing), pinned build, its archive SHA-256 checked per platform, through @puppeteer/browsers; renderer, on the first effect render or web capture. There is no build for Linux on arm64 |
-| [Music library](#music-library), 40 tracks | CC0 1.0 | The [fineframe-music](https://github.com/zcxy-dev/fineframe-music) repository's release, SHA-256 checked; engine, each track when an edit plays it or the page previews it |
+| [Music library](#music-library), 40 tracks | CC0 1.0 | `downloads.fineframe.app`, SHA-256 checked; engine, each track when an edit plays it or the page previews it |
 | [Lucide](https://lucide.dev) icons (`lucide-static` 1.50.0) | ISC; the icons drawn from Feather MIT, as its licence file lists them | npm registry tarball, SHA-256 checked; engine, on the first icon lookup |
 | [Tabler Icons](https://tabler.io/icons) (`@tabler/icons` 3.48.0), outline style | MIT | npm registry tarball, SHA-256 checked; engine, on the first icon lookup |
 | [Simple Icons](https://simpleicons.org) (`simple-icons` 16.33.0) | CC0-1.0, except the logos its data gives another licence (see [notes](#icons-and-logos)) | npm registry tarball, SHA-256 checked; engine, on the first logo lookup |
@@ -161,7 +161,7 @@ The installers are not signed with an Apple Developer ID or a Windows code-signi
 
 ### Music library
 
-The built-in music library's 40 tracks, each dedicated to the public domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) by its author on [FreePD](https://freepd.com), whose site said: "This music is all licensed CC0 1.0 Universal Public Domain Dedication" ([archived](https://web.archive.org/web/20251207054520/https://freepd.com/)). FreePD closed in 2025; each file is byte for byte the one freepd.com served, from the Internet Archive's capture below, and is published unchanged in the [fineframe-music](https://github.com/zcxy-dev/fineframe-music) repository. `packages/engine/assets/music/` holds each track's tags and its music index, not its audio.
+The built-in music library's 40 tracks, each dedicated to the public domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) by its author on [FreePD](https://freepd.com), whose site said: "This music is all licensed CC0 1.0 Universal Public Domain Dedication" ([archived](https://web.archive.org/web/20251207054520/https://freepd.com/)). FreePD closed in 2025; each file is byte for byte the one freepd.com served, from the Internet Archive's capture below, and is published unchanged on `downloads.fineframe.app`. `packages/engine/assets/music/` holds each track's tags and its music index, not its audio.
 
 | Title | Author | Mood | Source |
 |---|---|---|---|
@@ -232,7 +232,7 @@ A model's licence covers its weights, not the data it was trained on. Some of th
 
 ## README example
 
-The example edits at the top of the README are made from footage the project does not own. Their frames and videos are assets of the [v0.2.0 release](https://github.com/zcxy-dev/fineframe/releases/tag/v0.2.0), not files in this repository, and are shared under the footage's licence.
+The example edits at the top of the README are made from footage the project does not own. Their frames and videos are served from `downloads.fineframe.app`, not files in this repository, and are shared under the footage's licence.
 
 - **Footage:** "[Why NASA and IBM made a new AI model that predicts the Sun's damaging flares](https://www.youtube.com/watch?v=KWMoF97C1Ds)" by IBM Research, published 20 August 2025, with Mike Murphy and Johannes Schmude of IBM Research, licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). The edits shorten it to 60 s at 9:16 and 90 s at 16:9, reframe and grade it, process its sound and add music, captions, name cards and keyword highlights. Neither IBM Research nor the people in it endorse this project.
 - **Music:** in the 9:16 edit, "3 am West End" by statusq, dedicated to the public domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) ([source](https://commons.wikimedia.org/wiki/File:Statusq_-_3_am_West_End.opus)); in the 16:9 edit, "Cool Vibes" by Kevin MacLeod ([incompetech.com](https://incompetech.com)), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

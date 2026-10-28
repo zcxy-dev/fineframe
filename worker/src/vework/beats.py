@@ -17,10 +17,10 @@ from vework import download
 
 # The authors' main model, trained on every dataset but GTZAN; MIT, like the code.
 MODEL = "final0"
-# The authors' file server, then a copy of the same file on the music library's release (#155).
+# The authors' file server, then a copy of the same file on downloads.fineframe.app (#155).
 URLS = (
     f"https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/{MODEL}.ckpt",
-    f"https://github.com/zcxy-dev/fineframe-music/releases/download/v1/beat_this-{MODEL}.ckpt",
+    f"https://downloads.fineframe.app/models/beat_this-{MODEL}.ckpt",
 )
 SHA256 = "8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331"
 # The input the model was trained on: 22.05 kHz, 1024-sample frames every 20 ms, 128 mel bands
