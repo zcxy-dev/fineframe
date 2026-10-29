@@ -22,3 +22,7 @@ export const ERROR = "border-(length:--stroke) border-cut bg-paper text-ink";
 
 /** Small print beside a form. */
 export const HINT = "text-sm text-ink-3";
+
+/** A card that stands off the ground: a form on its own, or a plan. */
+export const RAISED =
+  "ring-1 ring-line shadow-[0_1px_2px_rgb(12_13_16/0.04),0_16px_40px_-16px_rgb(12_13_16/0.14)]";

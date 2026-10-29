@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { content } from "../lib/content.ts";
 import { href, LANG, LOCALES, type Locale, type PagePath } from "../lib/site.ts";
-import { Download } from "./Download.tsx";
+import { AccountLink } from "./AccountLink.tsx";
 import { Icon } from "./Icon.tsx";
 import { Phrases } from "./Rich.tsx";
 import { buttonClass } from "./ui/button.tsx";
@@ -15,9 +15,17 @@ const FOOTER_LINK =
 const BRAND =
   "flex items-center gap-2.5 text-[17px] leading-none font-bold tracking-[-0.02em] no-underline sm:text-[19px]";
 
+/** Sign in, outlined beside the amber button; on phones, where the bar is full, a link. */
+const ACCOUNT_LINK =
+  "whitespace-nowrap sm:inline-flex sm:h-10 sm:items-center sm:rounded-full sm:border-(length:--stroke) sm:border-line sm:px-4.5 sm:font-medium sm:text-ink sm:transition-[border-color] sm:hover:border-ink";
+
+/** Pages where the bar leaves out its button to the plans: they have their own next step. */
+const NO_PLANS_BUTTON: PagePath[] = [...ACCOUNT_PAGES, "/pricing/"];
+
 /**
  * The bar, the page and the footer that every page shares. The bar holds the home page's
- * sections, the other language, Sign in and Download; the footer, every page.
+ * sections, the other language, Sign in (or Account) and the button to the plans; the footer,
+ * every page.
  */
 export function Frame({
   locale,
@@ -99,23 +107,22 @@ export function Frame({
               aria-label={`${t.nav.language}: ${content(other).languageName}`}
             >
               <Icon name="globe" />
-              <span className="max-sm:text-sm max-[380px]:hidden">
+              {/* On phones the globe alone: the bar also holds Sign in and the plans. */}
+              <span className="whitespace-nowrap max-sm:text-sm max-[480px]:hidden">
                 {content(other).languageName}
               </span>
             </a>
-            <a
-              className={`${NAV_LINK} max-sm:hidden`}
-              href={href(locale, "/signin/")}
-              aria-current={ACCOUNT_PAGES.includes(path) ? "page" : undefined}
-            >
-              {t.nav.signIn}
-            </a>
-            <Download
+            <AccountLink
               locale={locale}
-              label={t.nav.getStarted}
-              className={buttonClass({ size: "sm" })}
-              icon={false}
+              labels={{ signIn: t.nav.signIn, account: t.nav.account }}
+              current={path === "/signin/" || path === "/account/"}
+              className={`${NAV_LINK} ${ACCOUNT_LINK}`}
             />
+            {!NO_PLANS_BUTTON.includes(path) && (
+              <a className={buttonClass({ size: "sm" })} href={href(locale, "/pricing/")}>
+                {t.nav.getStarted}
+              </a>
+            )}
           </div>
         </div>
       </header>

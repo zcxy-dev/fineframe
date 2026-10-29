@@ -16,6 +16,7 @@ export function Legal({ locale, path, page }: { locale: Locale; path: PagePath; 
               <Rich text={line} locale={locale} />
             </p>
           ))}
+          {page.updated && <p className="text-[15px] text-ink-3">{page.updated}</p>}
         </PageHead>
         <div className="wrap pb-[clamp(64px,8vw,120px)]">
           <div className="rounded-card bg-paper px-[clamp(20px,3vw,48px)]">

@@ -12,15 +12,17 @@ const accounts = () => import("../../lib/supabase.ts");
 const payments = () => import("../../lib/paddle.ts");
 
 /**
- * A plan's checkout button, once billing is on; until then, "Coming soon". A signed-out
- * visitor signs in first and comes back with `?plan=`, which opens that plan's checkout; a
- * subscriber is sent to their account instead.
+ * A plan's checkout button, once billing is on and this build has Paddle's values; until then,
+ * "Opening soon". A signed-out visitor creates an account (or signs in) first and comes back
+ * with `?plan=`, which opens that plan's checkout; a subscriber is sent to their account
+ * instead.
  */
 export function Subscribe({
   locale,
   plan,
   labels: t,
   subscribed: subscribedText,
+  primary = false,
 }: {
   locale: Locale;
   plan: Plan;
@@ -28,6 +30,8 @@ export function Subscribe({
   labels: { subscribe: string; failed: string; soon: string };
   /** What a subscriber sees instead of the button, set by the page. */
   subscribed: ReactNode;
+  /** Amber, for the plan the page recommends; the other plan's button is outlined. */
+  primary?: boolean;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const [selling, setSelling] = useState(false);
@@ -39,7 +43,7 @@ export function Subscribe({
     const check = () =>
       accounts()
         .then(async ({ billingEnabled, entitled, mySubscription, supabase }) => {
-          if (!(await billingEnabled())) return;
+          if (!(await billingEnabled()) || !(await payments()).sells(plan)) return;
           setSelling(true);
           const { data } = await supabase().auth.getSession();
           if (!data.session) return;
@@ -66,11 +70,11 @@ export function Subscribe({
   async function checkout() {
     setBusy(true);
     setError("");
-    const { signInHref, supabase } = await accounts();
+    const { signUpHref, supabase } = await accounts();
     const { data } = await supabase().auth.getSession();
     if (!data.session) {
       return window.location.assign(
-        signInHref(locale, `${href(locale, "/pricing/")}?plan=${plan}`),
+        signUpHref(locale, `${href(locale, "/pricing/")}?plan=${plan}`),
       );
     }
     const { loadPaddle, PRICE } = await payments();
@@ -92,16 +96,22 @@ export function Subscribe({
     });
   }
 
+  // Until there is a button, its place holds what is true instead, shaped like it but flat.
   const chip =
-    "inline-flex rounded-full border-(length:--stroke) border-line px-3.5 py-1.5 text-sm font-semibold text-ink-2";
+    "flex min-h-13 items-center justify-center rounded-full bg-ground px-6 py-2 text-center text-[15px] font-semibold text-ink-2";
   return (
-    <div ref={root} className="grid justify-items-start gap-4">
+    <div ref={root} className="grid gap-4">
       {!selling ? (
         <p className={chip}>{t.soon}</p>
       ) : subscribed ? (
         <p className={chip}>{subscribedText}</p>
       ) : (
-        <Button type="button" onClick={checkout} disabled={busy}>
+        <Button
+          type="button"
+          variant={primary ? "default" : "outline"}
+          onClick={checkout}
+          disabled={busy}
+        >
           {t.subscribe}
         </Button>
       )}

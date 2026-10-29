@@ -73,12 +73,12 @@ const shown = (t: typeof en) => {
     h.pricing.title,
   ];
   return {
-    400: [t.home, t.nav, t.footer, t.skip, t.languageName, t.pricing.plans],
+    400: [t.home, t.nav, t.footer, t.skip, t.languageName, t.pricing, t.download.needs],
     600: [
       [t.footer.product, t.footer.account, t.footer.legal, t.nav.getStarted],
-      [h.hero.download, h.hero.watch, h.features.music.voice, h.features.music.music],
+      [h.hero.plans, h.hero.watch, t.nav.download, h.features.music.voice, h.features.music.music],
       h.formats.spec.map(([, value]) => value),
-      [h.privacy.stays.title, h.privacy.sent.title, h.pricing.beta.name],
+      [h.privacy.stays.title, h.privacy.sent.title, t.pricing.includedTitle],
       t.pricing.plans.map((plan) => plan.name),
       t.pricing.checkout,
       h.faq.items.map((item) => item.q),

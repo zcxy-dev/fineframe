@@ -53,7 +53,7 @@ The site and the app share one token set, these values. `app/globals.css` holds 
 
 - **Ground** #f3f4f6 under everything, **paper** #ffffff for cards and forms, divided by **line** #dfe2e7.
 - **Ink** #0c0d10 for headings and the floating button; **ink-2** #3d424b for text; **ink-3** #5d636d for small print. All at least 4.5:1 on ground and paper.
-- **Amber** #ffb547, from the app's icon: the primary action and a whole card (the cut card, the free beta, the closing call), with **amber-ink** #3a2a0c for text on it.
+- **Amber** #ffb547, from the app's icon: the primary action and a whole card (the cut card, the closing call), with **amber-ink** #3a2a0c for text on it.
 - **Graphite** #16181c and **steel** #c9cdd3 are the other two card colours, with **on-dark** text and **steel-ink** text on them.
 - **Cut** #d4472f marks what the edit removes (struck filler words), the timeline's playhead and errors.
 
@@ -71,15 +71,17 @@ Line breaks are part of the design, on every page and at every width:
 
 ## Layout and components
 
-- **Bar** (`components/Frame.tsx`): sticky, translucent ground; the wordmark, the home page's sections (from 1081 px), the other language as a link with a globe, Sign in (from 641 px) and the amber Download.
+- **Bar** (`components/Frame.tsx`): sticky, translucent ground; the wordmark, the home page's sections (from 1081 px), the other language as a link with a globe, Sign in (or Account once signed in) outlined as a pill from 640 px and a link on phones, and the amber See plans, which the pricing, sign-in and account pages leave out.
 - **Download buttons** (`components/Download.tsx`) know the visitor's device (`lib/device.ts`, set on `<html data-device>` before the first paint): on a Mac, Windows or Linux computer they download its installer, named for it, with its requirement on the line under them; on a phone or tablet they lead to the download page. Where the device is not known (no JavaScript, crawlers, other systems) they lead there too and the page lists all three computers.
 - **Download page:** on a computer, only that computer's card, with its steps and how it updates; elsewhere the three side by side.
 - **Hero:** the headline and lede on the left, the buttons and the platforms under them, and on the right the **post** (`components/home/Reel.tsx`). On phones the order is headline, post, buttons, so the first screen shows the edit.
 - **Feature cards:** the cut card largest in amber, captions on graphite with its 9:16 clip, music on steel; on phones they scroll sideways and snap.
 - **YouTube section:** the 16:9 edit, its spec list, and the edit's four-track timeline (`components/home/WideEdit.tsx`).
-- **Privacy:** a graphite card: what stays on the computer, and, on amber, what goes to Claude.
-- **Pricing:** the free beta on amber beside the two plans on paper. **FAQ** on `<details>`. **Close:** an amber card with the download.
+- **Privacy:** a graphite card: the heading across it, then what stays on the computer, and, on amber, what goes to Claude.
+- **Plans** (`components/Plans.tsx`), the same on the home page, the pricing page and the account page: two raised paper cards, each with its name, price, billing line, a full-width button and the terms under it beside a shield. The yearly plan, which costs less, is ringed in amber with its saving on an amber tag and the amber button; monthly's is outlined. Until a checkout can open, the button's place holds "Opening soon", flat on ground. What both include is a paper card of four, each on an icon tile. The hero's button, the bar's and the floating one lead to the plans. **FAQ** (`components/Faq.tsx`) on `<details>`, on the home and pricing pages.
+- **Pricing page:** a centred two-line heading and lede, then, in one 1000 px column, the plans, what both include, the three steps after subscribing (numbered: they happen in order), what Claude costs beside refunds, and the FAQ. **Close:** an amber card with See plans and the download, and what running the app needs.
 - **Inner pages** open with `PageHead` and set their content on paper cards (`CARD` in `lib/styles.ts`); legal pages and the credits use `components/Legal.tsx`.
+- **Sign-in, sign-up, reset and authorize** stand in one 460 px column: the app's icon, the centred heading, and the form on a raised card (`RAISED`: a line ring and a soft shadow). The **account page** keeps the page's width: the subscription (who is signed in, the status on a pill with its dot, then managing billing and signing out under a rule) beside the download, and, until the account has a plan, the plans under them.
 - **Buttons** (`components/ui/button.tsx`): pills, amber, ink-outlined or ink; they lift a pixel on hover.
 - **Footage** is credited beside it in a short form; the full credits are on `/credits/`.
 
@@ -89,7 +91,7 @@ Line breaks are part of the design, on every page and at every width:
 - **The cut card:** fillers turn red, are struck through and close up out of the sentence as the length counts from 1:12 to 1:00.
 - **The music card:** the voice on top, the music under it dropping while someone talks, flowing left.
 - **Scroll:** the post lifts away, the cards fly in, the YouTube player straightens, the timeline's clips land on their tracks, and what goes to Claude comes in line by line (CSS scroll timelines). Where a browser has no scroll timelines, everything stands as it ends.
-- **Floating download:** on phones, a black pill across the bottom while neither the hero's buttons, the closing call nor the footer is on screen.
+- **Floating See plans:** on phones, a black pill across the bottom while neither the post, the hero's buttons, the closing call nor the footer is on screen.
 - Video loads only when needed: posters as a video comes near, sources as it is about to show, the small copy on phones and wherever it is sharp enough. Loops play only on screen.
 - **Reduced motion:** nothing moves. The post shows the finished Reel with its bars full and plays it only from its button; the cut card shows the cut sentence; the music holds still; the clips show their first frame with the browser's controls; the scroll pieces stand as they end.
 

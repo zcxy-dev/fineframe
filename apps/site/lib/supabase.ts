@@ -1,5 +1,6 @@
 import { type AuthError, createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Content } from "./content.ts";
+import type { Plan } from "./paddle.ts";
 import { href, type Locale } from "./site.ts";
 
 let client: SupabaseClient | undefined;
@@ -70,6 +71,18 @@ export function nextPath(
 /** The sign-in page, which comes back to `next` after. */
 export function signInHref(locale: Locale, next: string): string {
   return `${href(locale, "/signin/")}?next=${encodeURIComponent(next)}`;
+}
+
+/** The sign-up page, which comes back to `next` once the email is confirmed. */
+export function signUpHref(locale: Locale, next: string): string {
+  return `${href(locale, "/signup/")}?next=${encodeURIComponent(next)}`;
+}
+
+/** The plan a `?next=` back to the plans names, which the sign-in and sign-up pages mention. */
+export function nextPlan({ search }: Pick<Location, "search"> = window.location): Plan | undefined {
+  const next = new URLSearchParams(search).get("next");
+  const plan = next ? new URLSearchParams(next.split("?")[1] ?? "").get("plan") : null;
+  return plan === "monthly" || plan === "yearly" ? plan : undefined;
 }
 
 /** Sends a signed-out visitor to sign in, coming back here after. */

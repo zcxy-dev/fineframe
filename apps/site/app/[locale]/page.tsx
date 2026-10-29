@@ -1,7 +1,7 @@
 import "../../components/home/home.css";
 import type { Metadata } from "next";
-import { Subscribe } from "../../components/account/Subscribe.tsx";
 import { Download } from "../../components/Download.tsx";
+import { Faq } from "../../components/Faq.tsx";
 import { Frame } from "../../components/Frame.tsx";
 import { CutDemo } from "../../components/home/CutDemo.tsx";
 import { Duck } from "../../components/home/Duck.tsx";
@@ -10,22 +10,23 @@ import { Loop } from "../../components/home/Loop.tsx";
 import { Reel } from "../../components/home/Reel.tsx";
 import { WideEdit } from "../../components/home/WideEdit.tsx";
 import { Icon } from "../../components/Icon.tsx";
+import { Included, Plans } from "../../components/Plans.tsx";
 import { Phrases, Rich } from "../../components/Rich.tsx";
 import { buttonClass } from "../../components/ui/button.tsx";
 import { content, type Lines } from "../../lib/content.ts";
 import { lastTwo } from "../../lib/english.ts";
-import type { Plan } from "../../lib/paddle.ts";
-import { type Locale, localeOf, type PageProps, pageMetadata } from "../../lib/site.ts";
+import { href, type Locale, localeOf, type PageProps, pageMetadata } from "../../lib/site.ts";
 import { SECTION_LEDE } from "../../lib/styles.ts";
 
-const PLANS: Plan[] = ["monthly", "yearly"];
-
-/** While the page's own download buttons or the footer are on screen, the floating one stays away. */
-const CTAS = ["hero-ctas", "close-cta", "footer"];
+/**
+ * While the post, the page's own buttons to the plans or the footer are on screen, the floating
+ * one stays away.
+ */
+const CTAS = ["post", "hero-ctas", "close-cta", "footer"];
 
 /**
- * What runs it, under a download button: the computers, or the visitor's computer's
- * requirement once it is known; and the price.
+ * What runs it, under the buttons: the computers, or the visitor's computer's requirement once
+ * it is known; and the price.
  */
 function Facts({ locale }: { locale: Locale }) {
   const t = content(locale);
@@ -63,9 +64,7 @@ export default async function Home({ params }: PageProps) {
   const all = content(locale);
   const t = all.home;
   const { features: f, formats: y } = t;
-  const download = (className: string) => (
-    <Download locale={locale} label={t.hero.download} phone={t.hero.phone} className={className} />
-  );
+  const plans = href(locale, "/pricing/");
   const text = (s: string) => <Rich text={s} locale={locale} />;
   return (
     <Frame locale={locale} path="/">
@@ -79,7 +78,9 @@ export default async function Home({ params }: PageProps) {
           </div>
           <div className="act">
             <div className="ctas" id="hero-ctas">
-              {download(buttonClass())}
+              <a className={buttonClass()} href={plans}>
+                {t.hero.plans}
+              </a>
               <a className={buttonClass({ variant: "outline" })} href="#formats">
                 {t.hero.watch}
               </a>
@@ -176,11 +177,12 @@ export default async function Home({ params }: PageProps) {
         <section className="home-section" id="privacy" aria-labelledby="privacy-title">
           <div className="wrap">
             <div className="grid gap-x-[clamp(32px,6vw,96px)] gap-y-10 rounded-card bg-graphite p-[clamp(24px,4.4vw,64px)] text-on-dark lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end">
+              {/* The heading takes the card's width, so each of its two lines stays whole. */}
+              <h2 id="privacy-title" className="lg:col-span-2">
+                <Two locale={locale} lines={t.privacy.title} />
+              </h2>
               <div>
-                <h2 id="privacy-title">
-                  <Two locale={locale} lines={t.privacy.title} />
-                </h2>
-                <p className={`${SECTION_LEDE} text-on-dark-2`}>{text(t.privacy.lede)}</p>
+                <p className={`${SECTION_LEDE} mt-0! text-on-dark-2`}>{text(t.privacy.lede)}</p>
                 <p className="mt-6 text-[15px] [&_a]:decoration-on-dark-2">
                   {text(t.privacy.more)}
                 </p>
@@ -225,44 +227,11 @@ export default async function Home({ params }: PageProps) {
               <Two locale={locale} lines={t.pricing.title} />
             </h2>
             <p className={`${SECTION_LEDE} text-ink-2`}>{text(t.pricing.lede)}</p>
-            <div className="mt-[clamp(40px,5vw,64px)] grid gap-4 md:grid-cols-3">
-              <div className="flex flex-col rounded-card bg-amber p-[clamp(24px,2.6vw,36px)]">
-                <p className="font-semibold">{t.pricing.beta.name}</p>
-                <p className="mt-4 text-[clamp(44px,4.4vw,60px)] leading-none font-bold tracking-[-0.035em] tabular-nums">
-                  {t.pricing.beta.price}
-                </p>
-                <p className="mt-3 mb-8 text-[15px] text-amber-ink">{t.pricing.beta.period}</p>
-                {download(`${buttonClass({ variant: "dark" })} mt-auto self-start`)}
-              </div>
-              {all.pricing.plans.map((plan, i) => (
-                <div
-                  key={plan.name}
-                  className="flex flex-col rounded-card bg-paper p-[clamp(24px,2.6vw,36px)]"
-                >
-                  <p className="font-semibold">{plan.name}</p>
-                  <p className="mt-4 text-[clamp(44px,4.4vw,60px)] leading-none font-bold tracking-[-0.035em] tabular-nums">
-                    {plan.price}
-                    <span className="ml-1.5 text-base font-medium tracking-normal text-ink-3">
-                      {plan.period}
-                    </span>
-                  </p>
-                  <p className="mt-3 text-[15px] text-ink-3">{plan.billing}</p>
-                  <div className="mt-auto pt-8">
-                    <Subscribe
-                      locale={locale}
-                      plan={PLANS[i] as Plan}
-                      labels={{
-                        subscribe: all.checkout.subscribe,
-                        failed: all.checkout.failed,
-                        soon: all.pricing.checkout,
-                      }}
-                      subscribed={text(all.checkout.subscribed)}
-                    />
-                  </div>
-                </div>
-              ))}
+            <div className="mt-[clamp(40px,5vw,64px)] grid gap-4">
+              <Plans locale={locale} />
+              <Included locale={locale} />
             </div>
-            <p className="mt-6 max-w-[48em] text-[15px] text-ink-3">
+            <p className="mt-6 max-w-[40em] text-[15px] text-ink-2">
               {text(t.pricing.cost)} {text(t.pricing.more)}
             </p>
           </div>
@@ -273,22 +242,7 @@ export default async function Home({ params }: PageProps) {
             <h2 id="faq-title">
               <Phrases text={t.faq.title} locale={locale} />
             </h2>
-            <div className="border-t-(length:--stroke) border-ink">
-              {t.faq.items.map((item) => (
-                <details key={item.q} className="group border-b">
-                  <summary className="flex list-none items-center justify-between gap-4 py-5 text-[17px] leading-snug font-semibold [&::-webkit-details-marker]:hidden">
-                    <span>
-                      <Phrases text={item.q} locale={locale} />
-                    </span>
-                    <Icon
-                      name="plus"
-                      className="size-4.5 shrink-0 transition-transform duration-300 group-open:rotate-45"
-                    />
-                  </summary>
-                  <p className="max-w-[40em] pb-6 text-ink-2">{text(item.a)}</p>
-                </details>
-              ))}
-            </div>
+            <Faq locale={locale} />
           </div>
         </section>
 
@@ -298,17 +252,30 @@ export default async function Home({ params }: PageProps) {
               <h2 id="close-title">
                 <Two locale={locale} lines={t.close.title} />
               </h2>
-              <div id="close-cta" className="mt-9">
-                {download(buttonClass({ variant: "dark" }))}
+              <div id="close-cta" className="mt-9 flex flex-wrap justify-center gap-3">
+                <a className={buttonClass({ variant: "dark" })} href={plans}>
+                  {all.nav.getStarted}
+                </a>
+                <Download
+                  locale={locale}
+                  label={all.nav.download}
+                  phone={t.hero.phone}
+                  className={buttonClass({ variant: "outline" })}
+                />
               </div>
               <p className="mt-4 flex flex-wrap justify-center gap-x-4.5 text-sm text-amber-ink">
                 <Facts locale={locale} />
+              </p>
+              <p className="mt-2 text-sm text-amber-ink [&_a]:decoration-amber-ink">
+                {text(all.download.needs)}
               </p>
             </div>
           </div>
         </section>
       </div>
-      <Float ids={CTAS}>{download("")}</Float>
+      <Float ids={CTAS}>
+        <a href={plans}>{all.nav.getStarted}</a>
+      </Float>
     </Frame>
   );
 }

@@ -16,6 +16,8 @@ export type LegalPage = {
   title: string;
   description: string;
   intro: Rich[];
+  /** When the page last changed, shown under its introduction. */
+  updated?: string;
   sections: { heading: string; body: Rich[]; list?: Rich[] }[];
 };
 
@@ -54,7 +56,8 @@ export type Content = {
     hero: {
       title: Lines;
       lede: string;
-      download: string;
+      /** The main button, which leads to the plans. */
+      plans: string;
       /** The download buttons' label on a phone or tablet, which lead to the download page. */
       phone: string;
       watch: string;
@@ -104,7 +107,6 @@ export type Content = {
     pricing: {
       title: Lines;
       lede: string;
-      beta: { name: string; price: string; period: string };
       cost: Rich;
       more: Rich;
     };
@@ -115,6 +117,12 @@ export type Content = {
     title: string;
     description: string;
     lede: Rich;
+    /** Under the download buttons: what running the app needs. */
+    needs: Rich;
+    /** On a phone or tablet: the installers are for a computer. */
+    phone: string;
+    share: string;
+    copied: string;
     table: { computer: string; installer: string; get: string };
     platforms: {
       id: Exclude<Device, "mobile">;
@@ -136,10 +144,18 @@ export type Content = {
   };
   pricing: {
     title: string;
+    /** The page's heading; `title` names it in the tab and the bar. */
+    heading: Lines;
     description: string;
     lede: Rich;
-    plans: { name: string; price: string; period: string; billing: string }[];
+    /** `save`: the tag on the plan that costs less. */
+    plans: { name: string; price: string; period: string; billing: string; save?: string }[];
+    /** What the plan buttons say until purchases open. */
     checkout: string;
+    /** Under each plan's button. */
+    terms: string;
+    afterTitle: string;
+    after: Rich[];
     includedTitle: string;
     included: string[];
     keyTitle: string;
@@ -167,6 +183,8 @@ export type Content = {
       forgot: string;
       switchPrompt: string;
       switchLink: string;
+      /** Above the form when a plan sent the visitor here; `{plan}` is the plan's name. */
+      forPlan: string;
     };
     signUp: {
       title: string;
@@ -178,6 +196,9 @@ export type Content = {
       switchLink: string;
       /** `{email}` is the address the link went to. */
       sent: string;
+      forPlan: string;
+      /** `{email}` as in `sent`, `{plan}` as in `forPlan`. */
+      sentPlan: string;
     };
     reset: {
       title: string;
@@ -211,6 +232,9 @@ export type Content = {
     /** In each, `{date}` is a date. */
     status: {
       none: string;
+      noneNote: string;
+      /** Under `none` until purchases open. */
+      soon: string;
       active: string;
       renews: string;
       cancelled: string;
@@ -220,9 +244,8 @@ export type Content = {
       paused: string;
       ended: string;
       confirming: string;
-      beta: string;
-      betaNote: string;
     };
+    /** The plans' card, shown while the account has no plan. */
     choose: string;
     manage: string;
     manageNote: string;
@@ -235,6 +258,10 @@ export type Content = {
     description: string;
     /** `{email}` is the signed-in account. */
     lede: string;
+    /** What the app gets from the account. */
+    shares: string;
+    /** Once purchases open, for an account with no plan. */
+    noPlan: Rich;
     allow: string;
     deny: string;
     switch: string;

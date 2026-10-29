@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
-import { Subscribe } from "../../../components/account/Subscribe.tsx";
+import { Faq } from "../../../components/Faq.tsx";
 import { Frame } from "../../../components/Frame.tsx";
-import { Icon } from "../../../components/Icon.tsx";
 import { PageHead } from "../../../components/PageHead.tsx";
+import { Included, Plans } from "../../../components/Plans.tsx";
 import { Phrases, Rich } from "../../../components/Rich.tsx";
 import { content } from "../../../lib/content.ts";
-import type { Plan } from "../../../lib/paddle.ts";
 import { localeOf, type PageProps, pageMetadata } from "../../../lib/site.ts";
 import { CARD, HEADING, PROSE } from "../../../lib/styles.ts";
-
-/** The plans in the order the content lists them. */
-const PLANS: Plan[] = ["monthly", "yearly"];
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const locale = await localeOf(params);
@@ -24,64 +20,44 @@ export default async function Pricing({ params }: PageProps) {
   const t = all.pricing;
   return (
     <Frame locale={locale} path="/pricing/">
-      <PageHead title={t.title} locale={locale}>
+      <PageHead title={t.heading} locale={locale} center>
         <p>
           <Rich text={t.lede} locale={locale} />
         </p>
       </PageHead>
 
-      <div className="wrap grid gap-4 pb-[clamp(64px,8vw,120px)]">
-        <section
-          className="grid gap-4 md:grid-cols-2 lg:grid-cols-[repeat(2,minmax(0,1fr))_minmax(0,1.2fr)]"
-          aria-label={t.title}
-        >
-          {t.plans.map((plan, i) => (
-            <div key={plan.name} className={`${CARD} flex flex-col`}>
-              <h2 className="font-sans text-lg leading-snug font-semibold tracking-normal">
-                {plan.name}
-              </h2>
-              <p className="mt-5 text-[clamp(44px,4.4vw,64px)] leading-none font-bold tracking-[-0.035em] tabular-nums">
-                {plan.price}
-                <span className="ml-1.5 text-base font-medium tracking-normal text-ink-3">
-                  {plan.period}
+      <div className="wrap grid max-w-[1000px] gap-4 pb-[clamp(64px,8vw,120px)]">
+        <section aria-labelledby="plans">
+          <h2 id="plans" className="sr-only">
+            {t.title}
+          </h2>
+          <Plans locale={locale} />
+        </section>
+        <Included locale={locale} />
+
+        <section className="mt-[clamp(48px,6vw,88px)]" aria-labelledby="after">
+          <h2 id="after" className="text-center text-[clamp(32px,3.6vw,48px)]">
+            <Phrases text={t.afterTitle} locale={locale} />
+          </h2>
+          <ol className="mt-10 grid gap-8 md:grid-cols-3 md:gap-6">
+            {t.after.map((line, i) => (
+              <li
+                key={line}
+                className="grid content-start justify-items-center gap-4 text-center text-ink-2"
+              >
+                <span className="grid size-11 place-items-center rounded-full bg-ink text-base font-semibold text-white tabular-nums">
+                  {i + 1}
                 </span>
-              </p>
-              <p className="mt-3 text-[15px] text-ink-3">
-                <Phrases text={plan.billing} locale={locale} />
-              </p>
-              <div className="mt-auto pt-8">
-                <Subscribe
-                  locale={locale}
-                  plan={PLANS[i] as Plan}
-                  labels={{
-                    subscribe: all.checkout.subscribe,
-                    failed: all.checkout.failed,
-                    soon: all.pricing.checkout,
-                  }}
-                  subscribed={<Rich text={all.checkout.subscribed} locale={locale} />}
-                />
-              </div>
-            </div>
-          ))}
-          <div className={`${CARD} bg-graphite! text-on-dark md:col-span-2 lg:col-span-1`}>
-            <h2 className="font-sans text-lg leading-snug font-semibold tracking-normal">
-              {t.includedTitle}
-            </h2>
-            <ul className="mt-5 space-y-3 text-[15px] text-on-dark-2">
-              {t.included.map((line) => (
-                <li key={line} className="flex gap-3">
-                  <Icon name="check" className="mt-1 size-4.5 shrink-0 text-amber" />
-                  <span>
-                    <Phrases text={line} locale={locale} />
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
+                <span>
+                  <Rich text={line} locale={locale} />
+                </span>
+              </li>
+            ))}
+          </ol>
         </section>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <section className={CARD} aria-labelledby="key">
+        <div className="mt-[clamp(48px,6vw,88px)] grid gap-4 md:grid-cols-2">
+          <section className={`${CARD} ring-1 ring-line`} aria-labelledby="key">
             <h2 id="key" className={HEADING}>
               <Phrases text={t.keyTitle} locale={locale} />
             </h2>
@@ -91,7 +67,7 @@ export default async function Pricing({ params }: PageProps) {
               </p>
             ))}
           </section>
-          <section className={CARD} aria-labelledby="refund">
+          <section className={`${CARD} ring-1 ring-line`} aria-labelledby="refund">
             <h2 id="refund" className={HEADING}>
               <Phrases text={t.refundTitle} locale={locale} />
             </h2>
@@ -102,6 +78,13 @@ export default async function Pricing({ params }: PageProps) {
             ))}
           </section>
         </div>
+
+        <section className="mt-[clamp(48px,6vw,88px)]" aria-labelledby="faq-title">
+          <h2 id="faq-title" className="mb-8 text-center text-[clamp(32px,3.6vw,48px)]">
+            <Phrases text={all.home.faq.title} locale={locale} />
+          </h2>
+          <Faq locale={locale} />
+        </section>
       </div>
     </Frame>
   );
