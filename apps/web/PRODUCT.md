@@ -30,7 +30,7 @@ The edit is made end to end with no timeline to touch: analysis, planning, rende
 The name is "Fineframe". Its icon is in the repository's `brand/` folder, with the wordmark in Archivo SemiExpanded; the page shows the 32 px version (`public/icon.svg`) beside the name set in Geist bold, as the website sets it, and `app/favicon.ico` holds the 16 and 32 px ones. The interface takes the website's visual system, direction A: a light ground, white panels, ink type and one amber, as DESIGN.md sets out.
 
 ## Evidence on Hand
-The README's example frames and videos from a CC BY 3.0 interview (release `v0.2.0`). No testimonials, customers or usage numbers exist; none may be invented.
+The README's example frames and videos from a CC BY 3.0 interview (`downloads.fineframe.app/examples/v0.2.0/`). No testimonials, customers or usage numbers exist; none may be invented.
 
 ## Product Principles
 - No manual editing steps: every choice the page asks for must be one a newcomer can answer.
