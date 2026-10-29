@@ -15,6 +15,10 @@ const FOOTER_LINK =
 const BRAND =
   "flex items-center gap-2.5 text-[17px] leading-none font-bold tracking-[-0.02em] no-underline sm:text-[19px]";
 
+/** Sign in, outlined beside the amber button; on phones, where the bar is full, a link. */
+const ACCOUNT_LINK =
+  "whitespace-nowrap sm:inline-flex sm:h-10 sm:items-center sm:rounded-full sm:border-(length:--stroke) sm:border-line sm:px-4.5 sm:font-medium sm:text-ink sm:transition-[border-color] sm:hover:border-ink";
+
 /** Pages where the bar leaves out its button to the plans: they have their own next step. */
 const NO_PLANS_BUTTON: PagePath[] = [...ACCOUNT_PAGES, "/pricing/"];
 
@@ -112,7 +116,7 @@ export function Frame({
               locale={locale}
               labels={{ signIn: t.nav.signIn, account: t.nav.account }}
               current={path === "/signin/" || path === "/account/"}
-              className={`${NAV_LINK} whitespace-nowrap`}
+              className={`${NAV_LINK} ${ACCOUNT_LINK}`}
             />
             {!NO_PLANS_BUTTON.includes(path) && (
               <a className={buttonClass({ size: "sm" })} href={href(locale, "/pricing/")}>

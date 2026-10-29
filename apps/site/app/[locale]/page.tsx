@@ -1,7 +1,7 @@
 import "../../components/home/home.css";
 import type { Metadata } from "next";
-import { Subscribe } from "../../components/account/Subscribe.tsx";
 import { Download } from "../../components/Download.tsx";
+import { Faq } from "../../components/Faq.tsx";
 import { Frame } from "../../components/Frame.tsx";
 import { CutDemo } from "../../components/home/CutDemo.tsx";
 import { Duck } from "../../components/home/Duck.tsx";
@@ -10,15 +10,13 @@ import { Loop } from "../../components/home/Loop.tsx";
 import { Reel } from "../../components/home/Reel.tsx";
 import { WideEdit } from "../../components/home/WideEdit.tsx";
 import { Icon } from "../../components/Icon.tsx";
+import { Included, Plans } from "../../components/Plans.tsx";
 import { Phrases, Rich } from "../../components/Rich.tsx";
 import { buttonClass } from "../../components/ui/button.tsx";
 import { content, type Lines } from "../../lib/content.ts";
 import { lastTwo } from "../../lib/english.ts";
-import type { Plan } from "../../lib/paddle.ts";
 import { href, type Locale, localeOf, type PageProps, pageMetadata } from "../../lib/site.ts";
 import { SECTION_LEDE } from "../../lib/styles.ts";
-
-const PLANS: Plan[] = ["monthly", "yearly"];
 
 /**
  * While the post, the page's own buttons to the plans or the footer are on screen, the floating
@@ -229,50 +227,9 @@ export default async function Home({ params }: PageProps) {
               <Two locale={locale} lines={t.pricing.title} />
             </h2>
             <p className={`${SECTION_LEDE} text-ink-2`}>{text(t.pricing.lede)}</p>
-            <div className="mt-[clamp(40px,5vw,64px)] grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {all.pricing.plans.map((plan, i) => (
-                <div
-                  key={plan.name}
-                  className="flex flex-col rounded-card bg-paper p-[clamp(24px,2.6vw,36px)]"
-                >
-                  <p className="font-semibold">{plan.name}</p>
-                  <p className="mt-4 text-[clamp(44px,4.4vw,60px)] leading-none font-bold tracking-[-0.035em] tabular-nums">
-                    {plan.price}
-                    <span className="ml-1.5 text-base font-medium tracking-normal text-ink-3">
-                      {plan.period}
-                    </span>
-                  </p>
-                  <p className="mt-3 text-[15px] text-ink-3">{plan.billing}</p>
-                  <div className="mt-auto pt-8">
-                    <Subscribe
-                      locale={locale}
-                      plan={PLANS[i] as Plan}
-                      labels={{
-                        subscribe: all.checkout.subscribe,
-                        failed: all.checkout.failed,
-                        soon: all.pricing.checkout,
-                      }}
-                      subscribed={text(all.checkout.subscribed)}
-                    />
-                    <p className="mt-4 text-sm text-ink-3">
-                      <Phrases text={all.pricing.terms} locale={locale} />
-                    </p>
-                  </div>
-                </div>
-              ))}
-              <div className="rounded-card bg-graphite p-[clamp(24px,2.6vw,36px)] text-on-dark md:col-span-2 lg:col-span-1">
-                <p className="font-semibold">{all.pricing.includedTitle}</p>
-                <ul className="mt-5 space-y-3 text-[15px] text-on-dark-2">
-                  {all.pricing.included.map((line) => (
-                    <li key={line} className="flex gap-3">
-                      <Icon name="check" className="mt-1 size-4.5 shrink-0 text-amber" />
-                      <span>
-                        <Phrases text={line} locale={locale} />
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            <div className="mt-[clamp(40px,5vw,64px)] grid gap-4">
+              <Plans locale={locale} />
+              <Included locale={locale} />
             </div>
             <p className="mt-6 max-w-[40em] text-[15px] text-ink-2">
               {text(t.pricing.cost)} {text(t.pricing.more)}
@@ -285,22 +242,7 @@ export default async function Home({ params }: PageProps) {
             <h2 id="faq-title">
               <Phrases text={t.faq.title} locale={locale} />
             </h2>
-            <div className="border-t-(length:--stroke) border-ink">
-              {t.faq.items.map((item) => (
-                <details key={item.q} className="group border-b">
-                  <summary className="flex list-none items-center justify-between gap-4 py-5 text-[17px] leading-snug font-semibold [&::-webkit-details-marker]:hidden">
-                    <span>
-                      <Phrases text={item.q} locale={locale} />
-                    </span>
-                    <Icon
-                      name="plus"
-                      className="size-4.5 shrink-0 transition-transform duration-300 group-open:rotate-45"
-                    />
-                  </summary>
-                  <p className="max-w-[40em] pb-6 text-ink-2">{text(item.a)}</p>
-                </details>
-              ))}
-            </div>
+            <Faq locale={locale} />
           </div>
         </section>
 

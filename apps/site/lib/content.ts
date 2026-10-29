@@ -144,9 +144,12 @@ export type Content = {
   };
   pricing: {
     title: string;
+    /** The page's heading; `title` names it in the tab and the bar. */
+    heading: Lines;
     description: string;
     lede: Rich;
-    plans: { name: string; price: string; period: string; billing: string }[];
+    /** `save`: the tag on the plan that costs less. */
+    plans: { name: string; price: string; period: string; billing: string; save?: string }[];
     /** What the plan buttons say until purchases open. */
     checkout: string;
     /** Under each plan's button. */

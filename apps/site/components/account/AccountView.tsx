@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { content } from "../../lib/content.ts";
 import { lastTwo } from "../../lib/english.ts";
-import type { Plan } from "../../lib/paddle.ts";
 import { href, LANG, type Locale } from "../../lib/site.ts";
 import { CARD, ERROR, HEADING, HINT, NOTICE, PROSE } from "../../lib/styles.ts";
 import {
@@ -14,19 +13,16 @@ import {
   signInFirst,
   supabase,
 } from "../../lib/supabase.ts";
-import { Rich } from "../Rich.tsx";
+import { Plans } from "../Plans.tsx";
 import { Button, buttonClass } from "../ui/button.tsx";
-import { Subscribe } from "./Subscribe.tsx";
 
 /** How often, and how many times, to look again for the row a checkout's webhook writes. */
 const CONFIRM_EVERY_MS = 2000;
 const CONFIRM_TRIES = 15;
 
-const PLANS: Plan[] = ["monthly", "yearly"];
-
 /**
- * The signed-in user's subscription and its billing; then the download once the account has a
- * plan, or the plans until it has one.
+ * The signed-in user's subscription and its billing beside the download, and the plans under
+ * them until the account has one.
  */
 export function AccountView({ locale }: { locale: Locale }) {
   const all = content(locale);
@@ -94,108 +90,94 @@ export function AccountView({ locale }: { locale: Locale }) {
     : { label: t.status.none, note: t.status.soon };
   const hasPlan = billing && entitled(row);
 
+  // The status's dot: amber while the plan runs, red once it needs attention or has ended.
+  const tone =
+    !billing || !row
+      ? "bg-steel"
+      : entitled(row)
+        ? row.status === "past_due"
+          ? "bg-cut"
+          : "bg-amber"
+        : row.status === "canceled"
+          ? "bg-cut"
+          : "bg-steel";
+
   return (
-    <div className="grid items-start gap-4 md:grid-cols-2">
-      <section className={CARD} aria-labelledby="subscription">
-        <h2 id="subscription" className={HEADING}>
-          {t.subscriptionTitle}
-        </h2>
-        <dl className="grid max-w-[62ch] gap-4 [&_dt]:text-sm [&_dt]:text-ink-3">
-          <div>
-            <dt>{t.signedInAs}</dt>
-            <dd>{email}</dd>
-          </div>
-          <div>
-            <dt>{t.statusTitle}</dt>
-            <dd>
-              <strong data-status={billing ? (row?.status ?? "none") : "soon"}>
-                {status.label}
-              </strong>
-              {billing && row && ` · ${t.plans[row.plan]}`}
-              {status.note && <span className="mt-1 block text-ink-2">{lastTwo(status.note)}</span>}
-            </dd>
-          </div>
-        </dl>
-        {confirming && (
-          <p className={`${NOTICE} mt-5`} role="status">
-            {lastTwo(t.status.confirming)}
-          </p>
-        )}
-        {error && (
-          <p className={`${NOTICE} ${ERROR} mt-5`} role="alert">
-            {error}
-          </p>
-        )}
-        {billing && row && (
-          <>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button type="button" onClick={manage} disabled={busy}>
+    <div className="grid gap-[clamp(48px,6vw,88px)]">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+        <section className={`${CARD} ring-1 ring-line`} aria-labelledby="subscription">
+          <h2 id="subscription" className={HEADING}>
+            {t.subscriptionTitle}
+          </h2>
+          <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2 [&_dt]:text-sm [&_dt]:text-ink-3 [&_dd]:mt-1">
+            <div className="min-w-0">
+              <dt>{t.signedInAs}</dt>
+              <dd className="truncate">{email}</dd>
+            </div>
+            <div>
+              <dt>{t.statusTitle}</dt>
+              <dd>
+                <strong
+                  className="inline-flex items-center gap-2 rounded-full bg-ground px-3 py-1 text-[15px]"
+                  data-status={billing ? (row?.status ?? "none") : "soon"}
+                >
+                  <span className={`size-2 rounded-full ${tone}`} aria-hidden="true" />
+                  {status.label}
+                  {billing && row && ` · ${t.plans[row.plan]}`}
+                </strong>
+              </dd>
+            </div>
+          </dl>
+          {status.note && <p className="mt-5 text-ink-2">{lastTwo(status.note)}</p>}
+          {confirming && (
+            <p className={`${NOTICE} mt-5`} role="status">
+              {lastTwo(t.status.confirming)}
+            </p>
+          )}
+          {error && (
+            <p className={`${NOTICE} ${ERROR} mt-5`} role="alert">
+              {error}
+            </p>
+          )}
+          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4 border-t pt-6">
+            {billing && row && (
+              <Button type="button" variant="outline" size="sm" onClick={manage} disabled={busy}>
                 {t.manage}
               </Button>
-            </div>
-            <p className={`${HINT} mt-5`}>{lastTwo(t.manageNote)}</p>
-          </>
-        )}
-        <p className="mt-8 text-sm">
-          <button
-            type="button"
-            className="cursor-pointer bg-transparent p-0 text-ink-2 underline decoration-line underline-offset-[3px] hover:decoration-ink"
-            onClick={signOut}
-          >
-            {t.signOut}
-          </button>
-        </p>
-      </section>
-      {hasPlan ? (
-        <section className={CARD} aria-labelledby="download">
+            )}
+            <button
+              type="button"
+              className="cursor-pointer bg-transparent p-0 text-[15px] text-ink-2 underline decoration-line underline-offset-[3px] hover:decoration-ink"
+              onClick={signOut}
+            >
+              {t.signOut}
+            </button>
+          </div>
+          {billing && row && <p className={`${HINT} mt-4`}>{lastTwo(t.manageNote)}</p>}
+        </section>
+        <section className={`${CARD} ring-1 ring-line`} aria-labelledby="download">
           <h2 id="download" className={HEADING}>
             {t.downloadTitle}
           </h2>
           <p className={PROSE}>{lastTwo(t.downloadBody)}</p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <a className={buttonClass()} href={href(locale, "/download/")}>
+            <a
+              className={buttonClass({ variant: hasPlan ? "default" : "outline", size: "sm" })}
+              href={href(locale, "/download/")}
+            >
               {t.download}
             </a>
           </div>
         </section>
-      ) : (
-        <section className={CARD} aria-labelledby="plans">
-          <h2 id="plans" className={HEADING}>
+      </div>
+      {!hasPlan && (
+        <section aria-labelledby="plans">
+          <h2 id="plans" className="mb-8 text-center text-[clamp(32px,3.6vw,48px)]">
             {t.choose}
           </h2>
-          <ul className="divide-y">
-            {all.pricing.plans.map((plan, i) => (
-              <li
-                key={plan.name}
-                className="flex flex-wrap items-center justify-between gap-4 py-5 first:pt-0"
-              >
-                <div>
-                  <p className="font-semibold">{plan.name}</p>
-                  <p className="text-[28px] leading-tight font-bold tracking-[-0.03em] tabular-nums">
-                    {plan.price}
-                    <span className="ml-1 text-sm font-medium tracking-normal text-ink-3">
-                      {plan.period}
-                    </span>
-                  </p>
-                  <p className="text-sm text-ink-3">{lastTwo(plan.billing)}</p>
-                </div>
-                <Subscribe
-                  locale={locale}
-                  plan={PLANS[i] as Plan}
-                  labels={{
-                    subscribe: all.checkout.subscribe,
-                    failed: all.checkout.failed,
-                    soon: all.pricing.checkout,
-                  }}
-                  subscribed={<Rich text={all.checkout.subscribed} locale={locale} />}
-                />
-              </li>
-            ))}
-          </ul>
-          <p className={`${HINT} mt-2`}>{lastTwo(all.pricing.terms)}</p>
-          <p className={`${HINT} mt-3`}>
-            <a href={href(locale, "/download/")}>{t.download}</a>
-          </p>
+          <div className="mx-auto max-w-[1000px]">
+            <Plans locale={locale} />
+          </div>
         </section>
       )}
     </div>

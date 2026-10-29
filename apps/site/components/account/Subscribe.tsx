@@ -22,6 +22,7 @@ export function Subscribe({
   plan,
   labels: t,
   subscribed: subscribedText,
+  primary = false,
 }: {
   locale: Locale;
   plan: Plan;
@@ -29,6 +30,8 @@ export function Subscribe({
   labels: { subscribe: string; failed: string; soon: string };
   /** What a subscriber sees instead of the button, set by the page. */
   subscribed: ReactNode;
+  /** Amber, for the plan the page recommends; the other plan's button is outlined. */
+  primary?: boolean;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const [selling, setSelling] = useState(false);
@@ -93,15 +96,22 @@ export function Subscribe({
     });
   }
 
-  const chip = "text-[15px] font-semibold text-ink-2";
+  // Until there is a button, its place holds what is true instead, shaped like it but flat.
+  const chip =
+    "flex min-h-13 items-center justify-center rounded-full bg-ground px-6 py-2 text-center text-[15px] font-semibold text-ink-2";
   return (
-    <div ref={root} className="grid justify-items-start gap-4">
+    <div ref={root} className="grid gap-4">
       {!selling ? (
         <p className={chip}>{t.soon}</p>
       ) : subscribed ? (
         <p className={chip}>{subscribedText}</p>
       ) : (
-        <Button type="button" onClick={checkout} disabled={busy}>
+        <Button
+          type="button"
+          variant={primary ? "default" : "outline"}
+          onClick={checkout}
+          disabled={busy}
+        >
           {t.subscribe}
         </Button>
       )}

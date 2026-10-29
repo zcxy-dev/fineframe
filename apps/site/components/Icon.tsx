@@ -23,6 +23,37 @@ const PATHS = {
   ),
   plus: <path d="M12 5v14M5 12h14" />,
   check: <path d="m5 12 5 5 9-10" />,
+  laptop: (
+    <>
+      <rect x="4" y="5" width="16" height="11" rx="1.5" />
+      <path d="M2 19h20" />
+    </>
+  ),
+  timer: (
+    <>
+      <circle cx="12" cy="13" r="8" />
+      <path d="M12 9v4l2.5 2.5" />
+      <path d="M9.5 2h5" />
+    </>
+  ),
+  layers: (
+    <>
+      <path d="m12 3 9 5-9 5-9-5z" />
+      <path d="m3 13 9 5 9-5" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="4.5" y="10.5" width="15" height="10" rx="2" />
+      <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" />
+    </>
+  ),
+  shield: (
+    <>
+      <path d="M12 3 4.5 6v5.5c0 4.5 3.2 8.2 7.5 9.5 4.3-1.3 7.5-5 7.5-9.5V6z" />
+      <path d="m9 12 2.2 2.2L15.5 10" />
+    </>
+  ),
 };
 
 export function Icon({ name, className }: { name: keyof typeof PATHS; className?: string }) {

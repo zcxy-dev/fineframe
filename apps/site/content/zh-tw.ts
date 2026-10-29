@@ -212,15 +212,17 @@ export const zhTw: Content = {
   },
   pricing: {
     title: "價格",
+    heading: ["同一個完整的 App", "兩種付費方式"],
     description: "Fineframe 每月 15 美元或每年 120 美元，兩種方案是同一個完整的 App。",
-    lede: "兩種方案是同一個完整的 App，只差在扣款週期。",
+    lede: "兩種方案的功能完全相同：每月付 15 美元，或每年付一次 120 美元，等於每月 10 美元。",
     plans: [
       { name: "月繳", price: "US$15", period: "/ 月", billing: "每月扣款" },
       {
         name: "年繳",
         price: "US$120",
         period: "/ 年",
-        billing: "每年扣款一次，等於每月 10 美元，比月繳省 60 美元",
+        billing: "等於每月 10 美元，每年扣款一次",
+        save: "省 60 美元",
       },
     ],
     checkout: "即將開放購買",

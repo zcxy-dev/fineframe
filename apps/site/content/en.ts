@@ -230,15 +230,17 @@ export const en: Content = {
   },
   pricing: {
     title: "Pricing",
+    heading: ["One full app", "Two ways to pay"],
     description: "Fineframe is US$15 a month or US$120 a year, the same full app either way.",
-    lede: "Both plans are the same full app: only the billing period differs.",
+    lede: "Every feature is in both plans. Pay US$15 month to month, or US$120 once a year, which comes to US$10 a month.",
     plans: [
       { name: "Monthly", price: "US$15", period: "/ month", billing: "Billed every month" },
       {
         name: "Yearly",
         price: "US$120",
         period: "/ year",
-        billing: "Billed once a year: US$10 a month, US$60 less than monthly",
+        billing: "US$10 a month, billed once a year",
+        save: "Save US$60",
       },
     ],
     checkout: "Opening soon",
@@ -249,7 +251,7 @@ export const en: Content = {
       "Open it and sign in with this account.",
       "Paste your [Anthropic API key](https://console.anthropic.com/settings/keys) and make your first edit.",
     ],
-    includedTitle: "In both plans",
+    includedTitle: "Everything in both plans",
     included: [
       "Fineframe for Macs with Apple silicon, Windows and Linux",
       "Edits from 15 seconds to an hour, at 9:16, 1:1 or 16:9",
