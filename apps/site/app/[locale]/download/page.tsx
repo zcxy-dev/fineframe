@@ -3,10 +3,11 @@ import { Frame } from "../../../components/Frame.tsx";
 import { Icon } from "../../../components/Icon.tsx";
 import { PageHead } from "../../../components/PageHead.tsx";
 import { Phrases, Rich } from "../../../components/Rich.tsx";
+import { ShareLink } from "../../../components/ShareLink.tsx";
 import { buttonClass } from "../../../components/ui/button.tsx";
 import { content } from "../../../lib/content.ts";
 import { DOWNLOADS, localeOf, type PageProps, pageMetadata } from "../../../lib/site.ts";
-import { CARD, HEADING, LIST } from "../../../lib/styles.ts";
+import { CARD, HEADING, LIST, NOTICE } from "../../../lib/styles.ts";
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const locale = await localeOf(params);
@@ -23,9 +24,19 @@ export default async function Download({ params }: PageProps) {
         <p>
           <Rich text={t.lede} locale={locale} />
         </p>
+        <p className="text-[15px] text-ink-3">
+          <Rich text={t.needs} locale={locale} />
+        </p>
       </PageHead>
 
       <div className="wrap grid grid-cols-1 gap-4 pb-[clamp(64px,8vw,120px)]">
+        {/* On a phone or tablet: the installers are for a computer, so send the page there. */}
+        <div data-show="mobile" className={`${NOTICE} grid justify-items-start gap-4 bg-paper!`}>
+          <p>
+            <Phrases text={t.phone} locale={locale} />
+          </p>
+          <ShareLink label={t.share} copied={t.copied} />
+        </div>
         {/* On a computer, only its card, whole; elsewhere the three side by side. */}
         <section
           className="grid grid-cols-1 gap-4 lg:grid-cols-3 computer:lg:grid-cols-1"

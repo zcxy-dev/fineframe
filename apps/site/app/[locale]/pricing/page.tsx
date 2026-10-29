@@ -7,7 +7,7 @@ import { Phrases, Rich } from "../../../components/Rich.tsx";
 import { content } from "../../../lib/content.ts";
 import type { Plan } from "../../../lib/paddle.ts";
 import { localeOf, type PageProps, pageMetadata } from "../../../lib/site.ts";
-import { CARD, HEADING, PROSE } from "../../../lib/styles.ts";
+import { CARD, HEADING, LIST, PROSE } from "../../../lib/styles.ts";
 
 /** The plans in the order the content lists them. */
 const PLANS: Plan[] = ["monthly", "yearly"];
@@ -60,17 +60,22 @@ export default async function Pricing({ params }: PageProps) {
                   }}
                   subscribed={<Rich text={all.checkout.subscribed} locale={locale} />}
                 />
+                <p className="mt-4 text-sm text-ink-3">
+                  <Phrases text={t.terms} locale={locale} />
+                </p>
               </div>
             </div>
           ))}
-          <div className={`${CARD} bg-graphite! text-on-dark md:col-span-2 lg:col-span-1`}>
+          <div
+            className={`${CARD} border-(length:--stroke) border-line bg-ground! md:col-span-2 lg:col-span-1`}
+          >
             <h2 className="font-sans text-lg leading-snug font-semibold tracking-normal">
               {t.includedTitle}
             </h2>
-            <ul className="mt-5 space-y-3 text-[15px] text-on-dark-2">
+            <ul className="mt-5 space-y-3 text-[15px] text-ink-2">
               {t.included.map((line) => (
                 <li key={line} className="flex gap-3">
-                  <Icon name="check" className="mt-1 size-4.5 shrink-0 text-amber" />
+                  <Icon name="check" className="mt-1 size-4.5 shrink-0 text-ink" />
                   <span>
                     <Phrases text={line} locale={locale} />
                   </span>
@@ -80,7 +85,19 @@ export default async function Pricing({ params }: PageProps) {
           </div>
         </section>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <section className={CARD} aria-labelledby="after">
+            <h2 id="after" className={HEADING}>
+              <Phrases text={t.afterTitle} locale={locale} />
+            </h2>
+            <ol className={LIST}>
+              {t.after.map((line) => (
+                <li key={line}>
+                  <Rich text={line} locale={locale} />
+                </li>
+              ))}
+            </ol>
+          </section>
           <section className={CARD} aria-labelledby="key">
             <h2 id="key" className={HEADING}>
               <Phrases text={t.keyTitle} locale={locale} />

@@ -7,16 +7,16 @@
 web
 
 ## Users
-Creators who have footage and want a finished video without editing it by hand. The first market is Taiwanese and Mandarin-speaking creators, who often speak Mandarin and English in the same video. Visitors arrive deciding whether to download a desktop app and bring their own Anthropic API key.
+Creators who have footage and want a finished video without editing it by hand. The first market is Taiwanese and Mandarin-speaking creators, who often speak Mandarin and English in the same video. Visitors arrive deciding whether to subscribe to a desktop app and bring their own Anthropic API key.
 
 ## Product Purpose
-fineframe.app sells and explains Fineframe, a proprietary desktop app for macOS on Apple silicon, Windows and Linux that edits footage into a finished video automatically: cut, captioned, framed, graded, scored and animated. The site's job is to make that offer clear and believable, get the visitor to download the free public beta, and later sell the subscription. It also carries the legal pages, accounts (Supabase) and the Paddle checkout.
+fineframe.app sells and explains Fineframe, a proprietary desktop app for macOS on Apple silicon, Windows and Linux that edits footage into a finished video automatically: cut, captioned, framed, graded, scored and animated. The site's job is to make that offer clear and believable and to sell the subscription. It also carries the legal pages, accounts (Supabase) and the Paddle checkout.
 
 ## Positioning
 The edit is made end to end with no timeline to touch: analysis and rendering run on the user's own computer, Claude plans the edit and checks every cut on the user's own key, and it is built for Mandarin, English and speech that switches between them, with captions in Taiwan Traditional Chinese.
 
 ## Operating Context
-- The app is a free public beta; a free account signs in. Paid plans (US$15 a month, US$120 a year, the same full app) show "Coming soon" until billing is switched on.
+- There is no free plan and no free trial. Two plans, US$15 a month and US$120 a year, are the same full app; buying needs a free account. Until purchases open (`app_config.billing_enabled`), the plans say "Opening soon". Anyone can download the installers; the app needs an active plan to run.
 - The user pays Anthropic directly for Claude: about US$0.20 to 0.60 for an edit of a minute or less, US$1 to 1.20 for five minutes.
 - The site is a static Next.js export on Cloudflare Pages, in English and Traditional Chinese at equal quality.
 
@@ -36,7 +36,7 @@ The name is Fineframe. Its icon (`public/icon.svg`) is graphite and steel with o
 ## Product Principles
 - Show the edit, not adjectives: real output carries the page.
 - Say plainly what leaves the computer and what Claude costs.
-- One honest offer: free beta now, prices stated, nothing hidden.
+- One honest offer: prices stated, nothing hidden, no free plan to upsell from.
 - English and Traditional Chinese are equals, never a translation afterthought.
 
 ## Accessibility & Inclusion

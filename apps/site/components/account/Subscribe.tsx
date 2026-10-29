@@ -12,9 +12,9 @@ const accounts = () => import("../../lib/supabase.ts");
 const payments = () => import("../../lib/paddle.ts");
 
 /**
- * A plan's checkout button, once billing is on; until then, "Coming soon". A signed-out
- * visitor signs in first and comes back with `?plan=`, which opens that plan's checkout; a
- * subscriber is sent to their account instead.
+ * A plan's checkout button, once billing is on; until then, "Opening soon". A signed-out
+ * visitor creates an account (or signs in) first and comes back with `?plan=`, which opens that
+ * plan's checkout; a subscriber is sent to their account instead.
  */
 export function Subscribe({
   locale,
@@ -66,11 +66,11 @@ export function Subscribe({
   async function checkout() {
     setBusy(true);
     setError("");
-    const { signInHref, supabase } = await accounts();
+    const { signUpHref, supabase } = await accounts();
     const { data } = await supabase().auth.getSession();
     if (!data.session) {
       return window.location.assign(
-        signInHref(locale, `${href(locale, "/pricing/")}?plan=${plan}`),
+        signUpHref(locale, `${href(locale, "/pricing/")}?plan=${plan}`),
       );
     }
     const { loadPaddle, PRICE } = await payments();
@@ -92,8 +92,7 @@ export function Subscribe({
     });
   }
 
-  const chip =
-    "inline-flex rounded-full border-(length:--stroke) border-line px-3.5 py-1.5 text-sm font-semibold text-ink-2";
+  const chip = "text-[15px] font-semibold text-ink-2";
   return (
     <div ref={root} className="grid justify-items-start gap-4">
       {!selling ? (

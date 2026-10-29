@@ -4,9 +4,19 @@ import { useEffect, useState } from "react";
 import { content } from "../../lib/content.ts";
 import { lastTwo } from "../../lib/english.ts";
 import type { Locale } from "../../lib/site.ts";
-import { NOTICE, PROSE } from "../../lib/styles.ts";
-import { signInFirst, supabase } from "../../lib/supabase.ts";
+import { HINT, NOTICE, PROSE } from "../../lib/styles.ts";
+import {
+  billingEnabled,
+  entitled,
+  mySubscription,
+  signInFirst,
+  supabase,
+} from "../../lib/supabase.ts";
+import { Phrases, Rich } from "../Rich.tsx";
 import { Button } from "../ui/button.tsx";
+
+const TEXT_BUTTON =
+  "cursor-pointer bg-transparent p-0 text-ink-2 underline decoration-line underline-offset-[3px] hover:decoration-ink";
 
 /**
  * The consent step of the app's sign-in (ENTITLEMENT.md): Supabase sends the browser here with
@@ -18,6 +28,8 @@ export function AuthorizeView({ locale }: { locale: Locale }) {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  // Once purchases open, an account with no plan learns it here rather than in the app.
+  const [noPlan, setNoPlan] = useState(false);
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("authorization_id");
@@ -34,6 +46,10 @@ export function AuthorizeView({ locale }: { locale: Locale }) {
       }
       setId(id);
       setEmail(details.data.user.email);
+      const noPlan = await Promise.all([billingEnabled(), mySubscription()])
+        .then(([on, row]) => on && !entitled(row))
+        .catch(() => false);
+      setNoPlan(noPlan);
     });
   }, [locale, t]);
 
@@ -68,21 +84,24 @@ export function AuthorizeView({ locale }: { locale: Locale }) {
   return (
     <div className="grid gap-5">
       <p className={PROSE}>{lastTwo(t.lede.replace("{email}", email))}</p>
-      <div className="mt-3 flex flex-wrap gap-3">
+      <p className={HINT}>
+        <Phrases text={t.shares} locale={locale} />
+      </p>
+      {noPlan && (
+        <p className={NOTICE} role="status">
+          <Rich text={t.noPlan} locale={locale} />
+        </p>
+      )}
+      <div className="mt-3">
         <Button type="button" onClick={() => decide(true)} disabled={busy}>
           {t.allow}
         </Button>
-        <Button type="button" variant="outline" onClick={() => decide(false)} disabled={busy}>
-          {t.deny}
-        </Button>
       </div>
-      <p className="text-sm text-ink-3">
-        <button
-          type="button"
-          className="cursor-pointer bg-transparent p-0 text-ink-2 underline decoration-line underline-offset-[3px] hover:decoration-ink"
-          onClick={switchAccount}
-          disabled={busy}
-        >
+      <p className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+        <button type="button" className={TEXT_BUTTON} onClick={() => decide(false)} disabled={busy}>
+          {t.deny}
+        </button>
+        <button type="button" className={TEXT_BUTTON} onClick={switchAccount} disabled={busy}>
           {t.switch}
         </button>
       </p>

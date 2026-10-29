@@ -3,9 +3,10 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { content } from "../../lib/content.ts";
 import { lastTwo } from "../../lib/english.ts";
+import type { Plan } from "../../lib/paddle.ts";
 import { href, type Locale } from "../../lib/site.ts";
 import { ERROR, HINT, NOTICE } from "../../lib/styles.ts";
-import { errorText, nextPath, supabase } from "../../lib/supabase.ts";
+import { errorText, nextPath, nextPlan, supabase } from "../../lib/supabase.ts";
 import { Button } from "../ui/button.tsx";
 import { Input } from "../ui/input.tsx";
 import { Label } from "../ui/label.tsx";
@@ -21,17 +22,23 @@ export function AuthForm({
   /** Under the sign-up form: what creating an account agrees to, set by the page. */
   agree?: ReactNode;
 }) {
-  const t = content(locale).auth;
+  const all = content(locale);
+  const t = all.auth;
   const page = t[mode];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [sentTo, setSentTo] = useState("");
   // The other form keeps where to go after signing in.
   const [query, setQuery] = useState("");
+  // The plan whose checkout opens after, when the plans sent the visitor here.
+  const [plan, setPlan] = useState<Plan>();
   useEffect(() => {
     const next = new URLSearchParams(window.location.search).get("next");
     if (next) setQuery(`?next=${encodeURIComponent(next)}`);
+    setPlan(nextPlan());
   }, []);
+  const withPlan = (text: string) =>
+    plan ? text.replace("{plan}", all.account.plans[plan]) : text;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,13 +79,18 @@ export function AuthForm({
   if (sentTo) {
     return (
       <p className={NOTICE} role="status">
-        {lastTwo(t.signUp.sent.replace("{email}", sentTo))}
+        {lastTwo(withPlan(plan ? t.signUp.sentPlan : t.signUp.sent).replace("{email}", sentTo))}
       </p>
     );
   }
 
   return (
     <div className="grid gap-5">
+      {plan && (
+        <p className={NOTICE} role="status">
+          {lastTwo(withPlan(page.forPlan))}
+        </p>
+      )}
       <Button type="button" variant="outline" className="w-full" onClick={google} disabled={busy}>
         {t.google}
       </Button>

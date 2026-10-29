@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { content } from "../../lib/content.ts";
 import { lastTwo } from "../../lib/english.ts";
+import type { Plan } from "../../lib/paddle.ts";
 import { href, LANG, type Locale } from "../../lib/site.ts";
 import { CARD, ERROR, HEADING, HINT, NOTICE, PROSE } from "../../lib/styles.ts";
 import {
@@ -13,15 +14,23 @@ import {
   signInFirst,
   supabase,
 } from "../../lib/supabase.ts";
+import { Rich } from "../Rich.tsx";
 import { Button, buttonClass } from "../ui/button.tsx";
+import { Subscribe } from "./Subscribe.tsx";
 
 /** How often, and how many times, to look again for the row a checkout's webhook writes. */
 const CONFIRM_EVERY_MS = 2000;
 const CONFIRM_TRIES = 15;
 
-/** The signed-in user's subscription, its billing and the downloads. */
+const PLANS: Plan[] = ["monthly", "yearly"];
+
+/**
+ * The signed-in user's subscription and its billing; then the download once the account has a
+ * plan, or the plans until it has one.
+ */
 export function AccountView({ locale }: { locale: Locale }) {
-  const t = content(locale).account;
+  const all = content(locale);
+  const t = all.account;
   const [email, setEmail] = useState<string>();
   const [row, setRow] = useState<Subscription | null>();
   const [billing, setBilling] = useState(false);
@@ -82,7 +91,8 @@ export function AccountView({ locale }: { locale: Locale }) {
     iso ? new Intl.DateTimeFormat(LANG[locale], { dateStyle: "long" }).format(new Date(iso)) : "";
   const status = billing
     ? statusLine(t.status, row, date)
-    : { label: t.status.beta, note: t.status.betaNote };
+    : { label: t.status.none, note: t.status.soon };
+  const hasPlan = billing && entitled(row);
 
   return (
     <div className="grid items-start gap-4 md:grid-cols-2">
@@ -98,7 +108,7 @@ export function AccountView({ locale }: { locale: Locale }) {
           <div>
             <dt>{t.statusTitle}</dt>
             <dd>
-              <strong data-status={billing ? (row?.status ?? "none") : "beta"}>
+              <strong data-status={billing ? (row?.status ?? "none") : "soon"}>
                 {status.label}
               </strong>
               {billing && row && ` · ${t.plans[row.plan]}`}
@@ -116,34 +126,78 @@ export function AccountView({ locale }: { locale: Locale }) {
             {error}
           </p>
         )}
-        <div className="mt-8 flex flex-wrap gap-3">
-          {billing &&
-            (row ? (
+        {billing && row && (
+          <>
+            <div className="mt-8 flex flex-wrap gap-3">
               <Button type="button" onClick={manage} disabled={busy}>
                 {t.manage}
               </Button>
-            ) : (
-              <a className={buttonClass()} href={href(locale, "/pricing/")}>
-                {t.choose}
-              </a>
-            ))}
-          <Button type="button" variant="outline" onClick={signOut}>
+            </div>
+            <p className={`${HINT} mt-5`}>{lastTwo(t.manageNote)}</p>
+          </>
+        )}
+        <p className="mt-8 text-sm">
+          <button
+            type="button"
+            className="cursor-pointer bg-transparent p-0 text-ink-2 underline decoration-line underline-offset-[3px] hover:decoration-ink"
+            onClick={signOut}
+          >
             {t.signOut}
-          </Button>
-        </div>
-        {billing && row && <p className={`${HINT} mt-5`}>{lastTwo(t.manageNote)}</p>}
+          </button>
+        </p>
       </section>
-      <section className={CARD} aria-labelledby="download">
-        <h2 id="download" className={HEADING}>
-          {t.downloadTitle}
-        </h2>
-        <p className={PROSE}>{lastTwo(t.downloadBody)}</p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <a className={buttonClass({ variant: "outline" })} href={href(locale, "/download/")}>
-            {t.download}
-          </a>
-        </div>
-      </section>
+      {hasPlan ? (
+        <section className={CARD} aria-labelledby="download">
+          <h2 id="download" className={HEADING}>
+            {t.downloadTitle}
+          </h2>
+          <p className={PROSE}>{lastTwo(t.downloadBody)}</p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <a className={buttonClass()} href={href(locale, "/download/")}>
+              {t.download}
+            </a>
+          </div>
+        </section>
+      ) : (
+        <section className={CARD} aria-labelledby="plans">
+          <h2 id="plans" className={HEADING}>
+            {t.choose}
+          </h2>
+          <ul className="divide-y">
+            {all.pricing.plans.map((plan, i) => (
+              <li
+                key={plan.name}
+                className="flex flex-wrap items-center justify-between gap-4 py-5 first:pt-0"
+              >
+                <div>
+                  <p className="font-semibold">{plan.name}</p>
+                  <p className="text-[28px] leading-tight font-bold tracking-[-0.03em] tabular-nums">
+                    {plan.price}
+                    <span className="ml-1 text-sm font-medium tracking-normal text-ink-3">
+                      {plan.period}
+                    </span>
+                  </p>
+                  <p className="text-sm text-ink-3">{lastTwo(plan.billing)}</p>
+                </div>
+                <Subscribe
+                  locale={locale}
+                  plan={PLANS[i] as Plan}
+                  labels={{
+                    subscribe: all.checkout.subscribe,
+                    failed: all.checkout.failed,
+                    soon: all.pricing.checkout,
+                  }}
+                  subscribed={<Rich text={all.checkout.subscribed} locale={locale} />}
+                />
+              </li>
+            ))}
+          </ul>
+          <p className={`${HINT} mt-2`}>{lastTwo(all.pricing.terms)}</p>
+          <p className={`${HINT} mt-3`}>
+            <a href={href(locale, "/download/")}>{t.download}</a>
+          </p>
+        </section>
+      )}
     </div>
   );
 }
@@ -153,7 +207,7 @@ function statusLine(
   row: Subscription | null,
   date: (iso: string | null) => string,
 ): { label: string; note?: string } {
-  if (!row) return { label: t.none };
+  if (!row) return { label: t.none, note: t.noneNote };
   switch (row.status) {
     case "active":
     case "trialing":

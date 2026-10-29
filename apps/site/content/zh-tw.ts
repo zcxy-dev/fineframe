@@ -4,6 +4,7 @@ import { DOWNLOADS } from "../lib/site.ts";
 const BUYER = "https://www.paddle.com/legal/buyer-terms";
 const CONTACT =
   "如有任何問題，請來信 [support@fineframe.app](mailto:support@fineframe.app) 與我們聯繫。";
+const UPD = "最後更新：2026 年 10 月 29 日。";
 const SELLER = "Fineframe App 與本網站由 Fineframe（以下稱「我們」）開發與提供。";
 
 export const zhTw: Content = {
@@ -18,7 +19,7 @@ export const zhTw: Content = {
     download: "下載",
     account: "帳號",
     signIn: "登入",
-    getStarted: "免費下載",
+    getStarted: "查看方案",
     language: "語言",
   },
   footer: {
@@ -36,14 +37,14 @@ export const zhTw: Content = {
   home: {
     title: "Fineframe｜你只管拍，剪好的直接發",
     description:
-      "你只管拍，剪好的直接發。Fineframe 在你的電腦上完成剪接、字幕和配樂，中英夾雜也聽得懂。免費測試版支援 Mac、Windows 和 Linux。",
+      "你只管拍，剪好的直接發。Fineframe 在你的電腦上完成剪接、字幕和配樂，中英夾雜也聽得懂。支援 Mac、Windows 和 Linux。",
     hero: {
       title: ["你只管拍", "剪好的直接發"],
       lede: "素材丟進來，剪接、字幕、配樂一次完成，中英夾雜也聽得懂。",
-      download: "免費下載測試版",
+      plans: "查看方案與價格",
       phone: "到下載頁看電腦版",
       watch: "看一支成片",
-      facts: ["Mac（Apple 晶片）・Windows・Linux", "測試期間免費"],
+      facts: ["Mac（Apple 晶片）・Windows・Linux", "每月 15 美元，或每年 120 美元"],
       post: "22 分鐘的對談剪成 50 秒",
       steps: ["聽寫每一句", "挑出講得最好的段落", "裁成直式", "檢查每個剪接點", "完成・0:50・9:16"],
       credit: "素材：NASA 公有領域影片，不代表 NASA 背書",
@@ -52,10 +53,10 @@ export const zhTw: Content = {
     },
     features: {
       title: ["從剪接到配樂", "一次完成"],
-      lede: "以下功能都在目前的測試版裡。",
+      lede: "以下功能現在的 App 都有。",
       cut: {
         title: ["剪掉贅字和停頓", "長度剛剛好"],
-        body: "挑出講得最好的段落，長度誤差不超過 5%，也不會在字的中間下刀。",
+        body: "挑出講得最好的段落，長度誤差不超過 5%，每個剪接點都會對照前後的字句檢查。",
         words: [
           ["嗯", true],
           ["那個", true],
@@ -100,24 +101,23 @@ export const zhTw: Content = {
     },
     privacy: {
       title: ["在你的電腦上剪", "影片檔不上傳"],
-      lede: "分析和輸出都在你的電腦上進行。Claude 用你自己的 Anthropic 金鑰規劃剪輯，收到的只有這三樣。",
+      lede: "分析和輸出都在你的電腦上進行。Claude 用你自己的 Anthropic 金鑰規劃剪輯，收到的主要是這三樣，從不包含影片檔。",
       stays: { title: "留在你的電腦上", items: ["影片檔", "分析結果", "專案和品牌套組"] },
       sent: { title: "送給 Claude", items: ["逐字稿", "每個檔案的基本資訊", "剪接點前後的畫面"] },
       more: "[App 送出的所有資料和去處](/privacy/)",
     },
     pricing: {
-      title: ["測試期間免費", "之後每月 15 美元"],
-      lede: "現在下載，用免費帳號登入就能用。付費方案開放後，月繳和年繳都是同一個完整的 App。",
-      beta: { name: "測試版", price: "US$0", period: "測試期間" },
+      title: ["一個完整的 App", "每月 15 美元"],
+      lede: "月繳和年繳是同一個完整的 App，只差在扣款週期。購買前需要先建立免費的 Fineframe 帳號。",
       cost: "Claude 的費用另計，用你自己的 Anthropic API 金鑰：1 分鐘以內的影片約 0.20 到 0.60 美元，5 分鐘約 1 到 1.20 美元。每次剪輯前 App 都會先估算。",
       more: "[完整價格說明](/pricing/)",
     },
     faq: {
-      title: "下載前你可能想知道",
+      title: "購買前你可能想知道",
       items: [
         {
           q: "開始用需要準備什麼？",
-          a: "一台支援的電腦、免費的 Fineframe 帳號，和你自己的 [Anthropic API 金鑰](https://console.anthropic.com/settings/keys)。第一次打開時，App 會安裝約 2 GB 的分析元件。",
+          a: "一台支援的電腦、Fineframe 方案，和你自己的 [Anthropic API 金鑰](https://console.anthropic.com/settings/keys)。第一次打開時，App 會安裝約 2 GB 的分析元件。",
         },
         {
           q: "支援哪些電腦？",
@@ -137,7 +137,7 @@ export const zhTw: Content = {
         },
         {
           q: "可以退款嗎？",
-          a: "沒有免費試用。付費方案開放後，方案的首次付款可在 14 天內申請退款，每位客戶限一次；續訂款項不退。請見[退款政策](/refund/)。",
+          a: "沒有免費試用。方案的首次付款可在 14 天內申請退款，每位客戶限一次；續訂款項不退。請見[退款政策](/refund/)。",
         },
       ],
     },
@@ -146,7 +146,11 @@ export const zhTw: Content = {
   download: {
     title: "下載 Fineframe",
     description: "Apple 晶片 Mac、Windows 和 Linux 的安裝檔，不需要另外安裝其他軟體。",
-    lede: "下載安裝檔就能用，不必另外裝 Node、Python 或命令列工具。測試期間免費，用免費帳號登入。",
+    lede: "下載安裝檔就能用，不必另外裝 Node、Python 或命令列工具。用有訂閱方案的帳號登入。",
+    needs: "需要有效的 Fineframe 方案才能使用。[查看方案](/pricing/)",
+    phone: "Fineframe 在電腦上執行。請用電腦打開這一頁，或把連結傳給自己。",
+    share: "傳送連結",
+    copied: "已複製連結",
     table: { computer: "電腦", installer: "安裝檔", get: "下載" },
     platforms: [
       {
@@ -193,7 +197,7 @@ export const zhTw: Content = {
     ],
     firstOpenTitle: "第一次打開時",
     firstOpen: [
-      "在瀏覽器登入你的 Fineframe 帳號，測試期間免費。",
+      "在瀏覽器登入有訂閱方案的 Fineframe 帳號。",
       "貼上你的 [Anthropic API 金鑰](https://console.anthropic.com/settings/keys)，App 會確認它能用。",
       "同時 App 會安裝一次分析元件，約 2 GB 的 Python 和 PyTorch，視窗裡會顯示進度。",
       "第一次剪輯時會下載其餘元件，各有自己的進度條：語音模型、FFmpeg、特效算圖器，以及第一次匯入連結時用的 yt-dlp。",
@@ -208,18 +212,25 @@ export const zhTw: Content = {
   },
   pricing: {
     title: "價格",
-    description: "Fineframe 測試期間免費，之後每月 15 美元或每年 120 美元。",
-    lede: "測試期間 Fineframe 免費。以下價格在付費方案開放後適用；月繳和年繳是同一個完整的 App，只差在扣款週期。",
+    description: "Fineframe 每月 15 美元或每年 120 美元，兩種方案是同一個完整的 App。",
+    lede: "兩種方案是同一個完整的 App，只差在扣款週期。",
     plans: [
       { name: "月繳", price: "US$15", period: "/ 月", billing: "每月扣款" },
       {
         name: "年繳",
         price: "US$120",
         period: "/ 年",
-        billing: "每年扣款一次，等於每月 10 美元",
+        billing: "每年扣款一次，等於每月 10 美元，比月繳省 60 美元",
       },
     ],
-    checkout: "即將推出",
+    checkout: "即將開放購買",
+    terms: "隨時可取消，首次付款 14 天內可退款。",
+    afterTitle: "訂閱之後",
+    after: [
+      "[下載](/download/)你電腦的 Fineframe。",
+      "打開 App，用這個帳號登入。",
+      "貼上你的 [Anthropic API 金鑰](https://console.anthropic.com/settings/keys)，開始第一支影片。",
+    ],
     includedTitle: "兩種方案都包含",
     included: [
       "Apple 晶片 Mac、Windows 和 Linux 版 Fineframe",
@@ -241,6 +252,7 @@ export const zhTw: Content = {
       title: "服務條款",
       description: "使用 Fineframe 與 fineframe.app 的條款。",
       intro: ["本條款適用於 Fineframe App 與本網站。"],
+      updated: UPD,
       sections: [
         { heading: "服務提供者", body: [SELLER, CONTACT] },
         {
@@ -258,9 +270,9 @@ export const zhTw: Content = {
           ],
         },
         {
-          heading: "免費測試與退款",
+          heading: "退款",
           body: [
-            "公開測試期間 Fineframe 免費。付費方案開放後沒有免費試用：方案的首次付款可在 14 天內退款，每位客戶限一次，續訂款項不予退款；申請方式見[退款政策](/refund/)。",
+            "Fineframe 沒有免費方案，也沒有免費試用。方案的首次付款可在 14 天內退款，每位客戶限一次，續訂款項不予退款；申請方式見[退款政策](/refund/)。",
           ],
         },
         {
@@ -307,6 +319,7 @@ export const zhTw: Content = {
       intro: [
         "Fineframe 在你自己的電腦上剪輯影片。本政策說明 App 與本網站會送出哪些資料、送給誰、在什麼時候。",
       ],
+      updated: UPD,
       sections: [
         { heading: "服務提供者", body: [SELLER, CONTACT] },
         {
@@ -320,7 +333,7 @@ export const zhTw: Content = {
         {
           heading: "你的帳號",
           body: [
-            "你的 Fineframe 帳號保存你的電子郵件地址，以及你密碼的雜湊值；如果你用 Google 登入，則保存 Google 提供的姓名、電子郵件地址與大頭貼。帳號也記錄你註冊與最近登入的時間，登入紀錄會記下每次登入來自的 IP 位址。付費方案開放後，帳號還會保存 Paddle 傳給我們的訂閱狀態、方案與續訂日期。",
+            "你的 Fineframe 帳號保存你的電子郵件地址，以及你密碼的雜湊值；如果你用 Google 登入，則保存 Google 提供的姓名、電子郵件地址與大頭貼。帳號也記錄你註冊與最近登入的時間，登入紀錄會記下每次登入來自的 IP 位址。訂閱後，帳號還會保存 Paddle 傳給我們的訂閱狀態、方案與續訂日期。",
             "帳號由我們的帳號服務供應商 Supabase 保存在東京，適用 [Supabase 的隱私權政策](https://supabase.com/privacy)。App 登入帳號只是為了確認你可以使用 Fineframe；App 不會傳送使用資料、素材或金鑰給我們。",
           ],
         },
@@ -391,9 +404,8 @@ export const zhTw: Content = {
     refund: {
       title: "退款政策",
       description: "方案的首次付款可在 14 天內透過 Paddle 申請退款，每位客戶限一次。",
-      intro: [
-        "本政策在付費方案開放後適用。在那之前，Fineframe 是免費的公開測試版，沒有需要退款的款項。Fineframe 沒有免費試用。",
-      ],
+      intro: ["Fineframe 沒有免費方案，也沒有免費試用。本政策說明方案的付款在什麼情況下可以退款。"],
+      updated: UPD,
       sections: [
         {
           heading: "首次付款 14 天內可退款",
@@ -476,6 +488,7 @@ export const zhTw: Content = {
       forgot: "忘記密碼？",
       switchPrompt: "第一次使用 Fineframe？",
       switchLink: "建立帳號",
+      forPlan: "登入後，就會打開{plan}的結帳畫面。",
     },
     signUp: {
       title: "建立帳號",
@@ -486,6 +499,9 @@ export const zhTw: Content = {
       switchPrompt: "已經有帳號了？",
       switchLink: "登入",
       sent: "請查看收件匣：我們已寄信到 {email}，打開信裡的連結確認信箱後就會自動登入。",
+      forPlan: "建立帳號並確認信箱後，就會打開{plan}的結帳畫面。",
+      sentPlan:
+        "請查看收件匣：我們已寄信到 {email}，打開信裡的連結確認信箱後，就會打開{plan}的結帳畫面。",
     },
     reset: {
       title: "重設密碼",
@@ -517,6 +533,8 @@ export const zhTw: Content = {
     plans: { monthly: "月繳方案", yearly: "年繳方案" },
     status: {
       none: "尚未訂閱",
+      noneNote: "Fineframe 需要有效的方案才能使用。",
+      soon: "開放購買後，就能在這裡選擇方案。",
       active: "訂閱中",
       renews: "將於 {date} 續訂。",
       cancelled: "已取消",
@@ -526,8 +544,6 @@ export const zhTw: Content = {
       paused: "已暫停",
       ended: "已結束",
       confirming: "已收到付款，正在確認你的訂閱…",
-      beta: "免費公開測試版",
-      betaNote: "Fineframe 在測試期間免費使用，付費方案之後才會推出。",
     },
     choose: "選擇方案",
     manage: "管理帳單",
@@ -540,6 +556,8 @@ export const zhTw: Content = {
     title: "登入 App",
     description: "登入這台電腦上的 Fineframe App。",
     lede: "這台電腦上的 Fineframe App 要求以 {email} 登入。",
+    shares: "App 會取得這個帳號的電子郵件地址和方案是否有效，不會取得你的密碼。",
+    noPlan: "這個帳號還沒有方案。[選擇方案](/pricing/)後就能使用 Fineframe。",
     allow: "登入 App",
     deny: "取消",
     switch: "使用其他帳號",

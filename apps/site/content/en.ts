@@ -4,6 +4,7 @@ import { DOWNLOADS } from "../lib/site.ts";
 const BUYER = "https://www.paddle.com/legal/buyer-terms";
 const CONTACT =
   "If you have any questions, contact us at [support@fineframe.app](mailto:support@fineframe.app).";
+const UPD = "Last updated 29 October 2026.";
 const SELLER =
   "The Fineframe app and this website are developed and provided by Fineframe (“we”, “us”).";
 
@@ -19,7 +20,7 @@ export const en: Content = {
     download: "Download",
     account: "Account",
     signIn: "Sign in",
-    getStarted: "Download",
+    getStarted: "See plans",
     language: "Language",
   },
   footer: {
@@ -37,14 +38,14 @@ export const en: Content = {
   home: {
     title: "Fineframe | Shoot it, post it",
     description:
-      "Fineframe edits your footage on your own computer: the cuts, captions and music, even when you switch between Mandarin and English. Free beta for Mac, Windows and Linux.",
+      "Fineframe edits your footage on your own computer: the cuts, captions and music, even when you switch between Mandarin and English. For Mac, Windows and Linux.",
     hero: {
       title: ["Shoot it", "Post it"],
       lede: "Fineframe does the edit in between: the cuts, captions and music, even when you switch between Mandarin and English.",
-      download: "Download the free beta",
+      plans: "See plans and pricing",
       phone: "Downloads for your computer",
       watch: "Watch an edit",
-      facts: ["Mac (Apple silicon) · Windows · Linux", "Free while in beta"],
+      facts: ["Mac (Apple silicon) · Windows · Linux", "US$15 a month or US$120 a year"],
       post: "A 22-minute talk, cut to 50 seconds",
       steps: [
         "Transcribing",
@@ -59,10 +60,10 @@ export const en: Content = {
     },
     features: {
       title: ["From the first cut", "to the final mix"],
-      lede: "All of it ships in today’s beta.",
+      lede: "All of it is in the app today.",
       cut: {
         title: ["Ums and pauses out", "right on length"],
-        body: "Fineframe keeps your best takes, lands within 5 % of the length you pick and never cuts mid-word.",
+        body: "Fineframe keeps your best takes, lands within 5 % of the length you pick and checks every cut against the words around it.",
         words: [
           ["So,", true],
           ["um,", true],
@@ -111,7 +112,7 @@ export const en: Content = {
     },
     privacy: {
       title: ["Edited on your computer", "with no video uploaded"],
-      lede: "Analysis and rendering run on your own machine. Claude plans the edit on your own Anthropic key and gets only these three things.",
+      lede: "Analysis and rendering run on your own machine. Claude plans the edit on your own Anthropic key and gets mainly these three things, never your video files.",
       stays: {
         title: "Stays on your computer",
         items: ["Your video files", "Their analysis", "Your projects and brand kits"],
@@ -123,18 +124,17 @@ export const en: Content = {
       more: "[Everything the app sends, and where](/privacy/)",
     },
     pricing: {
-      title: ["Free while in beta", "then US$15 a month"],
-      lede: "Download it now and sign in with a free account. When paid plans open, monthly and yearly are the same full app.",
-      beta: { name: "Beta", price: "US$0", period: "while in beta" },
+      title: ["One full app", "US$15 a month"],
+      lede: "Monthly and yearly are the same full app: only the billing period differs. Buying needs a free Fineframe account.",
       cost: "Claude is billed apart, on your own Anthropic API key: about US$0.20 to 0.60 for an edit of a minute or less, and US$1 to 1.20 for five minutes. The app estimates it before every edit.",
       more: "[Full pricing](/pricing/)",
     },
     faq: {
-      title: "Before you download",
+      title: "Before you buy",
       items: [
         {
           q: "What do I need to start?",
-          a: "A supported computer, a free Fineframe account and your own [Anthropic API key](https://console.anthropic.com/settings/keys). The first time it opens, the app installs its analysis, about 2 GB.",
+          a: "A supported computer, a Fineframe plan and your own [Anthropic API key](https://console.anthropic.com/settings/keys). The first time it opens, the app installs its analysis, about 2 GB.",
         },
         {
           q: "Which computers does it run on?",
@@ -154,7 +154,7 @@ export const en: Content = {
         },
         {
           q: "Can I get a refund?",
-          a: "There is no free trial. When paid plans open, a plan’s first payment can be refunded within 14 days, once per customer; renewals are not. See the [refund policy](/refund/).",
+          a: "There is no free trial. A plan’s first payment can be refunded within 14 days, once per customer; renewals are not. See the [refund policy](/refund/).",
         },
       ],
     },
@@ -164,7 +164,11 @@ export const en: Content = {
     title: "Download Fineframe",
     description:
       "Installers for Macs with Apple silicon, Windows and Linux. Nothing else to install.",
-    lede: "Download the installer and there is nothing else to set up: no Node, no Python, no command line. The beta is free; sign in with a free account.",
+    lede: "Download the installer and there is nothing else to set up: no Node, no Python, no command line. Sign in with the account that has your plan.",
+    needs: "Needs an active Fineframe plan to run. [See plans](/pricing/)",
+    phone: "Fineframe runs on a computer. Open this page there, or send yourself the link.",
+    share: "Send the link",
+    copied: "Link copied",
     table: { computer: "Computer", installer: "Installer", get: "Download" },
     platforms: [
       {
@@ -211,7 +215,7 @@ export const en: Content = {
     ],
     firstOpenTitle: "The first time it opens",
     firstOpen: [
-      "Sign in to your Fineframe account in your browser. It is free during the beta.",
+      "Sign in to your Fineframe account in your browser: the one with your plan.",
       "Paste your [Anthropic API key](https://console.anthropic.com/settings/keys), and the app checks it.",
       "Meanwhile the app installs its analysis once, about 2 GB of Python and PyTorch, with the progress in the window.",
       "Your first edit downloads the rest, each with its own progress bar: the speech model, FFmpeg, the effects renderer, and yt-dlp for the first link you import.",
@@ -226,18 +230,25 @@ export const en: Content = {
   },
   pricing: {
     title: "Pricing",
-    description: "Fineframe is free while in beta, then US$15 a month or US$120 a year.",
-    lede: "Fineframe is free while in beta. These prices apply once paid plans open, and both plans are the same full app: only the billing period differs.",
+    description: "Fineframe is US$15 a month or US$120 a year, the same full app either way.",
+    lede: "Both plans are the same full app: only the billing period differs.",
     plans: [
       { name: "Monthly", price: "US$15", period: "/ month", billing: "Billed every month" },
       {
         name: "Yearly",
         price: "US$120",
         period: "/ year",
-        billing: "Billed once a year, US$10 a month",
+        billing: "Billed once a year: US$10 a month, US$60 less than monthly",
       },
     ],
-    checkout: "Coming soon",
+    checkout: "Opening soon",
+    terms: "Cancel anytime. A first payment can be refunded within 14 days.",
+    afterTitle: "After you subscribe",
+    after: [
+      "[Download Fineframe](/download/) for your computer.",
+      "Open it and sign in with this account.",
+      "Paste your [Anthropic API key](https://console.anthropic.com/settings/keys) and make your first edit.",
+    ],
     includedTitle: "In both plans",
     included: [
       "Fineframe for Macs with Apple silicon, Windows and Linux",
@@ -259,6 +270,7 @@ export const en: Content = {
       title: "Terms of service",
       description: "The terms for using Fineframe and fineframe.app.",
       intro: ["These terms apply to the Fineframe app and to this website."],
+      updated: UPD,
       sections: [
         { heading: "About us", body: [SELLER, CONTACT] },
         {
@@ -276,9 +288,9 @@ export const en: Content = {
           ],
         },
         {
-          heading: "The free beta and refunds",
+          heading: "Refunds",
           body: [
-            "Fineframe is free during its public beta. When paid plans open, there is no free trial. A plan’s first payment can be refunded within 14 days, once per customer, and renewals are not refunded; the [refund policy](/refund/) says how to ask.",
+            "Fineframe has no free plan and no free trial. A plan’s first payment can be refunded within 14 days, once per customer, and renewals are not refunded; the [refund policy](/refund/) says how to ask.",
           ],
         },
         {
@@ -329,6 +341,7 @@ export const en: Content = {
       intro: [
         "Fineframe edits your videos on your own computer. This policy says what the app and this website send, to whom, and when.",
       ],
+      updated: UPD,
       sections: [
         { heading: "About us", body: [SELLER, CONTACT] },
         {
@@ -342,7 +355,7 @@ export const en: Content = {
         {
           heading: "Your account",
           body: [
-            "Your Fineframe account holds your email address and either a hash of your password or, when you sign in with Google, the name, email address and picture Google shares. It also holds when you signed up and last signed in, and its sign-in records note the IP address each sign-in came from. Once paid plans open, it also holds your subscription’s status, plan and renewal date, which Paddle sends us.",
+            "Your Fineframe account holds your email address and either a hash of your password or, when you sign in with Google, the name, email address and picture Google shares. It also holds when you signed up and last signed in, and its sign-in records note the IP address each sign-in came from. Once you subscribe, it also holds your subscription’s status, plan and renewal date, which Paddle sends us.",
             "The account is held by Supabase, our account provider, in Tokyo, under [Supabase’s privacy policy](https://supabase.com/privacy). The app signs in to it only to check that you may use Fineframe; it sends us no usage data, footage or keys.",
           ],
         },
@@ -417,8 +430,9 @@ export const en: Content = {
       description:
         "A plan’s first payment can be refunded within 14 days, once per customer, through Paddle.",
       intro: [
-        "This policy applies once paid plans open. Until then, Fineframe is a free public beta, and there is nothing to refund. Fineframe has no free trial.",
+        "Fineframe has no free plan and no free trial. This policy says when a payment for a plan is refunded.",
       ],
+      updated: UPD,
       sections: [
         {
           heading: "14 days on a first payment",
@@ -505,6 +519,7 @@ export const en: Content = {
       forgot: "Forgot your password?",
       switchPrompt: "New to Fineframe?",
       switchLink: "Create an account",
+      forPlan: "Sign in, and the checkout for the {plan} opens.",
     },
     signUp: {
       title: "Create an account",
@@ -516,6 +531,10 @@ export const en: Content = {
       switchPrompt: "Already have an account?",
       switchLink: "Sign in",
       sent: "Check your inbox: we sent a link to {email}. Open it to confirm your address, and you are signed in.",
+      forPlan:
+        "Create your account, and the checkout for the {plan} opens once you confirm your email.",
+      sentPlan:
+        "Check your inbox: we sent a link to {email}. Open it to confirm your address, and the checkout for the {plan} opens.",
     },
     reset: {
       title: "Reset your password",
@@ -547,6 +566,8 @@ export const en: Content = {
     plans: { monthly: "Monthly plan", yearly: "Yearly plan" },
     status: {
       none: "No subscription",
+      noneNote: "Fineframe needs an active plan to run.",
+      soon: "Plans can be bought here once purchases open.",
       active: "Active",
       renews: "Renews on {date}.",
       cancelled: "Cancelled",
@@ -557,8 +578,6 @@ export const en: Content = {
       paused: "Paused",
       ended: "Ended",
       confirming: "Payment received. Confirming your subscription…",
-      beta: "Free public beta",
-      betaNote: "Fineframe is free while it is in beta. Paid plans open later.",
     },
     choose: "Choose a plan",
     manage: "Manage billing",
@@ -572,6 +591,9 @@ export const en: Content = {
     title: "Sign in to the app",
     description: "Sign in to the Fineframe app on this computer.",
     lede: "The Fineframe app on this computer asks to sign in as {email}.",
+    shares:
+      "The app gets this account’s email address and whether its plan is active, never your password.",
+    noPlan: "This account has no plan yet. [Choose one](/pricing/) to use Fineframe.",
     allow: "Sign in to the app",
     deny: "Cancel",
     switch: "Use another account",

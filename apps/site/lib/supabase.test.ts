@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { AuthApiError } from "@supabase/supabase-js";
 import { en } from "../content/en.ts";
-import { errorText, nextPath } from "./supabase.ts";
+import { errorText, nextPath, nextPlan, signUpHref } from "./supabase.ts";
 
 const rejected = (code: string) => new AuthApiError("rejected", 400, code);
 
@@ -30,4 +30,16 @@ test("after signing in, only a page of this site is gone to", () => {
     assert.equal(at(next), "/en/account/", next);
   }
   assert.equal(nextPath("en", { search: "", origin: "https://fineframe.app" }), "/en/account/");
+});
+
+test("a plan's button sends a new buyer to sign up, which names the plan", () => {
+  const search = new URL(signUpHref("en", "/en/pricing/?plan=yearly"), "https://fineframe.app")
+    .search;
+  assert.equal(nextPlan({ search }), "yearly");
+  assert.equal(
+    nextPlan({ search: `?next=${encodeURIComponent("/en/pricing/?plan=free")}` }),
+    undefined,
+  );
+  assert.equal(nextPlan({ search: "?next=%2Fen%2Faccount%2F" }), undefined);
+  assert.equal(nextPlan({ search: "" }), undefined);
 });
