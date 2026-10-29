@@ -12,9 +12,10 @@ const accounts = () => import("../../lib/supabase.ts");
 const payments = () => import("../../lib/paddle.ts");
 
 /**
- * A plan's checkout button, once billing is on; until then, "Opening soon". A signed-out
- * visitor creates an account (or signs in) first and comes back with `?plan=`, which opens that
- * plan's checkout; a subscriber is sent to their account instead.
+ * A plan's checkout button, once billing is on and this build has Paddle's values; until then,
+ * "Opening soon". A signed-out visitor creates an account (or signs in) first and comes back
+ * with `?plan=`, which opens that plan's checkout; a subscriber is sent to their account
+ * instead.
  */
 export function Subscribe({
   locale,
@@ -39,7 +40,7 @@ export function Subscribe({
     const check = () =>
       accounts()
         .then(async ({ billingEnabled, entitled, mySubscription, supabase }) => {
-          if (!(await billingEnabled())) return;
+          if (!(await billingEnabled()) || !(await payments()).sells(plan)) return;
           setSelling(true);
           const { data } = await supabase().auth.getSession();
           if (!data.session) return;

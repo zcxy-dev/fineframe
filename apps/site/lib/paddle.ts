@@ -18,3 +18,8 @@ export const PRICE: Record<Plan, string> = {
   monthly: process.env.NEXT_PUBLIC_PADDLE_PRICE_MONTHLY as string,
   yearly: process.env.NEXT_PUBLIC_PADDLE_PRICE_YEARLY as string,
 };
+
+/** Whether this build has Paddle's values for the plan: without them there is no checkout. */
+export function sells(plan: Plan): boolean {
+  return Boolean(process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN && PRICE[plan]);
+}
