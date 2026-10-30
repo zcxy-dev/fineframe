@@ -1,0 +1,43 @@
+name: verify-site-deploy
+
+# Fails when Cloudflare Pages does not deploy a main commit that changes apps/site/; the failed
+# run is the alert. Pages reports the deploy only as a `Cloudflare Pages` check run on the commit,
+# created when the build finishes (no commit status, no GitHub Deployment).
+on:
+  push:
+    branches: [main]
+    paths: [apps/site/**]
+
+permissions: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      checks: read
+    steps:
+      - name: Wait for the Cloudflare Pages check run
+        # Builds take about two minutes; a check run that never appears is a failure too.
+        run: |
+          deadline=$((SECONDS + 20 * 60))
+          while :; do
+            run=$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=Cloudflare%20Pages&filter=latest" \
+              --jq '[.check_runs[] | select(.app.slug == "cloudflare-workers-and-pages")] | first // empty | "\(.status) \(.conclusion) \(.details_url)"')
+            read -r status conclusion url <<< "$run"
+            if [ "$status" = completed ]; then
+              echo "Cloudflare Pages: $conclusion ($url)"
+              [ "$conclusion" = success ] && exit 0
+              echo "::error::The Cloudflare Pages deploy of $SHA did not succeed: $conclusion"
+              exit 1
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::No completed Cloudflare Pages check run on $SHA after 20 minutes"
+              exit 1
+            fi
+            sleep 20
+          done
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
