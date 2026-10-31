@@ -86,7 +86,7 @@ Row-level security returns only the signed-in user's row: a JSON array with one 
 |---|---|---|
 | `status` | text | Paddle's status: `active`, `trialing`, `past_due`, `paused` or `canceled` |
 | `plan` | text | `monthly` or `yearly` |
-| `current_period_end` | ISO 8601 timestamp or `null` | the end of the period paid for |
+| `current_period_end` | ISO 8601 timestamp or `null` | the end of the period paid for; after a cancel that takes effect at once, as for a refund, when it was canceled |
 | `cancel_at` | ISO 8601 timestamp or `null` | when a cancellation the user scheduled takes effect |
 
 ## The rule

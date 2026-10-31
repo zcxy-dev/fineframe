@@ -9,7 +9,7 @@ const PADDLE_API =
 
 const db = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+  JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}").default ?? "",
 );
 
 // The site calls it from the browser, on another origin.

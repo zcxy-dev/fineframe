@@ -68,6 +68,8 @@ The Edge Functions' secrets, in **Edge Functions → Secrets** (or `supabase sec
 | `PADDLE_WEBHOOK_SECRET` | the secret key of Paddle's notification destination, below |
 | `PADDLE_API_KEY` | a Paddle API key, in **Developer tools → Authentication**, with the customer portal session write permission |
 
+The functions reach the database with the project's secret key named `default`, which Supabase gives them in `SUPABASE_SECRET_KEYS`; it is not set here.
+
 `config push` lists each setting it would change before asking. It leaves alone what `config.toml` does not declare, such as the Google provider and the SMTP server below.
 
 In the dashboard, because their secrets stay out of the repository:

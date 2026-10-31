@@ -20,6 +20,7 @@ export type Subscription = {
   plan: "monthly" | "yearly";
   current_period_end: string | null;
   cancel_at: string | null;
+  paddle_customer_id: string;
 };
 
 /** Whether Fineframe charges yet: `app_config.billing_enabled`, false during the free beta. */
@@ -32,7 +33,7 @@ export async function billingEnabled(): Promise<boolean> {
 export async function mySubscription(): Promise<Subscription | null> {
   const { data, error } = await supabase()
     .from("subscriptions")
-    .select("status,plan,current_period_end,cancel_at")
+    .select("status,plan,current_period_end,cancel_at,paddle_customer_id")
     .maybeSingle();
   if (error) throw error;
   return data;
@@ -49,6 +50,12 @@ export function entitled(row: Subscription | null, now = new Date()): boolean {
     row.current_period_end !== null &&
     new Date(row.current_period_end) > now
   );
+}
+
+/** Whether Paddle bills the subscription, so its customer portal can manage it. */
+export function paddleBilled(row: Subscription): boolean {
+  // Paddle's customer ids are `ctm_…`; a row filed by hand has none.
+  return row.paddle_customer_id.startsWith("ctm_");
 }
 
 /**
