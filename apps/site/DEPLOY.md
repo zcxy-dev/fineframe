@@ -46,7 +46,7 @@ The build reads these public values; they end up in the browser, so none is a se
 
 ## Supabase
 
-The project is `nvpwglzrjiikoawpjaak`, in the Supabase organization Fineframe. Its schema, Edge Functions and Auth settings come from `supabase/`, with the [Supabase CLI](https://supabase.com/docs/guides/cli), after `supabase login`:
+The project is `nvpwglzrjiikoawpjaak`, in the owner's Pro organization ZCXY. Its schema, Edge Functions and Auth settings come from `supabase/`, with the [Supabase CLI](https://supabase.com/docs/guides/cli), after `supabase login`:
 
 ```bash
 supabase link --project-ref nvpwglzrjiikoawpjaak
@@ -70,9 +70,10 @@ The Edge Functions' secrets, in **Edge Functions → Secrets** (or `supabase sec
 
 `config push` lists each setting it would change before asking. It leaves alone what `config.toml` does not declare, such as the Google provider and the SMTP server below.
 
-In the dashboard, because their secrets stay out of the repository:
+In the dashboard, because `config.toml` has no key for them or their secrets stay out of the repository:
 
 - **Authentication → Sign In / Providers → Google:** on, with the client id and secret of a Google OAuth client whose authorized redirect URI is `https://nvpwglzrjiikoawpjaak.supabase.co/auth/v1/callback`.
+- **Authentication → Sign In / Providers → Email → Prevent use of leaked passwords:** on. It rejects passwords found in HaveIBeenPwned on sign-up and on password change, and needs the Pro plan.
 - **Authentication → Emails → SMTP Settings:** Resend, whose domain `fineframe.app` is verified with DNS records in Cloudflare: sender `noreply@fineframe.app`, name `Fineframe`, host `smtp.resend.com`, port `465`, username `resend`, and a Resend API key as the password. Supabase's own mailer sends only to the project team's addresses, at a few emails an hour.
 
 ## Paddle
