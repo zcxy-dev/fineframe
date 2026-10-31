@@ -1,4 +1,9 @@
-import { type AuthError, createClient, type SupabaseClient } from "@supabase/supabase-js";
+import {
+  type AuthError,
+  createClient,
+  isAuthWeakPasswordError,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
 import type { Content } from "./content.ts";
 import type { Plan } from "./paddle.ts";
 import { href, type Locale } from "./site.ts";
@@ -101,6 +106,7 @@ export function errorText(t: Content["auth"]["errors"], error: AuthError | Error
   const code = "code" in error ? error.code : undefined;
   if (code === "invalid_credentials") return t.invalid;
   if (code === "email_not_confirmed") return t.unconfirmed;
+  if (isAuthWeakPasswordError(error) && error.reasons.includes("pwned")) return t.leaked;
   if (code === "weak_password") return t.weak;
   if (code === "email_address_invalid" || code === "email_address_not_authorized") return t.address;
   if (code === "over_request_rate_limit" || code === "over_email_send_rate_limit") return t.rate;

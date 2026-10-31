@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { AuthApiError } from "@supabase/supabase-js";
+import { AuthApiError, AuthWeakPasswordError } from "@supabase/supabase-js";
 import { en } from "../content/en.ts";
 import { errorText, nextPath, nextPlan, paddleBilled, signUpHref } from "./supabase.ts";
 
@@ -11,6 +11,16 @@ test("an address Supabase will not take asks for another, not for a retry", () =
     assert.equal(errorText(en.auth.errors, rejected(code)), en.auth.errors.address);
   }
   assert.equal(errorText(en.auth.errors, rejected("unexpected_failure")), en.auth.errors.generic);
+});
+
+test("a leaked password asks for a different one, not a longer one", () => {
+  // As supabase-js throws Auth's `weak_password` error, with its `weak_password.reasons`.
+  const weak = (reasons: AuthWeakPasswordError["reasons"]) =>
+    new AuthWeakPasswordError("weak", 422, reasons);
+  assert.equal(errorText(en.auth.errors, weak(["pwned"])), en.auth.errors.leaked);
+  assert.equal(errorText(en.auth.errors, weak(["length", "pwned"])), en.auth.errors.leaked);
+  assert.equal(errorText(en.auth.errors, weak(["length"])), en.auth.errors.weak);
+  assert.equal(errorText(en.auth.errors, weak([])), en.auth.errors.weak);
 });
 
 test("after signing in, only a page of this site is gone to", () => {
