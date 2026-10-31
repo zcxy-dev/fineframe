@@ -9,6 +9,7 @@ import {
   billingEnabled,
   entitled,
   mySubscription,
+  paddleBilled,
   type Subscription,
   signInFirst,
   supabase,
@@ -140,7 +141,7 @@ export function AccountView({ locale }: { locale: Locale }) {
             </p>
           )}
           <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4 border-t pt-6">
-            {billing && row && (
+            {billing && row && paddleBilled(row) && (
               <Button type="button" variant="outline" size="sm" onClick={manage} disabled={busy}>
                 {t.manage}
               </Button>
@@ -153,7 +154,9 @@ export function AccountView({ locale }: { locale: Locale }) {
               {t.signOut}
             </button>
           </div>
-          {billing && row && <p className={`${HINT} mt-4`}>{lastTwo(t.manageNote)}</p>}
+          {billing && row && paddleBilled(row) && (
+            <p className={`${HINT} mt-4`}>{lastTwo(t.manageNote)}</p>
+          )}
         </section>
         <section className={`${CARD} ring-1 ring-line`} aria-labelledby="download">
           <h2 id="download" className={HEADING}>
@@ -195,7 +198,12 @@ function statusLine(
     case "trialing":
       return row.cancel_at
         ? { label: t.cancelled, note: t.until.replace("{date}", date(row.cancel_at)) }
-        : { label: t.active, note: t.renews.replace("{date}", date(row.current_period_end)) };
+        : {
+            label: t.active,
+            note: row.current_period_end
+              ? t.renews.replace("{date}", date(row.current_period_end))
+              : undefined,
+          };
     case "past_due":
       return { label: t.pastDue, note: t.pastDueNote };
     case "paused":

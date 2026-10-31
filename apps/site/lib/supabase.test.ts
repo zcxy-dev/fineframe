@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { AuthApiError } from "@supabase/supabase-js";
 import { en } from "../content/en.ts";
-import { errorText, nextPath, nextPlan, signUpHref } from "./supabase.ts";
+import { errorText, nextPath, nextPlan, paddleBilled, signUpHref } from "./supabase.ts";
 
 const rejected = (code: string) => new AuthApiError("rejected", 400, code);
 
@@ -42,4 +42,18 @@ test("a plan's button sends a new buyer to sign up, which names the plan", () =>
   );
   assert.equal(nextPlan({ search: "?next=%2Fen%2Faccount%2F" }), undefined);
   assert.equal(nextPlan({ search: "" }), undefined);
+});
+
+test("only a subscription Paddle bills offers its customer portal", () => {
+  const row = {
+    status: "active",
+    plan: "yearly",
+    current_period_end: null,
+    cancel_at: null,
+  } as const;
+  assert.equal(
+    paddleBilled({ ...row, paddle_customer_id: "ctm_01aaaaaaaaaaaaaaaaaaaaaaaa" }),
+    true,
+  );
+  assert.equal(paddleBilled({ ...row, paddle_customer_id: "comp" }), false);
 });
