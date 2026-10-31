@@ -553,6 +553,7 @@ export const en: Content = {
       invalid: "The email or the password is wrong.",
       unconfirmed: "Confirm your email first: open the link we sent you.",
       weak: "Choose a longer password, of at least 8 characters.",
+      leaked: "This password has appeared in a data breach. Choose a different one.",
       address: "This email address can't be used. Try another one.",
       rate: "Too many attempts. Wait a minute and try again.",
       generic: "Something went wrong. Try again.",

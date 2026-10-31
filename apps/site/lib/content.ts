@@ -216,6 +216,7 @@ export type Content = {
       invalid: string;
       unconfirmed: string;
       weak: string;
+      leaked: string;
       address: string;
       rate: string;
       generic: string;
