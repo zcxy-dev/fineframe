@@ -2,6 +2,7 @@
 // Paddle sends every `subscription.*` event here; the checkout's `custom_data.user_id` says whose
 // it is.
 import { createClient } from "@supabase/supabase-js";
+import { type PaddleSubscription, rpcArgs } from "./subscription.ts";
 
 const SECRET = Deno.env.get("PADDLE_WEBHOOK_SECRET") ?? "";
 /** How old a signed event may be, against replays. */
@@ -11,17 +12,6 @@ const db = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
 );
-
-type PaddleSubscription = {
-  id: string;
-  status: string;
-  customer_id: string;
-  custom_data: { user_id?: string } | null;
-  items: { price: { billing_cycle: { interval: string } | null } }[];
-  current_billing_period: { ends_at: string } | null;
-  scheduled_change: { action: string; effective_at: string } | null;
-  updated_at: string;
-};
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
@@ -33,24 +23,13 @@ Deno.serve(async (req) => {
   if (!event.event_type.startsWith("subscription.")) return new Response("Ignored");
 
   const sub = event.data;
-  const userId = sub.custom_data?.user_id;
-  const interval = sub.items[0]?.price.billing_cycle?.interval;
-  if (!userId || (interval !== "month" && interval !== "year")) {
+  const args = rpcArgs(sub);
+  if (!args) {
     // Not one of the site's checkouts: nothing to file, and nothing for Paddle to retry.
     console.warn(`${event.event_type} ${sub.id}: no user id or plan`);
     return new Response("Ignored");
   }
-  const { error } = await db.rpc("apply_paddle_subscription", {
-    p_user_id: userId,
-    p_status: sub.status,
-    p_plan: interval === "month" ? "monthly" : "yearly",
-    p_current_period_end: sub.current_billing_period?.ends_at ?? null,
-    p_cancel_at:
-      sub.scheduled_change?.action === "cancel" ? sub.scheduled_change.effective_at : null,
-    p_paddle_subscription_id: sub.id,
-    p_paddle_customer_id: sub.customer_id,
-    p_paddle_updated_at: sub.updated_at,
-  });
+  const { error } = await db.rpc("apply_paddle_subscription", args);
   if (error) {
     // Paddle retries a failed delivery.
     console.error(`${event.event_type} ${sub.id}: ${error.message}`);
