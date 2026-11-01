@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AccountFrame } from "../../../components/account/AccountFrame.tsx";
 import { AuthForm } from "../../../components/account/AuthForm.tsx";
+import { Rich } from "../../../components/Rich.tsx";
 import { content } from "../../../lib/content.ts";
 import { localeOf, type PageProps, pageMetadata } from "../../../lib/site.ts";
 
@@ -12,10 +13,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function SignIn({ params }: PageProps) {
   const locale = await localeOf(params);
-  const t = content(locale).auth.signIn;
+  const auth = content(locale).auth;
+  const t = auth.signIn;
   return (
     <AccountFrame locale={locale} path="/signin/" title={t.title} lede={t.lede}>
-      <AuthForm locale={locale} mode="signIn" />
+      <AuthForm locale={locale} mode="signIn" agree={<Rich text={auth.agree} locale={locale} />} />
     </AccountFrame>
   );
 }
