@@ -148,20 +148,25 @@ export type Content = {
     heading: Lines;
     description: string;
     lede: Rich;
-    /** `save`: the tag on the plan that costs less. */
+    /**
+     * In the content's order, which the checkout pairs with Paddle's prices: monthly, then
+     * yearly. `price` is per month; `save`: the tag on the plan that costs less.
+     */
     plans: { name: string; price: string; period: string; billing: string; save?: string }[];
     /** What the plan buttons say until purchases open. */
     checkout: string;
-    /** Under each plan's button. */
-    terms: string;
+    /** Under the plans: how buying works, each beside its icon. */
+    trust: string[];
     afterTitle: string;
     after: Rich[];
     includedTitle: string;
     included: string[];
     keyTitle: string;
-    key: Rich[];
-    refundTitle: string;
-    refund: Rich[];
+    key: Rich;
+    /** An edit's length and what Claude costs for it. */
+    keyRows: [string, string][];
+    faqTitle: string;
+    faq: { q: string; a: Rich }[];
   };
   legal: {
     terms: LegalPage;
@@ -248,8 +253,6 @@ export type Content = {
     status: {
       none: string;
       noneNote: string;
-      /** Under `none` until purchases open. */
-      soon: string;
       active: string;
       renews: string;
       cancelled: string;

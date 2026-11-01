@@ -1,6 +1,6 @@
 import "../../components/home/home.css";
 import type { Metadata } from "next";
-import { Download } from "../../components/Download.tsx";
+import { Close, Facts } from "../../components/Close.tsx";
 import { Faq } from "../../components/Faq.tsx";
 import { Frame } from "../../components/Frame.tsx";
 import { CutDemo } from "../../components/home/CutDemo.tsx";
@@ -23,26 +23,6 @@ import { EYEBROW, SECTION_LEDE, SLUG } from "../../lib/styles.ts";
  * one stays away.
  */
 const CTAS = ["post", "hero-ctas", "close-cta", "footer"];
-
-/**
- * What runs it, under the buttons: the computers, or the visitor's computer's requirement once
- * it is known; and the price.
- */
-function Facts({ locale }: { locale: Locale }) {
-  const t = content(locale);
-  const [computers, price] = t.home.hero.facts;
-  return (
-    <>
-      <span data-show="any mobile">{computers}</span>
-      {t.download.platforms.map((platform) => (
-        <span key={platform.id} data-show={platform.id}>
-          {platform.requirement}
-        </span>
-      ))}
-      <span>{price}</span>
-    </>
-  );
-}
 
 /** A heading's two lines: kept whole in Chinese, and in English never ending on one word. */
 function Two({ lines, locale }: { lines: Lines; locale: Locale }) {
@@ -246,34 +226,13 @@ export default async function Home({ params }: PageProps) {
                 <Phrases text={t.faq.title} locale={locale} />
               </h2>
             </div>
-            <Faq locale={locale} />
+            <Faq locale={locale} items={t.faq.items} />
           </div>
         </section>
 
         <section className="home-section" aria-labelledby="close-title">
           <div className="wrap">
-            <div className="close grid justify-items-center rounded-card bg-amber px-6 py-[clamp(56px,8vw,112px)] text-center">
-              <h2 id="close-title">
-                <Two locale={locale} lines={t.close.title} />
-              </h2>
-              <div id="close-cta" className="mt-9 flex flex-wrap justify-center gap-3">
-                <a className={buttonClass({ variant: "dark" })} href={plans}>
-                  {all.nav.getStarted}
-                </a>
-                <Download
-                  locale={locale}
-                  label={all.nav.download}
-                  phone={t.hero.phone}
-                  className={buttonClass({ variant: "outline" })}
-                />
-              </div>
-              <p className="mt-4 flex flex-wrap justify-center gap-x-4.5 text-small text-amber-ink">
-                <Facts locale={locale} />
-              </p>
-              <p className="mt-2 text-fine text-amber-ink [&_a]:decoration-amber-ink">
-                {text(all.download.needs)}
-              </p>
-            </div>
+            <Close locale={locale} plans={plans} />
           </div>
         </section>
       </div>
