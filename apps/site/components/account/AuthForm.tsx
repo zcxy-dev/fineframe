@@ -55,6 +55,10 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: "signIn" | "s
     const next = new URLSearchParams(window.location.search).get("next");
     if (next) setQuery(`?next=${encodeURIComponent(next)}`);
     setPlan(nextPlan());
+    // Back from Google's page, the browser may restore this one as it was left: at work.
+    const restored = (event: PageTransitionEvent) => event.persisted && setPending(undefined);
+    window.addEventListener("pageshow", restored);
+    return () => window.removeEventListener("pageshow", restored);
   }, []);
   const withPlan = (text: string) =>
     plan ? text.replace("{plan}", all.account.plans[plan]) : text;
@@ -99,6 +103,7 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: "signIn" | "s
     return (
       <section className={`${CARD} ${RAISED}`}>
         <Sent
+          locale={locale}
           title={t.signUp.sentTitle}
           text={withPlan(plan ? t.signUp.sentPlan : t.signUp.sent).replace("{email}", sentTo)}
         >

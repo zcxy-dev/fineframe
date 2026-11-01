@@ -89,7 +89,11 @@ export function ResetForm({ locale }: { locale: Locale }) {
     return (
       <div className="grid gap-6">
         <section className={`${CARD} ${RAISED}`}>
-          <Sent title={t.reset.sentTitle} text={t.reset.sent.replace("{email}", sentTo)}>
+          <Sent
+            locale={locale}
+            title={t.reset.sentTitle}
+            text={t.reset.sent.replace("{email}", sentTo)}
+          >
             <Button
               type="button"
               variant="outline"
@@ -150,6 +154,7 @@ export function ResetForm({ locale }: { locale: Locale }) {
                 type="email"
                 autoComplete="email"
                 aria-invalid={error === e.address || undefined}
+                aria-describedby={error === e.address ? "reset-error" : undefined}
                 required
               />
             </div>
