@@ -5,9 +5,9 @@ import { Faq } from "../../components/Faq.tsx";
 import { Frame } from "../../components/Frame.tsx";
 import { CutDemo } from "../../components/home/CutDemo.tsx";
 import { Duck } from "../../components/home/Duck.tsx";
-import { Float } from "../../components/home/Float.tsx";
 import { Loop } from "../../components/home/Loop.tsx";
 import { Reel } from "../../components/home/Reel.tsx";
+import { Reveal } from "../../components/home/Reveal.tsx";
 import { WideEdit } from "../../components/home/WideEdit.tsx";
 import { Icon } from "../../components/Icon.tsx";
 import { Included, Plans } from "../../components/Plans.tsx";
@@ -17,12 +17,6 @@ import { content, type Lines } from "../../lib/content.ts";
 import { lastTwo } from "../../lib/english.ts";
 import { href, type Locale, localeOf, type PageProps, pageMetadata } from "../../lib/site.ts";
 import { EYEBROW, SECTION_LEDE, SLUG } from "../../lib/styles.ts";
-
-/**
- * While the post, the page's own buttons to the plans or the footer are on screen, the floating
- * one stays away.
- */
-const CTAS = ["post", "hero-ctas", "close-cta", "footer"];
 
 /** A heading's two lines: kept whole in Chinese, and in English never ending on one word. */
 function Two({ lines, locale }: { lines: Lines; locale: Locale }) {
@@ -72,6 +66,7 @@ export default async function Home({ params }: PageProps) {
           <Reel
             post={t.hero.post}
             steps={t.hero.steps}
+            legend={t.hero.legend}
             credit={text(t.hero.credit)}
             pause={t.hero.pause}
             play={t.hero.play}
@@ -80,13 +75,17 @@ export default async function Home({ params }: PageProps) {
 
         <section className="home-section" id="features" aria-labelledby="features-title">
           <div className="wrap">
-            <p className={`${EYEBROW} mb-4`}>{all.nav.features}</p>
-            <h2 id="features-title">
-              <Two locale={locale} lines={f.title} />
-            </h2>
-            <p className="sub">{text(f.lede)}</p>
+            <header className="head">
+              <div>
+                <p className={`${EYEBROW} mb-4`}>{all.nav.features}</p>
+                <h2 id="features-title">
+                  <Two locale={locale} lines={f.title} />
+                </h2>
+              </div>
+              <p className="sub">{text(f.lede)}</p>
+            </header>
             <div className="cards">
-              <article className="card amber cut">
+              <article className="card amber cut" data-reveal>
                 <h3>
                   <Two locale={locale} lines={f.cut.title} />
                 </h3>
@@ -98,7 +97,7 @@ export default async function Home({ params }: PageProps) {
                   result={f.cut.result}
                 />
               </article>
-              <article className="card dark cap on-dark">
+              <article className="card dark cap on-dark" data-reveal>
                 <div className="txt">
                   <h3>
                     <Two locale={locale} lines={f.captions.title} />
@@ -116,7 +115,7 @@ export default async function Home({ params }: PageProps) {
                 </figure>
                 <p className="credit dim">{text(f.captions.credit)}</p>
               </article>
-              <article className="card steel mus">
+              <article className="card steel mus" data-reveal>
                 <h3>
                   <Two locale={locale} lines={f.music.title} />
                 </h3>
@@ -124,17 +123,37 @@ export default async function Home({ params }: PageProps) {
                 <Duck voice={f.music.voice} music={f.music.music} />
               </article>
             </div>
-            <p className="more">{text(f.more)}</p>
+            <section className="also" aria-labelledby="also-title" data-reveal>
+              <h3 id="also-title" className={`font-sans text-ink-3 ${SLUG}`}>
+                {f.alsoTitle}
+              </h3>
+              <ul>
+                {f.also.map((item) => (
+                  <li key={item.title}>
+                    <h4>
+                      <Phrases text={item.title} locale={locale} />
+                    </h4>
+                    <p>
+                      <Phrases text={item.body} locale={locale} />
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
           </div>
         </section>
 
         <section className="home-section" id="formats" aria-labelledby="formats-title">
           <div className="wrap">
-            <p className={`${EYEBROW} mb-4`}>{all.nav.examples}</p>
-            <h2 id="formats-title">
-              <Two locale={locale} lines={y.title} />
-            </h2>
-            <p className="sub">{text(y.lede)}</p>
+            <header className="head">
+              <div>
+                <p className={`${EYEBROW} mb-4`}>{all.nav.examples}</p>
+                <h2 id="formats-title">
+                  <Two locale={locale} lines={y.title} />
+                </h2>
+              </div>
+              <p className="sub">{text(y.lede)}</p>
+            </header>
             <WideEdit
               tracks={y.tracks}
               name={y.name}
@@ -185,7 +204,7 @@ export default async function Home({ params }: PageProps) {
                 </div>
                 <div className="rounded-frame bg-amber p-6 text-ink">
                   <p className={`${SLUG} text-amber-ink`}>{t.privacy.sent.title}</p>
-                  <ul className="sent mt-4 space-y-3">
+                  <ul className="sent mt-4 space-y-3" data-reveal>
                     {t.privacy.sent.items.map((item) => (
                       <li key={item} className="flex items-center gap-3">
                         <span aria-hidden="true" className="h-0.5 w-3.5 shrink-0 bg-ink" />
@@ -203,11 +222,15 @@ export default async function Home({ params }: PageProps) {
 
         <section className="home-section" id="pricing" aria-labelledby="pricing-title">
           <div className="wrap">
-            <p className={`${EYEBROW} mb-4`}>{all.nav.pricing}</p>
-            <h2 id="pricing-title">
-              <Two locale={locale} lines={t.pricing.title} />
-            </h2>
-            <p className={`${SECTION_LEDE} text-ink-2`}>{text(t.pricing.lede)}</p>
+            <header className="head">
+              <div>
+                <p className={`${EYEBROW} mb-4`}>{all.nav.pricing}</p>
+                <h2 id="pricing-title">
+                  <Two locale={locale} lines={t.pricing.title} />
+                </h2>
+              </div>
+              <p className="sub">{text(t.pricing.lede)}</p>
+            </header>
             <div className="mt-[clamp(40px,5vw,64px)] grid gap-4">
               <Plans locale={locale} />
               <Included locale={locale} />
@@ -236,9 +259,7 @@ export default async function Home({ params }: PageProps) {
           </div>
         </section>
       </div>
-      <Float ids={CTAS}>
-        <a href={plans}>{all.nav.getStarted}</a>
-      </Float>
+      <Reveal />
     </Frame>
   );
 }

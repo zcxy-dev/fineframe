@@ -21,6 +21,8 @@ export const zhTw: Content = {
     signIn: "登入",
     getStarted: "查看方案",
     language: "語言",
+    menu: "選單",
+    close: "關閉選單",
   },
   footer: {
     tagline: "你只管拍，剪好的直接發。",
@@ -47,6 +49,7 @@ export const zhTw: Content = {
       facts: ["Mac（Apple 晶片）・Windows・Linux", "每月 US$15，或每年 US$120"],
       post: "22 分鐘的對談剪成 50 秒",
       steps: ["聽寫每一句", "挑出講得最好的段落", "裁成直式", "檢查每個剪接點", "完成・0:50・9:16"],
+      legend: ["保留", "剪掉"],
       credit: "素材：NASA 公有領域影片，不代表 NASA 背書",
       pause: "暫停",
       play: "播放",
@@ -82,7 +85,33 @@ export const zhTw: Content = {
         voice: "人聲",
         music: "音樂",
       },
-      more: "另外還有名牌與標題、B-roll、品牌套組、一次剪出多支短影音，也能匯出到 Final Cut Pro、DaVinci Resolve 和 Premiere Pro。",
+      alsoTitle: "App 裡還有",
+      also: [
+        {
+          title: "一次剪出多支短影音",
+          body: "一支長影片最多剪出 10 支短影音，每支取自其中一段，附上標題、說明和主題標籤。",
+        },
+        {
+          title: "匯出到剪輯軟體",
+          body: "把剪好的影片匯出成 Final Cut Pro、DaVinci Resolve 或 Premiere Pro 的時間軸，音樂、字幕和圖像都在。",
+        },
+        {
+          title: "品牌套組",
+          body: "Logo 浮水印、最多三種顏色、你的字型和字幕樣式，存成有名字的套組。",
+        },
+        {
+          title: "名牌與標題",
+          body: "動態標題、名牌、章節和重點標示，放在說話內容需要的地方。",
+        },
+        {
+          title: "B-roll",
+          body: "切到素材庫的畫面，以及講者提到的網頁畫面，來源都是免費的。",
+        },
+        {
+          title: "用連結匯入素材",
+          body: "貼上 YouTube 或其他網站的公開影片連結，最高以 1080p 匯入。",
+        },
+      ],
     },
     formats: {
       title: ["直的給 Reels", "橫的給 YouTube"],
@@ -146,7 +175,8 @@ export const zhTw: Content = {
   download: {
     title: "下載 Fineframe",
     description: "Apple 晶片 Mac、Windows 和 Linux 的安裝檔，不需要另外安裝其他軟體。",
-    lede: "下載安裝檔就能用，不必另外裝 Node、Python 或命令列工具。用有訂閱方案的帳號登入。",
+    lede: "下載安裝檔就好，不必另外裝 Node、Python 或命令列工具。第一次打開時，App 會安裝分析工具（約 2 GB），再用有訂閱方案的帳號登入。",
+    others: "要裝在別台電腦：",
     needs: "需要有效的 Fineframe 方案才能使用。[查看方案](/pricing/)",
     phone: "Fineframe 在電腦上執行。請用電腦打開這一頁，或把連結傳給自己。",
     share: "傳送連結",

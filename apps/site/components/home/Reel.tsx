@@ -28,12 +28,14 @@ const SEGMENTS: [number, boolean][] = [
 export function Reel({
   post,
   steps,
+  legend,
   credit,
   pause,
   play,
 }: {
   post: string;
   steps: string[];
+  legend: [string, string];
   credit: ReactNode;
   pause: string;
   play: string;
@@ -225,6 +227,8 @@ export function Reel({
             data-src="/media/hero-source.mp4"
             data-src-sm="/media/hero-source-sm.mp4"
             data-sm-w="640"
+            data-src-md="/media/hero-source-md.mp4"
+            data-md-w="1280"
             data-zoom="1.6"
             data-poster="/media/hero-source.webp"
             width={1920}
@@ -239,6 +243,12 @@ export function Reel({
         </div>
         <div className="cutline" ref={cutline}>
           <div className="tc">
+            <span className="legend">
+              <i className="keep" />
+              {legend[0]}
+              <i className="drop" />
+              {legend[1]}
+            </span>
             <span ref={tc}>22:42</span>
           </div>
           <div className="segs" ref={segs}>
@@ -260,6 +270,8 @@ export function Reel({
           data-src="/media/hero-edit.mp4"
           data-src-sm="/media/hero-edit-sm.mp4"
           data-sm-w="432"
+          data-src-md="/media/hero-edit-md.mp4"
+          data-md-w="720"
           width={1080}
           height={1920}
         />

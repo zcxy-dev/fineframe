@@ -3,9 +3,10 @@
 import { type CSSProperties, type ReactNode, useEffect, useRef } from "react";
 import { loop } from "./media.ts";
 
-/** A deterministic scatter for the timeline's clips to fly in from. */
+/** A deterministic scatter for the timeline's clips to fly in from, one after another. */
 function scatter(): () => CSSProperties {
   let seed = 7;
+  let order = 0;
   const rnd = () => {
     seed = (seed * 9301 + 49297) % 233280;
     return seed / 233280;
@@ -15,13 +16,14 @@ function scatter(): () => CSSProperties {
       "--dx": `${Math.round((rnd() - 0.5) * 520)}px`,
       "--dy": `${Math.round(60 + rnd() * 240)}px`,
       "--rot": `${Math.round((rnd() - 0.5) * 30)}deg`,
+      "--delay": `${(order++ * 0.03).toFixed(2)}s`,
     }) as CSSProperties;
 }
 
 /**
- * The YouTube section's edit: its 16:9 player, which straightens as it scrolls in, and the
- * edit's timeline under it, whose clips fly into their tracks and whose red playhead runs
- * with the video.
+ * The YouTube section's edit: its 16:9 player, and the edit's timeline under it, whose clips
+ * land on their tracks the first time it comes on screen and whose red playhead runs with the
+ * video.
  */
 export function WideEdit({
   tracks,
@@ -61,8 +63,8 @@ export function WideEdit({
     ));
   return (
     <div className="ytgrid">
-      <div className="stage3d">
-        <figure className="player">
+      <div>
+        <figure className="player" data-reveal>
           <video
             ref={video}
             muted
@@ -80,7 +82,7 @@ export function WideEdit({
         </figure>
       </div>
       {spec}
-      <div className="tl" aria-hidden="true">
+      <div className="tl" aria-hidden="true" data-reveal>
         <div className="ph" ref={playhead} />
         <div className="row">
           <span className="tk">{tracks[0]}</span>

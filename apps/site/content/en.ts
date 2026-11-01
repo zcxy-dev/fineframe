@@ -22,6 +22,8 @@ export const en: Content = {
     signIn: "Sign in",
     getStarted: "See plans",
     language: "Language",
+    menu: "Menu",
+    close: "Close the menu",
   },
   footer: {
     tagline: "Shoot it, post it. Fineframe does the edit in between.",
@@ -54,6 +56,7 @@ export const en: Content = {
         "Checking every cut",
         "Done · 0:50 · 9:16",
       ],
+      legend: ["Kept", "Cut"],
       credit: "Footage: NASA, public domain. Not an endorsement.",
       pause: "Pause",
       play: "Play",
@@ -93,7 +96,33 @@ export const en: Content = {
         voice: "Voice",
         music: "Music",
       },
-      more: "Also: name cards and titles, B-roll, brand kits, several shorts from one video, and export to Final Cut Pro, DaVinci Resolve and Premiere Pro.",
+      alsoTitle: "Also in the app",
+      also: [
+        {
+          title: "Several shorts",
+          body: "Up to 10 shorts from one long video, each from one stretch of it, with a title, a description and hashtags.",
+        },
+        {
+          title: "Your editing app",
+          body: "Export the finished edit as a timeline for Final Cut Pro, DaVinci Resolve or Premiere Pro, with its music, captions and graphics.",
+        },
+        {
+          title: "Brand kits",
+          body: "A logo watermark, up to three colours, your fonts and caption style, kept as named kits.",
+        },
+        {
+          title: "Names and titles",
+          body: "Animated titles, name cards, chapters and callouts, placed where the speech calls for them.",
+        },
+        {
+          title: "B-roll",
+          body: "Cutaways to stock footage and to the pages the speaker names, from free sources.",
+        },
+        {
+          title: "Links as footage",
+          body: "Paste a public video’s link from YouTube or another site, and it comes in at up to 1080p.",
+        },
+      ],
     },
     formats: {
       title: ["Vertical for Reels", "wide for YouTube"],
@@ -164,7 +193,8 @@ export const en: Content = {
     title: "Download Fineframe",
     description:
       "Installers for Macs with Apple silicon, Windows and Linux. Nothing else to install.",
-    lede: "Download the installer and there is nothing else to set up: no Node, no Python, no command line. Sign in with the account that has your plan.",
+    lede: "Download the installer, with no Node, no Python and no command line to set up. The first time it opens, the app installs its analysis, about 2 GB, and you sign in with the account that has your plan.",
+    others: "For another computer:",
     needs: "Needs an active Fineframe plan to run. [See plans](/pricing/)",
     phone: "Fineframe runs on a computer. Open this page there, or send yourself the link.",
     share: "Send the link",
