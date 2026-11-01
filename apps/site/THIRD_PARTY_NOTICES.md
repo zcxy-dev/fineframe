@@ -8,6 +8,7 @@ The site's own code and text are proprietary, all rights reserved. It uses the c
 |---|---|---|
 | [Geist](https://github.com/vercel/geist-font) | `@fontsource-variable/geist` 5.3.0, its Latin face cut by `scripts/fonts.ts` to the characters the site uses | [SIL Open Font License 1.1](https://openfontlicense.org) |
 | [Noto Sans TC](https://github.com/notofonts/noto-cjk) | `@expo-google-fonts/noto-sans-tc` 0.4.4, its Regular, SemiBold and Black cut by `scripts/fonts.ts` to the characters the site uses | SIL Open Font License 1.1 |
+| [Noto Sans SC](https://github.com/notofonts/noto-cjk) | `@expo-google-fonts/noto-sans-sc` 0.4.4, its Regular and Bold cut by `scripts/fonts.ts` to the simplified Chinese the English pages quote (a source's name and title) | SIL Open Font License 1.1 |
 
 ## npm packages (direct dependencies)
 

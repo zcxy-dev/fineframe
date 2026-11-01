@@ -1,5 +1,5 @@
 @import "tailwindcss";
-/* Geist and Noto Sans TC, cut to the site's characters by scripts/fonts.ts, which writes their
+/* Geist, Noto Sans TC and Noto Sans SC, cut to the site's characters by scripts/fonts.ts, which writes their
    rules. */
 @import "./fonts.generated.css";
 
@@ -72,9 +72,9 @@
   /* Geist sets Latin text and numbers; Noto Sans TC, Chinese. Chinese headings put Noto Sans
      TC first, so their Latin words match its weight. */
   --font-sans:
-    "Geist Variable", "Noto Sans TC", system-ui, -apple-system, "Segoe UI", "PingFang TC",
-    "Microsoft JhengHei", sans-serif;
-  --font-display: "Geist Variable", "Noto Sans TC", sans-serif;
+    "Geist Variable", "Noto Sans TC", "Noto Sans SC", system-ui, -apple-system, "Segoe UI",
+    "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --font-display: "Geist Variable", "Noto Sans TC", "Noto Sans SC", sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
@@ -156,17 +156,15 @@
     letter-spacing: 0.02em;
   }
 
-  /* An English page names Chinese only in its language links and its sources' names, which the
-     system's fonts set rather than a Noto Sans TC download; the names are simplified
-     characters, some of which Noto Sans TC lacks (`Phrases`). */
+  /* An English page names Chinese only in its language links, which the system's font sets
+     rather than a Noto Sans TC download, and in its sources' names and titles, in simplified
+     characters (`Phrases`), which Noto Sans SC sets. */
   html:lang(en) a[hreflang] {
     font-family: system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
   }
 
   :lang(zh-Hans) {
-    font-family:
-      "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Noto Sans SC",
-      system-ui, sans-serif;
+    font-family: "Geist Variable", "Noto Sans SC", system-ui, sans-serif;
   }
 
   ::selection {
@@ -230,7 +228,7 @@
   }
 
   :lang(zh-Hant-TW) :is(h1, h2, h3) {
-    font-family: "Noto Sans TC", "Geist Variable", sans-serif;
+    font-family: "Noto Sans TC", "Geist Variable", "Noto Sans SC", sans-serif;
     font-weight: 900;
     letter-spacing: 0.01em;
     font-feature-settings: "palt";

@@ -125,7 +125,7 @@ Line breaks are part of the design, on every page and at every width:
 - **Chinese** breaks only between phrases, never inside a word (`lib/typeset.ts`): BudouX finds the phrases, a break stays only where ICU's dictionary also ends a word, numbers stay with their units and names stay whole. Each phrase is a `.w` span with a `<wbr>` between. No last line is one character, or one character and a mark.
 - **English** keeps its last two words together (`lib/english.ts`), so no last line is one word.
 - A space separates Chinese from Latin text (`content/content.test.ts` checks it).
-- **Chinese in an English page** is a source's name or title, in simplified characters (极客湾Geekerwan): `Phrases` sets it `lang="zh-Hans"`, in the system's Simplified Chinese font, since Noto Sans TC lacks some of its characters (湾, 访, 蓝, 玑). An English page then downloads no Chinese font.
+- **Chinese in an English page** is a source's name or title, in simplified characters (极客湾Geekerwan): `Phrases` sets it `lang="zh-Hans"`, in Noto Sans SC, cut to just those characters, so an English page downloads no Noto Sans TC. Noto Sans TC lacks some of them (湾, 访, 蓝, 玑), which on a Chinese page fall through to Noto Sans SC, the same design.
 - No `text-wrap: pretty`: WebKit draws some Chinese lines twice with it.
 
 ## Layout and components

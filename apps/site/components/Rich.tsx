@@ -6,8 +6,11 @@ import { phrases } from "../lib/typeset.ts";
 // `[label](href)` a link, `[[text]]` a placeholder, `**text**` strong and `` `text` `` code.
 const TOKEN = /\[\[(.+?)\]\]|\[(.+?)\]\((.+?)\)|\*\*(.+?)\*\*|`(.+?)`/g;
 
-/** Chinese in an English page: the names and titles of sources, written in simplified characters. */
-const HAN = /([\u3400-\u9fff\uf900-\ufaff]+)/;
+/**
+ * Chinese in an English page, with its marks: the names and titles of sources, written in
+ * simplified characters.
+ */
+const HAN = /([\u3000-\u303f\u3400-\u9fff\uf900-\ufaff\uff00-\uffef]+)/;
 
 /**
  * English text, with any Chinese in it (a source's name or title, in simplified characters) set
