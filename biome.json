@@ -11,5 +11,6 @@
     ]
   },
   "formatter": { "indentStyle": "space", "lineWidth": 100 },
-  "css": { "parser": { "tailwindDirectives": true } }
+  "css": { "parser": { "tailwindDirectives": true } },
+  "markdown": { "formatter": { "enabled": false } }
 }
