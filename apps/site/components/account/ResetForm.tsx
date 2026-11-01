@@ -1,11 +1,10 @@
 "use client";
 
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { content } from "../../lib/content.ts";
 import { href, type Locale } from "../../lib/site.ts";
 import { CARD, ERROR, HINT, NOTICE, RAISED } from "../../lib/styles.ts";
 import { errorText, supabase } from "../../lib/supabase.ts";
-import { Rich } from "../Rich.tsx";
 import { Button } from "../ui/button.tsx";
 import { Input } from "../ui/input.tsx";
 import { Label } from "../ui/label.tsx";
@@ -26,19 +25,21 @@ function step(): Step {
   return "ask";
 }
 
-/** The sentence under the heading, which says what this step asks for. */
-export function ResetLede({ locale }: { locale: Locale }) {
-  const t = content(locale).auth.reset;
+/**
+ * The sentence under the heading, which says what this step asks for. The page sets both, so
+ * BudouX stays out of the browser's code.
+ */
+export function ResetLede({ lede, newLede }: { lede: ReactNode; newLede: ReactNode }) {
   const [choosing, setChoosing] = useState(false);
   useEffect(() => setChoosing(step() === "choose"), []);
-  return <Rich text={choosing ? t.newLede : t.lede} locale={locale} />;
+  return choosing ? newLede : lede;
 }
 
 /**
  * Asking for a link to reset the password, or, opened from that link, choosing the new
  * password.
  */
-export function ResetForm({ locale }: { locale: Locale }) {
+export function ResetForm({ locale, sentTitle }: { locale: Locale; sentTitle: ReactNode }) {
   const t = content(locale).auth;
   const [current, setCurrent] = useState<Step>("ask");
   const [busy, setBusy] = useState(false);
@@ -89,11 +90,7 @@ export function ResetForm({ locale }: { locale: Locale }) {
     return (
       <div className="grid gap-6">
         <section className={`${CARD} ${RAISED}`}>
-          <Sent
-            locale={locale}
-            title={t.reset.sentTitle}
-            text={t.reset.sent.replace("{email}", sentTo)}
-          >
+          <Sent title={sentTitle} text={t.reset.sent.replace("{email}", sentTo)}>
             <Button
               type="button"
               variant="outline"

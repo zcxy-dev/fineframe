@@ -1,13 +1,12 @@
 "use client";
 
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { content } from "../../lib/content.ts";
 import { lastTwo } from "../../lib/english.ts";
 import type { Plan } from "../../lib/paddle.ts";
 import { href, type Locale } from "../../lib/site.ts";
 import { CARD, ERROR, HINT, NOTICE, RAISED } from "../../lib/styles.ts";
 import { errorText, nextPath, nextPlan, supabase } from "../../lib/supabase.ts";
-import { Rich } from "../Rich.tsx";
 import { Button } from "../ui/button.tsx";
 import { Input } from "../ui/input.tsx";
 import { Label } from "../ui/label.tsx";
@@ -38,8 +37,21 @@ function GoogleMark() {
   );
 }
 
-/** Signing in or creating an account, with an email and a password or with Google. */
-export function AuthForm({ locale, mode }: { locale: Locale; mode: "signIn" | "signUp" }) {
+/**
+ * Signing in or creating an account, with an email and a password or with Google. The page
+ * sets the consent line and the sent heading, so BudouX stays out of the browser's code.
+ */
+export function AuthForm({
+  locale,
+  mode,
+  agree,
+  sentTitle,
+}: {
+  locale: Locale;
+  mode: "signIn" | "signUp";
+  agree: ReactNode;
+  sentTitle?: ReactNode;
+}) {
   const all = content(locale);
   const t = all.auth;
   const page = t[mode];
@@ -103,8 +115,7 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: "signIn" | "s
     return (
       <section className={`${CARD} ${RAISED}`}>
         <Sent
-          locale={locale}
-          title={t.signUp.sentTitle}
+          title={sentTitle}
           text={withPlan(plan ? t.signUp.sentPlan : t.signUp.sent).replace("{email}", sentTo)}
         >
           <Button type="button" variant="outline" className="w-full" onClick={() => setSentTo("")}>
@@ -198,9 +209,7 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: "signIn" | "s
             {pending === "email" ? t.working : page.submit}
           </Button>
         </form>
-        <p className={`${HINT} text-center`}>
-          <Rich text={t.agree} locale={locale} />
-        </p>
+        <p className={`${HINT} text-center`}>{agree}</p>
       </section>
       <p className="text-center text-small text-ink-2">
         {page.switchPrompt}
