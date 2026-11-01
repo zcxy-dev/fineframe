@@ -1,11 +1,29 @@
 import type { Metadata } from "next";
-import { href, ORIGIN } from "../../lib/site.ts";
+import { content } from "../../lib/content.ts";
+import { href, ICONS, ORIGIN } from "../../lib/site.ts";
+
+// A link to fineframe.app itself shows the English home page's card.
+const { title, description } = content("en").home;
+const image = { url: "/en/og.png", width: 1200, height: 630 };
 
 export const metadata: Metadata = {
   metadataBase: new URL(ORIGIN),
   title: "Fineframe",
-  alternates: { languages: { en: "/en/", "zh-Hant-TW": "/zh-tw/" } },
-  icons: { icon: [{ url: "/favicon.ico", sizes: "32x32" }, { url: "/icon.svg" }] },
+  description,
+  alternates: {
+    canonical: "/",
+    languages: { en: "/en/", "zh-Hant-TW": "/zh-tw/", "x-default": "/" },
+  },
+  openGraph: {
+    type: "website",
+    siteName: "Fineframe",
+    title,
+    description,
+    url: "/",
+    images: [image],
+  },
+  twitter: { card: "summary_large_image", title, description, images: [image] },
+  icons: ICONS,
 };
 
 // A static site has no server to read Accept-Language: the browser picks the language,
