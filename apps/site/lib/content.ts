@@ -176,8 +176,17 @@ export type Content = {
     google: string;
     or: string;
     working: string;
+    /** The password field's toggle that shows what is typed. */
+    show: string;
+    /** Under every form that can create an account, Google's included. */
+    agree: Rich;
+    /** After a link is sent: start again with another address, or go home. */
+    again: string;
+    home: string;
     signIn: {
       title: string;
+      /** Under the heading. */
+      lede: string;
       description: string;
       submit: string;
       forgot: string;
@@ -188,13 +197,14 @@ export type Content = {
     };
     signUp: {
       title: string;
+      lede: string;
       description: string;
       submit: string;
       passwordHint: string;
-      agree: Rich;
       switchPrompt: string;
       switchLink: string;
-      /** `{email}` is the address the link went to. */
+      /** What the form becomes once the link is sent; `{email}` is the address it went to. */
+      sentTitle: string;
       sent: string;
       forPlan: string;
       /** `{email}` as in `sent`, `{plan}` as in `forPlan`. */
@@ -205,9 +215,13 @@ export type Content = {
       description: string;
       lede: string;
       submit: string;
-      /** `{email}` is the address the link went to. */
+      /** As in sign-up. */
+      sentTitle: string;
       sent: string;
-      newTitle: string;
+      /** Under the heading once the link is opened, instead of `lede`. */
+      newLede: string;
+      /** When the link has expired or was used already. */
+      expired: string;
       newPassword: string;
       save: string;
       back: string;

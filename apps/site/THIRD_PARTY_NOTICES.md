@@ -26,7 +26,7 @@ The site's own code and text are proprietary, all rights reserved. It uses the c
 
 ## Components copied into the site
 
-`components/ui/` holds the button, input and label, first added from [shadcn/ui](https://ui.shadcn.com) (MIT, Copyright (c) 2023 shadcn) and rewritten for the site. The icons in `components/Icon.tsx` are drawn after [Lucide](https://lucide.dev)'s ([ISC](https://github.com/lucide-icons/lucide/blob/main/LICENSE)).
+`components/ui/` holds the button, input and label, first added from [shadcn/ui](https://ui.shadcn.com) (MIT, Copyright (c) 2023 shadcn) and rewritten for the site. The icons in `components/Icon.tsx` are drawn after [Lucide](https://lucide.dev)'s ([ISC](https://github.com/lucide-icons/lucide/blob/main/LICENSE)). The "G" on the sign-in pages' Google button is Google's trademark, shown as its [sign-in branding guidelines](https://developers.google.com/identity/branding-guidelines) ask.
 
 ## Example edits
 
