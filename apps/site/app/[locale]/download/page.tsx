@@ -82,6 +82,27 @@ export default async function Download({ params }: PageProps) {
             </section>
           ))}
         </section>
+        {/* On a computer, which sees only its own card: the other computers' installers. */}
+        <p
+          data-show="mac windows linux"
+          className="flex flex-wrap items-center gap-x-5 gap-y-1 px-1 text-small text-ink-2"
+        >
+          <span>{t.others}</span>
+          {t.platforms.map((platform) => (
+            <a
+              key={platform.id}
+              className="inline-flex min-h-10 items-center gap-1.5 font-semibold text-ink"
+              data-show={t.platforms
+                .map((p) => p.id)
+                .filter((id) => id !== platform.id)
+                .join(" ")}
+              href={`${DOWNLOADS}/${platform.file}`}
+            >
+              <Icon name="download" className="size-4" />
+              {platform.name}
+            </a>
+          ))}
+        </p>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <section className={CARD} aria-labelledby="first-open">

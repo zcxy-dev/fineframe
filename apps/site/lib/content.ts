@@ -36,6 +36,9 @@ export type Content = {
     getStarted: string;
     /** The link to this page in the other language. */
     language: string;
+    /** The bar's menu button below 1081 px, closed and open. */
+    menu: string;
+    close: string;
   };
   footer: {
     tagline: string;
@@ -67,6 +70,8 @@ export type Content = {
       post: string;
       /** What the post's bar says while the edit is made, and once it is done. */
       steps: [string, string, string, string, string];
+      /** The cut line's legend: the stretches kept, and those cut. */
+      legend: [string, string];
       credit: string;
       pause: string;
       play: string;
@@ -85,7 +90,9 @@ export type Content = {
       };
       captions: { title: Lines; body: string; credit: string };
       music: { title: Lines; body: string; voice: string; music: string };
-      more: string;
+      /** The rest of what the app does, under the cards: each a name and a sentence. */
+      alsoTitle: string;
+      also: { title: string; body: string }[];
     };
     formats: {
       title: Lines;
@@ -117,6 +124,8 @@ export type Content = {
     title: string;
     description: string;
     lede: Rich;
+    /** On a computer, before the other computers' installers. */
+    others: string;
     /** Under the download buttons: what running the app needs. */
     needs: Rich;
     /** On a phone or tablet: the installers are for a computer. */

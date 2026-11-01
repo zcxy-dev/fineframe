@@ -4,6 +4,7 @@ import { href, LANG, LOCALES, type Locale, type PagePath } from "../lib/site.ts"
 import { SLUG } from "../lib/styles.ts";
 import { AccountLink } from "./AccountLink.tsx";
 import { Icon } from "./Icon.tsx";
+import { Menu } from "./Menu.tsx";
 import { Phrases } from "./Rich.tsx";
 import { buttonClass } from "./ui/button.tsx";
 
@@ -17,12 +18,9 @@ const FOOTER_LINK =
 const BRAND =
   "flex items-center gap-2.5 text-[17px] leading-none font-bold tracking-[-0.02em] no-underline sm:text-[19px]";
 
-/**
- * Sign in, as the outlined button beside the amber one; on phones, where the bar is full, a
- * link.
- */
-const ACCOUNT_LINK =
-  "whitespace-nowrap sm:inline-flex sm:h-10 sm:items-center sm:rounded-full sm:border-(length:--stroke) sm:border-edge sm:bg-paper sm:px-4.5 sm:font-semibold sm:text-ink sm:transition-[border-color] sm:hover:border-ink";
+/** A link in the menu below 1081 px: a full-width row, easy to tap. */
+const MENU_LINK =
+  "flex min-h-12 items-center border-b text-body font-semibold text-ink no-underline last:border-b-0 aria-[current=page]:text-ink-2";
 
 /** The wordmark, leading home. */
 export function Brand({ locale }: { locale: Locale }) {
@@ -34,8 +32,19 @@ export function Brand({ locale }: { locale: Locale }) {
   );
 }
 
-/** The same page in the other language, with a globe; on small phones the globe alone. */
-export function LanguageLink({ locale, path }: { locale: Locale; path: PagePath }) {
+/**
+ * The same page in the other language, with a globe; on small phones the globe alone, unless
+ * `named` (the menu's).
+ */
+export function LanguageLink({
+  locale,
+  path,
+  named = false,
+}: {
+  locale: Locale;
+  path: PagePath;
+  named?: boolean;
+}) {
   const other = LOCALES.find((l) => l !== locale) as Locale;
   return (
     <a
@@ -46,7 +55,9 @@ export function LanguageLink({ locale, path }: { locale: Locale; path: PagePath 
       aria-label={`${content(locale).nav.language}: ${content(other).languageName}`}
     >
       <Icon name="globe" />
-      <span className="whitespace-nowrap max-[480px]:hidden">{content(other).languageName}</span>
+      <span className={`whitespace-nowrap ${named ? "" : "max-[480px]:hidden"}`}>
+        {content(other).languageName}
+      </span>
     </a>
   );
 }
@@ -73,6 +84,13 @@ export function Frame({
   const current = (p: PagePath) => (p === path ? "page" : undefined);
   const home = href(locale, "/");
   const section = (id: string) => (path === "/" ? `#${id}` : `${home}#${id}`);
+  // The bar's links: the home page's sections, then the pages a visitor comes for.
+  const links: [string, string, PagePath?][] = [
+    [t.nav.examples, section("formats")],
+    [t.nav.features, section("features")],
+    [t.nav.pricing, href(locale, "/pricing/"), "/pricing/"],
+    [t.nav.download, href(locale, "/download/"), "/download/"],
+  ];
   const footer: { title: string; links: [string, string, PagePath?][] }[] = [
     {
       title: t.footer.product,
@@ -86,9 +104,9 @@ export function Frame({
     {
       title: t.footer.account,
       links: [
+        // Sign in, or Account once signed in (`AccountLink`).
         [t.nav.signIn, href(locale, "/signin/"), "/signin/"],
         [t.footer.signUp, href(locale, "/signup/"), "/signup/"],
-        [t.nav.account, href(locale, "/account/"), "/account/"],
       ],
     },
     {
@@ -113,33 +131,55 @@ export function Frame({
         <div className="wrap flex h-15 items-center gap-4 sm:h-17 sm:gap-8">
           <Brand locale={locale} />
           <nav className="hidden gap-7 text-small font-medium text-ink-2 min-[1081px]:flex">
-            <a className={NAV_LINK} href={section("formats")}>
-              {t.nav.examples}
-            </a>
-            <a className={NAV_LINK} href={section("features")}>
-              {t.nav.features}
-            </a>
-            <a
-              className={NAV_LINK}
-              href={href(locale, "/pricing/")}
-              aria-current={current("/pricing/")}
-            >
-              {t.nav.pricing}
-            </a>
+            {links.map(([label, link, page]) => (
+              <a
+                key={link}
+                className={NAV_LINK}
+                href={link}
+                aria-current={page ? current(page) : undefined}
+              >
+                {label}
+              </a>
+            ))}
           </nav>
-          <div className="ml-auto flex items-center gap-3.5 text-small text-ink-2 sm:gap-5">
-            <LanguageLink locale={locale} path={path} />
-            <AccountLink
-              locale={locale}
-              labels={{ signIn: t.nav.signIn, account: t.nav.account }}
-              current={path === "/signin/" || path === "/account/"}
-              className={`${NAV_LINK} ${ACCOUNT_LINK}`}
-            />
+          <div className="ml-auto flex items-center gap-3 text-small text-ink-2 sm:gap-5">
+            <div className="hidden items-center gap-5 min-[1081px]:flex">
+              <LanguageLink locale={locale} path={path} />
+              <AccountLink
+                locale={locale}
+                labels={{ signIn: t.nav.signIn, account: t.nav.account }}
+                current={path === "/signin/" || path === "/account/"}
+                className={buttonClass({ variant: "outline", size: "sm" })}
+              />
+            </div>
             {!NO_PLANS_BUTTON.includes(path) && (
               <a className={buttonClass({ size: "sm" })} href={href(locale, "/pricing/")}>
                 {t.nav.getStarted}
               </a>
             )}
+            <Menu open={t.nav.menu} close={t.nav.close}>
+              <nav className="wrap grid py-2" aria-label={t.nav.menu}>
+                {links.map(([label, link, page]) => (
+                  <a
+                    key={link}
+                    className={MENU_LINK}
+                    href={link}
+                    aria-current={page ? current(page) : undefined}
+                  >
+                    {label}
+                  </a>
+                ))}
+                <AccountLink
+                  locale={locale}
+                  labels={{ signIn: t.nav.signIn, account: t.nav.account }}
+                  current={path === "/signin/" || path === "/account/"}
+                  className={MENU_LINK}
+                />
+                <div className="flex min-h-12 items-center text-body text-ink-2">
+                  <LanguageLink locale={locale} path={path} named />
+                </div>
+              </nav>
+            </Menu>
           </div>
         </div>
       </header>
@@ -168,13 +208,22 @@ export function Frame({
               <ul className="space-y-2.5">
                 {group.links.map(([label, link, page]) => (
                   <li key={link}>
-                    <a
-                      className={FOOTER_LINK}
-                      href={link}
-                      aria-current={page ? current(page) : undefined}
-                    >
-                      {label}
-                    </a>
+                    {page === "/signin/" ? (
+                      <AccountLink
+                        locale={locale}
+                        labels={{ signIn: t.nav.signIn, account: t.nav.account }}
+                        current={path === "/signin/" || path === "/account/"}
+                        className={FOOTER_LINK}
+                      />
+                    ) : (
+                      <a
+                        className={FOOTER_LINK}
+                        href={link}
+                        aria-current={page ? current(page) : undefined}
+                      >
+                        {label}
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>

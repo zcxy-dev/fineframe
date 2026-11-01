@@ -79,8 +79,9 @@ const shown = (t: typeof en) => {
       [h.hero.plans, h.hero.watch, t.nav.download, h.features.music.voice, h.features.music.music],
       h.formats.spec.map(([, value]) => value),
       [h.privacy.stays.title, h.privacy.sent.title, t.pricing.includedTitle],
-      // The sections' eyebrows.
+      // The sections' eyebrows, and the names of what else the app does.
       [t.nav.examples, t.nav.features, t.nav.pricing, t.nav.faq],
+      [h.features.alsoTitle, ...h.features.also.map((item) => item.title)],
       t.pricing.plans.map((plan) => plan.name),
       t.pricing.checkout,
       h.faq.items.map((item) => item.q),

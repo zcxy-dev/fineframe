@@ -6,8 +6,10 @@ export const still = () => matchMedia("(prefers-reduced-motion: reduce)").matche
 
 /**
  * Gives a video its source the first time it is needed: the small copy (`data-src-sm`) on
- * phones, and wherever it is sharp enough for the size the video is shown at
- * (`data-sm-w` pixels wide, times `data-zoom` when it is shown enlarged).
+ * phones and wherever it is sharp enough, else the medium copy (`data-src-md`, for a Retina
+ * desktop) where that is, else the full one. Sharp enough: at least the pixels the video is
+ * shown at (`data-sm-w`, `data-md-w` pixels wide, against its width times `data-zoom` when it
+ * is shown enlarged), the medium copy within a tenth of them.
  */
 export function load(video: HTMLVideoElement) {
   const d = video.dataset;
@@ -18,7 +20,9 @@ export function load(video: HTMLVideoElement) {
     (video.clientWidth || video.parentElement?.clientWidth || 0) *
     devicePixelRatio *
     Number(d.zoom || 1);
-  video.src = d.srcSm && (phone || need <= Number(d.smW)) ? d.srcSm : (d.src ?? "");
+  if (d.srcSm && (phone || need <= Number(d.smW))) video.src = d.srcSm;
+  else if (d.srcMd && need <= Number(d.mdW) * 1.1) video.src = d.srcMd;
+  else video.src = d.src ?? "";
 }
 
 /** Shows a video's first frame, from `data-poster`, once it comes near the screen. */
