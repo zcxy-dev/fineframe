@@ -20,6 +20,7 @@
     "react-dom": "19.3.1"
   },
   "devDependencies": {
+    "@expo-google-fonts/noto-sans-sc": "0.4.4",
     "@expo-google-fonts/noto-sans-tc": "0.4.4",
     "@fontsource-variable/geist": "5.3.0",
     "@tailwindcss/postcss": "4.3.3",

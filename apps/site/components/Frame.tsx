@@ -12,8 +12,9 @@ const ACCOUNT_PAGES: PagePath[] = ["/signin/", "/signup/", "/reset/", "/account/
 
 const NAV_LINK =
   "no-underline transition-colors duration-150 hover:text-ink aria-[current=page]:text-ink";
+/** A footer link: on phones a 40 px row, easy to tap. */
 const FOOTER_LINK =
-  "text-small text-ink-2 no-underline transition-colors duration-150 hover:text-ink aria-[current=page]:text-ink aria-[current=page]:font-semibold";
+  "inline-flex min-h-10 items-center text-small text-ink-2 no-underline transition-colors duration-150 hover:text-ink aria-[current=page]:text-ink aria-[current=page]:font-semibold md:min-h-0";
 /** The wordmark: a logo, at its own sizes rather than the text scale's. */
 const BRAND =
   "flex items-center gap-2.5 text-[17px] leading-none font-bold tracking-[-0.02em] no-underline sm:text-[19px]";
@@ -48,7 +49,7 @@ export function LanguageLink({
   const other = LOCALES.find((l) => l !== locale) as Locale;
   return (
     <a
-      className={`${NAV_LINK} flex items-center gap-1.5`}
+      className={`${NAV_LINK} flex min-h-10 min-w-10 items-center justify-center gap-1.5`}
       href={href(other, path)}
       hrefLang={LANG[other]}
       lang={LANG[other]}
@@ -205,7 +206,7 @@ export function Frame({
               <h2 id={`footer-${i}`} className={`mb-4 font-sans text-ink-3 ${SLUG}`}>
                 {group.title}
               </h2>
-              <ul className="space-y-2.5">
+              <ul className="md:space-y-2.5">
                 {group.links.map(([label, link, page]) => (
                   <li key={link}>
                     {page === "/signin/" ? (
@@ -233,7 +234,7 @@ export function Frame({
         <div className="wrap flex flex-wrap justify-between gap-x-6 gap-y-3 border-t py-6 text-fine text-ink-3">
           <p>{t.footer.rights}</p>
           <a
-            className="no-underline hover:text-ink"
+            className="inline-flex min-h-10 items-center no-underline hover:text-ink md:min-h-0"
             href={href(other, path)}
             hrefLang={LANG[other]}
             lang={LANG[other]}

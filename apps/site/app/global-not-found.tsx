@@ -1,31 +1,52 @@
 import "./fonts.ts";
 import type { Metadata } from "next";
+import { buttonClass } from "../components/ui/button.tsx";
 import { content } from "../lib/content.ts";
 import { href, LANG, LOCALES } from "../lib/site.ts";
+import { EYEBROW } from "../lib/styles.ts";
 
-export const metadata: Metadata = { title: "404 · Fineframe" };
+export const metadata: Metadata = { title: "404 · Fineframe", robots: { index: false } };
 
-/** Unknown addresses have no language, so the page says it in both. */
+/**
+ * Unknown addresses have no language, so the page says it in both, each with its way home, under
+ * a bar with the wordmark.
+ */
 export default function GlobalNotFound() {
   return (
     <html lang="en">
       <body>
-        <main className="grid min-h-screen place-content-center justify-items-center gap-5 bg-ground px-4 py-8 text-center">
-          <img src="/icon.svg" alt="" width={40} height={40} />
-          {LOCALES.map((locale) => {
-            const t = content(locale).notFound;
-            return (
-              <section
-                key={locale}
-                lang={LANG[locale]}
-                className="grid gap-2 [&>h1]:text-heading [&>p]:text-ink-2"
-              >
-                <h1>{t.title}</h1>
-                <p>{t.body}</p>
-                <a href={href(locale, "/")}>{t.home}</a>
-              </section>
-            );
-          })}
+        <header className="wrap flex h-15 items-center sm:h-17">
+          <a
+            className="flex items-center gap-2.5 text-[19px] leading-none font-bold tracking-[-0.02em] no-underline"
+            href="/"
+          >
+            <img src="/icon.svg" alt="" width={28} height={28} />
+            <span>Fineframe</span>
+          </a>
+        </header>
+        <main className="wrap grid flex-1 content-center gap-10 py-block">
+          <p className={EYEBROW}>404</p>
+          <div className="grid gap-10 sm:grid-cols-2 sm:gap-16">
+            {LOCALES.map((locale, i) => {
+              const t = content(locale).notFound;
+              return (
+                <section key={locale} lang={LANG[locale]} className="grid content-start gap-3">
+                  {i === 0 ? (
+                    <h1 className="text-title">{t.title}</h1>
+                  ) : (
+                    <h2 className="text-title">{t.title}</h2>
+                  )}
+                  <p className="text-lede text-ink-2">{t.body}</p>
+                  <a
+                    className={`${buttonClass({ variant: i === 0 ? "default" : "outline" })} mt-5 justify-self-start`}
+                    href={href(locale, "/")}
+                  >
+                    {t.home}
+                  </a>
+                </section>
+              );
+            })}
+          </div>
         </main>
       </body>
     </html>

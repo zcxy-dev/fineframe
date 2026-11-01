@@ -4,7 +4,11 @@
     "packages/*": { "entry": ["scripts/*.ts"] },
     "apps/site": {
       "ignore": ["supabase/**"],
-      "ignoreDependencies": ["@expo-google-fonts/noto-sans-tc", "@fontsource-variable/geist"]
+      "ignoreDependencies": [
+        "@expo-google-fonts/noto-sans-sc",
+        "@expo-google-fonts/noto-sans-tc",
+        "@fontsource-variable/geist"
+      ]
     }
   },
   "ignore": ["packages/schema/src/generated/**"],

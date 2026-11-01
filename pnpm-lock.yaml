@@ -64,6 +64,9 @@ importers:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
     devDependencies:
+      '@expo-google-fonts/noto-sans-sc':
+        specifier: 0.4.4
+        version: 0.4.4
       '@expo-google-fonts/noto-sans-tc':
         specifier: 0.4.4
         version: 0.4.4
@@ -528,6 +531,9 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@expo-google-fonts/noto-sans-sc@0.4.4':
+    resolution: {integrity: sha512-LF4+p6xdtgUArufW0K+l9/FeDiXrW8FcEkEbOPIUC5ZnPupeFVA6yY9qCZ0sBrdAeLdlusDhv0R7q2x3onXo3w==}
 
   '@expo-google-fonts/noto-sans-tc@0.4.4':
     resolution: {integrity: sha512-mTYARqbwmV05CyyMFEpPtRz2QdtBZCIL3AgT1nzE2QyB2uhA7KdBBzr49ON41aIP+1xnJ6z8AtWYICk4DjygAQ==}
@@ -3800,6 +3806,8 @@ snapshots:
 
   '@esbuild/win32-x64@0.25.12':
     optional: true
+
+  '@expo-google-fonts/noto-sans-sc@0.4.4': {}
 
   '@expo-google-fonts/noto-sans-tc@0.4.4': {}
 

@@ -5,8 +5,9 @@
 // characters the home page and the frame around every page show in that weight, and the rest,
 // which only the other pages need; `app/fonts.generated.css` declares every file with the
 // characters it covers, so a browser downloads a file only for text that uses it, and sets any
-// other character in the next font of the stack. `pnpm dev` and
-// `pnpm build` run it first; its output is not committed.
+// other character in the next font of the stack. Noto Sans SC, cut to the simplified Chinese the
+// English pages quote, sets that and what Noto Sans TC lacks. `pnpm dev` and `pnpm build` run it
+// first; its output is not committed.
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import subsetFont from "subset-font";
@@ -139,10 +140,34 @@ for (const [weight, name] of Object.entries(WEIGHTS)) {
 }`);
   }
 }
+// Noto Sans SC, for the Chinese the English pages quote: sources' names and titles, in
+// simplified characters (`lang="zh-Hans"`, set by `Phrases`). Noto Sans TC lacks some of them,
+// which on the Chinese pages fall through to it too. Cut to the Chinese in the English content,
+// at the weights its text and headings take.
+const SC = join(ROOT, "node_modules/@expo-google-fonts/noto-sans-sc");
+const simplified = cjk(JSON.stringify(en));
+for (const [weight, name] of [
+  [400, "400Regular"],
+  [700, "700Bold"],
+] as const) {
+  const face = await readFile(join(SC, name, `NotoSansSC_${name}.ttf`));
+  await writeFile(
+    join(out, `noto-sans-sc-${weight}.woff2`),
+    await subsetFont(face, simplified, { targetFormat: "woff2" }),
+  );
+  rules.push(`@font-face {
+  font-family: "Noto Sans SC";
+  font-style: normal;
+  font-weight: ${weight};
+  font-display: swap;
+  src: url(/fonts/noto-sans-sc-${weight}.woff2) format("woff2");
+  unicode-range: ${range(simplified)};
+}`);
+}
 await writeFile(
   join(ROOT, "app/fonts.generated.css"),
   `/* Written by scripts/fonts.ts. */\n${rules.join("\n\n")}\n`,
 );
 console.log(
-  `fonts: Geist cut to ${latin.length} characters, and Noto Sans TC 400, 600 and 900 to ${all.length}`,
+  `fonts: Geist cut to ${latin.length} characters, Noto Sans TC 400, 600 and 900 to ${all.length}, and Noto Sans SC 400 and 700 to ${simplified.length}`,
 );
