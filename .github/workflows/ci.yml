@@ -60,7 +60,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           BEFORE: ${{ github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           cache: false
       - name: Check each Python package
@@ -130,14 +130,14 @@ jobs:
       # mirror's archive against SHASUMS256.txt signed with Node.js's release keys, as it does
       # nodejs.org's.
       - id: mise
-        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         continue-on-error: true
         env:
           MISE_HTTP_DOWNLOAD_TIMEOUT: 5m
         with:
           cache: false
       - if: steps.mise.outcome == 'failure'
-        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         env:
           MISE_HTTP_DOWNLOAD_TIMEOUT: 10m
           MISE_NODE_MIRROR_URL: https://cdn.npmmirror.com/binaries/node/
