@@ -26,7 +26,7 @@ export default async function Pricing({ params }: PageProps) {
         </p>
       </PageHead>
 
-      <div className="wrap grid max-w-[1000px] gap-4 pb-[clamp(64px,8vw,120px)]">
+      <div className="wrap grid max-w-[1000px] gap-4 pb-end">
         <section aria-labelledby="plans">
           <h2 id="plans" className="sr-only">
             {t.title}
@@ -35,8 +35,8 @@ export default async function Pricing({ params }: PageProps) {
         </section>
         <Included locale={locale} />
 
-        <section className="mt-[clamp(48px,6vw,88px)]" aria-labelledby="after">
-          <h2 id="after" className="text-center text-[clamp(32px,3.6vw,48px)]">
+        <section className="mt-block" aria-labelledby="after">
+          <h2 id="after" className="text-center text-heading">
             <Phrases text={t.afterTitle} locale={locale} />
           </h2>
           <ol className="mt-10 grid gap-8 md:grid-cols-3 md:gap-6">
@@ -45,7 +45,7 @@ export default async function Pricing({ params }: PageProps) {
                 key={line}
                 className="grid content-start justify-items-center gap-4 text-center text-ink-2"
               >
-                <span className="grid size-11 place-items-center rounded-full bg-ink text-base font-semibold text-white tabular-nums">
+                <span className="grid size-11 place-items-center rounded-full bg-ink text-body font-semibold text-white tabular-nums">
                   {i + 1}
                 </span>
                 <span>
@@ -56,8 +56,8 @@ export default async function Pricing({ params }: PageProps) {
           </ol>
         </section>
 
-        <div className="mt-[clamp(48px,6vw,88px)] grid gap-4 md:grid-cols-2">
-          <section className={`${CARD} ring-1 ring-line`} aria-labelledby="key">
+        <div className="mt-block grid gap-4 md:grid-cols-2">
+          <section className={CARD} aria-labelledby="key">
             <h2 id="key" className={HEADING}>
               <Phrases text={t.keyTitle} locale={locale} />
             </h2>
@@ -67,7 +67,7 @@ export default async function Pricing({ params }: PageProps) {
               </p>
             ))}
           </section>
-          <section className={`${CARD} ring-1 ring-line`} aria-labelledby="refund">
+          <section className={CARD} aria-labelledby="refund">
             <h2 id="refund" className={HEADING}>
               <Phrases text={t.refundTitle} locale={locale} />
             </h2>
@@ -79,8 +79,8 @@ export default async function Pricing({ params }: PageProps) {
           </section>
         </div>
 
-        <section className="mt-[clamp(48px,6vw,88px)]" aria-labelledby="faq-title">
-          <h2 id="faq-title" className="mb-8 text-center text-[clamp(32px,3.6vw,48px)]">
+        <section className="mt-block" aria-labelledby="faq-title">
+          <h2 id="faq-title" className="mb-8 text-center text-heading">
             <Phrases text={all.home.faq.title} locale={locale} />
           </h2>
           <Faq locale={locale} />

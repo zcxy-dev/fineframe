@@ -16,7 +16,7 @@ import { buttonClass } from "../../components/ui/button.tsx";
 import { content, type Lines } from "../../lib/content.ts";
 import { lastTwo } from "../../lib/english.ts";
 import { href, type Locale, localeOf, type PageProps, pageMetadata } from "../../lib/site.ts";
-import { SECTION_LEDE } from "../../lib/styles.ts";
+import { EYEBROW, SECTION_LEDE, SLUG } from "../../lib/styles.ts";
 
 /**
  * While the post, the page's own buttons to the plans or the footer are on screen, the floating
@@ -100,6 +100,7 @@ export default async function Home({ params }: PageProps) {
 
         <section className="home-section" id="features" aria-labelledby="features-title">
           <div className="wrap">
+            <p className={`${EYEBROW} mb-4`}>{all.nav.features}</p>
             <h2 id="features-title">
               <Two locale={locale} lines={f.title} />
             </h2>
@@ -117,7 +118,7 @@ export default async function Home({ params }: PageProps) {
                   result={f.cut.result}
                 />
               </article>
-              <article className="card dark cap">
+              <article className="card dark cap on-dark">
                 <div className="txt">
                   <h3>
                     <Two locale={locale} lines={f.captions.title} />
@@ -149,6 +150,7 @@ export default async function Home({ params }: PageProps) {
 
         <section className="home-section" id="formats" aria-labelledby="formats-title">
           <div className="wrap">
+            <p className={`${EYEBROW} mb-4`}>{all.nav.examples}</p>
             <h2 id="formats-title">
               <Two locale={locale} lines={y.title} />
             </h2>
@@ -176,20 +178,18 @@ export default async function Home({ params }: PageProps) {
 
         <section className="home-section" id="privacy" aria-labelledby="privacy-title">
           <div className="wrap">
-            <div className="grid gap-x-[clamp(32px,6vw,96px)] gap-y-10 rounded-card bg-graphite p-[clamp(24px,4.4vw,64px)] text-on-dark lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end">
+            <div className="grid gap-x-[clamp(32px,6vw,96px)] gap-y-10 on-dark rounded-card bg-graphite p-[clamp(24px,4.4vw,64px)] text-on-dark lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end">
               {/* The heading takes the card's width, so each of its two lines stays whole. */}
               <h2 id="privacy-title" className="lg:col-span-2">
                 <Two locale={locale} lines={t.privacy.title} />
               </h2>
               <div>
                 <p className={`${SECTION_LEDE} mt-0! text-on-dark-2`}>{text(t.privacy.lede)}</p>
-                <p className="mt-6 text-[15px] [&_a]:decoration-on-dark-2">
-                  {text(t.privacy.more)}
-                </p>
+                <p className="mt-6 text-small [&_a]:decoration-on-dark-2">{text(t.privacy.more)}</p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[18px] bg-white/7 p-6">
-                  <p className="text-sm font-semibold text-on-dark-2">
+                <div className="rounded-frame bg-white/7 p-6">
+                  <p className={`${SLUG} text-on-dark-2`}>
                     <Phrases text={t.privacy.stays.title} locale={locale} />
                   </p>
                   <ul className="mt-4 space-y-3">
@@ -203,8 +203,8 @@ export default async function Home({ params }: PageProps) {
                     ))}
                   </ul>
                 </div>
-                <div className="rounded-[18px] bg-amber p-6 text-ink">
-                  <p className="text-sm font-semibold text-amber-ink">{t.privacy.sent.title}</p>
+                <div className="rounded-frame bg-amber p-6 text-ink">
+                  <p className={`${SLUG} text-amber-ink`}>{t.privacy.sent.title}</p>
                   <ul className="sent mt-4 space-y-3">
                     {t.privacy.sent.items.map((item) => (
                       <li key={item} className="flex items-center gap-3">
@@ -223,6 +223,7 @@ export default async function Home({ params }: PageProps) {
 
         <section className="home-section" id="pricing" aria-labelledby="pricing-title">
           <div className="wrap">
+            <p className={`${EYEBROW} mb-4`}>{all.nav.pricing}</p>
             <h2 id="pricing-title">
               <Two locale={locale} lines={t.pricing.title} />
             </h2>
@@ -231,7 +232,7 @@ export default async function Home({ params }: PageProps) {
               <Plans locale={locale} />
               <Included locale={locale} />
             </div>
-            <p className="mt-6 max-w-[40em] text-[15px] text-ink-2">
+            <p className="mt-6 max-w-[40em] text-small text-ink-2">
               {text(t.pricing.cost)} {text(t.pricing.more)}
             </p>
           </div>
@@ -239,9 +240,12 @@ export default async function Home({ params }: PageProps) {
 
         <section className="home-section" id="faq" aria-labelledby="faq-title">
           <div className="wrap grid gap-x-[clamp(32px,6vw,96px)] gap-y-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-            <h2 id="faq-title">
-              <Phrases text={t.faq.title} locale={locale} />
-            </h2>
+            <div>
+              <p className={`${EYEBROW} mb-4`}>{all.nav.faq}</p>
+              <h2 id="faq-title">
+                <Phrases text={t.faq.title} locale={locale} />
+              </h2>
+            </div>
             <Faq locale={locale} />
           </div>
         </section>
@@ -263,10 +267,10 @@ export default async function Home({ params }: PageProps) {
                   className={buttonClass({ variant: "outline" })}
                 />
               </div>
-              <p className="mt-4 flex flex-wrap justify-center gap-x-4.5 text-sm text-amber-ink">
+              <p className="mt-4 flex flex-wrap justify-center gap-x-4.5 text-small text-amber-ink">
                 <Facts locale={locale} />
               </p>
-              <p className="mt-2 text-sm text-amber-ink [&_a]:decoration-amber-ink">
+              <p className="mt-2 text-fine text-amber-ink [&_a]:decoration-amber-ink">
                 {text(all.download.needs)}
               </p>
             </div>

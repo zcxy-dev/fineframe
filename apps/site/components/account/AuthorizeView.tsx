@@ -97,7 +97,7 @@ export function AuthorizeView({ locale }: { locale: Locale }) {
           {t.allow}
         </Button>
       </div>
-      <p className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+      <p className="flex flex-wrap gap-x-5 gap-y-2 text-small">
         <button type="button" className={TEXT_BUTTON} onClick={() => decide(false)} disabled={busy}>
           {t.deny}
         </button>

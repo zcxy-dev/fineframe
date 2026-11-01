@@ -36,6 +36,7 @@
   --ink-2: #3d424b;
   --ink-3: #5d636d;
   --line: #dfe2e7;
+  --edge: #868c96;
   --amber: #ffb547;
   --amber-hover: #ffc46d;
   --amber-ink: #3a2a0c;
@@ -45,7 +46,6 @@
   --on-dark: #f2f3f5;
   --on-dark-2: #b4b9c1;
   --cut: #d4472f;
-  --r-card: 24px;
   --stroke: 1.5px;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --gutter: clamp(16px, 4vw, 32px);
@@ -58,6 +58,7 @@
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
   --color-line: var(--line);
+  --color-edge: var(--edge);
   --color-amber: var(--amber);
   --color-amber-hover: var(--amber-hover);
   --color-amber-ink: var(--amber-ink);
@@ -67,7 +68,6 @@
   --color-on-dark: var(--on-dark);
   --color-on-dark-2: var(--on-dark-2);
   --color-cut: var(--cut);
-  --radius-card: var(--r-card);
   --ease-out: var(--ease);
   /* Geist sets Latin text and numbers; Noto Sans TC, Chinese. Chinese headings put Noto Sans
      TC first, so their Latin words match its weight. */
@@ -76,6 +76,61 @@
     "Microsoft JhengHei", sans-serif;
   --font-display: "Geist Variable", "Noto Sans TC", sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* The scales (DESIGN.md). Tailwind's own sizes, radii and shadows are cleared, so a page can
+   only reach for these: eight text sizes and the slug, three radii and the pill, two shadows. */
+@theme {
+  --text-*: initial;
+  --text-display: clamp(44px, 5.6vw, 84px);
+  --text-display--line-height: 1.02;
+  --text-title: clamp(36px, 4.4vw, 60px);
+  --text-title--line-height: 1.08;
+  --text-heading: clamp(26px, 2.4vw, 34px);
+  --text-heading--line-height: 1.15;
+  --text-subhead: clamp(19px, 1.6vw, 22px);
+  --text-subhead--line-height: 1.3;
+  --text-lede: clamp(17px, 1.3vw, 19px);
+  --text-lede--line-height: 1.6;
+  --text-body: 17px;
+  --text-body--line-height: 1.65;
+  --text-small: 15px;
+  --text-small--line-height: 1.55;
+  --text-fine: 13px;
+  --text-fine--line-height: 1.5;
+  --text-slug: 11px;
+  --text-slug--line-height: 1.4;
+  --tracking-slug: 0.1em;
+
+  --radius-*: initial;
+  --radius-field: 8px;
+  --radius-frame: 16px;
+  --radius-card: 24px;
+
+  --shadow-*: initial;
+  --shadow-card: 0 1px 2px rgb(12 13 16 / 0.05);
+  --shadow-raised: 0 1px 2px rgb(12 13 16 / 0.04), 0 20px 44px -20px rgb(12 13 16 / 0.22);
+
+  /* The page's rhythm: above a home section, between blocks on a page, a page's head and end,
+     and inside a card. Everything smaller takes Tailwind's 4 px steps. */
+  --spacing-section: clamp(80px, 9vw, 136px);
+  --spacing-block: clamp(48px, 6vw, 88px);
+  --spacing-head: clamp(40px, 6vw, 88px);
+  --spacing-end: clamp(64px, 8vw, 120px);
+  --spacing-card: clamp(24px, 2.6vw, 36px);
+}
+
+/* Chinese has no capitals and sets its display a step larger; phones read at 16 px. */
+:root:lang(zh-Hant-TW) {
+  --text-display: clamp(48px, 6.6vw, 96px);
+  --text-slug: 12px;
+  --tracking-slug: 0.16em;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --text-body: 16px;
+  }
 }
 
 @layer base {
@@ -92,21 +147,13 @@
   }
 
   body {
-    @apply flex min-h-screen flex-col bg-ground text-ink;
-    font-size: 17px;
-    line-height: 1.65;
+    @apply flex min-h-screen flex-col bg-ground text-body text-ink;
     overflow-x: clip;
   }
 
   body:lang(zh-Hant-TW) {
     line-height: 1.8;
     letter-spacing: 0.02em;
-  }
-
-  @media (max-width: 640px) {
-    body {
-      font-size: 16px;
-    }
   }
 
   /* An English page names Chinese only in its language links, which the system's font
@@ -131,10 +178,16 @@
     text-decoration-color: currentColor;
   }
 
+  /* One focus ring everywhere: 2 px of ink, off the element, following its corners. On a
+     dark card it turns light (`.on-dark`). */
   :focus-visible {
     outline: 2px solid var(--ink);
     outline-offset: 3px;
     border-radius: 6px;
+  }
+
+  .on-dark :focus-visible {
+    outline-color: var(--on-dark);
   }
 
   b,
@@ -144,7 +197,7 @@
   }
 
   code {
-    @apply rounded-md border bg-paper px-1.5 py-0.5 font-mono text-[0.88em] leading-none whitespace-nowrap;
+    @apply rounded-field border bg-paper px-1.5 py-0.5 font-mono text-[0.88em] leading-none whitespace-nowrap;
   }
 
   button:not(:disabled),
@@ -162,6 +215,11 @@
     font-weight: 700;
     letter-spacing: -0.035em;
     text-wrap: balance;
+  }
+
+  /* A card's or a clause's heading is small enough to need less tracking. */
+  :is(h1, h2, h3):is(.text-subhead) {
+    letter-spacing: -0.015em;
   }
 
   :lang(zh-Hant-TW) :is(h1, h2, h3) {

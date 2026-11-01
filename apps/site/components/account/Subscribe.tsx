@@ -98,7 +98,7 @@ export function Subscribe({
 
   // Until there is a button, its place holds what is true instead, shaped like it but flat.
   const chip =
-    "flex min-h-13 items-center justify-center rounded-full bg-ground px-6 py-2 text-center text-[15px] font-semibold text-ink-2";
+    "flex min-h-12 items-center justify-center rounded-full bg-ground px-6 py-2 text-center text-small font-semibold text-ink-2";
   return (
     <div ref={root} className="grid gap-4">
       {!selling ? (

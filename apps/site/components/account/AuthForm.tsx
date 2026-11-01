@@ -94,7 +94,7 @@ export function AuthForm({
       <Button type="button" variant="outline" className="w-full" onClick={google} disabled={busy}>
         {t.google}
       </Button>
-      <p className="flex items-center gap-3 text-xs text-ink-3 before:h-px before:flex-1 before:bg-line after:h-px after:flex-1 after:bg-line">
+      <p className="flex items-center gap-3 text-fine text-ink-3 before:h-px before:flex-1 before:bg-line after:h-px after:flex-1 after:bg-line">
         <span>{t.or}</span>
       </p>
       <form className="grid gap-4" onSubmit={submit}>
@@ -119,7 +119,7 @@ export function AuthForm({
           )}
         </Label>
         {mode === "signIn" && (
-          <a className="justify-self-start text-sm text-ink-3" href={href(locale, "/reset/")}>
+          <a className="justify-self-start text-small text-ink-3" href={href(locale, "/reset/")}>
             {t.signIn.forgot}
           </a>
         )}
@@ -133,7 +133,7 @@ export function AuthForm({
         </Button>
         {agree && <p className={HINT}>{agree}</p>}
       </form>
-      <p className="text-sm text-ink-3">
+      <p className="text-small text-ink-3">
         {page.switchPrompt}{" "}
         <a href={href(locale, mode === "signIn" ? "/signup/" : "/signin/") + query}>
           {page.switchLink}
