@@ -128,6 +128,11 @@ export const zhTw: Content = {
       nameTitle: "Meet Christina Koch",
       credit: "素材：NASA 公有領域影片，不代表 NASA 背書",
     },
+    editor: {
+      title: ["剪好的影片", "都能在剪輯器裡再改"],
+      lede: "在逐字稿上刪字或改字、換字幕樣式或音樂，每個版本都留著。也能匯出到 Final Cut Pro、DaVinci Resolve 或 Premiere Pro。",
+      alt: "Fineframe 的剪輯器，打開一支剪好的 59 秒直式影片：帶字幕的影片、下方是逐字稿與時間軸，旁邊是下載按鈕和兩個版本，第二版修正了一個字幕用字。",
+    },
     privacy: {
       title: ["在你的電腦上剪", "影片檔不上傳"],
       lede: "分析和輸出都在你的電腦上進行。Claude 用你自己的 Anthropic 金鑰規劃剪輯，收到的主要是這三樣，從不包含影片檔。",
@@ -177,6 +182,7 @@ export const zhTw: Content = {
     description: "Apple 晶片 Mac、Windows 和 Linux 的安裝檔，不需要另外安裝其他軟體。",
     lede: "下載安裝檔就好，不必另外裝 Node、Python 或命令列工具。第一次打開時，App 會請你用有訂閱方案的帳號登入、輸入你的 Anthropic API 金鑰，並安裝分析工具（約 2 GB）。",
     others: "要裝在別台電腦：",
+    screen: "Fineframe 加入一支影片後的第一個畫面：左邊是素材，右邊選長度、畫面比例和字幕樣式。",
     needs: "需要有效的 Fineframe 方案才能使用。[查看方案](/pricing/)",
     phone: "Fineframe 在電腦上執行。請用電腦打開這一頁，或把連結傳給自己。",
     share: "傳送連結",

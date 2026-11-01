@@ -104,6 +104,8 @@ export type Content = {
       nameTitle: string;
       credit: string;
     };
+    /** The app's editor, as it opened on a finished edit: its picture's description and credit. */
+    editor: { title: Lines; lede: string; alt: string };
     privacy: {
       title: Lines;
       lede: string;
@@ -126,6 +128,8 @@ export type Content = {
     lede: Rich;
     /** On a computer, before the other computers' installers. */
     others: string;
+    /** The app's first screen, footage added: its picture's description. */
+    screen: string;
     /** Under the download buttons: what running the app needs. */
     needs: Rich;
     /** On a phone or tablet: the installers are for a computer. */
