@@ -70,6 +70,7 @@ const shown = (t: typeof en) => {
     h.features.captions.title,
     h.features.music.title,
     h.formats.title,
+    h.editor.title,
     h.privacy.title,
     h.pricing.title,
   ];
@@ -77,13 +78,15 @@ const shown = (t: typeof en) => {
     400: [t.home, t.nav, t.footer, t.skip, t.languageName, t.pricing, t.download.needs],
     600: [
       [t.footer.product, t.footer.account, t.footer.legal, t.nav.getStarted],
+      [t.nav.signIn, t.nav.account],
       [h.hero.plans, h.hero.watch, t.nav.download, h.features.music.voice, h.features.music.music],
+      t.download.platforms.map((platform) => platform.button),
       h.formats.spec.map(([, value]) => value),
       [h.privacy.stays.title, h.privacy.sent.title, t.pricing.includedTitle],
       // The sections' eyebrows, and the names of what else the app does.
       [t.nav.examples, t.nav.features, t.nav.pricing, t.nav.faq],
       [h.features.alsoTitle, ...h.features.also.map((item) => item.title)],
-      t.pricing.plans.map((plan) => plan.name),
+      t.pricing.plans.map((plan) => [plan.name, plan.save]),
       t.pricing.checkout,
       h.faq.items.map((item) => item.q),
     ],
