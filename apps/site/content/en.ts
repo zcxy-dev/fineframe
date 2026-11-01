@@ -232,19 +232,24 @@ export const en: Content = {
     title: "Pricing",
     heading: ["One full app", "Two ways to pay"],
     description: "Fineframe is US$15 a month or US$120 a year, the same full app either way.",
-    lede: "Every feature is in both plans. Pay US$15 month to month, or US$120 once a year, which comes to US$10 a month.",
+    lede: "Every feature is in both plans. Pay month to month, or once a year for less.",
     plans: [
-      { name: "Monthly", price: "US$15", period: "/ month", billing: "Billed every month" },
+      { name: "Monthly", price: "US$15", period: "/ month", billing: "Billed monthly" },
       {
         name: "Yearly",
-        price: "US$120",
-        period: "/ year",
-        billing: "US$10 a month, billed once a year",
-        save: "Save US$60",
+        price: "US$10",
+        period: "/ month",
+        billing: "US$120 billed yearly",
+        save: "Save 33%",
       },
     ],
     checkout: "Opening soon",
-    terms: "Cancel anytime. A first payment can be refunded within 14 days.",
+    trust: [
+      "Checkout by Paddle",
+      "Cancel anytime",
+      "First payment refundable within 14 days",
+      "Invoices in your account",
+    ],
     afterTitle: "After you subscribe",
     after: [
       "[Download Fineframe](/download/) for your computer.",
@@ -259,12 +264,37 @@ export const en: Content = {
       "Analysis and rendering on your own computer",
     ],
     keyTitle: "What Claude costs",
-    key: [
-      "Fineframe plans and checks each edit with Claude on your own Anthropic API key, so Anthropic bills you directly for what each edit uses: about US$0.20 to 0.60 for an edit of a minute or less, and US$1 to 1.20 for five minutes. None of it passes through Fineframe.",
+    key: "Fineframe plans and checks each edit with Claude on your own Anthropic API key, so Anthropic bills you directly for what each edit uses. None of it passes through Fineframe, and the app estimates it before every edit.",
+    keyRows: [
+      ["An edit of a minute or less", "about US$0.20 to 0.60"],
+      ["A five-minute edit", "US$1 to 1.20"],
     ],
-    refundTitle: "Refunds within 14 days",
-    refund: [
-      "There is no free trial. If Fineframe is not right for you, a plan’s first payment can be refunded within 14 days, once per customer; renewals are not. See the [refund policy](/refund/).",
+    faqTitle: "Questions about paying",
+    faq: [
+      {
+        q: "Is there a free trial?",
+        a: "No. If Fineframe is not right for you, a plan’s first payment can be refunded within 14 days, once per customer; renewals are not. See the [refund policy](/refund/).",
+      },
+      {
+        q: "Who takes the payment?",
+        a: "Paddle.com, our online reseller and the Merchant of Record for every order. It handles the payment, billing and invoices, and we never see your card details.",
+      },
+      {
+        q: "Can I switch plans or cancel?",
+        a: "Yes, at any time. In your [account](/account/), Manage billing opens Paddle’s customer portal, where you change your plan or payment method, see your invoices or cancel. After you cancel, Fineframe works until the end of the period you paid for.",
+      },
+      {
+        q: "Do I need an account to buy?",
+        a: "Yes, a free Fineframe account. You subscribe with it, and you sign in to the app with it.",
+      },
+      {
+        q: "Can I use it on more than one computer?",
+        a: "Yes. While your subscription is active, you may install and use Fineframe on your own computers.",
+      },
+      {
+        q: "Which computers does it run on?",
+        a: "Macs with Apple silicon (M1 or later), Windows 10 or 11 on x64, and Linux on x86-64. Intel Macs are not supported.",
+      },
     ],
   },
   legal: {
@@ -578,7 +608,6 @@ export const en: Content = {
     status: {
       none: "No subscription",
       noneNote: "Fineframe needs an active plan to run.",
-      soon: "Plans can be bought here once purchases open.",
       active: "Active",
       renews: "Renews on {date}.",
       cancelled: "Cancelled",

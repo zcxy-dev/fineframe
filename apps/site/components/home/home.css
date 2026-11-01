@@ -872,9 +872,3 @@
     grid-template-columns: 1fr;
   }
 }
-
-/* The closing call, on an amber card. */
-.home-section .close h2 {
-  font-size: var(--text-display);
-  line-height: var(--text-display--line-height);
-}

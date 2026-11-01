@@ -35,7 +35,7 @@ function headings(t: Content): string[] {
     t.pricing.title,
     t.pricing.includedTitle,
     t.pricing.keyTitle,
-    t.pricing.refundTitle,
+    t.pricing.faqTitle,
     ...t.pricing.plans.map((plan) => plan.name),
     t.auth.signIn.title,
     t.auth.signUp.title,

@@ -44,7 +44,7 @@ export const zhTw: Content = {
       plans: "查看方案與價格",
       phone: "到下載頁看電腦版",
       watch: "看一支成片",
-      facts: ["Mac（Apple 晶片）・Windows・Linux", "每月 15 美元，或每年 120 美元"],
+      facts: ["Mac（Apple 晶片）・Windows・Linux", "每月 US$15，或每年 US$120"],
       post: "22 分鐘的對談剪成 50 秒",
       steps: ["聽寫每一句", "挑出講得最好的段落", "裁成直式", "檢查每個剪接點", "完成・0:50・9:16"],
       credit: "素材：NASA 公有領域影片，不代表 NASA 背書",
@@ -107,9 +107,9 @@ export const zhTw: Content = {
       more: "[App 送出的所有資料和去處](/privacy/)",
     },
     pricing: {
-      title: ["一個完整的 App", "每月 15 美元"],
+      title: ["一個完整的 App", "每月 US$15"],
       lede: "月繳和年繳是同一個完整的 App，只差在扣款週期。購買前需要先建立免費的 Fineframe 帳號。",
-      cost: "Claude 的費用另計，用你自己的 Anthropic API 金鑰：1 分鐘以內的影片約 0.20 到 0.60 美元，5 分鐘約 1 到 1.20 美元。每次剪輯前 App 都會先估算。",
+      cost: "Claude 的費用另計，用你自己的 Anthropic API 金鑰：1 分鐘以內的影片約 US$0.20 到 0.60，5 分鐘約 US$1 到 1.20。每次剪輯前 App 都會先估算。",
       more: "[完整價格說明](/pricing/)",
     },
     faq: {
@@ -125,7 +125,7 @@ export const zhTw: Content = {
         },
         {
           q: "電腦記憶體不夠怎麼辦？",
-          a: "記憶體少於 12 GB 時，改用你自己的 OpenRouter 金鑰在雲端聽寫語音，每小時素材約 0.03 美元。App 會先告訴你，兩種方式都能選。",
+          a: "記憶體少於 12 GB 時，改用你自己的 OpenRouter 金鑰在雲端聽寫語音，每小時素材約 US$0.03。App 會先告訴你，兩種方式都能選。",
         },
         {
           q: "聽得懂哪些語言？",
@@ -201,7 +201,7 @@ export const zhTw: Content = {
       "貼上你的 [Anthropic API 金鑰](https://console.anthropic.com/settings/keys)，App 會確認它能用。",
       "同時 App 會安裝一次分析元件，約 2 GB 的 Python 和 PyTorch，視窗裡會顯示進度。",
       "第一次剪輯時會下載其餘元件，各有自己的進度條：語音模型、FFmpeg、特效算圖器，以及第一次匯入連結時用的 yt-dlp。",
-      "記憶體少於 12 GB 的電腦，會改用 OpenRouter 聽寫語音，用你的 [OpenRouter API 金鑰](https://openrouter.ai/settings/keys)，每小時素材約 0.03 美元。App 會先告訴你，兩種方式都能選。",
+      "記憶體少於 12 GB 的電腦，會改用 OpenRouter 聽寫語音，用你的 [OpenRouter API 金鑰](https://openrouter.ai/settings/keys)，每小時素材約 US$0.03。App 會先告訴你，兩種方式都能選。",
     ],
     verifyTitle: "更新與檢查碼",
     update:
@@ -213,20 +213,20 @@ export const zhTw: Content = {
   pricing: {
     title: "價格",
     heading: ["同一個完整的 App", "兩種付費方式"],
-    description: "Fineframe 每月 15 美元或每年 120 美元，兩種方案是同一個完整的 App。",
-    lede: "兩種方案的功能完全相同：每月付 15 美元，或每年付一次 120 美元，等於每月 10 美元。",
+    description: "Fineframe 每月 US$15 或每年 US$120，兩種方案是同一個完整的 App。",
+    lede: "兩種方案的功能完全相同。按月付，或一年付一次、更划算。",
     plans: [
       { name: "月繳", price: "US$15", period: "/ 月", billing: "每月扣款" },
       {
         name: "年繳",
-        price: "US$120",
-        period: "/ 年",
-        billing: "等於每月 10 美元，每年扣款一次",
-        save: "省 60 美元",
+        price: "US$10",
+        period: "/ 月",
+        billing: "每年扣款 US$120",
+        save: "省 33%",
       },
     ],
     checkout: "即將開放購買",
-    terms: "隨時可取消，首次付款 14 天內可退款。",
+    trust: ["由 Paddle 處理結帳", "隨時可取消", "首次付款 14 天內可退款", "在帳號裡查看發票"],
     afterTitle: "訂閱之後",
     after: [
       "[下載](/download/)你電腦的 Fineframe。",
@@ -241,12 +241,37 @@ export const zhTw: Content = {
       "分析和輸出都在你的電腦上進行",
     ],
     keyTitle: "Claude 的費用",
-    key: [
-      "Fineframe 用你自己的 Anthropic API 金鑰，請 Claude 規劃和檢查每支影片，費用由 Anthropic 直接向你收取：1 分鐘以內的影片約 0.20 到 0.60 美元，5 分鐘約 1 到 1.20 美元。這筆錢不經過 Fineframe。",
+    key: "Fineframe 用你自己的 Anthropic API 金鑰，請 Claude 規劃和檢查每支影片，費用由 Anthropic 直接向你收取。這筆錢不經過 Fineframe，每次剪輯前 App 都會先估算。",
+    keyRows: [
+      ["1 分鐘以內的影片", "約 US$0.20 到 0.60"],
+      ["5 分鐘的影片", "US$1 到 1.20"],
     ],
-    refundTitle: "首次付款 14 天內可退款",
-    refund: [
-      "沒有免費試用。如果 Fineframe 不適合你，方案的首次付款可以在 14 天內申請退款，每位客戶限一次；續訂款項不退。請見[退款政策](/refund/)。",
+    faqTitle: "付款相關問題",
+    faq: [
+      {
+        q: "有免費試用嗎？",
+        a: "沒有。如果 Fineframe 不適合你，方案的首次付款可以在 14 天內申請退款，每位客戶限一次；續訂款項不退。請見[退款政策](/refund/)。",
+      },
+      {
+        q: "誰負責收款？",
+        a: "Paddle.com，我們的線上經銷商，也是每筆訂單的記錄商家（Merchant of Record）。付款、帳單與發票都由 Paddle 處理，我們看不到你的信用卡資料。",
+      },
+      {
+        q: "可以換方案或取消嗎？",
+        a: "可以，隨時都行。在你的[帳號](/account/)按「管理帳單」會打開 Paddle 的客戶入口，可以變更方案或付款方式、查看發票或取消訂閱。取消後，App 可以用到已付費期間結束。",
+      },
+      {
+        q: "購買需要帳號嗎？",
+        a: "需要一個免費的 Fineframe 帳號。你用它訂閱，也用它登入 App。",
+      },
+      {
+        q: "可以裝在不只一台電腦上嗎？",
+        a: "可以。在訂閱有效期間，你可以在你自己的電腦上安裝與使用 Fineframe。",
+      },
+      {
+        q: "支援哪些電腦？",
+        a: "Apple 晶片的 Mac（M1 或更新）、x64 的 Windows 10 或 11，以及 x86-64 的 Linux。不支援 Intel 處理器的 Mac。",
+      },
     ],
   },
   legal: {
@@ -544,7 +569,6 @@ export const zhTw: Content = {
     status: {
       none: "尚未訂閱",
       noneNote: "Fineframe 需要有效的方案才能使用。",
-      soon: "開放購買後，就能在這裡選擇方案。",
       active: "訂閱中",
       renews: "將於 {date} 續訂。",
       cancelled: "已取消",

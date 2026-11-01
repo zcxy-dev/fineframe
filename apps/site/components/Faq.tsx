@@ -1,13 +1,12 @@
-import { content } from "../lib/content.ts";
 import type { Locale } from "../lib/site.ts";
 import { Icon } from "./Icon.tsx";
 import { Phrases, Rich } from "./Rich.tsx";
 
-/** The questions asked before buying, each opening on its answer. */
-export function Faq({ locale }: { locale: Locale }) {
+/** Questions, each opening on its answer: the home page's before buying, the pricing page's about paying. */
+export function Faq({ locale, items }: { locale: Locale; items: { q: string; a: string }[] }) {
   return (
     <div className="border-t-(length:--stroke) border-ink">
-      {content(locale).home.faq.items.map((item) => (
+      {items.map((item) => (
         <details key={item.q} className="group border-b">
           <summary className="flex list-none items-center justify-between gap-4 py-5 text-body leading-snug font-semibold [&::-webkit-details-marker]:hidden">
             <span>

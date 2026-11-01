@@ -86,9 +86,7 @@ export function AccountView({ locale }: { locale: Locale }) {
 
   const date = (iso: string | null) =>
     iso ? new Intl.DateTimeFormat(LANG[locale], { dateStyle: "long" }).format(new Date(iso)) : "";
-  const status = billing
-    ? statusLine(t.status, row, date)
-    : { label: t.status.none, note: t.status.soon };
+  const status = billing ? statusLine(t.status, row, date) : { label: t.status.none };
   const hasPlan = billing && entitled(row);
 
   // The status's dot: amber while the plan runs, red once it needs attention or has ended.
@@ -142,7 +140,14 @@ export function AccountView({ locale }: { locale: Locale }) {
           )}
           <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-4 border-t pt-6">
             {billing && row && paddleBilled(row) && (
-              <Button type="button" variant="outline" size="sm" onClick={manage} disabled={busy}>
+              // Past due, updating the payment method is the page's one action.
+              <Button
+                type="button"
+                variant={row.status === "past_due" ? "default" : "outline"}
+                size={row.status === "past_due" ? "default" : "sm"}
+                onClick={manage}
+                disabled={busy}
+              >
                 {t.manage}
               </Button>
             )}
@@ -165,7 +170,10 @@ export function AccountView({ locale }: { locale: Locale }) {
           <p className={PROSE}>{lastTwo(t.downloadBody)}</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <a
-              className={buttonClass({ variant: hasPlan ? "default" : "outline", size: "sm" })}
+              className={buttonClass({
+                variant: hasPlan && row?.status !== "past_due" ? "default" : "outline",
+                size: "sm",
+              })}
               href={href(locale, "/download/")}
             >
               {t.download}
