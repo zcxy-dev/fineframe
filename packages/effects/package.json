@@ -16,12 +16,12 @@
   },
   "dependencies": {
     "@fontsource-variable/inter": "5.3.0",
-    "@fontsource/noto-sans-tc": "5.3.0",
-    "@hyperframes/producer": "0.8.164",
+    "@fontsource/noto-sans-tc": "5.3.1",
+    "@hyperframes/producer": "0.8.217",
     "@video-editor/schema": "workspace:*",
     "ajv": "8.20.0",
     "htmlparser2": "10.1.0",
-    "postcss": "8.5.30",
-    "puppeteer-core": "25.14.0"
+    "postcss": "8.5.32",
+    "puppeteer-core": "25.16.0"
   }
 }

@@ -15,9 +15,9 @@
     "check-gen": "pnpm -r check-gen"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.15",
+    "@biomejs/biome": "2.6.4",
     "@types/node": "24.19.2",
-    "knip": "6.41.0",
+    "knip": "6.43.0",
     "typescript": "6.0.3"
   }
 }

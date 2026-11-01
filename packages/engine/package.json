@@ -30,9 +30,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.133.0",
-    "@puppeteer/browsers": "3.2.5",
+    "@puppeteer/browsers": "3.2.6",
     "@video-editor/effects": "workspace:*",
     "@video-editor/schema": "workspace:*",
-    "playwright-core": "1.63.0"
+    "playwright-core": "1.64.1"
   }
 }
