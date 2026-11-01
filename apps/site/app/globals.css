@@ -156,10 +156,17 @@
     letter-spacing: 0.02em;
   }
 
-  /* An English page names Chinese only in its language links, which the system's font
-     sets rather than the whole Noto Sans TC download. */
+  /* An English page names Chinese only in its language links and its sources' names, which the
+     system's fonts set rather than a Noto Sans TC download; the names are simplified
+     characters, some of which Noto Sans TC lacks (`Phrases`). */
   html:lang(en) a[hreflang] {
     font-family: system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+  }
+
+  :lang(zh-Hans) {
+    font-family:
+      "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Noto Sans SC",
+      system-ui, sans-serif;
   }
 
   ::selection {

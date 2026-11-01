@@ -177,6 +177,8 @@ export type Content = {
     faqTitle: string;
     faq: { q: string; a: Rich }[];
   };
+  /** The heading of a legal page's contents. */
+  contents: string;
   legal: {
     terms: LegalPage;
     privacy: LegalPage;

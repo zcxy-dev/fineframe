@@ -327,6 +327,7 @@ export const en: Content = {
       },
     ],
   },
+  contents: "On this page",
   legal: {
     terms: {
       title: "Terms of service",

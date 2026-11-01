@@ -6,6 +6,27 @@ import { phrases } from "../lib/typeset.ts";
 // `[label](href)` a link, `[[text]]` a placeholder, `**text**` strong and `` `text` `` code.
 const TOKEN = /\[\[(.+?)\]\]|\[(.+?)\]\((.+?)\)|\*\*(.+?)\*\*|`(.+?)`/g;
 
+/** Chinese in an English page: the names and titles of sources, written in simplified characters. */
+const HAN = /([\u3400-\u9fff\uf900-\ufaff]+)/;
+
+/**
+ * English text, with any Chinese in it (a source's name or title, in simplified characters) set
+ * as Simplified Chinese, in the system's font for it: Noto Sans TC lacks some of its characters,
+ * and an English page then loads no Chinese font.
+ */
+function chineseNames(text: string): ReactNode {
+  if (!HAN.test(text)) return text;
+  return text.split(HAN).map((part, i) =>
+    i % 2 ? (
+      <span key={`${i}${part}`} lang="zh-Hans">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
+
 /**
  * Chinese set in phrases a line breaks only between; English with its last two words kept
  * together unless the text goes on after it (`end` false).
@@ -19,7 +40,7 @@ export function Phrases({
   locale: Locale;
   end?: boolean;
 }): ReactNode {
-  if (locale !== "zh-tw") return end ? lastTwo(text) : text;
+  if (locale !== "zh-tw") return chineseNames(end ? lastTwo(text) : text);
   // A phrase's trailing space stays outside it, where a line may break: WebKit draws a
   // no-wrap phrase twice when it ends in a space before a `<wbr>`.
   return phrases(text).map((phrase, i, all) => {

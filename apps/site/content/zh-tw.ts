@@ -304,6 +304,7 @@ export const zhTw: Content = {
       },
     ],
   },
+  contents: "本頁內容",
   legal: {
     terms: {
       title: "服務條款",
