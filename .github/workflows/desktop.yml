@@ -217,3 +217,15 @@ jobs:
           AWS_DEFAULT_REGION: auto
           AWS_REQUEST_CHECKSUM_CALCULATION: when_required
           AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+      # fineframe.app's download page names the version its build read from the update feed
+      # (apps/site/lib/release.ts): build it again now that the feed names this one, with the
+      # Pages project's deploy hook, which builds main (apps/site/DEPLOY.md).
+      - name: Build fineframe.app again
+        run: |
+          if [ -z "$PAGES_DEPLOY_HOOK" ]; then
+            echo "::error::The CLOUDFLARE_PAGES_DEPLOY_HOOK secret is not set, so fineframe.app still names the previous version"
+            exit 1
+          fi
+          curl --fail --silent --show-error --request POST "$PAGES_DEPLOY_HOOK" > /dev/null
+        env:
+          PAGES_DEPLOY_HOOK: ${{ secrets.CLOUDFLARE_PAGES_DEPLOY_HOOK }}

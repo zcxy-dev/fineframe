@@ -183,6 +183,7 @@ export const zhTw: Content = {
     lede: "下載安裝檔就好，不必另外裝 Node、Python 或命令列工具。第一次打開時，App 會請你用有訂閱方案的帳號登入、輸入你的 Anthropic API 金鑰，並安裝分析工具（約 2 GB）。",
     others: "要裝在別台電腦：",
     screen: "Fineframe 加入一支影片後的第一個畫面：左邊是素材，右邊選長度、畫面比例和字幕樣式。",
+    version: "版本 {version}，{date}發布",
     needs: "需要有效的 Fineframe 方案才能使用。[查看方案](/pricing/)",
     phone: "Fineframe 在電腦上執行。請用電腦打開這一頁，或把連結傳給自己。",
     share: "傳送連結",

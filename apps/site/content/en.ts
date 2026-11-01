@@ -202,6 +202,7 @@ export const en: Content = {
     others: "For another computer:",
     screen:
       "Fineframe’s first screen with a video added: the footage on the left, and the length, the shape and the caption style to choose on the right.",
+    version: "Version {version}, released {date}",
     needs: "Needs an active Fineframe plan to run. [See plans](/pricing/)",
     phone: "Fineframe runs on a computer. Open this page there, or send yourself the link.",
     share: "Send the link",
