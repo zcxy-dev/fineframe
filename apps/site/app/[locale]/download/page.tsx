@@ -20,7 +20,26 @@ export default async function Download({ params }: PageProps) {
   const t = content(locale).download;
   return (
     <Frame locale={locale} path="/download/">
-      <PageHead title={t.title} locale={locale}>
+      <PageHead
+        title={t.title}
+        locale={locale}
+        aside={
+          <figure className="m-0">
+            <div className="overflow-hidden rounded-frame border bg-paper shadow-raised">
+              <img
+                className="block h-auto w-full"
+                src="/media/app-start.webp"
+                srcSet="/media/app-start-sm.webp 1440w, /media/app-start.webp 2880w"
+                sizes="(min-width: 1024px) 680px, calc(100vw - 2 * var(--gutter))"
+                width={2880}
+                height={1800}
+                alt={t.screen}
+                fetchPriority="high"
+              />
+            </div>
+          </figure>
+        }
+      >
         <p>
           <Rich text={t.lede} locale={locale} />
         </p>

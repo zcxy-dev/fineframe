@@ -6,22 +6,24 @@ import { Phrases } from "./Rich.tsx";
 
 /**
  * An inner page's heading and the sentence under it; `center` sets both on the page's middle,
- * over content that is centred too.
+ * over content that is centred too. `aside` stands beside them from 1024 px, under them before.
  */
 export function PageHead({
   title,
   locale,
   center = false,
+  aside,
   children,
 }: {
   /** A heading, or its two lines, each kept whole. */
   title: string | Lines;
   locale: Locale;
   center?: boolean;
+  aside?: ReactNode;
   children?: ReactNode;
 }) {
-  return (
-    <header className={`wrap pt-head pb-[clamp(32px,4vw,56px)] ${center ? "text-center" : ""}`}>
+  const head = (
+    <>
       <h1 className="text-title">
         {typeof title === "string" ? (
           <Phrases text={title} locale={locale} />
@@ -40,6 +42,14 @@ export function PageHead({
           {children}
         </div>
       )}
+    </>
+  );
+  return (
+    <header
+      className={`wrap pt-head pb-[clamp(32px,4vw,56px)] ${center ? "text-center" : ""} ${aside ? "grid items-center gap-x-16 gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]" : ""}`}
+    >
+      {aside ? <div>{head}</div> : head}
+      {aside}
     </header>
   );
 }

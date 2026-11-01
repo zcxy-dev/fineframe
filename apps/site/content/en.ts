@@ -139,6 +139,11 @@ export const en: Content = {
       nameTitle: "Meet Christina Koch",
       credit: "Footage: NASA, public domain. Not an endorsement.",
     },
+    editor: {
+      title: ["Every edit opens", "in the editor"],
+      lede: "Cut words from the transcript, fix one, switch the caption style or the music, and keep each version. Or export the edit to Final Cut Pro, DaVinci Resolve or Premiere Pro.",
+      alt: "Fineframe’s editor on a finished 59-second vertical edit: the video with its captions, the transcript as a timeline under it, and beside it the downloads and its two versions, the second with one caption word fixed.",
+    },
     privacy: {
       title: ["Edited on your computer", "with no video uploaded"],
       lede: "Analysis and rendering run on your own machine. Claude plans the edit on your own Anthropic key and gets mainly these three things, never your video files.",
@@ -195,6 +200,8 @@ export const en: Content = {
       "Installers for Macs with Apple silicon, Windows and Linux. Nothing else to install.",
     lede: "Download the installer, with no Node, no Python and no command line to set up. The first time it opens, the app asks you to sign in with the account that has your plan and for your Anthropic API key, and installs its analysis, about 2 GB.",
     others: "For another computer:",
+    screen:
+      "Fineframe’s first screen with a video added: the footage on the left, and the length, the shape and the caption style to choose on the right.",
     needs: "Needs an active Fineframe plan to run. [See plans](/pricing/)",
     phone: "Fineframe runs on a computer. Open this page there, or send yourself the link.",
     share: "Send the link",

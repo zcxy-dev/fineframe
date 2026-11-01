@@ -175,6 +175,30 @@ export default async function Home({ params }: PageProps) {
           </div>
         </section>
 
+        <section className="home-section" id="editor" aria-labelledby="editor-title">
+          <div className="wrap">
+            <header className="head">
+              <h2 id="editor-title">
+                <Two locale={locale} lines={t.editor.title} />
+              </h2>
+              <p className="sub">{text(t.editor.lede)}</p>
+            </header>
+            <figure className="window" data-reveal>
+              <img
+                src="/media/app-editor.webp"
+                srcSet="/media/app-editor-sm.webp 1440w, /media/app-editor.webp 2880w"
+                sizes="(min-width: 1800px) 1360px, (min-width: 1300px) 1240px, calc(100vw - 2 * var(--gutter))"
+                width={2880}
+                height={1800}
+                alt={t.editor.alt}
+                loading="lazy"
+                decoding="async"
+              />
+            </figure>
+            <p className="credit">{text(t.hero.credit)}</p>
+          </div>
+        </section>
+
         <section className="home-section" id="privacy" aria-labelledby="privacy-title">
           <div className="wrap">
             <div className="grid gap-x-[clamp(32px,6vw,96px)] gap-y-10 on-dark rounded-card bg-graphite p-[clamp(24px,4.4vw,64px)] text-on-dark lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end">

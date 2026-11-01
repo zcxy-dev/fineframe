@@ -523,6 +523,22 @@
 .duck .lbl.m {
   top: 70px;
 }
+/* The app's own window: a screenshot of the editor, in a hairline frame that lifts off the
+   ground. */
+.window {
+  margin: clamp(40px, 5vw, 64px) 0 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-frame);
+  overflow: hidden;
+  background: var(--paper);
+  box-shadow: var(--shadow-raised);
+}
+.window img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 /* The rest of what the app does, under the cards: names and sentences in three columns, each
    under a rule. */
 .also {
