@@ -249,7 +249,9 @@ export function Reel({
               <i className="drop" />
               {legend[1]}
             </span>
-            <span ref={tc}>22:42</span>
+            <span className="time" ref={tc}>
+              22:42
+            </span>
           </div>
           <div className="segs" ref={segs}>
             {SEGMENTS.map(([grow, keep], i) => (

@@ -1,11 +1,12 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon.tsx";
 
 /**
  * The bar's menu below 1081 px, where its links do not fit: a button that opens them in a
- * panel under the bar. Escape, a link or the button closes it.
+ * panel under the bar. Escape (which hands the keyboard back to the button), a link or the
+ * button closes it.
  */
 export function Menu({
   open: openLabel,
@@ -17,15 +18,29 @@ export function Menu({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setOpen(false);
+    const el = panel.current;
+    if (!open || !el) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      button.current?.focus();
+    };
+    const onClick = (event: MouseEvent) =>
+      (event.target as HTMLElement).closest("a") && setOpen(false);
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    el.addEventListener("click", onClick);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      el.removeEventListener("click", onClick);
+    };
   }, [open]);
   return (
     <>
       <button
+        ref={button}
         type="button"
         className="-mr-2 grid size-11 place-items-center rounded-full text-ink min-[1081px]:hidden"
         aria-expanded={open}
@@ -35,12 +50,11 @@ export function Menu({
       >
         <Icon name={open ? "close" : "menu"} className="size-6" />
       </button>
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: closes the panel when one of its links is followed; the links themselves take the keyboard. */}
       <div
+        ref={panel}
         id="menu"
         hidden={!open}
         className="absolute inset-x-0 top-full border-b bg-ground shadow-raised min-[1081px]:hidden"
-        onClick={(event) => (event.target as HTMLElement).closest("a") && setOpen(false)}
       >
         {children}
       </div>

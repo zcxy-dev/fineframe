@@ -63,24 +63,22 @@ export function WideEdit({
     ));
   return (
     <div className="ytgrid">
-      <div>
-        <figure className="player" data-reveal>
-          <video
-            ref={video}
-            muted
-            playsInline
-            loop
-            preload="none"
-            data-src="/media/wide.mp4"
-            data-src-sm="/media/wide-sm.mp4"
-            data-sm-w="960"
-            data-poster="/media/wide.webp"
-            width={1920}
-            height={1080}
-            aria-label={nameTitle}
-          />
-        </figure>
-      </div>
+      <figure className="player" data-reveal>
+        <video
+          ref={video}
+          muted
+          playsInline
+          loop
+          preload="none"
+          data-src="/media/wide.mp4"
+          data-src-sm="/media/wide-sm.mp4"
+          data-sm-w="960"
+          data-poster="/media/wide.webp"
+          width={1920}
+          height={1080}
+          aria-label={nameTitle}
+        />
+      </figure>
       {spec}
       <div className="tl" aria-hidden="true" data-reveal>
         <div className="ph" ref={playhead} />

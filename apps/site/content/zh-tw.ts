@@ -175,7 +175,7 @@ export const zhTw: Content = {
   download: {
     title: "下載 Fineframe",
     description: "Apple 晶片 Mac、Windows 和 Linux 的安裝檔，不需要另外安裝其他軟體。",
-    lede: "下載安裝檔就好，不必另外裝 Node、Python 或命令列工具。第一次打開時，App 會安裝分析工具（約 2 GB），再用有訂閱方案的帳號登入。",
+    lede: "下載安裝檔就好，不必另外裝 Node、Python 或命令列工具。第一次打開時，App 會請你用有訂閱方案的帳號登入、輸入你的 Anthropic API 金鑰，並安裝分析工具（約 2 GB）。",
     others: "要裝在別台電腦：",
     needs: "需要有效的 Fineframe 方案才能使用。[查看方案](/pricing/)",
     phone: "Fineframe 在電腦上執行。請用電腦打開這一頁，或把連結傳給自己。",

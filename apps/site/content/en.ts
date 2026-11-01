@@ -193,7 +193,7 @@ export const en: Content = {
     title: "Download Fineframe",
     description:
       "Installers for Macs with Apple silicon, Windows and Linux. Nothing else to install.",
-    lede: "Download the installer, with no Node, no Python and no command line to set up. The first time it opens, the app installs its analysis, about 2 GB, and you sign in with the account that has your plan.",
+    lede: "Download the installer, with no Node, no Python and no command line to set up. The first time it opens, the app asks you to sign in with the account that has your plan and for your Anthropic API key, and installs its analysis, about 2 GB.",
     others: "For another computer:",
     needs: "Needs an active Fineframe plan to run. [See plans](/pricing/)",
     phone: "Fineframe runs on a computer. Open this page there, or send yourself the link.",

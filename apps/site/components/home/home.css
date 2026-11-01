@@ -200,7 +200,7 @@
 .legend .drop {
   background: repeating-linear-gradient(90deg, rgb(255 255 255 / 0.5) 0 2px, transparent 2px 4px);
 }
-.tc span {
+.tc .time {
   color: #fff;
   font-size: 22px;
   letter-spacing: -0.01em;
@@ -703,7 +703,8 @@
   background: var(--cut);
 }
 
-/* The scroll-driven pieces start outside the page; never let them widen it. */
+/* The entrances start below their place, and the timeline's clips outside it; never let them
+   widen the page. */
 .home {
   padding-bottom: 120px;
   overflow-x: clip;
@@ -759,6 +760,13 @@
 }
 .sent li:nth-child(3) {
   transition-delay: 0.3s;
+}
+/* On phones the cards scroll sideways: the next card's edge says so, so it never waits. */
+@media (max-width: 640px) {
+  .cards > [data-reveal="wait"] {
+    opacity: 1;
+    translate: none;
+  }
 }
 
 /* Tablet and phone */
