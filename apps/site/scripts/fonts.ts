@@ -79,7 +79,8 @@ const shown = (t: typeof en) => {
     600: [
       [t.footer.product, t.footer.account, t.footer.legal, t.nav.getStarted],
       [t.nav.signIn, t.nav.account],
-      [h.hero.plans, h.hero.watch, t.nav.download, h.features.music.voice, h.features.music.music],
+      [h.hero.plans, h.hero.watch, h.hero.phone, t.nav.download],
+      [h.features.music.voice, h.features.music.music],
       t.download.platforms.map((platform) => platform.button),
       h.formats.spec.map(([, value]) => value),
       [h.privacy.stays.title, h.privacy.sent.title, t.pricing.includedTitle],
