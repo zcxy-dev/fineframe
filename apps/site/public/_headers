@@ -1,0 +1,4 @@
+# Cloudflare Pages' response headers (https://developers.cloudflare.com/pages/configuration/headers/).
+# Next.js names every file under /_next/static/ by its content, so a browser may keep it a year.
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable

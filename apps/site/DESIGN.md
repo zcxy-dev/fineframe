@@ -145,6 +145,7 @@ Line breaks are part of the design, on every page and at every width:
 - **Surfaces:** the ground; a paper card on it (`CARD`: a 1 px line edge, the `card` shadow, 24 px corners, the `card` padding); a raised card that stands off it (`CARD` and `RAISED`: the `raised` shadow), for a form on its own, a plan, the post and the player. Inside paper, a note or a tile sits on ground (`NOTICE`, 16 px corners). The colour cards (amber, graphite, steel) carry no edge or shadow: their colour is the edge. Cards never nest.
 - **Focus:** one ring everywhere, 2 px of ink 3 px off the element, following its corners; on graphite (`.on-dark`) it turns light.
 - **Footage** is credited beside it in a short form; the full credits are on `/credits/`.
+- **Share card** (`app/[locale]/og.png/route.tsx`, 1200 × 630, one per language): the wordmark, the hero's headline and lede and an amber-dotted `FINEFRAME.APP` on the ground, and on the right the post with a frame of the finished Reel over its credit. Every page shares its language's card; `/` shares the English one.
 
 ## Motion
 

@@ -30,7 +30,7 @@ The site's own code and text are proprietary, all rights reserved. It uses the c
 
 ## Example edits
 
-The home page shows edits Fineframe 0.5.0 made, with no manual steps, from three videos. `public/media/` holds loops cut from them, re-encoded for the web, with a smaller copy for phones (`-sm`) where the page shows them large, each with its first frame (`.webp`): the hero's source footage (`hero-source`) and the opening of the 9:16 short made from it (`hero-edit`), both from Don Pettit's talk; the 9:16 edit of 极客湾Geekerwan's interview (`captions`); and the 16:9 edit of Christina Koch's interview (`wide`). None has sound. `/credits/` lists the same sources on the site.
+The home page shows edits Fineframe 0.5.0 made, with no manual steps, from three videos. `public/media/` holds loops cut from them, re-encoded for the web, with a smaller copy for phones (`-sm`) where the page shows them large, each with its first frame (`.webp`): the hero's source footage (`hero-source`) and the opening of the 9:16 short made from it (`hero-edit`), both from Don Pettit's talk; the 9:16 edit of 极客湾Geekerwan's interview (`captions`); and the 16:9 edit of Christina Koch's interview (`wide`). None has sound. `app/[locale]/og.png/reel.jpg` is `hero-edit`'s first frame again, as a JPEG for the share cards a shared link shows (`/en/og.png`, `/zh-tw/og.png`), which credit it under it. `/credits/` lists the same sources on the site.
 
 - **Footage**, all in the public domain as works of NASA, which does not endorse Fineframe; neither do the people in it:
   - "[Christina Koch Artemis II Crew Announcement Resource Reel](https://images.nasa.gov/details/jsc2023m000095_Christina_Koch_Artemis_II_Crew_Announcement_Resource_Reel-social)", NASA, 3 April 2023;

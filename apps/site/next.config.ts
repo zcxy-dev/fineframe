@@ -17,6 +17,9 @@ const config: NextConfig = {
   reactStrictMode: true,
   // Each language has its own root layout, so the 404 page has one of its own.
   experimental: { globalNotFound: true },
+  // The share cards cut their fonts with subset-font, which loads its WebAssembly from its own
+  // folder: left out of the bundle, it finds it.
+  serverExternalPackages: ["subset-font"],
 };
 
 export default config;
