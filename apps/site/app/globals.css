@@ -229,6 +229,11 @@
     font-feature-settings: "palt";
   }
 
+  /* Black clogs a Chinese heading at the two smaller steps: there it takes SemiBold. */
+  :lang(zh-Hant-TW) :is(h1, h2, h3):is(.text-heading, .text-subhead) {
+    font-weight: 600;
+  }
+
   /* Chinese breaks only between phrases (lib/typeset.ts): each phrase is a `.w`, with a
      `<wbr>` between, and a heading's lines are `.ln`, broken only where written. Text takes no
      `text-wrap: pretty`: WebKit draws some Chinese lines twice with it, and the pages keep

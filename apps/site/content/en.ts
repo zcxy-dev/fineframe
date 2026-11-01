@@ -514,8 +514,14 @@ export const en: Content = {
     google: "Continue with Google",
     or: "or",
     working: "One moment…",
+    show: "Show password",
+    agree:
+      "By continuing, you agree to the [terms of service](/terms/) and the [privacy policy](/privacy/).",
+    again: "Use a different email",
+    home: "Back to the home page",
     signIn: {
       title: "Sign in",
+      lede: "Use the account your plan is on.",
       description: "Sign in to your Fineframe account.",
       submit: "Sign in",
       forgot: "Forgot your password?",
@@ -525,26 +531,28 @@ export const en: Content = {
     },
     signUp: {
       title: "Create an account",
+      lede: "One account for your plan and for the app.",
       description: "Create a Fineframe account to subscribe and sign in to the app.",
       submit: "Create account",
       passwordHint: "At least 8 characters.",
-      agree:
-        "By creating an account you agree to the [terms of service](/terms/) and the [privacy policy](/privacy/).",
       switchPrompt: "Already have an account?",
       switchLink: "Sign in",
-      sent: "Check your inbox: we sent a link to {email}. Open it to confirm your address, and you are signed in.",
+      sentTitle: "Check your inbox",
+      sent: "We sent a link to {email}. Open it to confirm your address, and you are signed in.",
       forPlan:
         "Create your account, and the checkout for the {plan} opens once you confirm your email.",
       sentPlan:
-        "Check your inbox: we sent a link to {email}. Open it to confirm your address, and the checkout for the {plan} opens.",
+        "We sent a link to {email}. Open it to confirm your address, and the checkout for the {plan} opens.",
     },
     reset: {
       title: "Reset your password",
       description: "Get a link to choose a new password for your Fineframe account.",
       lede: "Enter your account’s email, and we will send you a link to choose a new password.",
       submit: "Send the link",
+      sentTitle: "Check your inbox",
       sent: "If an account uses {email}, a link to reset its password is on its way.",
-      newTitle: "Choose a new password",
+      newLede: "Choose a new password for your account.",
+      expired: "This link has expired or was used already. Enter your email for a new one.",
       newPassword: "New password", // betterleaks:allow: a field label, not a password
       save: "Save the password",
       back: "Back to sign in",

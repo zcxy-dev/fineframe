@@ -2,13 +2,37 @@
 
 import { type FormEvent, useEffect, useState } from "react";
 import { content } from "../../lib/content.ts";
-import { lastTwo } from "../../lib/english.ts";
 import { href, type Locale } from "../../lib/site.ts";
-import { ERROR, HINT, NOTICE } from "../../lib/styles.ts";
+import { CARD, ERROR, HINT, NOTICE, RAISED } from "../../lib/styles.ts";
 import { errorText, supabase } from "../../lib/supabase.ts";
+import { Rich } from "../Rich.tsx";
 import { Button } from "../ui/button.tsx";
 import { Input } from "../ui/input.tsx";
 import { Label } from "../ui/label.tsx";
+import { PasswordInput } from "../ui/password.tsx";
+import { Sent } from "./Sent.tsx";
+
+/**
+ * Where the visitor is, from the address: asking for a link, back from the link to choose the
+ * new password, or back from a link that has expired or was used already. Read before the
+ * Supabase client takes the address's hash.
+ */
+type Step = "ask" | "choose" | "expired";
+
+function step(): Step {
+  const hash = window.location.hash;
+  if (hash.includes("type=recovery")) return "choose";
+  if (hash.includes("error_code=")) return "expired";
+  return "ask";
+}
+
+/** The sentence under the heading, which says what this step asks for. */
+export function ResetLede({ locale }: { locale: Locale }) {
+  const t = content(locale).auth.reset;
+  const [choosing, setChoosing] = useState(false);
+  useEffect(() => setChoosing(step() === "choose"), []);
+  return <Rich text={choosing ? t.newLede : t.lede} locale={locale} />;
+}
 
 /**
  * Asking for a link to reset the password, or, opened from that link, choosing the new
@@ -16,16 +40,18 @@ import { Label } from "../ui/label.tsx";
  */
 export function ResetForm({ locale }: { locale: Locale }) {
   const t = content(locale).auth;
-  const [recovering, setRecovering] = useState(false);
+  const [current, setCurrent] = useState<Step>("ask");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [sentTo, setSentTo] = useState("");
 
   useEffect(() => {
     // The link's address carries a recovery session, which creating the client signs in with.
-    if (window.location.hash.includes("type=recovery")) setRecovering(true);
+    const now = step();
+    setCurrent(now);
+    if (now === "expired") setError(t.reset.expired);
     supabase();
-  }, []);
+  }, [t]);
 
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,61 +77,94 @@ export function ResetForm({ locale }: { locale: Locale }) {
     else window.location.assign(href(locale, "/account/"));
   }
 
+  const back = (
+    <p className="text-center text-small">
+      <a className="font-semibold text-ink" href={href(locale, "/signin/")}>
+        {t.reset.back}
+      </a>
+    </p>
+  );
+
   if (sentTo) {
     return (
-      <p className={NOTICE} role="status">
-        {lastTwo(t.reset.sent.replace("{email}", sentTo))}
-      </p>
+      <div className="grid gap-6">
+        <section className={`${CARD} ${RAISED}`}>
+          <Sent
+            locale={locale}
+            title={t.reset.sentTitle}
+            text={t.reset.sent.replace("{email}", sentTo)}
+          >
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => setSentTo("")}
+            >
+              {t.again}
+            </Button>
+          </Sent>
+        </section>
+        {back}
+      </div>
     );
   }
 
+  const e = t.errors;
+  const badPassword = [e.weak, e.leaked].includes(error);
+  const alert = error && (
+    <p id="reset-error" className={`${NOTICE} ${ERROR}`} role="alert">
+      {error}
+    </p>
+  );
+
   return (
-    <div className="grid gap-5">
-      {recovering ? (
-        <form className="grid gap-4" onSubmit={save}>
-          <h2 className="text-subhead">{t.reset.newTitle}</h2>
-          <Label>
-            <span>{t.reset.newPassword}</span>
-            <Input
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              minLength={8}
-              aria-describedby="password-hint"
-              required
-            />
-            <small id="password-hint" className={HINT}>
-              {t.signUp.passwordHint}
-            </small>
-          </Label>
-          {error && (
-            <p className={`${NOTICE} ${ERROR}`} role="alert">
-              {error}
-            </p>
-          )}
-          <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? t.working : t.reset.save}
-          </Button>
-        </form>
-      ) : (
-        <form className="grid gap-4" onSubmit={send}>
-          <Label>
-            <span>{t.email}</span>
-            <Input name="email" type="email" autoComplete="email" required />
-          </Label>
-          {error && (
-            <p className={`${NOTICE} ${ERROR}`} role="alert">
-              {error}
-            </p>
-          )}
-          <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? t.working : t.reset.submit}
-          </Button>
-        </form>
-      )}
-      <p className="text-small text-ink-3">
-        <a href={href(locale, "/signin/")}>{t.reset.back}</a>
-      </p>
+    <div className="grid gap-6">
+      <section className={`${CARD} ${RAISED}`}>
+        {current === "choose" ? (
+          <form className="grid gap-4" onSubmit={save}>
+            <div className="grid gap-2">
+              <Label htmlFor="password">{t.reset.newPassword}</Label>
+              <PasswordInput
+                id="password"
+                name="password"
+                show={t.show}
+                autoComplete="new-password"
+                minLength={8}
+                aria-invalid={badPassword || undefined}
+                aria-describedby={badPassword ? "password-hint reset-error" : "password-hint"}
+                required
+              />
+              <p id="password-hint" className={HINT}>
+                {t.signUp.passwordHint}
+              </p>
+            </div>
+            {alert}
+            <Button type="submit" className="mt-1 w-full" disabled={busy}>
+              {busy ? t.working : t.reset.save}
+            </Button>
+          </form>
+        ) : (
+          <form className="grid gap-4" onSubmit={send}>
+            {alert}
+            <div className="grid gap-2">
+              <Label htmlFor="email">{t.email}</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                aria-invalid={error === e.address || undefined}
+                aria-describedby={error === e.address ? "reset-error" : undefined}
+                required
+              />
+            </div>
+            <Button type="submit" className="mt-1 w-full" disabled={busy}>
+              {busy ? t.working : t.reset.submit}
+            </Button>
+          </form>
+        )}
+      </section>
+      {back}
     </div>
   );
 }

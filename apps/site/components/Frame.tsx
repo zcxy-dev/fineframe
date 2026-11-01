@@ -24,6 +24,33 @@ const BRAND =
 const ACCOUNT_LINK =
   "whitespace-nowrap sm:inline-flex sm:h-10 sm:items-center sm:rounded-full sm:border-(length:--stroke) sm:border-edge sm:bg-paper sm:px-4.5 sm:font-semibold sm:text-ink sm:transition-[border-color] sm:hover:border-ink";
 
+/** The wordmark, leading home. */
+export function Brand({ locale }: { locale: Locale }) {
+  return (
+    <a className={BRAND} href={href(locale, "/")} aria-label={content(locale).nav.home}>
+      <img src="/icon.svg" alt="" width={28} height={28} />
+      <span>Fineframe</span>
+    </a>
+  );
+}
+
+/** The same page in the other language, with a globe; on small phones the globe alone. */
+export function LanguageLink({ locale, path }: { locale: Locale; path: PagePath }) {
+  const other = LOCALES.find((l) => l !== locale) as Locale;
+  return (
+    <a
+      className={`${NAV_LINK} flex items-center gap-1.5`}
+      href={href(other, path)}
+      hrefLang={LANG[other]}
+      lang={LANG[other]}
+      aria-label={`${content(locale).nav.language}: ${content(other).languageName}`}
+    >
+      <Icon name="globe" />
+      <span className="whitespace-nowrap max-[480px]:hidden">{content(other).languageName}</span>
+    </a>
+  );
+}
+
 /** Pages where the bar leaves out its button to the plans: they have their own next step. */
 const NO_PLANS_BUTTON: PagePath[] = [...ACCOUNT_PAGES, "/pricing/"];
 
@@ -84,10 +111,7 @@ export function Frame({
       </a>
       <header className="sticky top-0 z-20 border-b bg-ground/92 backdrop-blur-md backdrop-saturate-140">
         <div className="wrap flex h-15 items-center gap-4 sm:h-17 sm:gap-8">
-          <a className={BRAND} href={home} aria-label={t.nav.home}>
-            <img src="/icon.svg" alt="" width={28} height={28} />
-            <span>Fineframe</span>
-          </a>
+          <Brand locale={locale} />
           <nav className="hidden gap-7 text-small font-medium text-ink-2 min-[1081px]:flex">
             <a className={NAV_LINK} href={section("formats")}>
               {t.nav.examples}
@@ -104,19 +128,7 @@ export function Frame({
             </a>
           </nav>
           <div className="ml-auto flex items-center gap-3.5 text-small text-ink-2 sm:gap-5">
-            <a
-              className={`${NAV_LINK} flex items-center gap-1.5`}
-              href={href(other, path)}
-              hrefLang={LANG[other]}
-              lang={LANG[other]}
-              aria-label={`${t.nav.language}: ${content(other).languageName}`}
-            >
-              <Icon name="globe" />
-              {/* On phones the globe alone: the bar also holds Sign in and the plans. */}
-              <span className="whitespace-nowrap max-[480px]:hidden">
-                {content(other).languageName}
-              </span>
-            </a>
+            <LanguageLink locale={locale} path={path} />
             <AccountLink
               locale={locale}
               labels={{ signIn: t.nav.signIn, account: t.nav.account }}
@@ -137,10 +149,7 @@ export function Frame({
       <footer id="footer" className="border-t">
         <div className="wrap grid grid-cols-2 gap-x-6 gap-y-10 py-14 md:grid-cols-[1.6fr_repeat(3,1fr)]">
           <div className="col-span-full md:col-span-1">
-            <a className={BRAND} href={home} aria-label={t.nav.home}>
-              <img src="/icon.svg" alt="" width={28} height={28} />
-              <span>Fineframe</span>
-            </a>
+            <Brand locale={locale} />
             <p className="mt-4 max-w-[30ch] text-small text-ink-2">
               <Phrases text={t.footer.tagline} locale={locale} />
             </p>
