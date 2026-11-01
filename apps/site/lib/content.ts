@@ -130,6 +130,8 @@ export type Content = {
     others: string;
     /** The app's first screen, footage added: its picture's description. */
     screen: string;
+    /** The released version, read when the site is built: `{version}`, and `{date}` it came out. */
+    version: string;
     /** Under the download buttons: what running the app needs. */
     needs: Rich;
     /** On a phone or tablet: the installers are for a computer. */

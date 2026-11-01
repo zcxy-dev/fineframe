@@ -22,6 +22,7 @@ The site is a static export: `pnpm build` writes it to `out/`, and Cloudflare Pa
    Set the same for **Production** and **Preview**, with the two Supabase values in [Environment](#environment), which the build needs. Corepack prepares pnpm from the `packageManager` field of the repository's `package.json`. `SKIP_DEPENDENCY_INSTALL` skips the image's own install step, and the build command installs only this folder's dependencies from the repository's `pnpm-lock.yaml`. Do not set `PNPM_VERSION`.
 4. Select **Save and Deploy**.
 5. In **Settings** → **Build** → **Build watch paths**, include `apps/site/*`, so a change elsewhere in the repository neither builds nor deploys the site.
+6. In **Settings** → **Build** → **Deploy hooks**, select **Add deploy hook**, name it `release`, choose the branch `main` and save. Its URL is a credential: store it as the repository's `CLOUDFLARE_PAGES_DEPLOY_HOOK` secret (`gh secret set CLOUDFLARE_PAGES_DEPLOY_HOOK --repo zcxy-dev/fineframe`, then paste it). A release (`desktop.yml`) calls it once the installers and the update feed are up, so the download page, which names the version its build read from `latest-mac.yml` (`lib/release.ts`), names the new one.
 
 Every other branch pushed to the repository gets a public preview at `<branch>.<project>.pages.dev`. To turn previews off, set **Settings** → **Builds & deployments** → **Preview branch control** to **None**.
 

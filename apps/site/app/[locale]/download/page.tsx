@@ -6,7 +6,14 @@ import { Phrases, Rich } from "../../../components/Rich.tsx";
 import { ShareLink } from "../../../components/ShareLink.tsx";
 import { buttonClass } from "../../../components/ui/button.tsx";
 import { content } from "../../../lib/content.ts";
-import { DOWNLOADS, localeOf, type PageProps, pageMetadata } from "../../../lib/site.ts";
+import { latestRelease } from "../../../lib/release.ts";
+import {
+  DOWNLOADS,
+  type Locale,
+  localeOf,
+  type PageProps,
+  pageMetadata,
+} from "../../../lib/site.ts";
 import { CARD, HEADING, LIST, NOTICE } from "../../../lib/styles.ts";
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -15,9 +22,25 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return pageMetadata(locale, "/download/", t.title, t.description);
 }
 
+/** A release's day in Taiwan, written as the pages write dates: 28 October 2026, 2026 年 10 月 29 日. */
+function released(date: Date, locale: Locale): string {
+  const parts = new Intl.DateTimeFormat("en", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    timeZone: "Asia/Taipei",
+  }).formatToParts(date);
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  if (locale === "zh-tw") return `${part("year")} 年 ${part("month")} 月 ${part("day")} 日`;
+  return new Intl.DateTimeFormat("en-GB", { dateStyle: "long", timeZone: "Asia/Taipei" }).format(
+    date,
+  );
+}
+
 export default async function Download({ params }: PageProps) {
   const locale = await localeOf(params);
   const t = content(locale).download;
+  const release = await latestRelease();
   return (
     <Frame locale={locale} path="/download/">
       <PageHead
@@ -44,6 +67,14 @@ export default async function Download({ params }: PageProps) {
           <Rich text={t.lede} locale={locale} />
         </p>
         <p className="text-small text-ink-3">
+          {release && (
+            <>
+              {t.version
+                .replace("{version}", release.version)
+                .replace("{date}", released(release.date, locale))}
+              {locale === "zh-tw" ? "。" : ". "}
+            </>
+          )}
           <Rich text={t.needs} locale={locale} />
         </p>
       </PageHead>
