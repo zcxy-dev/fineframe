@@ -9,7 +9,7 @@ export function Faq({ locale }: { locale: Locale }) {
     <div className="border-t-(length:--stroke) border-ink">
       {content(locale).home.faq.items.map((item) => (
         <details key={item.q} className="group border-b">
-          <summary className="flex list-none items-center justify-between gap-4 py-5 text-[17px] leading-snug font-semibold [&::-webkit-details-marker]:hidden">
+          <summary className="flex list-none items-center justify-between gap-4 py-5 text-body leading-snug font-semibold [&::-webkit-details-marker]:hidden">
             <span>
               <Phrases text={item.q} locale={locale} />
             </span>

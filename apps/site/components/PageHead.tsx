@@ -21,10 +21,8 @@ export function PageHead({
   children?: ReactNode;
 }) {
   return (
-    <header
-      className={`wrap pt-[clamp(40px,6vw,88px)] pb-[clamp(32px,4vw,56px)] ${center ? "text-center" : ""}`}
-    >
-      <h1 className="text-[clamp(40px,5.6vw,76px)] leading-[1.06]">
+    <header className={`wrap pt-head pb-[clamp(32px,4vw,56px)] ${center ? "text-center" : ""}`}>
+      <h1 className="text-title">
         {typeof title === "string" ? (
           <Phrases text={title} locale={locale} />
         ) : (
@@ -37,7 +35,7 @@ export function PageHead({
       </h1>
       {children && (
         <div
-          className={`mt-5 max-w-[40em] space-y-3 text-[clamp(17px,1.3vw,19px)] text-ink-2 ${center ? "mx-auto max-w-[34em]" : ""}`}
+          className={`mt-5 max-w-[40em] space-y-3 text-lede text-ink-2 ${center ? "mx-auto max-w-[34em]" : ""}`}
         >
           {children}
         </div>

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { content } from "../lib/content.ts";
 import { href, LANG, LOCALES, type Locale, type PagePath } from "../lib/site.ts";
+import { SLUG } from "../lib/styles.ts";
 import { AccountLink } from "./AccountLink.tsx";
 import { Icon } from "./Icon.tsx";
 import { Phrases } from "./Rich.tsx";
@@ -11,13 +12,17 @@ const ACCOUNT_PAGES: PagePath[] = ["/signin/", "/signup/", "/reset/", "/account/
 const NAV_LINK =
   "no-underline transition-colors duration-150 hover:text-ink aria-[current=page]:text-ink";
 const FOOTER_LINK =
-  "text-[15px] text-ink-2 no-underline transition-colors duration-150 hover:text-ink aria-[current=page]:text-ink aria-[current=page]:font-semibold";
+  "text-small text-ink-2 no-underline transition-colors duration-150 hover:text-ink aria-[current=page]:text-ink aria-[current=page]:font-semibold";
+/** The wordmark: a logo, at its own sizes rather than the text scale's. */
 const BRAND =
   "flex items-center gap-2.5 text-[17px] leading-none font-bold tracking-[-0.02em] no-underline sm:text-[19px]";
 
-/** Sign in, outlined beside the amber button; on phones, where the bar is full, a link. */
+/**
+ * Sign in, as the outlined button beside the amber one; on phones, where the bar is full, a
+ * link.
+ */
 const ACCOUNT_LINK =
-  "whitespace-nowrap sm:inline-flex sm:h-10 sm:items-center sm:rounded-full sm:border-(length:--stroke) sm:border-line sm:px-4.5 sm:font-medium sm:text-ink sm:transition-[border-color] sm:hover:border-ink";
+  "whitespace-nowrap sm:inline-flex sm:h-10 sm:items-center sm:rounded-full sm:border-(length:--stroke) sm:border-edge sm:bg-paper sm:px-4.5 sm:font-semibold sm:text-ink sm:transition-[border-color] sm:hover:border-ink";
 
 /** Pages where the bar leaves out its button to the plans: they have their own next step. */
 const NO_PLANS_BUTTON: PagePath[] = [...ACCOUNT_PAGES, "/pricing/"];
@@ -72,7 +77,7 @@ export function Frame({
   return (
     <>
       <a
-        className="absolute -top-12 left-3 z-40 rounded-md bg-ink px-3 py-2 text-white focus:top-3"
+        className="absolute -top-12 left-3 z-40 rounded-field bg-ink px-3 py-2 text-white focus:top-3"
         href="#main"
       >
         {t.skip}
@@ -83,7 +88,7 @@ export function Frame({
             <img src="/icon.svg" alt="" width={28} height={28} />
             <span>Fineframe</span>
           </a>
-          <nav className="hidden gap-7 text-[15px] font-medium text-ink-2 min-[1081px]:flex">
+          <nav className="hidden gap-7 text-small font-medium text-ink-2 min-[1081px]:flex">
             <a className={NAV_LINK} href={section("formats")}>
               {t.nav.examples}
             </a>
@@ -98,7 +103,7 @@ export function Frame({
               {t.nav.pricing}
             </a>
           </nav>
-          <div className="ml-auto flex items-center gap-3.5 text-[15px] text-ink-2 sm:gap-5">
+          <div className="ml-auto flex items-center gap-3.5 text-small text-ink-2 sm:gap-5">
             <a
               className={`${NAV_LINK} flex items-center gap-1.5`}
               href={href(other, path)}
@@ -108,7 +113,7 @@ export function Frame({
             >
               <Icon name="globe" />
               {/* On phones the globe alone: the bar also holds Sign in and the plans. */}
-              <span className="whitespace-nowrap max-sm:text-sm max-[480px]:hidden">
+              <span className="whitespace-nowrap max-[480px]:hidden">
                 {content(other).languageName}
               </span>
             </a>
@@ -136,11 +141,11 @@ export function Frame({
               <img src="/icon.svg" alt="" width={28} height={28} />
               <span>Fineframe</span>
             </a>
-            <p className="mt-4 max-w-[30ch] text-[15px] text-ink-2">
+            <p className="mt-4 max-w-[30ch] text-small text-ink-2">
               <Phrases text={t.footer.tagline} locale={locale} />
             </p>
             <a
-              className="mt-3 inline-block text-[15px] text-ink-2"
+              className="mt-3 inline-block text-small text-ink-2"
               href="mailto:support@fineframe.app"
             >
               support@fineframe.app
@@ -148,10 +153,7 @@ export function Frame({
           </div>
           {footer.map((group, i) => (
             <nav key={group.title} aria-labelledby={`footer-${i}`}>
-              <h2
-                id={`footer-${i}`}
-                className="mb-3.5 font-sans text-sm font-semibold tracking-normal"
-              >
+              <h2 id={`footer-${i}`} className={`mb-4 font-sans text-ink-3 ${SLUG}`}>
                 {group.title}
               </h2>
               <ul className="space-y-2.5">
@@ -170,7 +172,7 @@ export function Frame({
             </nav>
           ))}
         </div>
-        <div className="wrap flex flex-wrap justify-between gap-x-6 gap-y-3 border-t py-6 text-sm text-ink-3">
+        <div className="wrap flex flex-wrap justify-between gap-x-6 gap-y-3 border-t py-6 text-fine text-ink-3">
           <p>{t.footer.rights}</p>
           <a
             className="no-underline hover:text-ink"

@@ -62,7 +62,7 @@ export function Rich({ text, locale }: { text: string; locale: Locale }): ReactN
     const key = match.index;
     if (placeholder) {
       parts.push(
-        <span key={key} className="rounded-md border border-dashed border-ink-3 px-1.5 py-px">
+        <span key={key} className="rounded-field border border-dashed border-ink-3 px-1.5 py-px">
           {placeholder}
         </span>,
       );

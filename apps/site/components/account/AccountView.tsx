@@ -104,13 +104,13 @@ export function AccountView({ locale }: { locale: Locale }) {
           : "bg-steel";
 
   return (
-    <div className="grid gap-[clamp(48px,6vw,88px)]">
+    <div className="grid gap-block">
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-        <section className={`${CARD} ring-1 ring-line`} aria-labelledby="subscription">
+        <section className={CARD} aria-labelledby="subscription">
           <h2 id="subscription" className={HEADING}>
             {t.subscriptionTitle}
           </h2>
-          <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2 [&_dt]:text-sm [&_dt]:text-ink-3 [&_dd]:mt-1">
+          <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2 [&_dt]:text-fine [&_dt]:text-ink-3 [&_dd]:mt-1">
             <div className="min-w-0">
               <dt>{t.signedInAs}</dt>
               <dd className="truncate">{email}</dd>
@@ -119,7 +119,7 @@ export function AccountView({ locale }: { locale: Locale }) {
               <dt>{t.statusTitle}</dt>
               <dd>
                 <strong
-                  className="inline-flex items-center gap-2 rounded-full bg-ground px-3 py-1 text-[15px]"
+                  className="inline-flex items-center gap-2 rounded-full bg-ground px-3 py-1 text-small"
                   data-status={billing ? (row?.status ?? "none") : "soon"}
                 >
                   <span className={`size-2 rounded-full ${tone}`} aria-hidden="true" />
@@ -148,7 +148,7 @@ export function AccountView({ locale }: { locale: Locale }) {
             )}
             <button
               type="button"
-              className="cursor-pointer bg-transparent p-0 text-[15px] text-ink-2 underline decoration-line underline-offset-[3px] hover:decoration-ink"
+              className="cursor-pointer bg-transparent p-0 text-small text-ink-2 underline decoration-line underline-offset-[3px] hover:decoration-ink"
               onClick={signOut}
             >
               {t.signOut}
@@ -158,7 +158,7 @@ export function AccountView({ locale }: { locale: Locale }) {
             <p className={`${HINT} mt-4`}>{lastTwo(t.manageNote)}</p>
           )}
         </section>
-        <section className={`${CARD} ring-1 ring-line`} aria-labelledby="download">
+        <section className={CARD} aria-labelledby="download">
           <h2 id="download" className={HEADING}>
             {t.downloadTitle}
           </h2>
@@ -175,7 +175,7 @@ export function AccountView({ locale }: { locale: Locale }) {
       </div>
       {!hasPlan && (
         <section aria-labelledby="plans">
-          <h2 id="plans" className="mb-8 text-center text-[clamp(32px,3.6vw,48px)]">
+          <h2 id="plans" className="mb-8 text-center text-heading">
             {t.choose}
           </h2>
           <div className="mx-auto max-w-[1000px]">

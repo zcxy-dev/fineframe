@@ -63,7 +63,7 @@ export function ResetForm({ locale }: { locale: Locale }) {
     <div className="grid gap-5">
       {recovering ? (
         <form className="grid gap-4" onSubmit={save}>
-          <h2 className="text-[22px] leading-snug">{t.reset.newTitle}</h2>
+          <h2 className="text-subhead">{t.reset.newTitle}</h2>
           <Label>
             <span>{t.reset.newPassword}</span>
             <Input
@@ -103,7 +103,7 @@ export function ResetForm({ locale }: { locale: Locale }) {
           </Button>
         </form>
       )}
-      <p className="text-sm text-ink-3">
+      <p className="text-small text-ink-3">
         <a href={href(locale, "/signin/")}>{t.reset.back}</a>
       </p>
     </div>

@@ -18,7 +18,7 @@ export default function GlobalNotFound() {
               <section
                 key={locale}
                 lang={LANG[locale]}
-                className="grid gap-2 [&>h1]:text-2xl [&>p]:text-ink-2"
+                className="grid gap-2 [&>h1]:text-heading [&>p]:text-ink-2"
               >
                 <h1>{t.title}</h1>
                 <p>{t.body}</p>

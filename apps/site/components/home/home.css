@@ -27,17 +27,14 @@
   align-self: center;
 }
 .hero h1 {
-  font-size: clamp(56px, 7.4vw, 112px);
-  line-height: 1.04;
-}
-.hero h1:lang(en) {
-  font-size: clamp(48px, 5.6vw, 84px);
-  line-height: 1;
+  font-size: var(--text-display);
+  line-height: var(--text-display--line-height);
 }
 .hero .lede {
   margin: 28px 0 0;
   max-width: 31em;
-  font-size: clamp(17px, 1.35vw, 20px);
+  font-size: var(--text-lede);
+  line-height: var(--text-lede--line-height);
   color: var(--ink-2);
 }
 .hero .lede:lang(en) {
@@ -50,8 +47,8 @@
   margin-top: 36px;
 }
 .facts {
-  margin: 22px 0 0;
-  font-size: 14px;
+  margin: 20px 0 0;
+  font-size: var(--text-small);
   color: var(--ink-3);
   display: flex;
   flex-wrap: wrap;
@@ -66,11 +63,10 @@
 .post {
   margin: 0;
   background: var(--paper);
-  border-radius: 30px;
-  padding: 14px 14px 12px;
-  box-shadow:
-    0 40px 80px -36px rgb(12 13 16 / 0.42),
-    0 2px 8px rgb(12 13 16 / 0.06);
+  border-radius: var(--radius-card);
+  padding: 12px 12px 10px;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-raised);
   transform-origin: 50% 0;
 }
 .who {
@@ -78,7 +74,7 @@
   align-items: center;
   gap: 10px;
   padding: 2px 6px 12px;
-  font-size: 14px;
+  font-size: var(--text-small);
   line-height: 1.35;
 }
 .who img {
@@ -87,12 +83,12 @@
 .who small {
   display: block;
   color: var(--ink-3);
-  font-size: 13px;
+  font-size: var(--text-fine);
 }
 .reel {
   position: relative;
   aspect-ratio: 9 / 16;
-  border-radius: 20px;
+  border-radius: var(--radius-frame);
   overflow: hidden;
   background: #050506;
   isolation: isolate;
@@ -176,7 +172,7 @@
   color: #fff;
 }
 .tc {
-  font: 600 13px / 1 var(--font-sans);
+  font: 600 var(--text-fine) / 1 var(--font-sans);
   font-variant-numeric: tabular-nums;
   margin-bottom: 10px;
   display: flex;
@@ -256,7 +252,7 @@
 .status {
   margin: 10px 0 0;
   color: #fff;
-  font: 500 13px / 1.3 var(--font-sans);
+  font: 500 var(--text-fine) / 1.3 var(--font-sans);
   letter-spacing: 0;
   text-shadow: 0 1px 3px rgb(0 0 0 / 0.5);
 }
@@ -277,7 +273,7 @@
 }
 .credit {
   margin: 10px 4px 0;
-  font-size: 11.5px;
+  font-size: var(--text-fine);
   line-height: 1.5;
   color: var(--ink-3);
   letter-spacing: 0;
@@ -285,19 +281,17 @@
 
 /* Sections */
 .home-section {
-  padding: clamp(88px, 10vw, 150px) 0 0;
+  padding: var(--spacing-section) 0 0;
 }
 .home-section h2 {
-  font-size: clamp(36px, 4.4vw, 64px);
-  line-height: 1.12;
-}
-.home-section h2:lang(en) {
-  line-height: 1.04;
+  font-size: var(--text-title);
+  line-height: var(--text-title--line-height);
 }
 .sub {
-  margin: 18px 0 0;
+  margin: 16px 0 0;
   max-width: 34em;
-  font-size: clamp(17px, 1.3vw, 19px);
+  font-size: var(--text-lede);
+  line-height: var(--text-lede--line-height);
   color: var(--ink-2);
 }
 
@@ -311,8 +305,8 @@
   perspective: 1400px;
 }
 .card {
-  border-radius: var(--r-card);
-  padding: clamp(24px, 2.6vw, 36px);
+  border-radius: var(--radius-card);
+  padding: var(--spacing-card);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -320,25 +314,23 @@
   position: relative;
 }
 .card h3 {
-  font-size: clamp(24px, 2.2vw, 32px);
-  line-height: 1.22;
+  font-size: var(--text-heading);
+  line-height: var(--text-heading--line-height);
 }
 .card p {
   margin: 0;
-  font-size: 16px;
 }
 .card.amber {
   background: var(--amber);
   grid-row: span 2;
 }
 .card.amber h3 {
-  font-size: clamp(32px, 3.4vw, 50px);
-  line-height: 1.12;
+  font-size: var(--text-title);
+  line-height: var(--text-title--line-height);
 }
 .card.amber p {
   color: var(--amber-ink);
   max-width: 27em;
-  font-size: 17px;
 }
 .card.dark {
   background: var(--graphite);
@@ -361,15 +353,15 @@
 .cut .ui {
   margin-top: auto;
   background: var(--paper);
-  border-radius: 18px;
-  padding: 22px 22px 18px;
+  border-radius: var(--radius-frame);
+  padding: 20px 20px 16px;
   position: relative;
 }
 .tag {
   position: absolute;
   right: 16px;
   top: 14px;
-  font-size: 12px;
+  font-size: var(--text-fine);
   color: var(--ink-3);
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -435,7 +427,7 @@
   margin-top: 16px;
   padding-top: 14px;
   border-top: 1px solid var(--line);
-  font-size: 14px;
+  font-size: var(--text-small);
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
@@ -456,7 +448,7 @@
   margin: 0;
   grid-row: span 2;
   aspect-ratio: 9 / 16;
-  border-radius: 14px;
+  border-radius: var(--radius-frame);
   overflow: hidden;
   background: #000;
   align-self: start;
@@ -469,7 +461,6 @@
 .cap .credit {
   grid-column: 1;
   align-self: end;
-  font-size: 12px;
 }
 
 .duck {
@@ -484,7 +475,7 @@
 .duck .lbl {
   position: absolute;
   left: 0;
-  font-size: 13px;
+  font-size: var(--text-fine);
   font-weight: 600;
   color: var(--steel-ink);
   letter-spacing: 0;
@@ -498,7 +489,7 @@
 .more {
   margin: 24px 0 0;
   max-width: 60em;
-  font-size: 15px;
+  font-size: var(--text-small);
   color: var(--ink-3);
 }
 
@@ -516,10 +507,10 @@
 .player {
   margin: 0;
   aspect-ratio: 16 / 9;
-  border-radius: 22px;
+  border-radius: var(--radius-card);
   overflow: hidden;
   background: #000;
-  box-shadow: 0 40px 80px -40px rgb(12 13 16 / 0.5);
+  box-shadow: var(--shadow-raised);
   transform-origin: 50% 100%;
 }
 .player video {
@@ -537,7 +528,7 @@
   gap: 16px;
   padding: 14px 0;
   border-bottom: 1px solid var(--line);
-  font-size: 15px;
+  font-size: var(--text-small);
 }
 .spec dt {
   color: var(--ink-3);
@@ -552,8 +543,8 @@
   grid-column: 1 / -1;
   position: relative;
   background: var(--paper);
-  border-radius: 20px;
-  padding: 18px 20px;
+  border-radius: var(--radius-card);
+  padding: 20px;
   border: 1px solid var(--line);
   display: grid;
   gap: 10px;
@@ -566,7 +557,7 @@
   gap: 14px;
 }
 .tk {
-  font-size: 13px;
+  font-size: var(--text-fine);
   color: var(--ink-3);
   white-space: nowrap;
   letter-spacing: 0;
@@ -582,7 +573,7 @@
 .clip {
   border-radius: 6px;
   min-width: 0;
-  font: 600 11.5px / 30px var(--font-sans);
+  font: 600 var(--text-slug) / 30px var(--font-sans);
   color: var(--ink);
   padding: 0 8px;
   white-space: nowrap;
@@ -665,14 +656,14 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  height: 52px;
+  height: 48px;
   padding: 0 24px;
   border-radius: 999px;
   background: var(--ink);
   color: #fff;
-  font: 600 16px / 1 var(--font-sans);
+  font: 600 var(--text-body) / 1 var(--font-sans);
   text-decoration: none;
-  box-shadow: 0 16px 36px -12px rgb(12 13 16 / 0.5);
+  box-shadow: var(--shadow-raised);
   white-space: nowrap;
   letter-spacing: 0;
 }
@@ -818,25 +809,18 @@
   }
   .ctas > a {
     flex: 1 1 100%;
-    height: 50px;
   }
   .hero {
     row-gap: 24px;
     padding-top: 20px;
     padding-bottom: 56px;
   }
-  .hero h1,
-  .hero h1:lang(en) {
-    font-size: 50px;
-  }
   .hero .lede {
-    margin-top: 14px;
-    font-size: 16px;
+    margin-top: 16px;
   }
   .post {
     width: min(100%, 300px);
     padding: 10px 10px 8px;
-    border-radius: 24px;
   }
   .who {
     padding-bottom: 8px;
@@ -888,17 +872,9 @@
     grid-template-columns: 1fr;
   }
 }
-@media (max-width: 380px) {
-  .hero h1 {
-    font-size: 52px;
-  }
-  .hero h1:lang(en) {
-    font-size: 44px;
-  }
-}
 
 /* The closing call, on an amber card. */
 .home-section .close h2 {
-  font-size: clamp(40px, 6vw, 88px);
-  line-height: 1.06;
+  font-size: var(--text-display);
+  line-height: var(--text-display--line-height);
 }

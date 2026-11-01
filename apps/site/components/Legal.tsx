@@ -16,16 +16,16 @@ export function Legal({ locale, path, page }: { locale: Locale; path: PagePath; 
               <Rich text={line} locale={locale} />
             </p>
           ))}
-          {page.updated && <p className="text-[15px] text-ink-3">{page.updated}</p>}
+          {page.updated && <p className="text-small text-ink-3">{page.updated}</p>}
         </PageHead>
-        <div className="wrap pb-[clamp(64px,8vw,120px)]">
-          <div className="rounded-card bg-paper px-[clamp(20px,3vw,48px)]">
+        <div className="wrap pb-end">
+          <div className="rounded-card border bg-paper px-[clamp(20px,3vw,48px)] shadow-card">
             {page.sections.map((section) => (
               <section
                 key={section.heading}
                 className="grid gap-3 border-b py-7 last:border-b-0 md:grid-cols-[minmax(180px,280px)_minmax(0,1fr)] md:gap-10 md:py-9"
               >
-                <h2 className="text-[19px] leading-snug tracking-[-0.01em]">
+                <h2 className="text-subhead">
                   <Phrases text={section.heading} locale={locale} />
                 </h2>
                 <div className="space-y-3 text-ink-2 [&>p]:max-w-[40em]">

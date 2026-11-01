@@ -32,16 +32,16 @@ export function AccountFrame({
             </p>
           )}
         </PageHead>
-        <div className="wrap pb-[clamp(64px,8vw,120px)]">{children}</div>
+        <div className="wrap pb-end">{children}</div>
       </Frame>
     );
   }
   return (
     <Frame locale={locale} path={path}>
-      <div className="wrap max-w-[460px] pt-[clamp(40px,6vw,80px)] pb-[clamp(64px,8vw,120px)]">
+      <div className="wrap max-w-[460px] pt-head pb-end">
         <header className="grid justify-items-center text-center">
           <img src="/icon.svg" alt="" width={48} height={48} />
-          <h1 className="mt-6 text-[clamp(32px,3.4vw,44px)] leading-[1.1]">
+          <h1 className="mt-6 text-heading">
             <Phrases text={title} locale={locale} />
           </h1>
           {lede && (

@@ -24,12 +24,12 @@ export default async function Download({ params }: PageProps) {
         <p>
           <Rich text={t.lede} locale={locale} />
         </p>
-        <p className="text-[15px] text-ink-3">
+        <p className="text-small text-ink-3">
           <Rich text={t.needs} locale={locale} />
         </p>
       </PageHead>
 
-      <div className="wrap grid grid-cols-1 gap-4 pb-[clamp(64px,8vw,120px)]">
+      <div className="wrap grid grid-cols-1 gap-4 pb-end">
         {/* On a phone or tablet: the installers are for a computer, so send the page there. */}
         <div data-show="mobile" className={`${NOTICE} grid justify-items-start gap-4 bg-paper!`}>
           <p>
@@ -50,13 +50,10 @@ export default async function Download({ params }: PageProps) {
               className={`${CARD} flex flex-col gap-5 computer:lg:grid computer:lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] computer:lg:grid-rows-[auto_auto_1fr] computer:lg:content-start computer:lg:gap-x-[clamp(32px,6vw,96px)]`}
             >
               <div>
-                <h2
-                  id={`${platform.id}-title`}
-                  className="text-[clamp(26px,2.4vw,34px)] leading-tight"
-                >
+                <h2 id={`${platform.id}-title`} className="text-heading">
                   {platform.name}
                 </h2>
-                <p className="mt-1 text-[15px] text-ink-3">
+                <p className="mt-1 text-small text-ink-3">
                   <Phrases text={platform.requirement} locale={locale} />
                 </p>
               </div>
@@ -68,15 +65,15 @@ export default async function Download({ params }: PageProps) {
                 {t.table.get}
                 <span className="sr-only"> {platform.name}</span>
               </a>
-              <p className="text-xs">
+              <p className="text-fine">
                 <span className="sr-only">{t.table.installer}: </span>
                 <code>{platform.file}</code>
               </p>
-              <ol className="space-y-3 border-t pt-5 text-[15px] text-ink-2 [counter-reset:step] computer:lg:col-start-2 computer:lg:row-span-3 computer:lg:row-start-1 computer:lg:border-t-0 computer:lg:pt-0">
+              <ol className="space-y-3 border-t pt-5 text-small text-ink-2 [counter-reset:step] computer:lg:col-start-2 computer:lg:row-span-3 computer:lg:row-start-1 computer:lg:border-t-0 computer:lg:pt-0">
                 {platform.steps.map((step) => (
                   <li
                     key={step}
-                    className="relative pl-8 [counter-increment:step] before:absolute before:top-0.5 before:left-0 before:grid before:size-5.5 before:place-items-center before:rounded-full before:bg-ink before:text-[11px] before:leading-none before:font-semibold before:text-white before:tabular-nums before:content-[counter(step)]"
+                    className="relative pl-8 [counter-increment:step] before:absolute before:top-0.5 before:left-0 before:grid before:size-5.5 before:place-items-center before:rounded-full before:bg-ink before:text-slug before:leading-none before:font-semibold before:text-white before:tabular-nums before:content-[counter(step)]"
                   >
                     <Rich text={step} locale={locale} />
                   </li>
