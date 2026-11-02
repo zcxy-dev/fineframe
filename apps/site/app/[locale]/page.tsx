@@ -66,6 +66,10 @@ export default async function Home({ params }: PageProps) {
           <Reel
             post={t.hero.post}
             steps={t.hero.steps}
+            details={t.hero.details}
+            sample={t.hero.sample}
+            reset={t.hero.reset}
+            hint={t.hero.hint}
             legend={t.hero.legend}
             credit={text(t.hero.credit)}
             pause={t.hero.pause}

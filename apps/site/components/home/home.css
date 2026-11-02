@@ -5,7 +5,7 @@
 /* Hero */
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(320px, 27vw, 420px);
+  grid-template-columns: minmax(0, 1fr) clamp(560px, 46vw, 700px);
   grid-template-areas: "copy post" "act post";
   grid-template-rows: 1fr 1fr;
   column-gap: clamp(40px, 6vw, 96px);
@@ -59,7 +59,7 @@
   white-space: nowrap;
 }
 
-/* The post the edit plays in. */
+/* The post the edit plays in: a window of the app, its steps beside the reel. */
 .post {
   margin: 0;
   background: var(--paper);
@@ -68,13 +68,120 @@
   border: 1px solid var(--line);
   box-shadow: var(--shadow-raised);
 }
+.post .bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 2px 12px 6px;
+}
 .who {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 2px 6px 12px;
+  flex: 1;
+  min-width: 0;
   font-size: var(--text-small);
   line-height: 1.35;
+}
+/* Marked as a sample the way the cut card is (.tag below), in line in the bar. */
+.post .tag {
+  position: static;
+}
+.panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 12px;
+}
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 4px 4px 2px;
+}
+.steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.steps li {
+  position: relative;
+  border-radius: var(--radius-field);
+  overflow: hidden;
+}
+/* How far the step has come, along its foot. */
+.steps li::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--amber);
+  transform: scaleX(var(--p, 1));
+  transform-origin: 0 0;
+}
+.steps li[data-state="pending"]::after {
+  opacity: 0;
+}
+.steps button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-field);
+  background: var(--paper);
+  color: var(--ink);
+  font: 500 var(--text-small) / 1.3 var(--font-sans);
+  text-align: left;
+  transition: border-color 0.25s;
+}
+.steps button:hover {
+  border-color: var(--ink);
+}
+.steps [data-state="pending"] button {
+  color: var(--ink-3);
+}
+.steps button[aria-current] {
+  border-color: var(--ink);
+}
+.steps .n {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: var(--stroke) solid var(--edge);
+  font-size: var(--text-fine);
+  font-variant-numeric: tabular-nums;
+}
+.steps [data-state="done"] .n {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+.steps [data-state="active"] .n {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: var(--amber-ink);
+}
+.detail {
+  margin: 0;
+  min-height: 6.2em;
+  color: var(--ink-2);
+  font-size: var(--text-small);
+  line-height: 1.55;
+}
+.hint {
+  margin: auto 0 0;
+  color: var(--ink-3);
+  font-size: var(--text-fine);
+  line-height: 1.5;
 }
 .who img {
   border-radius: 50%;
@@ -244,39 +351,6 @@
   flex-grow: 0;
   opacity: 0;
   margin: 0 -1.5px;
-}
-.hud {
-  position: absolute;
-  inset: 0 0 auto;
-  padding: 12px 12px 36px;
-  background: linear-gradient(rgb(0 0 0 / 0.55), transparent);
-  z-index: 3;
-}
-.bars {
-  display: flex;
-  gap: 4px;
-}
-.bars i {
-  flex: 1;
-  height: 3px;
-  border-radius: 2px;
-  background: rgb(255 255 255 / 0.32);
-  overflow: hidden;
-}
-.bars i::after {
-  content: "";
-  display: block;
-  height: 100%;
-  background: #fff;
-  transform: scaleX(var(--p, 1));
-  transform-origin: 0 0;
-}
-.status {
-  margin: 10px 0 0;
-  color: #fff;
-  font: 500 var(--text-fine) / 1.3 var(--font-sans);
-  letter-spacing: 0;
-  text-shadow: 0 1px 3px rgb(0 0 0 / 0.5);
 }
 .pp {
   position: absolute;
@@ -787,16 +861,6 @@
 
 /* Tablet and phone */
 @media (max-width: 1080px) {
-  .ytgrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .spec {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    column-gap: 32px;
-  }
-}
-@media (max-width: 900px) {
   .hero {
     grid-template-columns: 1fr;
     grid-template-areas: "copy" "post" "act";
@@ -808,9 +872,19 @@
     align-self: auto;
   }
   .post {
-    width: min(100%, 400px);
+    width: min(100%, 680px);
     justify-self: center;
   }
+  .ytgrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .spec {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    column-gap: 32px;
+  }
+}
+@media (max-width: 900px) {
   .cards {
     grid-template-columns: 1fr 1fr;
   }
@@ -835,11 +909,25 @@
     margin-top: 16px;
   }
   .post {
-    width: min(100%, 300px);
     padding: 10px 10px 8px;
   }
-  .who {
+  .post .bar {
     padding-bottom: 8px;
+  }
+  /* The reel first, its steps under it, two by two. */
+  .panes {
+    grid-template-columns: 1fr;
+  }
+  .reel {
+    order: -1;
+    width: min(100%, 300px);
+    justify-self: center;
+  }
+  .steps {
+    grid-template-columns: 1fr 1fr;
+  }
+  .detail {
+    min-height: 4.7em;
   }
   .facts {
     margin-top: 16px;
