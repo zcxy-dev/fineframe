@@ -68,8 +68,16 @@ export type Content = {
       facts: [string, string];
       /** The post's line, and the label of the edit it plays. */
       post: string;
-      /** What the post's bar says while the edit is made, and once it is done. */
+      /** The post's steps, each a button that replays the edit from it, and what it says once
+       * the edit is done. */
       steps: [string, string, string, string, string];
+      /** What each of the four steps does, shown while it runs or once it is picked. */
+      details: [string, string, string, string];
+      /** The tag that marks the post as a sample, the button that starts it over, and the line
+       * under its steps. */
+      sample: string;
+      reset: string;
+      hint: string;
       /** The cut line's legend: the stretches kept, and those cut. */
       legend: [string, string];
       credit: string;

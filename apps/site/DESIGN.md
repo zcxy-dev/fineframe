@@ -157,13 +157,13 @@ Line breaks are part of the design, on every page and at every width:
 
 ## Motion
 
-- **The post:** the 22:42 source plays as amber cut marks land on its cut line, the cut stretches close up and the timecode counts to 0:50; a 9:16 frame follows the speaker, the camera pushes into it and the finished Reel plays. Four bars above fill with each step. It starts after the page has loaded, and a button pauses it.
+- **The post:** a window of the app, tagged as a sample, with the edit's four steps beside the reel. The 22:42 source plays as amber cut marks land on its cut line, the cut stretches close up and the timecode counts to 0:50; a 9:16 frame follows the speaker, the camera pushes into it and the finished Reel plays. Each step fills along its foot and says what it does while it runs; picking one replays the edit from it, and Start over from the beginning. It starts after the page has loaded, and a button pauses it.
 - **The cut card:** fillers turn red, are struck through and close up out of the sentence as the length counts from 1:12 to 1:00.
 - **The music card:** the voice on top, the music under it dropping while someone talks, flowing left.
 - **Entrances, once** (`components/home/Reveal.tsx`): the first time a piece below the first screen comes on screen, it rises into place: the cards one after another, the player, the list of what else the app does; the timeline's clips land on their tracks and what goes to Claude comes in line by line. Nothing moves with the scroll itself, and nothing runs again on the way back; without JavaScript everything stands as it ends.
 - **The cut line** in the post carries its legend: kept stretches in white, cut ones hatched.
 - Video loads only when needed: posters as a video comes near, sources as it is about to show; the small copy on phones and wherever it is sharp enough, a medium one (`-md`, 720 px for the Reel, 1280 px for its source) on a Retina desktop, the full one only beyond that. Loops play only on screen.
-- **Reduced motion:** nothing moves. The post shows the finished Reel with its bars full and plays it only from its button; the cut card shows the cut sentence; the music holds still; the clips show their first frame with the browser’s controls; nothing waits to enter.
+- **Reduced motion:** nothing moves. The post shows the finished Reel with its steps done and plays it only from its button, and picking a step only says what it does; the cut card shows the cut sentence; the music holds still; the clips show their first frame with the browser’s controls; nothing waits to enter.
 
 ## Do's and don'ts
 
