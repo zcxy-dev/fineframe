@@ -42,7 +42,8 @@ if (url.includes("slow")) {
     process.execPath,
     [
       "-e",
-      `setInterval(() => { try { require("fs").appendFileSync(${JSON.stringify(part)}, "x"); } catch {} }, 10)`,
+      'setInterval(() => { try { require("fs").appendFileSync(process.argv[1], "x"); } catch {} }, 10)',
+      part,
     ],
     { stdio: "ignore" },
   );

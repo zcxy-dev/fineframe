@@ -150,7 +150,7 @@ function symbols(set: "lucide" | "tabler", dir: string): Promise<Glyph[]> {
 async function symbolIcon(icon: Glyph, dir: string): Promise<Icon> {
   const root = await unpacked(icon.set, dir);
   const file = icon.set === "lucide" ? `icons/${icon.name}.svg` : `icons/outline/${icon.name}.svg`;
-  const svg = (await readFile(join(root, file), "utf8")).replace(/<!--[\s\S]*?-->\s*/g, "").trim();
+  const svg = withoutComments(await readFile(join(root, file), "utf8")).trim();
   const lucide = icon.set === "lucide";
   // Lucide's licence lists the icons drawn from Feather by their old names; an icon renamed
   // since is the same drawing under its new name, and MIT too.
@@ -194,10 +194,20 @@ function featherDrawings(dir: string): Promise<Set<string>> {
   });
 }
 
+/** An SVG without its comments, removed until none is left (removing one can join the halves
+ * of another). */
+function withoutComments(svg: string): string {
+  let rest = svg;
+  for (let previous = ""; previous !== rest; ) {
+    previous = rest;
+    rest = rest.replace(/<!--[\s\S]*?-->\s*/g, "");
+  }
+  return rest;
+}
+
 /** An SVG's shapes alone, without its comments, classes or spacing. */
 function drawing(svg: string): string {
-  return svg
-    .replace(/<!--[\s\S]*?-->/g, "")
+  return withoutComments(svg)
     .replace(/\sclass="[^"]*"/g, "")
     .replace(/\s+/g, " ")
     .trim();

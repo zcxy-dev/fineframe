@@ -114,7 +114,7 @@ export function* untar(archive: Buffer): Generator<[string, Buffer]> {
     offset += 512 + Math.ceil(size / 512) * 512;
     if (type === "x") {
       // A pax header: only its path is used.
-      longName = /\d+ path=([^\n]*)\n/.exec(data.toString("utf8"))?.[1] ?? null;
+      longName = /^\d+ path=(.*)$/m.exec(data.toString("utf8"))?.[1] ?? null;
       continue;
     }
     const name = longName ?? (prefix ? `${prefix}/${field(0, 100)}` : field(0, 100));
