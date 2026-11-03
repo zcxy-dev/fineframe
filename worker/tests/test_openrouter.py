@@ -78,7 +78,7 @@ def test_each_chunk_is_sent_as_flac_speech_only_and_in_order(fake):
     def answer(body):
         # The reply names the chunk's length, so a mix-up in order would show.
         audio = base64.b64decode(body["input_audio"]["data"])
-        with av.open(io.BytesIO(audio)) as container:
+        with av.open(io.BytesIO(audio), mode="r") as container:
             samples = sum(frame.samples for frame in container.decode(audio=0))
         return {"text": f"{samples}", "usage": {"cost": 0.001}}
 
@@ -115,7 +115,7 @@ def test_progress_counts_only_the_chunks_it_reports(fake, monkeypatch):
 
 def test_audio_that_peaks_past_full_scale_is_scaled_not_clipped():
     wav = np.sin(np.linspace(0, 200, 16_000)).astype(np.float32) * 2
-    with av.open(io.BytesIO(openrouter.flac(wav))) as container:
+    with av.open(io.BytesIO(openrouter.flac(wav)), mode="r") as container:
         decoded = np.concatenate([f.to_ndarray()[0] for f in container.decode(audio=0)])
     peak = np.abs(decoded).max()
     assert decoded.dtype == np.int16 and 32_000 < peak < 32_768

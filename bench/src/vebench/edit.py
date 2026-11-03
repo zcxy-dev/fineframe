@@ -323,10 +323,12 @@ class _Sound:
     """A source's recording, decoded when first asked for; None where it cannot be."""
 
     def __init__(self, path: Path) -> None:
-        self.path, self._samples = path, False
+        self.path, self._decoded = path, False
+        self._samples: np.ndarray | None = None
 
     def samples(self) -> np.ndarray | None:
-        if self._samples is False:
+        if not self._decoded:
+            self._decoded = True
             try:
                 self._samples = render.decode_audio(self.path, LEVEL_RATE).astype(np.float64)
             except (OSError, ValueError, RuntimeError):
@@ -351,9 +353,10 @@ def _heard(edge: float, plays_after: bool, words: list, sound: _Sound) -> bool:
     beside = words[nearer] if 0 <= nearer < len(words) else word
     span = (edge, edge + FADE) if plays_after else (edge - FADE, edge)
     levels = [sound.db(w.start, w.end) for w in (word, beside)] + [sound.db(*span)]
-    if any(level is None for level in levels):
+    known = [level for level in levels if level is not None]
+    if len(known) < len(levels):
         return True
-    return levels[2] > min(levels[:2]) - UNDER_DB
+    return known[2] > min(known[:2]) - UNDER_DB
 
 
 def _inside(edge: float, words: list) -> float | None:

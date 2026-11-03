@@ -39,6 +39,7 @@ def build(
     corrections = []
 
     def fix(chunks: list[dict]) -> list[str]:
+        assert correction is not None  # passed on only with a correction
         texts, records = correct.correct(chunks, correction, progress)
         corrections.extend(records)
         return texts
@@ -70,7 +71,7 @@ def build(
     if voiced and stem is not None:
         progress("removing noise from speech")
         measured = voice.analyze(path, voiced, stem)
-    if voiced:
+    if voiced and samples is not None:
         transcript = transcribe.transcribe(
             samples,
             voiced,

@@ -1,3 +1,4 @@
+import email.message
 import hashlib
 import urllib.error
 
@@ -57,7 +58,9 @@ def failing_host(monkeypatch, tmp_path, down: str):
     def fetch(address, name, timeout=60):
         asked.append(address)
         if down in address:
-            raise urllib.error.HTTPError(address, 503, "Service Unavailable", None, None)
+            raise urllib.error.HTTPError(
+                address, 503, "Service Unavailable", email.message.Message(), None
+            )
         return body
 
     monkeypatch.setattr(download, "url", fetch)

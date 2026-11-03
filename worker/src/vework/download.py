@@ -72,7 +72,7 @@ def hub(repo: str, revision: str | None, files: list[str] | None = None) -> None
     except Exception:
         return
     missing = [file for file in planned if file.will_download]
-    total = sum(file.file_size for file in missing)
+    total = sum(file.file_size or 0 for file in missing)
     if not total:
         return
     # A file is written to <name>.<run>.incomplete in the repository's folder, then moved into the
@@ -82,7 +82,7 @@ def hub(repo: str, revision: str | None, files: list[str] | None = None) -> None
 
     def done() -> int:
         whole = sum(
-            file.file_size
+            file.file_size or 0
             for file in missing
             if isinstance(
                 huggingface_hub.try_to_load_from_cache(repo, file.filename, revision=revision), str

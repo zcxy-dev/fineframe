@@ -1,6 +1,6 @@
 # Contributing
 
-Plans and open work are [GitHub issues](https://github.com/zcxy-dev/fineframe/issues). Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+Plans and open work are [GitHub issues](https://github.com/zcxy-dev/fineframe/issues). Bug reports and ideas are welcome there. Fineframe is not open source ([LICENSE](LICENSE)), so pull requests with code from outside the project are not accepted: open an issue instead. Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Setup
 
@@ -16,7 +16,7 @@ CI's `windows` and `macos` jobs run the worker's `ml` tests except those marked 
 
 ## Checks
 
-A change passes the steps in [`.github/workflows/ci.yml`](.github/workflows/ci.yml); run them locally before opening a pull request. Every synthetic edit CI renders has no clicks and under 10 ms of drift, except `copy-joined`, a deliberately naive baseline joined with `-c copy`. `pnpm exec biome check --write` fixes TypeScript and JSON formatting.
+A change passes the steps in [`.github/workflows/ci.yml`](.github/workflows/ci.yml); run them locally before opening a pull request. The `macos` and `windows` jobs run only on request (`gh workflow run ci.yml --ref <branch>`) and for a pull request that changes the desktop app, the toolchains or the dependencies, as every version pull request does (the `scope` job lists the paths); request them for a change that may behave differently on macOS or Windows. The same holds for the desktop app's installers (`desktop.yml`), built for a pull request only when it changes `apps/desktop/`. Every synthetic edit CI renders has no clicks and under 10 ms of drift, except `copy-joined`, a deliberately naive baseline joined with `-c copy`. `pnpm exec biome check --write` fixes TypeScript and JSON formatting.
 
 ## Where code goes
 
@@ -31,8 +31,8 @@ A change passes the steps in [`.github/workflows/ci.yml`](.github/workflows/ci.y
 - **Keep data synthetic.** Tests generate their own media (ffmpeg `lavfi`, synthetic tones).
 - **Corpus footage** follows [bench/README.md](bench/README.md#corpus-layout).
 - **Never commit** other people's media, credentials or `.env` files.
-- **Keep third-party notices in one file.** A new model, font, program or dependency gets a row in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md#components) with its licence, checked against its own licence file or model card. Code adapted from another project keeps that project's copyright and licence in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), which lists the files it is in; no other file carries its copyright, licence or attribution. Its brand assets (logos, product names) are not covered by its licence; don't copy them.
+- **Keep third-party notices in one file per product.** A new model, font, program or dependency gets a row in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md#components) with its licence, checked against its own licence file or model card. Code adapted from another project keeps that project's copyright and licence in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), which lists the files it is in; no other file carries its copyright, licence or attribution. Its brand assets (logos, product names) are not covered by its licence; don't copy them. The website (`apps/site`), built and served on its own, is the exception: what it ships is listed in [its own notices](apps/site/THIRD_PARTY_NOTICES.md) instead.
 
 ## Pull requests
 
-Branch as `feat/`, `fix/`, `chore/` or `docs/` from the latest `main`, give the pull request a [Conventional Commits](https://www.conventionalcommits.org) title and fill in the template. Pull requests are squash-merged once CI is green.
+Pull requests come from the maintainers. Branch as `feat/`, `fix/`, `chore/` or `docs/` from the latest `main`, give the pull request a [Conventional Commits](https://www.conventionalcommits.org) title and fill in the template. Pull requests are squash-merged once CI is green.

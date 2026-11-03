@@ -414,7 +414,7 @@ def test_a_cloud_recognizer_hears_every_chunk_at_once_and_only_the_aligner_loads
     monkeypatch.setattr(transcribe, "_aligner", lambda half: half and align)
     sent = []
 
-    def recognizer(wavs, progress):
+    def recognizer(wavs, progress) -> list[tuple[str, str | None]]:
         sent.extend(len(w) for w in wavs)
         return [("处理视频。", None), ("", None)]
 

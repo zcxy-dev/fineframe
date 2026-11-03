@@ -4,15 +4,20 @@ import shutil
 import subprocess
 import sys
 import weakref
+from collections.abc import Callable
 from types import SimpleNamespace
+from typing import cast
 
 import av
+import av.codec.hwaccel
+import av.error
 import numpy as np
 import pytest
 from conftest import ffmpeg
 from test_voice import vowels
 
 from vework import denoise, framing, gpu, index, probe, shots, transcribe
+from vework.openrouter import Client
 
 
 def on_mac_gpu(monkeypatch, on=True):
@@ -23,8 +28,8 @@ def said(capsys):
     return capsys.readouterr().err.splitlines()
 
 
-def loader(gpu_run, cpu_run, loaded):
-    def load(on):
+def loader(gpu_run, cpu_run, loaded) -> Callable[[bool], Callable]:
+    def load(on: bool) -> Callable:
         loaded.append(on)
         return gpu_run if on else cpu_run
 
@@ -193,6 +198,7 @@ def test_videotoolbox_decodes_the_frames_software_does_at_their_times(mac_gpu, s
     assert len(thumbs[0]) == len(thumbs[1]) == 360 and hardware == software
     assert all(t.shape == (27, 48, 3) and t.dtype == np.uint8 for t in thumbs[0] + thumbs[1])
     video = probe.probe(shots_video).video
+    assert video is not None
     samples = [
         [(t, image.shape, image.dtype.name) for t, image, _ in framing.sampled_frames(
             shots_video, video, [], h)]
@@ -249,7 +255,7 @@ def test_an_analysis_on_the_mac_says_where_each_step_ran(mac_gpu, spoken_video, 
         cost=0.0,
         model="stand-in",
     )
-    found = index.build(spoken_video, stem=tmp_path / "talk.voice.wav", cloud=cloud)
+    found = index.build(spoken_video, stem=tmp_path / "talk.voice.wav", cloud=cast(Client, cloud))
     lines = said(capsys)
     print("\n".join(line for line in lines if "downloading" not in line))
     for line in (

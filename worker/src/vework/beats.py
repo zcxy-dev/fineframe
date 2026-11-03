@@ -52,7 +52,7 @@ def mel_filters() -> np.ndarray:
     linear, knee = 200 / 3, 1000.0
     log_step = np.log(6.4) / 27
 
-    def to_mel(hz: np.ndarray) -> np.ndarray:
+    def to_mel(hz: np.ndarray | float) -> np.ndarray:
         hz = np.asarray(hz, float)
         safe = np.maximum(hz, knee)
         return np.where(hz < knee, hz / linear, knee / linear + np.log(safe / knee) / log_step)

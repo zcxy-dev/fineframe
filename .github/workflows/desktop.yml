@@ -3,21 +3,17 @@ name: desktop
 # Builds the desktop app's installers on each system they are for, then runs each built app as
 # a person would the first time (apps/desktop/scripts/smoke.ts): it installs the analysis, makes
 # an edit of a synthetic clip with stand-ins for Claude and OpenRouter, and quits, leaving nothing
-# running. A pull request that changes the app or the page builds and checks them; a tag v<version>
+# running. A pull request that changes the app builds and checks them; a tag v<version>
 # also uploads them, with copies under names without the version that the website's download page
 # links to, their checksums and the update feed, to Cloudflare R2, which downloads.fineframe.app
-# serves. Nothing goes to GitHub's releases.
+# serves. Nothing goes to GitHub's releases. Any other branch builds them on request
+# (`gh workflow run desktop.yml --ref <branch>`).
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - .github/workflows/desktop.yml
       - apps/desktop/**
-      - apps/web/**
-      - packages/**
-      - skills/**
-      - worker/**
-      - pnpm-lock.yaml
   push:
     tags: ["v*"]
   workflow_dispatch:

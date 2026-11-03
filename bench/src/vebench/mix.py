@@ -47,10 +47,13 @@ def compare(voice: np.ndarray, music: np.ndarray) -> dict:
         return {"talking_blocks": 0, "voice_lufs": None, "music_lufs": None, "over_music_db": None,
                 "p5_over_music_db": None, "music_in_gaps_lufs": None}  # fmt: skip
     level = _power_mean(heard[heard >= level - RELATIVE])
+    assert level is not None  # the loudest block is at least as loud as the mean
     talking = voice >= level - RELATIVE
     under = np.maximum(music[talking], ABSOLUTE)
     gaps = music[(voice < GAP) & (music > ABSOLUTE)]
     music_level = _power_mean(under)
+    gaps_level = _power_mean(gaps)
+    assert music_level is not None  # talking holds at least the loudest block
     return {
         "talking_blocks": int(talking.sum()),
         "voice_lufs": round(level, 2),
@@ -59,7 +62,7 @@ def compare(voice: np.ndarray, music: np.ndarray) -> dict:
         # of phrases, where music most easily covers speech.
         "over_music_db": round(level - music_level, 2),
         "p5_over_music_db": round(float(np.percentile(voice[talking] - under, 5)), 2),
-        "music_in_gaps_lufs": round(_power_mean(gaps), 2) if len(gaps) else None,
+        "music_in_gaps_lufs": round(gaps_level, 2) if gaps_level is not None else None,
     }
 
 

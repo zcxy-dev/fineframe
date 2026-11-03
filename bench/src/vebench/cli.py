@@ -4,6 +4,7 @@ import subprocess
 import sys
 from importlib.metadata import version
 from pathlib import Path
+from typing import Any
 
 from vebench import ascend, beats, edit, mix, render, shots, speakers, tables, transcript
 from vebench.synth import corpus, published
@@ -29,6 +30,7 @@ def main(argv: list[str] | None = None) -> None:
     Exits with 1 on a failure, and from `report` when any output failed to score.
     """
     args = _parser().parse_args(argv)
+    result: Any
     try:
         if args.command == "tables":
             stale = tables.write(check=args.check)

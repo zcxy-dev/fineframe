@@ -3,6 +3,7 @@
 import json
 import math
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -18,7 +19,7 @@ def load(path: Path) -> list[dict]:
     turns = data.get("turns") if isinstance(data, dict) else None
 
     def valid(t) -> bool:
-        times = [t.get("start"), t.get("end")] if isinstance(t, dict) else []
+        times: list[Any] = [t.get("start"), t.get("end")] if isinstance(t, dict) else []
         return (
             all(isinstance(v, int | float) and not isinstance(v, bool) for v in times)
             and 0 <= times[0] <= times[1]

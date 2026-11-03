@@ -9,6 +9,7 @@ from pathlib import Path
 from statistics import median
 
 import av
+import av.codec.hwaccel
 import numpy as np
 
 from vework import gpu, ml

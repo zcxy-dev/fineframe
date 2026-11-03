@@ -1,10 +1,12 @@
 import argparse
+import io
 import json
 import sys
 from importlib.metadata import version
 from pathlib import Path
 
 import av
+import av.error
 
 from vework import correct, index, music, openrouter, transcribe, truth
 
@@ -14,7 +16,8 @@ def main(argv: list[str] | None = None) -> None:
     # Messages name files and speech in any script. The engine reads them as UTF-8, while
     # Windows would write them to a pipe in its ANSI code page, which has no CJK.
     for stream in (sys.stdout, sys.stderr):
-        stream.reconfigure(encoding="utf-8")
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8")
     parser = _parser()
     args = parser.parse_args(argv)
     if args.command == "analyze":
