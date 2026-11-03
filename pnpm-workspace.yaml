@@ -6,9 +6,9 @@ packages:
 # its address the same way on Windows.
 shellEmulator: true
 
-# Three days, as Dependabot's cooldown (.github/dependabot.yml): its update jobs fail while the
+# Seven days, as Dependabot's cooldown (.github/dependabot.yml): its update jobs fail while the
 # lockfile holds a younger release.
-minimumReleaseAge: 4320
+minimumReleaseAge: 10080
 
 # Security fixes HyperFrames' exact pins hold back (Dependabot cannot raise a transitive pin):
 # undici 7.25.0 has the advisories fixed in 7.30.1, and puppeteer 25.11.0 pulls zod 3, which has

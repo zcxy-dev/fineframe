@@ -15,6 +15,7 @@ def test_portrait_phone_footage_reports_displayed_size(tmp_path):
     ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x180:r=25:d=1", "-c:v", "libx264", str(plain))
     ffmpeg("-display_rotation", "90", "-i", str(plain), "-c", "copy", str(rotated))
     video = probe(rotated).video
+    assert video is not None
     assert (video.width, video.height, video.rotation) == (180, 320, 90)
     assert video.fps == 25
 
@@ -26,10 +27,13 @@ def test_anamorphic_footage_reports_its_pixel_shape_as_displayed(tmp_path):
     ffmpeg("-f", "lavfi", "-i", "testsrc2=s=240x180:r=25:d=1", "-vf", "setsar=4/3",
            "-c:v", "libx264", str(wide))  # fmt: skip
     ffmpeg("-display_rotation", "90", "-i", str(wide), "-c", "copy", str(rotated))
-    assert probe(square).video.sample_aspect == 1
-    assert probe(wide).video.sample_aspect == pytest.approx(4 / 3)
+    square_video, wide_video = probe(square).video, probe(wide).video
+    assert square_video is not None and wide_video is not None
+    assert square_video.sample_aspect == 1
+    assert wide_video.sample_aspect == pytest.approx(4 / 3)
     # Turned upright, the pixels turn too.
     video = probe(rotated).video
+    assert video is not None
     assert (video.width, video.height, video.sample_aspect) == (180, 240, pytest.approx(3 / 4))
 
 
@@ -42,6 +46,7 @@ def test_hdr_footage_reports_its_transfer_and_matrix(tmp_path, trc, code):
     ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x180:r=25:d=1", "-vf", tags, "-c:v", "libx264",
            "-pix_fmt", "yuv420p10le", str(out))  # fmt: skip
     video = probe(out).video
+    assert video is not None
     assert (video.transfer, video.matrix) == (code, 9)
 
 
@@ -49,6 +54,7 @@ def test_untagged_footage_has_no_transfer_or_matrix(tmp_path):
     out = tmp_path / "plain.mp4"
     ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x180:r=25:d=1", "-c:v", "libx264", str(out))
     video = probe(out).video
+    assert video is not None
     assert (video.transfer, video.matrix) == (None, None)
 
 

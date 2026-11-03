@@ -207,7 +207,7 @@ def _model(
     ml.require()
     import onnxruntime
 
-    providers = ["CPUExecutionProvider"]
+    providers: list[str | tuple[str, dict[str, str]]] = ["CPUExecutionProvider"]
     if apple_gpu:
         coreml = {"MLComputeUnits": "CPUAndGPU", "ModelFormat": "MLProgram"}
         providers.insert(0, ("CoreMLExecutionProvider", coreml))
@@ -221,13 +221,14 @@ def _model(
         raise RuntimeError(f"{MODEL}: {exc}") from exc
 
     def run(erb: np.ndarray, cplx: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        spec = np.stack([cplx.real, cplx.imag])[None].astype(np.float32)
+        spec = np.stack([np.real(cplx), np.imag(cplx)])[None].astype(np.float32)
         try:
             e0, e1, e2, e3, emb, c0, _ = enc.run(
                 None, {"feat_erb": erb[None, None], "feat_spec": spec}
             )
             (gains,) = erb_dec.run(None, {"emb": emb, "e3": e3, "e2": e2, "e1": e1, "e0": e0})
-            coefs = df_dec.run(None, {"emb": emb, "c0": c0})[0][0]
+            gains = np.asarray(gains)
+            coefs = np.asarray(df_dec.run(None, {"emb": emb, "c0": c0})[0])[0]
         except Exception as exc:
             raise RuntimeError(f"{MODEL}: {exc}") from exc
         # [frames, bins, order * 2] with real and imaginary parts interleaved.
@@ -254,7 +255,9 @@ def _download() -> Path:
         for member in tar.getmembers():
             name = Path(member.name).name
             if member.isfile() and name in {f"{part}.onnx" for part in PARTS}:
-                data = tar.extractfile(member).read()
+                extracted = tar.extractfile(member)
+                assert extracted is not None  # a regular file
+                data = extracted.read()
                 partial = folder / f"{name}.partial"
                 partial.write_bytes(data)
                 partial.rename(folder / name)

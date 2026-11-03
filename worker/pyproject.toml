@@ -86,9 +86,17 @@ ml = [
     "transnetv2-pytorch>=1.0.5",
 ]
 dev = [
+    "basedpyright>=1.40.2",
     "datamodel-code-generator>=0.83.0",
     "imageio-ffmpeg>=0.6.0",
     "pytest>=9.1.1",
     "ruff>=0.17.0",
     "vebench",
 ]
+
+[tool.basedpyright]
+typeCheckingMode = "basic"
+# CI's quick checks leave out the `ml` group, so its packages cannot be found there: a missing
+# import is a warning, and pytest still fails on a wrong one. With the group installed, the code
+# that uses them is checked against their types.
+reportMissingImports = "warning"

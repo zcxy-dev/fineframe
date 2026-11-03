@@ -59,6 +59,7 @@ class Track:
             # would silence the audio that follows a brief jump back.
             self.skip = -gap if gap < -self.tolerance else 0
             self.tolerance = self.rate // 50
+        assert self.resampler is not None
         self._emit(self.resampler.resample(frame))
 
     def flush(self) -> None:

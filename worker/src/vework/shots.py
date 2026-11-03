@@ -4,6 +4,7 @@ from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 
 import av
+import av.codec.hwaccel
 import numpy as np
 
 from vework import gpu, ml

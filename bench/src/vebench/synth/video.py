@@ -58,6 +58,8 @@ def render(clip: Clip, layout: Layout, path: Path, seed: int) -> None:
             "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2", str(encoded),
         ]  # fmt: skip
         ffmpeg = subprocess.Popen(_ffmpeg(*args), stdin=subprocess.PIPE)
+        stdin = ffmpeg.stdin
+        assert stdin is not None
         try:
             shot = 0
             for k in range(count):
@@ -73,9 +75,9 @@ def render(clip: Clip, layout: Layout, path: Path, seed: int) -> None:
                 if clip.portrait:
                     # Phones store portrait video sideways plus a display rotation.
                     frame = np.rot90(frame, -1)
-                ffmpeg.stdin.write(np.ascontiguousarray(frame).tobytes())
+                stdin.write(np.ascontiguousarray(frame).tobytes())
         finally:
-            ffmpeg.stdin.close()
+            stdin.close()
             if ffmpeg.wait():
                 raise RuntimeError(f"{path}: ffmpeg failed")
         if clip.portrait:
@@ -135,7 +137,8 @@ def _gradient(width: int, height: int, top, bottom) -> np.ndarray:
 
 
 def _color(rng: np.random.Generator, low: int = 40, high: int = 220) -> tuple[int, int, int]:
-    return tuple(int(c) for c in rng.integers(low, high, 3))
+    red, green, blue = (int(c) for c in rng.integers(low, high, 3))
+    return red, green, blue
 
 
 def _ellipses(width: float) -> list[np.ndarray]:
@@ -312,7 +315,7 @@ class Street:
         _figure(ImageDraw.Draw(sprite), width / 2, 0.5 * height, r, rng)
         rgba = np.asarray(sprite)
         rows, cols = np.nonzero(rgba[..., 3])
-        self.top, self.left = rows.min(), cols.min()
+        self.top, self.left = int(rows.min()), int(cols.min())
         crop = rgba[self.top : rows.max() + 1, self.left : cols.max() + 1]
         self.mask, self.figure = crop[..., 3] > 0, crop[..., :3]
         self.mouth = (width / 2, 0.5 * height + 0.5 * r)

@@ -165,6 +165,12 @@ def test_a_single_second_naming_someone_else_inside_a_turn_is_noise():
     assert found == [{"face": 10, "start": 0.0, "end": 6.0}]
 
 
+def video_of(path) -> probe.VideoInfo:
+    video = probe.probe(path).video
+    assert video is not None
+    return video
+
+
 @pytest.fixture
 def numbered_video(tmp_path):
     """10 fps, 2 s: frame k is grey level 10 k, from the top, over a white bottom row."""
@@ -176,7 +182,7 @@ def numbered_video(tmp_path):
 
 
 def test_each_sample_is_the_frame_on_screen_compared_with_those_after_it(numbered_video):
-    video = probe.probe(numbered_video).video
+    video = video_of(numbered_video)
     ends = []
     found = list(framing.sampled_frames(numbered_video, video, ends))
     assert [t for t, *_ in found] == pytest.approx([k / 5 for k in range(10)])
@@ -193,7 +199,7 @@ def test_a_fast_source_is_compared_with_three_of_the_frames_after_each_sample(tm
     ffmpeg("-f", "lavfi", "-i", "nullsrc=s=64x48:r=60:d=1,format=gray",
            "-vf", "geq=lum='2*N'", "-c:v", "libx264", "-qp", "0", "-pix_fmt", "yuv444p",
            str(out))  # fmt: skip
-    _, image, later = next(framing.sampled_frames(out, probe.probe(out).video, []))
+    _, image, later = next(framing.sampled_frames(out, video_of(out), []))
     # Frames 1 to 6 follow within 0.1 s: the first, middle and last are kept.
     assert [round(int(f[0, 0, 0]) / 2) for f in [image, *later]] == [0, 1, 3, 6]
 
@@ -201,7 +207,7 @@ def test_a_fast_source_is_compared_with_three_of_the_frames_after_each_sample(tm
 def test_frames_are_sampled_upright(numbered_video, tmp_path):
     turned = tmp_path / "turned.mp4"
     ffmpeg("-display_rotation", "90", "-i", str(numbered_video), "-c", "copy", str(turned))
-    video = probe.probe(turned).video
+    video = video_of(turned)
     assert (video.width, video.height, video.rotation) == (48, 64, 90)
     _, image, _ = next(framing.sampled_frames(turned, video, []))
     assert image.shape == (64, 48, 3)
@@ -214,14 +220,14 @@ def test_frames_of_anamorphic_footage_are_sampled_in_its_displayed_shape(tmp_pat
     out = tmp_path / "hdv.mp4"
     ffmpeg("-f", "lavfi", "-i", "testsrc2=s=48x36:r=5:d=1", "-vf", "setsar=4/3",
            "-c:v", "libx264", str(out))  # fmt: skip
-    _, image, _ = next(framing.sampled_frames(out, probe.probe(out).video, []))
+    _, image, _ = next(framing.sampled_frames(out, video_of(out), []))
     assert image.shape == (36, 64, 3)
 
 
 def test_a_sample_on_the_last_frame_has_nothing_to_compare_with(tmp_path):
     out = tmp_path / "five.mp4"
     ffmpeg("-f", "lavfi", "-i", "testsrc2=s=64x48:r=5:d=1", "-c:v", "libx264", str(out))
-    found = list(framing.sampled_frames(out, probe.probe(out).video, []))
+    found = list(framing.sampled_frames(out, video_of(out), []))
     assert [len(later) for *_, later in found] == [1, 1, 1, 1, 0]
 
 
@@ -230,7 +236,7 @@ def test_samples_start_with_the_first_frame_of_a_late_picture(numbered_video, tm
     late = tmp_path / "late.ts"
     ffmpeg("-f", "lavfi", "-i", "anullsrc=d=2.5", "-itsoffset", "0.5", "-i", str(numbered_video),
            "-map", "0:a", "-map", "1:v", "-c:v", "copy", "-c:a", "mp2", str(late))  # fmt: skip
-    times = [t for t, *_ in framing.sampled_frames(late, probe.probe(late).video, [])]
+    times = [t for t, *_ in framing.sampled_frames(late, video_of(late), [])]
     assert times[0] == pytest.approx(0.6) and times[-1] == pytest.approx(2.4)
 
 
@@ -248,6 +254,8 @@ def draw_people(path, talk, seconds=6.0, fps=25, size=(640, 360), head=0.08, tur
             "-pix_fmt", "bgr24", "-s", f"{width}x{height}", "-r", str(fps), "-i", "pipe:0",
             "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", str(path)]  # fmt: skip
     encoder = subprocess.Popen(args, stdin=subprocess.PIPE)
+    stdin = encoder.stdin
+    assert stdin is not None
     openness = [0.0, 0.0]
     for k in range(int(seconds * fps)):
         t = k / fps
@@ -293,8 +301,8 @@ def draw_people(path, talk, seconds=6.0, fps=25, size=(640, 360), head=0.08, tur
                      max(1, int((0.04 + 0.25 * openness[i]) * r)))  # fmt: skip
             cv2.ellipse(frame, (int(nx + 0.05 * r * np.sin(yaw)), int(y + 0.5 * r)), mouth,
                         0, 0, 360, (40, 30, 90), -1)  # fmt: skip
-        encoder.stdin.write(frame.tobytes())
-    encoder.stdin.close()
+        stdin.write(frame.tobytes())
+    stdin.close()
     assert encoder.wait() == 0
 
 
@@ -302,9 +310,8 @@ def draw_people(path, talk, seconds=6.0, fps=25, size=(640, 360), head=0.08, tur
 def test_finds_two_people_and_who_of_them_speaks(tmp_path):
     path = tmp_path / "two.mp4"
     draw_people(path, [[(0.4, 2.6)], [(3.4, 5.6)]])
-    info = probe.probe(path)
     speech = [{"start": 0.4, "end": 2.6}, {"start": 3.4, "end": 5.6}]
-    found = framing.analyze(path, info.video, [], speech)
+    found = framing.analyze(path, video_of(path), [], speech)
     assert found["fps"] == 5
     (shot,) = found["shots"]
     assert (shot["start"], shot["end"], shot["layout"]) == (0.0, 6.0, "two_shot")
@@ -326,7 +333,7 @@ def test_a_speaker_turned_aside_is_named_over_a_listener_facing_the_camera(tmp_p
     # 0.87 turned 30 degrees, 0.5 to 0.8 turned 40 and 0.5 to 0.7 drawn larger turned 35.
     path = tmp_path / "turned.mp4"
     draw_people(path, [[(0.4, 5.6)], []], size=size, head=0.11, turn=(turn, 0.0))
-    found = framing.analyze(path, probe.probe(path).video, [], [{"start": 0.4, "end": 5.6}])
+    found = framing.analyze(path, video_of(path), [], [{"start": 0.4, "end": 5.6}])
     (shot,) = found["shots"]
     assert shot["layout"] == "two_shot"
     speaker, listener = sorted(shot["faces"], key=lambda f: f["boxes"][0]["x"])
@@ -339,7 +346,7 @@ def test_a_speaker_turned_aside_is_named_over_a_listener_facing_the_camera(tmp_p
 def test_shots_split_at_transitions_and_number_their_faces_apart(tmp_path):
     path = tmp_path / "two.mp4"
     draw_people(path, [[], []], seconds=4.0)
-    found = framing.analyze(path, probe.probe(path).video, [{"start": 2.0, "end": 2.0}], [])
+    found = framing.analyze(path, video_of(path), [{"start": 2.0, "end": 2.0}], [])
     assert [(s["start"], s["end"], s["layout"]) for s in found["shots"]] == [
         (0.0, 2.0, "two_shot"),
         (2.0, 4.0, "two_shot"),

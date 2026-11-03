@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import av
+import av.container
+import av.stream
 
 
 @dataclass(frozen=True)

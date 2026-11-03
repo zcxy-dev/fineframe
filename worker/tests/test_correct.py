@@ -30,6 +30,7 @@ class FakeClaude:
     def _answer(self, **params):
         self.requests.append(params)
         chunk = re.search(r"<chunk>\n(.*)\n</chunk>", params["messages"][0]["content"][1]["text"])
+        assert chunk is not None
         changes = self.reply(chunk.group(1))
         if changes == "refusal":
             details = SimpleNamespace(category="general_harms")

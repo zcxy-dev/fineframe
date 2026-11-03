@@ -43,14 +43,14 @@ def to_tokens(units: list[Unit]) -> list[Token]:
     tokens = []
     for unit in units:
         parts = tokenize(unit.text)
-        timed = unit.start is not None and unit.end is not None
-        step = (unit.end - unit.start) / len(parts) if timed and parts else 0.0
+        start, end = unit.start, unit.end
+        if start is None or end is None:
+            tokens.extend(Token(text, cjk, None, None) for text, cjk in parts)
+            continue
+        # Providers time multi-character units as a whole; split the span evenly.
+        step = (end - start) / len(parts) if parts else 0.0
         for i, (text, cjk) in enumerate(parts):
-            if timed:
-                # Providers time multi-character units as a whole; split the span evenly.
-                tokens.append(Token(text, cjk, unit.start + i * step, unit.start + (i + 1) * step))
-            else:
-                tokens.append(Token(text, cjk, None, None))
+            tokens.append(Token(text, cjk, start + i * step, start + (i + 1) * step))
     return tokens
 
 
@@ -143,7 +143,13 @@ def compare(ref_units: list[Unit], hyp_units: list[Unit]) -> Comparison:
             continue
         pairs = zip(ref[op.src_start : op.src_end], hyp[op.dest_start : op.dest_end], strict=True)
         for r, h in pairs:
-            if r.start is not None and h.start is not None:
+            # A token has both times or neither.
+            if (
+                r.start is not None
+                and h.start is not None
+                and r.end is not None
+                and h.end is not None
+            ):
                 c.start_deltas.append(h.start - r.start)
                 c.end_deltas.append(h.end - r.end)
     return c

@@ -5,6 +5,7 @@ from collections import Counter
 from collections.abc import Callable, Iterator
 from functools import cache
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -288,7 +289,7 @@ def _converter():
     stock = Path(opencc.OpenCC("s2twp").config)
     config = json.loads(stock.read_text(encoding="utf-8"))
 
-    def resolve(node):
+    def resolve(node: Any) -> Any:
         if isinstance(node, dict):
             if node.get("type") == "ocd2":
                 return {**node, "file": str(stock.parent / node["file"])}
@@ -387,7 +388,7 @@ def transcribe_chunks(
                 heard.append(recognize(wav, context))
             return heard
 
-        def recognizer(wavs, progress):
+        def hear_again_on_failure(wavs, progress):
             heard = hear(wavs, progress)
             # Nothing heard in any chunk of speech is taken for the GPU failing: hear it again.
             on_gpu = isinstance(recognize, gpu.Fallback) and recognize.on_gpu
@@ -395,6 +396,8 @@ def transcribe_chunks(
                 recognize.fail("it heard nothing in any chunk")
                 heard = hear(wavs, progress)
             return heard
+
+        recognizer = hear_again_on_failure
     else:
         align = None  # loaded only once there is text to align, and in half precision
     chunks = []
@@ -420,6 +423,7 @@ def transcribe_chunks(
     floor = timing.noise_floor(samples, speech)
     for n, chunk in enumerate(chunks, 1):
         progress(f"aligning {n}/{len(chunks)}")
+        assert align is not None  # loaded above once there are chunks
         start, end, language = chunk["start"], chunk["end"], chunk["language"]
         text = separate_latin(chunk["text"])
         # Padding added to a short chunk is not audio; keep words inside the real speech.

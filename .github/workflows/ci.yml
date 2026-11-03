@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions: {}
 
@@ -73,6 +74,7 @@ jobs:
               uv sync --locked
               uv run ruff format --check .
               uv run ruff check .
+              uv run basedpyright
               uv run pytest -q
             )
           done
@@ -96,13 +98,40 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-build-only
           NEXT_TELEMETRY_DISABLED: "1"
 
+  # Whether a pull request changes what differs most between systems: the desktop app, the
+  # toolchains, the dependencies or this workflow. Only then do the macOS and Windows runners,
+  # billed at a multiple of Linux minutes in a private repository, run for it.
+  scope:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      pull-requests: read
+    outputs:
+      platforms: ${{ steps.files.outputs.platforms }}
+    steps:
+      - id: files
+        run: |
+          files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename')
+          if grep -qE "$PLATFORM_PATHS" <<<"$files"; then platforms=true; else platforms=false; fi
+          echo "platforms=$platforms" | tee -a "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          PLATFORM_PATHS: '^(\.github/workflows/ci\.yml|apps/desktop/|apps/web/scripts/|mise\.toml|\.node-version|\.python-version|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|(worker|bench)/(pyproject\.toml|uv\.lock))'
+
   # The renderer on macOS (Apple silicon) and on Windows, with each one's pinned
   # FFmpeg: the engine tests, then a synthetic edit scored by vebench, and the worker's models: on
   # the Mac's GPU there. On Windows also the rest of the workspace, the worker and the page as
-  # `mise run start` starts it.
+  # `mise run start` starts it. Runs on request and for a pull request whose scope includes them,
+  # which every version pull request's does (its uv.lock files), so each release tag is tested.
+  # (A tag trigger would expose the model cache below to poisoning in a release run.)
   platforms:
     name: ${{ matrix.check }}
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    needs: scope
+    if: >-
+      !cancelled() && (github.event_name == 'workflow_dispatch' ||
+      needs.scope.outputs.platforms == 'true')
     strategy:
       fail-fast: false
       matrix:
@@ -214,3 +243,21 @@ jobs:
           jq -e 'del(.["copy-joined"]) | length == 2 and all(.[];
             .errors == [] and .missing == [] and .render.clicks == 0 and .render.max_abs_drift_ms < 10)' \
             "$RUNNER_TEMP/report.json"
+
+  # The required check for macOS and Windows: it passes when they passed or were not needed,
+  # and fails when they, or the scope that decides, failed.
+  platforms-passed:
+    needs: [scope, platforms]
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - run: |
+          echo "scope: $SCOPE, platforms: $PLATFORMS"
+          for result in "$SCOPE" "$PLATFORMS"; do
+            case "$result" in failure | cancelled) exit 1 ;; esac
+          done
+        env:
+          SCOPE: ${{ needs.scope.result }}
+          PLATFORMS: ${{ needs.platforms.result }}

@@ -117,6 +117,7 @@ def _classifier() -> Callable[[np.ndarray], np.ndarray]:
             (found,) = session.run(None, {"waveform": batch})
         except Exception as exc:
             raise RuntimeError(f"{MODEL}: {exc}") from exc
+        found = np.asarray(found)
         return np.stack([found[:, c].max(axis=1) for c in columns], axis=1)
 
     return classify

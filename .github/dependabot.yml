@@ -1,6 +1,7 @@
 # Monthly dependency updates keep review noise low. Minor and patch releases are
 # grouped per ecosystem (majors arrive as individual PRs), and a release must be
-# three days old before it is proposed.
+# seven days old before it is proposed (security updates are not held back). Every PR gets
+# only the `dependencies` label, so Dependabot does not create one per ecosystem.
 version: 2
 updates:
   - package-ecosystem: uv
@@ -9,7 +10,8 @@ updates:
       interval: monthly
     open-pull-requests-limit: 2
     cooldown:
-      default-days: 3
+      default-days: 7
+    labels: ["dependencies"]
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -23,7 +25,8 @@ updates:
       interval: monthly
     open-pull-requests-limit: 2
     cooldown:
-      default-days: 3
+      default-days: 7
+    labels: ["dependencies"]
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -42,7 +45,8 @@ updates:
       interval: monthly
     open-pull-requests-limit: 2
     cooldown:
-      default-days: 3
+      default-days: 7
+    labels: ["dependencies"]
     commit-message:
       prefix: "chore"
       include: "scope"

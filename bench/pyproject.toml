@@ -46,6 +46,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "basedpyright>=1.40.2",
     "pytest>=9.1.1",
     "ruff>=0.17.0",
 ]
@@ -71,3 +72,9 @@ select = ["E", "F", "I", "B", "UP"]
 tmp_path_retention_policy = "none"
 testpaths = ["tests"]
 markers = ["synth: needs the synth extra and downloads the speech model"]
+
+[tool.basedpyright]
+typeCheckingMode = "basic"
+# CI leaves out the `synth` extra, so its packages cannot be found there: a missing import is a
+# warning. With `uv sync --extra synth`, the code that uses them is checked against their types.
+reportMissingImports = "warning"

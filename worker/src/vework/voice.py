@@ -1,5 +1,6 @@
 import tempfile
 from pathlib import Path
+from typing import cast
 
 import av
 import numpy as np
@@ -63,7 +64,7 @@ class Clipping:
         top = 1.0
         if data.dtype.kind in "iu":
             # Unsigned samples centre on the middle of their range.
-            info = np.iinfo(data.dtype)
+            info = np.iinfo(cast(np.dtype[np.integer], data.dtype))
             middle = (int(info.max) + int(info.min) + 1) // 2
             data, top = data.astype(np.int64) - middle, info.max - middle
         self.hits += int(np.count_nonzero((np.abs(data) >= top * CLIPPED).any(axis=0)))
@@ -96,7 +97,8 @@ def _block_powers(samples: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarr
         for i, sos in enumerate(filters):
             filtered, states[i] = sosfilt(sos, chunk, zi=states[i])
             out[i].append((filtered.reshape(-1, BLOCK) ** 2).mean(axis=1))
-    return tuple(np.concatenate(o) if o else np.zeros(0) for o in out)
+    recorded, weighted, decay = (np.concatenate(o) if o else np.zeros(0) for o in out)
+    return recorded, weighted, decay
 
 
 def _db(power: np.ndarray | float) -> np.ndarray:
@@ -202,8 +204,9 @@ def _balance(samples: np.ndarray, talking: np.ndarray) -> dict:
         chunk = samples[lo : lo + step]
         if len(chunk) < size:
             break
+        # SciPy takes boundary=None, though its signature's default types the argument as str.
         freqs, times, spectrum = stft(chunk, RATE, nperseg=size, noverlap=size // 2,
-                                      boundary=None, padded=False)  # fmt: skip
+                                      boundary=cast(str, None), padded=False)  # fmt: skip
         centre = ((lo + times * RATE) // BLOCK).astype(int)
         inside = talking[np.minimum(centre, len(talking) - 1)]
         totals += (np.abs(spectrum[:, inside]) ** 2).sum(axis=1)
