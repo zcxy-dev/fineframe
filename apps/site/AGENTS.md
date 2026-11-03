@@ -9,7 +9,7 @@ The website for fineframe.app: a static, bilingual (English, Traditional Chinese
 ## Release
 - A merge to `main` that changes `apps/site/` deploys fineframe.app through Cloudflare Pages' Git integration (its build watch path is `apps/site/*`). It does not wait for CI; the `ci` ruleset check is what keeps a red change from merging. Dependabot updates that change this folder wait for the owner.
 - A merge never deploys Supabase (`supabase/migrations`, `supabase/functions`, `supabase/config.toml`) or Paddle changes: `DEPLOY.md` has the steps; ask first.
-- Health: no endpoint reports the commit. After a merge, the `Cloudflare Pages` check run on the merge commit must be `success` (`gh api -X GET repos/zcxy-dev/fineframe/commits/main/check-runs`) and `https://fineframe.app/en/` must return 200.
+- Health: no endpoint reports the commit. After a merge, the `Cloudflare Pages` check run on the merge commit must be `success` (`gh api -X GET repos/zcxy-dev/fineframe/commits/main/check-runs`; `verify-site-deploy.yml` fails when it is not) and `https://fineframe.app/en/` must return 200.
 - Preview for user-visible changes: the Cloudflare Pages preview linked from the PR's `Cloudflare Pages` check (public URL).
 
 ## Notes

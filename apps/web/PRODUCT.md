@@ -13,7 +13,7 @@ Anyone, in any field, who has footage and wants a finished video without editing
 A fully automatic video editor. The person drops in footage, picks a length and an aspect ratio, and gets back a finished video: cut, captioned, framed, graded and animated, with no manual steps. Success is a video they can publish as it comes out. The goal is the strongest automatic video editor there is.
 
 ## Positioning
-The edit is made end to end with no timeline to touch: analysis, planning, rendering and a check of every cut run locally, with Claude planning the edit. It is built for Mandarin, English and speech that switches between them, with captions in Taiwan Traditional Chinese.
+The edit is made end to end with no timeline to touch: analysis and rendering run locally, and Claude plans the edit and checks every cut with the person's own key. It is built for Mandarin, English and speech that switches between them, with captions in Taiwan Traditional Chinese.
 
 ## Operating Context
 - The web page (`apps/web`) is the one interface; the desktop app (`apps/desktop`) runs the same page in an Electron window on Apple silicon Macs, Windows and Linux.

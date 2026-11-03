@@ -60,7 +60,7 @@ Models that come inside a package: the TransNetV2 weights in transnetv2-pytorch,
 | [jieba](https://github.com/fxsjy/jieba) | MIT | benchmark `synth` |
 | [pillow](https://github.com/python-pillow/Pillow) | MIT-CMU | benchmark `synth` |
 | [en_core_web_sm](https://github.com/explosion/spacy-models) | MIT | benchmark `synth` |
-| [datamodel-code-generator](https://github.com/koxudaxi/datamodel-code-generator), [pytest](https://github.com/pytest-dev/pytest), [ruff](https://github.com/astral-sh/ruff) | MIT | development |
+| [basedpyright](https://github.com/DetachHead/basedpyright), [datamodel-code-generator](https://github.com/koxudaxi/datamodel-code-generator), [pytest](https://github.com/pytest-dev/pytest), [ruff](https://github.com/astral-sh/ruff) | MIT | development |
 
 ### npm packages, installed by pnpm (direct dependencies)
 

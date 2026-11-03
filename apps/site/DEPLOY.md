@@ -89,7 +89,7 @@ In the Paddle dashboard (the sandbox at [sandbox-vendors.paddle.com](https://san
 
 ## Billing on and off
 
-Whether Fineframe charges is one switch, `billing_enabled` in the one row of `public.app_config`. While it is `false`, as during the free public beta, the pricing page shows "Coming soon" instead of the checkout, the account page shows "Free public beta", and the app lets every signed-in user in ([ENTITLEMENT.md](ENTITLEMENT.md)). With Paddle set up and its values in Pages, turn it on in the Supabase dashboard's **SQL Editor**:
+Whether Fineframe charges is one switch, `billing_enabled` in the one row of `public.app_config`. While it is `false`, as during the free public beta, the plans show "Opening soon" instead of the checkout, and the app lets every signed-in user in ([ENTITLEMENT.md](ENTITLEMENT.md)). With Paddle set up and its values in Pages, turn it on in the Supabase dashboard's **SQL Editor**:
 
 ```sql
 update public.app_config set billing_enabled = true;

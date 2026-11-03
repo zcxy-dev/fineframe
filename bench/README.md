@@ -116,10 +116,10 @@ uv sync --extra synth                  # or generate it: Kokoro TTS, its G2P and
 uv run vebench synth synthetic/ --seed 0
 ```
 
-`vebench synthetic` downloads seed 0 as
+`vebench synthetic` downloads seed 0 as published in
 [`corpus/synthetic-seed0-v1/`](https://downloads.fineframe.app/corpus/synthetic-seed0-v1/SHA256SUMS)
-on `downloads.fineframe.app` publishes it, checks its SHA-256 and unpacks it, so every machine measures on the same
-files; measurements use it. `vebench synth` writes 16 minutes of clips and 85 MB to
+on `downloads.fineframe.app`, checks its SHA-256 and unpacks it, so every machine measures on the
+same files; measurements use it. `vebench synth` writes 16 minutes of clips and 85 MB to
 `bench/synthetic/`, which git ignores, in 5 to 7 minutes on the
 [reference machine](#reference-machine); the first run also downloads 330 MB of speech model.
 The same seed gives the same files with the same lockfile on the same machine, not on another.
@@ -149,8 +149,9 @@ pauses of 2 to 5 s and retakes. The talk clips run at 25 fps, the others at 30 o
   things on them that hold still while they show (a settings form's fields and Save button, an
   editor's file list, a slide's lines), each `{"start", "end", "name", "rect"}` with the rect
   `{"x", "y", "w", "h"}` in fractions of the picture, from when the screen shows alone until the
-  next shot starts coming in. A terminal's lines and an editor's code move, so they have none. A speaker is on screen in the wide shot, in their
-  own close-up and on the phone; during a dissolve, in either shot.
+  next shot starts coming in. A terminal's lines and an editor's code move, so they have none. A
+  speaker is on screen in the wide shot, in their own close-up and on the phone; during a
+  dissolve, in either shot.
 
 `synthetic/music/` holds drum-and-bass tracks with known beats for beat-synced cuts,
 `beat-<bpm>.wav` beside `beat-<bpm>.json`:
