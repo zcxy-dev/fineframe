@@ -1,6 +1,5 @@
 name: Feature request
 description: Suggest an improvement to the edits it produces or to the tools.
-labels: [enhancement]
 body:
   - type: textarea
     id: problem
