@@ -147,6 +147,7 @@ A rich edit (`visuals: "rich"`, the default; `pnpm edit --visuals`) shows what t
   - A still is cropped in its box's shape around the words it was captured for, at most 0.75 of their width and never past its own pixels, and pushes in by 8 % over its time on screen. Every change is a hard cut.
 - **Effects** are planned first, and the visuals keep clear of them.
 - **Sound.** A visual that asks for a sound gets the next file of that kind from the [CC0 set](#b-roll-sourcing) on its first frame, at most one every 6 s: -16 dB for a click, tap or stop, -14 for a tone or air, -12 for paper, under the voice. They play with the music bed, not ducked.
+- **Credits.** Each capture, clip and sound is a source with its `credit`; the renderer writes those the video plays to `<name>.broll.txt`.
 
 **Graphics** (`graphics.ts`). Once the edit is fitted, one request writes all of its graphics, or one for each 3 minutes of a longer edit, with the planning model at medium effort. The request carries:
 - the edit's words on its own timeline, each with its time;
@@ -183,7 +184,6 @@ Code then times and checks each graphic:
 - **Credits.** The render adds each icon and logo a graphic draws to `<name>.broll.txt`, a logo with its trademark note.
 
 A request that fails leaves the edit without graphics there.
-- **Credits.** Each capture, clip and sound is a source with its `credit`; the renderer writes those the video plays to `<name>.broll.txt`.
 
 ## Rendering
 

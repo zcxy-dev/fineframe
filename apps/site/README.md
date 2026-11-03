@@ -29,7 +29,7 @@ The desktop app signs in through the site and reads its own row of `subscription
 
 ## Develop
 
-With Node 24, pnpm (`corepack enable`), Docker and the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), from this folder (`pnpm install` installs the whole workspace; the repository's `pnpm lint`, `pnpm typecheck` and `pnpm test` cover this folder too):
+With the repository's Node and pnpm (`mise install`, as in the [quick start](../../README.md#quick-start)), Docker and the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), from this folder (`pnpm install` installs the whole workspace; the repository's `pnpm lint`, `pnpm typecheck` and `pnpm test` cover this folder too):
 
 ```bash
 pnpm install

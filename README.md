@@ -5,8 +5,6 @@
 [![CI](https://github.com/zcxy-dev/fineframe/actions/workflows/ci.yml/badge.svg)](https://github.com/zcxy-dev/fineframe/actions/workflows/ci.yml)
 [![License: proprietary](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
 
-> **Status:** the analysis worker, the planner, the renderer with its captions and effect templates, the `pnpm edit` command that runs them from footage to a finished video, the web page in front of it, the desktop app for Apple silicon Macs, Windows and Linux that runs the page with nothing else to install, the agent skill that changes a finished edit by conversation, and the benchmark work today.
-
 ![Six frames from a 60-second 9:16 edit of an interview about Surya, an AI model that forecasts solar flares: name cards for the interviewer and the researcher, close-ups framed on whoever speaks, "solar flare" and "data" highlighted, and captions lit word by word](https://downloads.fineframe.app/examples/v0.2.0/example-edit-9x16.jpg)
 
 *A 60-second 9:16 edit made by `pnpm edit` with no manual steps from IBM Research's 19-minute interview "[Why NASA and IBM made a new AI model that predicts the Sun's damaging flares](https://www.youtube.com/watch?v=KWMoF97C1Ds)" ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)), cut, reframed, captioned and named on screen ([watch it](https://downloads.fineframe.app/examples/v0.2.0/example-edit-60s-9x16.mp4), [16:9 version](https://downloads.fineframe.app/examples/v0.2.0/example-edit-90s-16x9.mp4), [credits](THIRD_PARTY_NOTICES.md#readme-example)).*
@@ -21,7 +19,7 @@ The desktop app needs nothing else installed: no Node, no Python, no command lin
 | Windows 10 or 11 (x64) | [`Fineframe-win-x64.exe`](https://downloads.fineframe.app/Fineframe-win-x64.exe) |
 | Linux (x86-64) | [`Fineframe-linux-x86_64.AppImage`](https://downloads.fineframe.app/Fineframe-linux-x86_64.AppImage) |
 
-These are always the latest version; each version is also there as `Fineframe-<version>-<computer>`, such as `Fineframe-0.5.0-mac-arm64.dmg`.
+These are always the latest version; each version also stays there as `Fineframe-<version>-mac-arm64.dmg`, `-win-x64.exe` and `-linux-x86_64.AppImage`.
 
 Macs with an Intel processor are not supported: PyTorch and ONNX Runtime, which the analysis runs on, no longer publish builds for them.
 
@@ -82,7 +80,7 @@ A single web page drives it: drop the files or paste a video's link, pick the le
 - **Benchmark:** [`vebench`](bench/README.md#metrics) scores transcripts, shots, speakers, renders, music and edits across a corpus.
 - **File formats:** [JSON Schemas](packages/schema/) for the media index, `project.json` and progress lines, with generated types and validators.
 - **Ground truth drafts:** `vework draft-truth` drafts a corpus clip's transcript for a person to correct ([workflow](bench/README.md#ground-truth)).
-- **Platforms:** macOS on Apple silicon, Windows x64 and Linux x64, tested by CI on every change. Intel Macs are not supported.
+- **Platforms:** macOS on Apple silicon, Windows x64 and Linux x64. CI tests Linux on every change, and macOS and Windows for changes that can differ between systems ([checks](CONTRIBUTING.md#checks)). Intel Macs are not supported.
 - **Synthetic corpus:** [`vebench synth`](bench/README.md#synthetic-corpus) generates talks, conversations, a phone walk, screen recordings and music with exact truth.
 
 Analysis and rendering run locally; [SECURITY.md](SECURITY.md#scope) says what planning, the cut review, transcript correction, cloud speech, a rich edit's B-roll and link import send or fetch.

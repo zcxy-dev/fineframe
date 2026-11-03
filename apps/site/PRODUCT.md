@@ -16,7 +16,7 @@ fineframe.app sells and explains Fineframe, a proprietary desktop app for macOS 
 The edit is made end to end with no timeline to touch: analysis and rendering run on the user's own computer, Claude plans the edit and checks every cut on the user's own key, and it is built for Mandarin, English and speech that switches between them, with captions in Taiwan Traditional Chinese.
 
 ## Operating Context
-- There is no free plan and no free trial. Two plans, US$15 a month and US$120 a year, are the same full app; buying needs a free account. Until purchases open (`app_config.billing_enabled`), the plans say "Opening soon". Anyone can download the installers; the app needs an active plan to run.
+- There is no free plan and no free trial. Two plans, US$15 a month and US$120 a year, are the same full app; buying needs a free account. Until purchases open (`app_config.billing_enabled`), the plans say "Opening soon". Anyone can download the installers; the app needs a signed-in account to make an edit and, once purchases open, an active plan ([ENTITLEMENT.md](ENTITLEMENT.md)).
 - The user pays Anthropic directly for Claude: about US$0.20 to 0.60 for an edit of a minute or less, US$1 to 1.20 for five minutes.
 - The site is a static Next.js export on Cloudflare Pages, in English and Traditional Chinese at equal quality.
 
