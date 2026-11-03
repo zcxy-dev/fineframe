@@ -176,7 +176,7 @@ test("a visual that cannot be sourced is left out and its line keeps the speaker
     onProblem: (message) => problems.push(message),
     capture: async (options) => {
       captured.push(options);
-      if (options.url.includes("example.org")) throw new Error("timed out");
+      if (new URL(options.url).hostname === "example.org") throw new Error("timed out");
       await writeFile(options.out, "png");
       const focus = { x: 400, y: 300, width: 600, height: 80 };
       const credit = {

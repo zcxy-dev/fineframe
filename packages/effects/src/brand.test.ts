@@ -57,7 +57,7 @@ test("text in an amber takes the kit's primary, and a page in a kit's look keeps
     graphicPage({ ...job, brand: { colors: BLUE } }).page,
     /<script>\(\(\) => \{[\s\S]*getComputedStyle[\s\S]*<\/script>/,
   );
-  assert.doesNotMatch(graphicPage(job).page, /<script>/);
+  assert.doesNotMatch(graphicPage(job).page, /<script\b/i);
   assert.equal(readable("#9be7ff", PALETTE.ink), "#9be7ff");
   assert.ok(contrast(hex(readable("#14213d", PALETTE.ink)), hex(PALETTE.ink)) >= 3);
 });

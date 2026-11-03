@@ -9,3 +9,11 @@ shellEmulator: true
 # Three days, as Dependabot's cooldown (.github/dependabot.yml): its update jobs fail while the
 # lockfile holds a younger release.
 minimumReleaseAge: 4320
+
+# Security fixes HyperFrames' exact pins hold back (Dependabot cannot raise a transitive pin):
+# undici 7.25.0 has the advisories fixed in 7.30.1, and puppeteer 25.11.0 pulls zod 3, which has
+# GHSA-mrhx-c7xc-m3w5 (25.16.0 uses zod 4). Drop each once HyperFrames' own pin is past it.
+overrides:
+  "@hyperframes/engine>undici": 7.30.1
+  "@hyperframes/engine>puppeteer": 25.16.0
+  "@hyperframes/producer>puppeteer": 25.16.0

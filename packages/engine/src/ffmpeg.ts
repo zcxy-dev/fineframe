@@ -210,7 +210,7 @@ async function pinned(onDownload?: DownloadProgress): Promise<string> {
 /** Names in `ffmpeg -filters` output. */
 export function parseFilters(listing: string): Set<string> {
   // " T.C afade             A->A       Fade in/out input audio."
-  const names = listing.matchAll(/^ [T.][S.][C.] (\S+)\s+\S*->\S*\s/gm);
+  const names = listing.matchAll(/^ [T.][S.][C.] (\S+)\s+[A-Z|]*->[A-Z|]*\s/gm);
   return new Set([...names].map((match) => match[1] as string));
 }
 
