@@ -5,11 +5,8 @@ import { useEffect, useState } from "react";
 import { useT } from "./I18n.tsx";
 import { Button } from "./ui/button.tsx";
 
-/** What the desktop app says of its update: downloaded and ready to install on a restart, or, on
- * a Mac, which cannot install it by itself, out and downloadable from `url`. */
-type Update =
-  | { kind: "ready"; version: string }
-  | { kind: "available"; version: string; url: string };
+/** What the desktop app says of its update: downloaded and ready to install on a restart. */
+type Update = { version: string };
 
 /** The desktop app's update, which it sets on the window and announces with this event. */
 const EVENT = "fineframe:update";
@@ -37,20 +34,10 @@ export function UpdateNotice() {
       role="status"
     >
       <ArrowDownToLine className="size-4 shrink-0" aria-hidden="true" />
-      <span>
-        {update.kind === "ready"
-          ? t.update.ready(update.version)
-          : t.update.available(update.version)}
-      </span>
+      <span>{t.update.ready(update.version)}</span>
       <Button asChild size="sm">
-        {update.kind === "ready" ? (
-          // The app restarts into the update when the window goes here.
-          <a href="fineframe:restart">{t.update.restart}</a>
-        ) : (
-          <a href={update.url} target="_blank" rel="noreferrer">
-            {t.update.download}
-          </a>
-        )}
+        {/* The app restarts into the update when the window goes here. */}
+        <a href="fineframe:restart">{t.update.restart}</a>
       </Button>
       <Button type="button" variant="ghost" size="sm" onClick={() => setDismissed(true)}>
         {t.update.dismiss}

@@ -157,7 +157,7 @@ Left out on purpose, and downloaded on first use instead, from their publishers,
 - **The analysis's Python**, its packages (PyAV's GPL FFmpeg among them) and the models, which uv and vework download into the user's folders.
 - **sharp** and its libvips, which neither the page nor a render uses.
 
-The installers are not signed with an Apple Developer ID or a Windows code-signing certificate yet; the macOS app is signed ad hoc, which Apple silicon requires to run it.
+The macOS app is signed with an Apple Developer ID and notarized; the Windows installer is not signed with a code-signing certificate yet.
 
 ### Music library
 
