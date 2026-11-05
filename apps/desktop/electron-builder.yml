@@ -26,12 +26,14 @@ publish:
   provider: generic
   url: https://downloads.fineframe.app/
 mac:
-  target: dmg
+  # The zip is what an installed app updates from (src/updates.ts).
+  target: [dmg, zip]
   category: public.app-category.video
-  # Signed ad hoc, which Apple silicon needs to run it at all; not with a Developer ID yet, so
-  # the first launch needs "Open Anyway" (README).
+  # Signed ad hoc, which Apple silicon needs to run it at all. A release is signed with the
+  # Developer ID and notarized instead: desktop.yml overrides these three.
   identity: "-"
   hardenedRuntime: false
+  notarize: false
   gatekeeperAssess: false
 win:
   target: nsis

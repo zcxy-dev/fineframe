@@ -361,8 +361,6 @@ export const zhTW: Messages = {
   update: {
     ready: (version) => `Fineframe ${version} 已準備好。`,
     restart: "重新啟動以更新",
-    available: (version) => `Fineframe ${version} 已推出。`,
-    download: "下載",
     dismiss: "關閉",
   },
   run: {

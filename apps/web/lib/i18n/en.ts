@@ -396,8 +396,6 @@ export const en = {
   update: {
     ready: (version: string) => `Fineframe ${version} is ready.`,
     restart: "Restart to update",
-    available: (version: string) => `Fineframe ${version} is available.`,
-    download: "Download",
     dismiss: "Dismiss",
   },
   run: {

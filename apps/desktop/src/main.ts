@@ -272,13 +272,13 @@ async function update(window: BrowserWindow): Promise<void> {
   };
   window.webContents.on("did-finish-load", tell);
   window.webContents.on("will-navigate", (event, target) => {
-    if (target !== RESTART || notice?.kind !== "ready") return;
+    if (target !== RESTART || !notice) return;
     event.preventDefault();
     // The updated app starts before this one has quit: it must not hand over to this one.
     app.releaseSingleInstanceLock();
     autoUpdater.quitAndInstall();
   });
-  watchUpdates(autoUpdater, process.platform, (found) => {
+  watchUpdates(autoUpdater, (found) => {
     notice = found;
     tell();
   });
