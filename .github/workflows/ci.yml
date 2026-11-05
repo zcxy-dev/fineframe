@@ -19,7 +19,8 @@ jobs:
     # Draft PRs are skipped (reported as passing); marking one ready runs CI.
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    # The website's screenshots add about a minute on pull requests.
+    timeout-minutes: 12
     permissions:
       contents: read
     steps:
@@ -97,6 +98,26 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-build-only
           NEXT_TELEMETRY_DISABLED: "1"
+      # The website's pages compared with the baselines recorded in the pinned Playwright image
+      # (apps/site/AGENTS.md); pull requests only.
+      - name: Screenshots of the website
+        if: github.event_name != 'push'
+        env:
+          # Keep the tag equal to apps/desktop's playwright-core (checked here).
+          SITE_PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
+        run: |
+          version="$(node -p "require('./apps/desktop/node_modules/playwright-core/package.json').version")"
+          test "${SITE_PLAYWRIGHT_IMAGE%@*}" = "mcr.microsoft.com/playwright:v$version-noble" \
+            || { echo "::error::playwright-core is $version; update SITE_PLAYWRIGHT_IMAGE and re-record the screenshots (apps/site/AGENTS.md)"; exit 1; }
+          apps/site/scripts/visual-in-image.sh "$RUNNER_TEMP/site-screenshots"
+      - name: Keep the screenshot differences
+        if: failure() && github.event_name != 'push'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: site-screenshot-differences
+          path: ${{ runner.temp }}/site-screenshots
+          retention-days: 7
+          if-no-files-found: ignore
 
   # Whether a pull request changes what differs most between systems: the desktop app, the
   # toolchains, the dependencies or this workflow. Only then do the macOS and Windows runners,

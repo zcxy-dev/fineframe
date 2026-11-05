@@ -3,6 +3,7 @@
   "workspaces": {
     "packages/engine": { "entry": ["scripts/*.ts"] },
     "apps/site": {
+      "entry": ["scripts/visual-screens.mjs"],
       "ignore": ["supabase/**"],
       "ignoreDependencies": [
         "@expo-google-fonts/noto-sans-sc",

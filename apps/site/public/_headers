@@ -2,3 +2,10 @@
 # Next.js names every file under /_next/static/ by its content, so a browser may keep it a year.
 /_next/static/*
   Cache-Control: public, max-age=31536000, immutable
+
+# Previews (<branch>.fineframe.pages.dev) and the pages.dev copy of production are never indexed;
+# fineframe.app is.
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex
+https://:version.:project.pages.dev/*
+  X-Robots-Tag: noindex
