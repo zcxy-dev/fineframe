@@ -10,3 +10,51 @@ node.corepack = true
 # `mise run start`: from a fresh clone to the open page, installing the tools first.
 [tasks.start]
 run = "node apps/web/scripts/start.ts"
+
+# The same task names in every app (`mise run <task>`); each wraps this repository's own commands.
+
+[tasks.dev]
+description = "The page from a fresh clone (same as start)"
+run = "node apps/web/scripts/start.ts"
+
+[tasks.check]
+description = "The TypeScript checks CI runs (AGENTS.md lists worker/ and bench/ too); screenshots compare only in CI"
+run = "pnpm install --frozen-lockfile && pnpm lint && pnpm knip && pnpm typecheck && pnpm test && pnpm check-gen"
+
+[tasks.test]
+description = "TypeScript tests"
+run = "pnpm test"
+
+[tasks.preview]
+description = "The site's Cloudflare Pages preview and the app's installers for this branch's pull request"
+run = '''
+pr="$(gh pr view --json number --jq .number)"
+gh pr view "$pr" --json comments --jq '.comments[] | select(.body | test("pages.dev|fineframe-installers")) | .body'
+'''
+
+[tasks."screenshots:update"]
+description = "Re-record the screenshot baselines in CI and commit them on this branch (push it yourself)"
+shell = "bash -c"
+run = '''
+set -euo pipefail
+branch="$(git branch --show-current)"
+git push -q origin "HEAD:$branch"
+url="$(gh workflow run screenshots.yml --ref "$branch")"
+run="${url##*/}"
+gh run watch "$run" --exit-status
+dir="$(mktemp -d)"
+gh run download "$run" --name screenshot-baselines --dir "$dir"
+rm -rf apps/site/screenshots
+mkdir -p apps/site/screenshots
+cp -R "$dir"/. apps/site/screenshots/
+rm -rf "$dir"
+git add apps/site/screenshots
+git diff --cached --quiet && { echo "The screenshot baselines are unchanged."; exit 0; }
+git diff --cached --stat
+git commit -q -m "test: update screenshot baselines"
+echo "Committed; push the branch. Files changed on the pull request shows each PNG before and after."
+'''
+
+[tasks.deploy]
+description = "The site deploys on merge (Cloudflare Pages); the app releases with a v<version> tag after the owner's yes"
+run = "echo 'Site: merge to main. App: a version PR, then an annotated v<version> tag (AGENTS.md), after the owner says yes.'"

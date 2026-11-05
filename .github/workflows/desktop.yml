@@ -3,17 +3,20 @@ name: desktop
 # Builds the desktop app's installers on each system they are for, then runs each built app as
 # a person would the first time (apps/desktop/scripts/smoke.ts): it installs the analysis, makes
 # an edit of a synthetic clip with stand-ins for Claude and OpenRouter, and quits, leaving nothing
-# running. A pull request that changes the app builds and checks them; a tag v<version>
+# running. Every pull request builds and checks them and links them on the pull request (the
+# app's preview, AGENTS.md); a tag v<version>
 # also uploads them, with copies under names without the version that the website's download page
 # links to, their checksums and the update feed, to Cloudflare R2, which downloads.fineframe.app
 # serves. Nothing goes to GitHub's releases. Any other branch builds them on request
 # (`gh workflow run desktop.yml --ref <branch>`).
 on:
+  # Every pull request builds the installers, the desktop app's preview (AGENTS.md), except one
+  # that changes only Markdown or docs.
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - .github/workflows/desktop.yml
-      - apps/desktop/**
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
   push:
     tags: ["v*"]
   workflow_dispatch:
@@ -144,6 +147,32 @@ jobs:
           path: ${{ runner.temp }}/shots/
           if-no-files-found: ignore
           retention-days: 14
+
+  # The installers are the desktop app's preview: link them on the pull request.
+  link:
+    needs: build
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Link the installers on the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          body="$(printf '<!-- fineframe-installers -->\nInstallers of %s (macOS, Windows, Linux; the installer artifacts, kept 14 days): %s\n' "$SHA" "$url")"
+          id="$(gh api "repos/$GH_REPO/issues/$PR/comments" --paginate \
+            --jq '[.[] | select(.body | startswith("<!-- fineframe-installers -->")) | .id][0] // empty')"
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GH_REPO/issues/comments/$id" -f body="$body" >/dev/null
+          else
+            gh pr comment "$PR" --body "$body"
+          fi
 
   release:
     needs: build

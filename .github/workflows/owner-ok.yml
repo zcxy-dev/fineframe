@@ -1,0 +1,89 @@
+name: owner-ok
+
+# fineframe.app and the desktop app are used by customers, so a pull request that
+# changes what they see (the site's and apps' pages, components and assets, or the
+# screenshot baselines) merges only
+# after the owner looked at its preview and screenshots and added the
+# `owner-ok` label. The label covers the commit it was added on: a new commit
+# removes it. An automatic revert opened by verify-deploy is exempt once its one
+# commit is shown to be exactly the revert of a commit on main.
+# The ruleset requires this check. Workflows that push a commit (screenshots,
+# verify-deploy's revert) dispatch it, since their commits start no pull_request run.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: The pull request number
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: owner-ok-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: true
+
+jobs:
+  owner-ok:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      # Removes a stale owner-ok label.
+      pull-requests: write
+    steps:
+      # Read only by git, to check an automatic revert; no repository code runs.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require the owner's OK for a visible change
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number || inputs.pr }}
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          pr="$(gh pr view "$PR" --json author,headRefName,headRefOid,labels)"
+          author="$(jq -r .author.login <<<"$pr")"
+          head_ref="$(jq -r .headRefName <<<"$pr")"
+          # A dispatched run decides only for the pull request whose head it checks.
+          if [ "$(jq -r .headRefOid <<<"$pr")" != "$HEAD_SHA" ] \
+            || { [ "$EVENT" = workflow_dispatch ] && [ "$head_ref" != "$GITHUB_REF_NAME" ]; }; then
+            echo "::error::Pull request $PR's head is not $HEAD_SHA."; exit 1
+          fi
+          # A new commit (pushed by a person or a workflow) needs a new OK.
+          if [ "$ACTION" = synchronize ] || [ "$EVENT" = workflow_dispatch ]; then
+            if jq -e '.labels | any(.name == "owner-ok")' <<<"$pr" >/dev/null; then
+              gh pr edit "$PR" --remove-label owner-ok
+              pr="$(jq '.labels |= map(select(.name != "owner-ok"))' <<<"$pr")"
+            fi
+          fi
+          if [ "$author" = 'app/github-actions' ] && [[ "$head_ref" == auto-revert/* ]]; then
+            reverted="$(git log -1 --format=%B "$HEAD_SHA" | sed -n 's/^This reverts commit \([0-9a-f]\{40\}\)\..*/\1/p')"
+            if [ "$(git rev-list --count "origin/main..$HEAD_SHA")" = 1 ] && [ -n "$reverted" ] \
+              && git merge-base --is-ancestor "$reverted" origin/main \
+              && [ "$(git diff "$reverted" "$reverted^" | git patch-id --verbatim | cut -d' ' -f1)" \
+                = "$(git diff "$HEAD_SHA^" "$HEAD_SHA" | git patch-id --verbatim | cut -d' ' -f1)" ]; then
+              echo "Automatic revert of $reverted: no OK needed." >> "$GITHUB_STEP_SUMMARY"; exit 0
+            fi
+            echo "::error::$head_ref is not exactly one commit reverting a commit on main."; exit 1
+          fi
+          # From the checkout, which a pull request of any size lists in full; a failure fails the check.
+          base="$(git merge-base origin/main "$HEAD_SHA")"
+          files="$(git diff --name-only "$base" "$HEAD_SHA")"
+          visible="$(grep -E '^apps/(site/(app|components|content|public|screenshots)/|web/(app|components|public)/|desktop/(src|assets)/)' <<<"$files" || true)"
+          if [ -z "$visible" ]; then
+            echo "No visible change." >> "$GITHUB_STEP_SUMMARY"; exit 0
+          fi
+          printf 'Visible change:\n%s\n' "$visible" >> "$GITHUB_STEP_SUMMARY"
+          if jq -e '.labels | any(.name == "owner-ok")' <<<"$pr" >/dev/null; then
+            echo "The owner's OK is recorded (owner-ok label)." >> "$GITHUB_STEP_SUMMARY"; exit 0
+          fi
+          echo "::error::This pull request changes what people see; it merges after the owner adds the owner-ok label."
+          exit 1

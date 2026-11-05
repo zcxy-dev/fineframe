@@ -1,0 +1,49 @@
+name: screenshots
+
+# Re-records the website's screenshot baselines (apps/site/screenshots) for a branch in the ci
+# job's Playwright image (apps/site/scripts/visual-in-image.sh) and uploads them as the
+# `screenshot-baselines` artifact. `mise run screenshots:update` starts it, downloads the artifact
+# and commits the baselines, so the push is a person's: a commit pushed by a workflow starts no
+# checks.
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: screenshots-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      # Keep it equal to ci.yml's.
+      SITE_PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+        with:
+          cache: false
+      - name: Build the website
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter @video-editor/site build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-build-only
+          NEXT_TELEMETRY_DISABLED: "1"
+      - name: Record the screenshot baselines
+        run: |
+          rm -rf apps/site/screenshots
+          SITE_UPDATE_SCREENSHOTS=1 apps/site/scripts/visual-in-image.sh "$RUNNER_TEMP/site-screenshots"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: screenshot-baselines
+          path: apps/site/screenshots/
+          retention-days: 7
