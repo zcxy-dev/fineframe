@@ -1,8 +1,11 @@
 name: verify-site-deploy
 
-# Fails when Cloudflare Pages does not deploy a main commit that changes apps/site/; the failed
-# run is the alert. Pages reports the deploy only as a `Cloudflare Pages` check run on the commit,
-# created when the build finishes (no commit status, no GitHub Deployment).
+# Fails when Cloudflare Pages does not deploy a main commit that changes apps/site/, or when
+# fineframe.app then does not answer; the failed run is the alert. Pages reports the deploy only as
+# a `Cloudflare Pages` check run on the commit, created when the build finishes (no commit status,
+# no GitHub Deployment). When Pages deployed but the site does not answer, the revert job reverts
+# the commit through a pull request that runs its checks and merges itself, and Pages deploys the
+# previous site again; a failed Pages build leaves the previous site serving.
 on:
   push:
     branches: [main]
@@ -13,7 +16,9 @@ permissions: {}
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
+    outputs:
+      outcome: ${{ steps.live.outputs.outcome }}
     permissions:
       checks: read
     steps:
@@ -41,3 +46,98 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
+      # Pages reports success once the files are uploaded; the site must then answer.
+      - name: Check that fineframe.app answers
+        id: live
+        run: |
+          for _ in $(seq 12); do
+            if curl -fsS --max-time 15 -o "$RUNNER_TEMP/en.html" https://fineframe.app/en/ \
+              && grep -q 'Fineframe' "$RUNNER_TEMP/en.html"; then
+              echo "outcome=verified" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            sleep 15
+          done
+          echo "outcome=failed" >> "$GITHUB_OUTPUT"
+          echo "::error::https://fineframe.app/en/ did not answer with the site after the deploy of $SHA"
+          exit 1
+        env:
+          SHA: ${{ github.sha }}
+
+  revert:
+    needs: verify
+    if: always() && needs.verify.outputs.outcome == 'failed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+      pull-requests: write
+      # Approves the runs of the pull request it opens, which wait for an approval.
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          # Pushes the revert branch.
+          persist-credentials: true # zizmor: ignore[artipacked]
+      # Only main's newest commit is reverted, never an automatic revert and never a
+      # commit with a No-Auto-Rollback trailer: anything else (a redeploy of an older
+      # commit, a failed revert, a change older releases cannot run against) waits
+      # for a person, so two runs can never revert each other.
+      - name: Refuse anything but main's newest commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          branch="$(gh api "repos/$GH_REPO/commits/$SHA/pulls" --jq '.[0].head.ref // ""')"
+          if [ "$(git rev-parse HEAD)" != "$SHA" ] || [[ "$branch" == auto-revert/* ]] \
+            || git log -1 --format=%B "$SHA" | grep -qi '^No-Auto-Rollback:'; then
+            echo "::error::$SHA is not main's newest commit, is an automatic revert or has a No-Auto-Rollback trailer; nothing was reverted."
+            exit 1
+          fi
+      - name: Open the revert, run its checks and merge it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          branch="auto-revert/${SHA:0:12}"
+          git switch -c "$branch"
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            revert --no-edit "$SHA"
+          # The revert must give back exactly the tree main had before the commit.
+          test "$(git rev-parse 'HEAD^{tree}')" = "$(git rev-parse "$SHA^^{tree}")"
+          git push origin "$branch"
+          pr_url="$(gh pr create --base main --head "$branch" --title "Revert $(git log -1 --format=%s "$SHA")" \
+            --body "verify-site-deploy reverts $SHA: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. Merging this revert makes Cloudflare Pages deploy the previous site.")"
+          # Runs started by a pull request opened with the workflow token wait for an
+          # approval; approve them, then wait for owner-ok and ci (with browser) to pass.
+          # The ruleset requires them.
+          pending=""
+          for _ in $(seq 20); do
+            sleep 6
+            pending="$(gh api "repos/$GH_REPO/actions/runs?branch=$branch&event=pull_request" \
+              --jq '[.workflow_runs[] | select(.conclusion == "action_required") | .id] | join(" ")')"
+            [ -n "$pending" ] && break
+          done
+          for id in $pending; do gh api -X POST "repos/$GH_REPO/actions/runs/$id/approve" >/dev/null; done
+          for workflow in owner-ok ci; do
+            run=""
+            for _ in $(seq 20); do
+              sleep 6
+              run="$(gh api "repos/$GH_REPO/actions/runs?branch=$branch&event=pull_request" \
+                --jq "[.workflow_runs[] | select(.name == \"$workflow\" and .conclusion != \"action_required\")][0].id // empty")"
+              [ -n "$run" ] && break
+            done
+            [ -n "$run" ] || { echo "::error::$workflow did not run on $branch."; exit 1; }
+            gh run watch "$run" --exit-status --interval 15
+          done
+          # Merge only the checked commit, and only while the reverted commit is
+          # still main's newest: on a newer main the result would be untested.
+          if [ "$(gh api "repos/$GH_REPO/commits/main" --jq .sha)" != "$SHA" ]; then
+            echo "::error::main moved past $SHA while the revert was checked; $pr_url waits for a person."; exit 1
+          fi
+          gh pr merge "$pr_url" --squash --match-head-commit "$(git rev-parse HEAD)"
+          # A merge made with the workflow token starts no ci on main.
+          gh workflow run ci.yml --ref main

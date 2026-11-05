@@ -9,8 +9,9 @@ The website for fineframe.app: a static, bilingual (English, Traditional Chinese
 ## Release
 - A merge to `main` that changes `apps/site/` deploys fineframe.app through Cloudflare Pages' Git integration (its build watch path is `apps/site/*`). It does not wait for CI; the `ci` ruleset check is what keeps a red change from merging. Dependabot updates that change this folder wait for the owner.
 - A merge never deploys Supabase (`supabase/migrations`, `supabase/functions`, `supabase/config.toml`) or Paddle changes: `DEPLOY.md` has the steps; ask first.
-- Health: no endpoint reports the commit. After a merge, the `Cloudflare Pages` check run on the merge commit must be `success` (`gh api -X GET repos/zcxy-dev/fineframe/commits/main/check-runs`; `verify-site-deploy.yml` fails when it is not) and `https://fineframe.app/en/` must return 200.
-- Preview for user-visible changes: the Cloudflare Pages preview linked from the PR's `Cloudflare Pages` check (public URL).
+- Health: no endpoint reports the commit. After a merge, `verify-site-deploy.yml` waits for the `Cloudflare Pages` check run on the merge commit and then for `https://fineframe.app/en/` to answer; when the site does not, it opens a revert pull request that runs its checks and merges itself, and Pages deploys the previous site.
+- Preview: every pull request's Cloudflare Pages preview, linked from its `Cloudflare Pages` check (public URL; `_headers` makes every `*.pages.dev` page `X-Robots-Tag: noindex`). The site is public: a PR that changes its pages, components, content, public files or screenshot baselines merges only after the owner adds the `owner-ok` label (the `owner-ok` check); send the preview URL and the screenshot comparison.
+- Screenshots: CI compares both languages' home and the pricing, download, legal and sign-in pages (desktop and phone) with `screenshots/`, in the pinned Playwright image (`scripts/visual-in-image.sh`, which serves `out/`); a local run does not compare them. For an intended change, `mise run screenshots:update` re-records them in CI and commits them. After a Playwright update, change `SITE_PLAYWRIGHT_IMAGE` in `ci.yml` and `screenshots.yml`, then re-record.
 
 ## Notes
 - Previews and production share one Supabase project (the same values are set for Production and Preview, [DEPLOY.md](DEPLOY.md#environment)): sign up only synthetic accounts.
