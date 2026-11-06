@@ -292,3 +292,17 @@ jobs:
           curl --fail --silent --show-error --request POST "$PAGES_DEPLOY_HOOK" > /dev/null
         env:
           PAGES_DEPLOY_HOOK: ${{ secrets.CLOUDFLARE_PAGES_DEPLOY_HOOK }}
+      # The failed run is the alert when the rebuilt page still names an older version.
+      - name: Check that the download page names this version
+        run: |
+          version="${TAG#v}"
+          for _ in $(seq 40); do
+            if curl -fsS --max-time 15 "https://fineframe.app/en/download/?run=$GITHUB_RUN_ID" | grep -qF "Version $version,"; then
+              echo "https://fineframe.app/en/download/ names $version"; exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::https://fineframe.app/en/download/ does not name $version 10 minutes after the deploy hook"
+          exit 1
+        env:
+          TAG: ${{ github.ref_name }}

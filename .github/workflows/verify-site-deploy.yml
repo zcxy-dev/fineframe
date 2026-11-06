@@ -1,9 +1,10 @@
 name: verify-site-deploy
 
 # Fails when Cloudflare Pages does not deploy a main commit that changes apps/site/, or when
-# fineframe.app then does not answer; the failed run is the alert. Pages reports the deploy only as
-# a `Cloudflare Pages` check run on the commit, created when the build finishes (no commit status,
-# no GitHub Deployment). When Pages deployed but the site does not answer, the revert job reverts
+# fineframe.app then does not serve it (its /version.json) or does not answer; the failed run is
+# the alert. Pages reports the deploy only as a `Cloudflare Pages` check run on the commit, created
+# when the build finishes (no commit status, no GitHub Deployment). When Pages deployed but the site
+# does not serve the commit or does not answer, the revert job reverts
 # the commit through a pull request that runs its checks and merges itself, and Pages deploys the
 # previous site again; a failed Pages build leaves the previous site serving.
 # A rollback drill runs the revert by hand for main's newest commit
@@ -30,6 +31,7 @@ jobs:
       outcome: ${{ steps.live.outputs.outcome }}
     permissions:
       checks: read
+      contents: read
     steps:
       - name: Wait for the Cloudflare Pages check run
         # Builds take about two minutes; a check run that never appears is a failure too.
@@ -55,21 +57,28 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
-      # Pages reports success once the files are uploaded; the site must then answer.
-      - name: Check that fineframe.app answers
+      # Pages reports success once the files are uploaded; fineframe.app must then serve this
+      # commit (or a newer one built on it), read from the version.json the build writes.
+      - name: Check that fineframe.app serves the commit
         id: live
         run: |
-          for _ in $(seq 12); do
-            if curl -fsS --max-time 15 -o "$RUNNER_TEMP/en.html" https://fineframe.app/en/ \
+          for _ in $(seq 20); do
+            served="$(curl -fsS --max-time 15 "https://fineframe.app/version.json?run=$GITHUB_RUN_ID" | jq -r '.commit // empty' || true)"
+            if [ "$served" = "$SHA" ] || { [ -n "$served" ] \
+              && [ "$(gh api "repos/$REPO/compare/$SHA...$served" --jq .status 2>/dev/null)" = ahead ]; } \
+              && curl -fsS --max-time 15 -o "$RUNNER_TEMP/en.html" https://fineframe.app/en/ \
               && grep -q 'Fineframe' "$RUNNER_TEMP/en.html"; then
+              echo "fineframe.app serves $served"
               echo "outcome=verified" >> "$GITHUB_OUTPUT"; exit 0
             fi
             sleep 15
           done
           echo "outcome=failed" >> "$GITHUB_OUTPUT"
-          echo "::error::https://fineframe.app/en/ did not answer with the site after the deploy of $SHA"
+          echo "::error::fineframe.app serves ${served:-no version.json}, not $SHA, after its deploy"
           exit 1
         env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
 
   revert:
