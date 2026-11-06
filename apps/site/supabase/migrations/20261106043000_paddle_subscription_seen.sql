@@ -1,16 +1,19 @@
--- The latest Paddle `updated_at` the webhook has seen for each subscription, whichever
--- subscription the user's row holds now: a late event of a subscription that has since been
--- replaced is still recognised as stale, and never brings it back.
+-- The latest Paddle `updated_at` the webhook has seen for each subscription, whether or not its
+-- event changed the user's row: a late event of a subscription that has since been replaced is
+-- recognised as stale once a newer event of it was seen. Only the webhook reads and writes it.
 create table public.paddle_subscriptions_seen (
   paddle_subscription_id text primary key,
+  user_id uuid not null references auth.users (id) on delete cascade,
   paddle_updated_at timestamptz not null
 );
 
 alter table public.paddle_subscriptions_seen enable row level security;
 revoke all on public.paddle_subscriptions_seen from anon, authenticated;
+grant select, insert, update on public.paddle_subscriptions_seen to service_role;
 
-insert into public.paddle_subscriptions_seen (paddle_subscription_id, paddle_updated_at)
-select paddle_subscription_id, paddle_updated_at from public.subscriptions;
+-- What is known so far: the subscription each row holds.
+insert into public.paddle_subscriptions_seen (paddle_subscription_id, user_id, paddle_updated_at)
+select paddle_subscription_id, user_id, paddle_updated_at from public.subscriptions;
 
 -- The webhook's write: the subscription in one Paddle event. It skips an event older than one
 -- already seen for the same subscription, and an ended subscription never replaces another,
@@ -29,17 +32,15 @@ language plpgsql
 set search_path = ''
 as $$
 begin
-  if exists (
-    select 1 from public.paddle_subscriptions_seen
-    where paddle_subscription_id = p_paddle_subscription_id
-      and paddle_updated_at > p_paddle_updated_at
-  ) then
+  -- One statement, so that of two deliveries at once the older waits for the newer and then
+  -- finds it seen.
+  insert into public.paddle_subscriptions_seen as seen (paddle_subscription_id, user_id, paddle_updated_at)
+  values (p_paddle_subscription_id, p_user_id, p_paddle_updated_at)
+  on conflict (paddle_subscription_id) do update set paddle_updated_at = excluded.paddle_updated_at
+  where seen.paddle_updated_at <= excluded.paddle_updated_at;
+  if not found then
     return;
   end if;
-
-  insert into public.paddle_subscriptions_seen as seen (paddle_subscription_id, paddle_updated_at)
-  values (p_paddle_subscription_id, p_paddle_updated_at)
-  on conflict (paddle_subscription_id) do update set paddle_updated_at = excluded.paddle_updated_at;
 
   insert into public.subscriptions as s (
     user_id, status, plan, current_period_end, cancel_at,

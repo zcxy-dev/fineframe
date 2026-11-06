@@ -1,8 +1,9 @@
--- The rules of `public.subscriptions` and `apply_paddle_subscription`
--- (migrations/20261022022240_subscriptions.sql). Run with `supabase test db`.
+-- The rules of `public.subscriptions`, `public.paddle_subscriptions_seen` and
+-- `apply_paddle_subscription` (migrations/20261022022240_subscriptions.sql,
+-- 20261106043000_paddle_subscription_seen.sql). Run with `supabase test db`.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(22);
+select plan(23);
 
 -- Two synthetic users, each with a live yearly subscription.
 insert into auth.users (id, email) values
@@ -170,6 +171,22 @@ select is(
     where user_id = '00000000-0000-4000-8000-000000000003'),
   row('sub_01ffffffffffffffffffffffff', 'active')::text,
   'a live subscription seen for the first time replaces an ended one'
+);
+
+-- An event the row turned away (an ended subscription beside a live one) still counts as seen.
+select public.apply_paddle_subscription(
+  '00000000-0000-4000-8000-000000000001', 'canceled', 'yearly', '2027-11-01T00:00:00Z', null,
+  'sub_01aaaaaaaaaaaaaaaaaaaaaaaa', 'ctm_01aaaaaaaaaaaaaaaaaaaaaaaa', '2026-11-08T00:00:00Z'
+);
+select public.apply_paddle_subscription(
+  '00000000-0000-4000-8000-000000000001', 'active', 'monthly', '2026-12-02T00:00:00Z', null,
+  'sub_01cccccccccccccccccccccccc', 'ctm_01aaaaaaaaaaaaaaaaaaaaaaaa', '2026-11-02T00:00:00Z'
+);
+select is(
+  (select row(paddle_subscription_id, status)::text from public.subscriptions
+    where user_id = '00000000-0000-4000-8000-000000000001'),
+  row('sub_01aaaaaaaaaaaaaaaaaaaaaaaa', 'canceled')::text,
+  'an event older than one the row turned away is ignored'
 );
 reset role;
 
