@@ -18,6 +18,9 @@ updates:
     groups:
       uv-minor-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # The benchmark itself, which the worker installs from `../bench` for its tests.
+      - dependency-name: "vebench"
 
   - package-ecosystem: npm
     directory: "/"
@@ -37,6 +40,9 @@ updates:
       # TypeScript 7 ships no tsserver.js, which typescript-language-server needs for code
       # intelligence in editors and agents.
       - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # Node's types follow the major in `.node-version`.
+      - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
