@@ -63,7 +63,7 @@ A single web page drives it: drop the files or paste a video's link, pick the le
 - **Plan:** [Claude plans the edit](packages/engine/README.md#planning) and checks every cut; code cuts between words to the length asked ([measurements](packages/engine/MEASUREMENTS.md#planner-measurements)).
 - **Framing:** a [virtual camera](packages/engine/README.md#framing) frames every clip in the edit's shape and follows whoever speaks.
 - **Render:** [`project.json` to MP4](packages/engine/README.md#how-it-renders) with frame- and sample-exact cuts, transitions, B-roll, grading and loudness ([measurements](packages/engine/MEASUREMENTS.md#render-measurements)).
-- **Music:** tracks you supply, fitted to the edit and ducked under speech ([details](packages/engine/README.md#planning), [measurements](packages/engine/MEASUREMENTS.md#music-measurements)).
+- **Music:** a built-in library of 40 CC0 tracks, or tracks you supply, fitted to the edit and ducked under speech ([details](packages/engine/README.md#planning), [measurements](packages/engine/MEASUREMENTS.md#music-measurements)).
 - **Links:** a public video's link, from YouTube or another site [yt-dlp](https://github.com/yt-dlp/yt-dlp) reads, imported as footage at up to 1080p, in the page and in `pnpm edit` ([details](packages/engine/README.md#editing-footage)).
 - **One command:** [`pnpm edit`](packages/engine/README.md#editing-footage) turns a folder of footage into the finished video at the length and aspect asked ([measurements](packages/engine/MEASUREMENTS.md#edit-measurements)).
 - **Several shorts:** [`pnpm edit --shorts`](packages/engine/README.md#editing-footage) and the page make up to 10 shorts from one long video, each from one stretch of it, with a title, a description and hashtags.
@@ -159,7 +159,7 @@ The editor is built on these models and libraries: [Qwen3-ASR and Qwen3-ForcedAl
 
 ## License
 
-The project's code is proprietary, all rights reserved ([LICENSE](LICENSE)). [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists every model, font and program it uses and every package it depends on directly, with its licence and how it reaches you, and keeps the notices of code adapted from other projects. Three of them need attention before commercial use or redistribution:
+The project's code is proprietary, all rights reserved ([LICENSE](LICENSE)). [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists every model, font and program it uses and every package it depends on directly, with its licence and how it reaches you, and keeps the notices of code adapted from other projects. Two of them need attention before commercial use or redistribution:
 
 - **FFmpeg**: the builds the renderer downloads and the PyAV wheels the worker installs are GPL. Redistributing FFmpeg means meeting the GPL or shipping an LGPL build ([details](THIRD_PARTY_NOTICES.md#ffmpeg)); the desktop app's installers carry no FFmpeg, which downloads on first use ([details](THIRD_PARTY_NOTICES.md#desktop-installers)).
 - **Optional extras** install a few GPL packages: espeak-ng and phonemizer in the benchmark's `synth` extra ([details](THIRD_PARTY_NOTICES.md#copyleft-dependencies)).
