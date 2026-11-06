@@ -4,7 +4,7 @@ The website for fineframe.app: a static, bilingual (English, Traditional Chinese
 
 ## Commands
 - Dev, in this folder: `supabase start`, then `pnpm dev` (port 3000, needs `.env.local` copied from `.env.example`, with the publishable key `supabase status` prints)
-- Check before a PR: the repository's checks (root `AGENTS.md`), which lint, typecheck and test this folder too, and `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=local pnpm build` here (`pnpm build` stops unless both are set).
+- Check before a PR: the repository's checks (root `AGENTS.md`), which lint, typecheck and test this folder too, and `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=local pnpm build` here (`pnpm build` stops unless both are set); when `supabase/` changes, `supabase db start && supabase test db` here, which CI's `site-db` job runs.
 
 ## Release
 - A merge to `main` that changes `apps/site/` deploys fineframe.app through Cloudflare Pages' Git integration (its build watch path is `apps/site/*`). It does not wait for CI; the `ci` ruleset check is what keeps a red change from merging. Dependabot updates that change this folder wait for the owner.

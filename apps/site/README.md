@@ -37,6 +37,7 @@ supabase start  # Supabase at http://127.0.0.1:54321, the emails it sends at htt
 pnpm dev        # http://127.0.0.1:3000/en/
 pnpm typecheck
 pnpm test
+supabase test db  # the database rules' pgTAP tests in supabase/tests, on the running stack
 ```
 
 `pnpm dev` and `pnpm build` need the public values in [`.env.example`](.env.example), in the environment or in a git-ignored `.env.local`, and stop with an error that names a missing Supabase one. [DEPLOY.md](DEPLOY.md#environment) says where each comes from.
