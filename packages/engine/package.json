@@ -29,7 +29,7 @@
     "plan": "node src/plan/cli.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.133.0",
+    "@anthropic-ai/sdk": "1.3.0",
     "@puppeteer/browsers": "3.2.6",
     "@video-editor/effects": "workspace:*",
     "@video-editor/schema": "workspace:*",
