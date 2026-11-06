@@ -6,16 +6,25 @@ name: verify-site-deploy
 # no GitHub Deployment). When Pages deployed but the site does not answer, the revert job reverts
 # the commit through a pull request that runs its checks and merges itself, and Pages deploys the
 # previous site again; a failed Pages build leaves the previous site serving.
+# A rollback drill runs the revert by hand for main's newest commit
+# (`gh workflow run verify-site-deploy.yml -f drill_sha=<sha>`), without breaking the site.
 on:
   push:
     branches: [main]
     paths: [apps/site/**]
+  workflow_dispatch:
+    inputs:
+      drill_sha:
+        description: Main's newest commit, to revert as if the site had failed on it
+        required: true
+        type: string
 
 permissions: {}
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     outputs:
       outcome: ${{ steps.live.outputs.outcome }}
@@ -65,8 +74,10 @@ jobs:
 
   revert:
     needs: verify
-    if: always() && needs.verify.outputs.outcome == 'failed'
-    runs-on: ubuntu-latest
+    if: >-
+      always() && (needs.verify.outputs.outcome == 'failed'
+        || (github.event_name == 'workflow_dispatch' && inputs.drill_sha != ''))
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
       contents: write
@@ -88,7 +99,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
+          SHA: ${{ inputs.drill_sha || github.sha }}
         run: |
           branch="$(gh api "repos/$GH_REPO/commits/$SHA/pulls" --jq '.[0].head.ref // ""')"
           if [ "$(git rev-parse HEAD)" != "$SHA" ] || [[ "$branch" == auto-revert/* ]] \
@@ -96,11 +107,11 @@ jobs:
             echo "::error::$SHA is not main's newest commit, is an automatic revert or has a No-Auto-Rollback trailer; nothing was reverted."
             exit 1
           fi
-      - name: Open the revert, run its checks and merge it
+      - name: Open the revert, run its required checks and merge it
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
+          SHA: ${{ inputs.drill_sha || github.sha }}
         run: |
           branch="auto-revert/${SHA:0:12}"
           git switch -c "$branch"
@@ -108,36 +119,33 @@ jobs:
             revert --no-edit "$SHA"
           # The revert must give back exactly the tree main had before the commit.
           test "$(git rev-parse 'HEAD^{tree}')" = "$(git rev-parse "$SHA^^{tree}")"
+          head="$(git rev-parse HEAD)"
           git push origin "$branch"
           pr_url="$(gh pr create --base main --head "$branch" --title "Revert $(git log -1 --format=%s "$SHA")" \
-            --body "verify-site-deploy reverts $SHA: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. Merging this revert makes Cloudflare Pages deploy the previous site.")"
+            --body "verify-site-deploy ($GITHUB_EVENT_NAME) reverts $SHA: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. Merging this revert makes Cloudflare Pages deploy the previous site.")"
           # Runs started by a pull request opened with the workflow token wait for an
-          # approval; approve them, then wait for owner-ok and ci (with browser) to pass.
-          # The ruleset requires them.
-          pending=""
-          for _ in $(seq 20); do
+          # approval: approve each as it appears, until every check main's ruleset
+          # requires has started on the revert, then wait for them to pass.
+          required="$(gh api "repos/$GH_REPO/rules/branches/main" \
+            --jq '[.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context] | unique | .[]')"
+          missing="$required"
+          for _ in $(seq 40); do
             sleep 6
-            pending="$(gh api "repos/$GH_REPO/actions/runs?branch=$branch&event=pull_request" \
-              --jq '[.workflow_runs[] | select(.conclusion == "action_required") | .id] | join(" ")')"
-            [ -n "$pending" ] && break
-          done
-          for id in $pending; do gh api -X POST "repos/$GH_REPO/actions/runs/$id/approve" >/dev/null; done
-          for workflow in owner-ok ci; do
-            run=""
-            for _ in $(seq 20); do
-              sleep 6
-              run="$(gh api "repos/$GH_REPO/actions/runs?branch=$branch&event=pull_request" \
-                --jq "[.workflow_runs[] | select(.name == \"$workflow\" and .conclusion != \"action_required\")][0].id // empty")"
-              [ -n "$run" ] && break
+            for id in $(gh api "repos/$GH_REPO/actions/runs?branch=$branch&event=pull_request" \
+              --jq '.workflow_runs[] | select(.conclusion == "action_required") | .id'); do
+              gh api -X POST "repos/$GH_REPO/actions/runs/$id/approve" >/dev/null
             done
-            [ -n "$run" ] || { echo "::error::$workflow did not run on $branch."; exit 1; }
-            gh run watch "$run" --exit-status --interval 15
+            started="$(gh api "repos/$GH_REPO/commits/$head/check-runs?per_page=100" --jq '.check_runs[].name')"
+            missing="$(grep -vxF -f <(printf '%s\n' "$started") <<<"$required" || true)"
+            [ -z "$missing" ] && break
           done
+          [ -z "$missing" ] || { echo "::error::$(paste -sd ' ' - <<<"$missing") did not start on $branch."; exit 1; }
+          gh pr checks "$pr_url" --required --watch --fail-fast --interval 15
           # Merge only the checked commit, and only while the reverted commit is
           # still main's newest: on a newer main the result would be untested.
           if [ "$(gh api "repos/$GH_REPO/commits/main" --jq .sha)" != "$SHA" ]; then
             echo "::error::main moved past $SHA while the revert was checked; $pr_url waits for a person."; exit 1
           fi
-          gh pr merge "$pr_url" --squash --match-head-commit "$(git rev-parse HEAD)"
+          gh pr merge "$pr_url" --squash --match-head-commit "$head"
           # A merge made with the workflow token starts no ci on main.
           gh workflow run ci.yml --ref main
