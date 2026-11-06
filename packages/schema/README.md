@@ -29,11 +29,11 @@ const project: Project = await loadJson("edit/project.json", validateProject);
 - A source has at most one voice decision, and an image's clips start at 0.
 - The output frame rate has a whole number of ticks per frame, and the size matches the aspect.
 
-**Projects from 0.4.0.** `validateProject` first reads a project as this version would have written it (`upgradeProject`). A project Fineframe 0.4.0 wrote keeps its cuts, framing, captions, B-roll, music and sounds, and loses what this version no longer draws:
+**Projects from 0.4.0.** `validateProject` first reads a project as this version would have written it (`upgradeProject`). A project Fineframe 0.4.0 wrote keeps its cuts, framing, captions, B-roll, music and sounds, and loses what this version does not draw:
 - its motion-graphics `cards`, with the speaker clips that played below a panel card and the sound that started with each card;
 - its `keyword` overlays.
 
-Its caption presets `spotlight`, `sweep` and `boxed` are gone too: a project that used one is captioned in `bold`.
+A project captioned in its presets `spotlight`, `sweep` or `boxed` is captioned in `bold`.
 
 `upgradeProject` returns how many of each it took out, so a caller can say that planning the edit again gives it the new motion graphics.
 

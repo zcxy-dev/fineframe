@@ -30,18 +30,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       # Release binaries pinned by version and SHA-256; Dependabot does not update them.
-      - name: Install actionlint, zizmor and betterleaks
+      - name: Install actionlint, zizmor, betterleaks and lychee
         run: |
           mkdir -p "$RUNNER_TEMP/tools"
           cd "$RUNNER_TEMP/tools"
           while read -r sha name url; do
             curl -fsSL --retry 3 -o tool.tar.gz "$url"
             echo "$sha  tool.tar.gz" | sha256sum --check --quiet
-            tar -xzf tool.tar.gz "$name"
+            tar -xzf tool.tar.gz --transform="s|.*/||" "$name"
           done <<'EOF'
           8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8 actionlint https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
           e65324f4430c2717591937edcec90ccbefaf14c174f8ec9415e03ca875b46e1a zizmor https://github.com/zizmorcore/zizmor/releases/download/v1.30.1/zizmor-x86_64-unknown-linux-gnu.tar.gz
           f8b185a39ffcece2a1ca82bf3a4e7435cd81963ffd16b7a9128daf75f35f6de7 betterleaks https://github.com/betterleaks/betterleaks/releases/download/v1.9.0/betterleaks_1.9.0_linux_x64.tar.gz
+          1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a lychee-x86_64-unknown-linux-gnu/lychee https://github.com/lycheeverse/lychee/releases/download/lychee-v0.24.2/lychee-x86_64-unknown-linux-gnu.tar.gz
           EOF
           echo "$RUNNER_TEMP/tools" >> "$GITHUB_PATH"
       - name: Lint workflows (actionlint)
@@ -50,6 +51,10 @@ jobs:
         run: zizmor --config .github/zizmor.yml --format github .github/
         env:
           GH_TOKEN: ${{ github.token }}
+      # Every relative link and its anchor in the Markdown; links to other sites are not fetched,
+      # so the check never fails on someone else's outage. A folder link resolves to its README.
+      - name: Check the docs' links (lychee)
+        run: git ls-files -z '*.md' | xargs -0 lychee --offline --include-fragments --index-files 'README.md,.' --no-progress
       - name: Scan the tested change for secrets (betterleaks)
         # Every commit of a pull request, or every commit a push added; a new branch's first push
         # has no previous commit, so the tested commit's history is scanned whole.
