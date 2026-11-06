@@ -272,7 +272,13 @@ export const zhTw: Content = {
       },
     ],
     checkout: "即將開放購買",
-    trust: ["由 Paddle 處理結帳", "隨時可取消", "首次付款 14 天內可退款", "在帳號裡查看發票", "稅金在結帳時依你的所在地計算"],
+    trust: [
+      "由 Paddle 處理結帳",
+      "隨時可取消",
+      "首次付款 14 天內可退款",
+      "在帳號裡查看發票",
+      "稅金在結帳時依你的所在地計算",
+    ],
     afterTitle: "訂閱之後",
     after: [
       "[下載](/download/)你電腦的 Fineframe。",
