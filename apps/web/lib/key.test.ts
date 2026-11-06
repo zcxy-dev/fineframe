@@ -24,7 +24,7 @@ delete process.env.PIXABAY_API_KEY;
 // Anthropic as far as the check sees it: one model lookup, answered by the key it is sent.
 const asked: { path?: string; key?: string }[] = [];
 const anthropic = createServer((request, response) => {
-  const key = request.headers["x-api-key"] as string | undefined;
+  const key = request.headers.authorization?.replace(/^Bearer /, "");
   asked.push({ path: request.url, key });
   const reply = (status: number, body: object) => {
     response.writeHead(status, { "content-type": "application/json" });
