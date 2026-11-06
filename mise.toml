@@ -32,6 +32,19 @@ pr="$(gh pr view --json number --jq .number)"
 gh pr view "$pr" --json comments --jq '.comments[] | select(.body | test("pages.dev|fineframe-installers")) | .body'
 '''
 
+[tasks."screenshots:record"]
+description = "Record the website's screenshot baselines in the Playwright image (the screenshots workflow runs it)"
+shell = "bash -c"
+# Keep the image equal to ci.yml's.
+env = { SITE_PLAYWRIGHT_IMAGE = "mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f", NEXT_PUBLIC_SUPABASE_URL = "http://127.0.0.1:54321", NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "ci-build-only", NEXT_TELEMETRY_DISABLED = "1" }
+run = '''
+set -euo pipefail
+pnpm install --frozen-lockfile
+pnpm --filter @video-editor/site build
+rm -rf apps/site/screenshots
+SITE_UPDATE_SCREENSHOTS=1 apps/site/scripts/visual-in-image.sh "${RUNNER_TEMP:-$(mktemp -d)}/site-screenshots"
+'''
+
 [tasks."screenshots:update"]
 description = "Re-record the screenshot baselines in CI and commit them on this branch (push it yourself)"
 shell = "bash -c"

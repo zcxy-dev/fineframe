@@ -1,7 +1,15 @@
-# Every Dependabot update that is not a major version merges itself once the required checks
-# pass, except GitHub Actions updates (which edit workflows) and updates that change the website
-# (a merge there deploys fineframe.app). Those and major updates stay open for review (owner
-# decision 2026-10-18).
+# A Dependabot update merges itself once the required checks pass, except GitHub Actions updates
+# (which edit workflows) and major versions, which stay open for review. Shared by every app
+# (dotfiles github/templates); a repository holds more back with its variables, declared in
+# dotfiles github/repo-settings.json:
+#   AUTOMERGE_MAX_UPDATE       minor (default: anything but a major version, a digest-only update
+#                              too) or patch (only patch versions)
+#   AUTOMERGE_DEPENDENCY_TYPE  only this dependency type merges, e.g. direct:development; a group
+#                              with any production dependency reports direct:production
+#   AUTOMERGE_HOLD_NAMES       packages that never merge, space-separated (matched by name, since
+#                              security updates are never grouped)
+#   AUTOMERGE_HOLD_PATHS       an ERE: an update changing a matching file stays open (a merge
+#                              there deploys something the checks do not cover)
 name: Dependabot auto-merge
 
 on: pull_request
@@ -11,7 +19,7 @@ permissions: {}
 jobs:
   auto-merge:
     if: github.event.pull_request.user.login == 'dependabot[bot]'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -19,18 +27,37 @@ jobs:
     steps:
       - id: metadata
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
-      - id: site
-        run: |
-          if gh pr diff "$PR_URL" --name-only | grep -q '^apps/site/'; then
-            echo changed=true >> "$GITHUB_OUTPUT"
-          fi
+      - id: policy
         env:
-          PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          ECOSYSTEM: ${{ steps.metadata.outputs.package-ecosystem }}
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+          DEPENDENCY_TYPE: ${{ steps.metadata.outputs.dependency-type }}
+          NAMES: ${{ steps.metadata.outputs.dependency-names }}
+          MAX_UPDATE: ${{ vars.AUTOMERGE_MAX_UPDATE || 'minor' }}
+          ONLY_DEPENDENCY_TYPE: ${{ vars.AUTOMERGE_DEPENDENCY_TYPE }}
+          HOLD_NAMES: ${{ vars.AUTOMERGE_HOLD_NAMES }}
+          HOLD_PATHS: ${{ vars.AUTOMERGE_HOLD_PATHS }}
+        run: |
+          hold() { echo "Stays open for review: $1." >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+          [ "$ECOSYSTEM" != github_actions ] || hold "a GitHub Actions update edits workflows"
+          [ "$UPDATE_TYPE" != version-update:semver-major ] || hold "a major version"
+          [ "$MAX_UPDATE" != patch ] || [ "$UPDATE_TYPE" = version-update:semver-patch ] || hold "only patch versions merge here"
+          [ -z "$ONLY_DEPENDENCY_TYPE" ] || [ "$DEPENDENCY_TYPE" = "$ONLY_DEPENDENCY_TYPE" ] \
+            || hold "only $ONLY_DEPENDENCY_TYPE updates merge here"
+          for name in ${NAMES//,/ }; do
+            for held in $HOLD_NAMES; do [ "$name" != "$held" ] || hold "$name is held"; done
+          done
+          if [ -n "$HOLD_PATHS" ]; then
+            files="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename')"
+            ! grep -qE "$HOLD_PATHS" <<<"$files" || hold "it changes a file matching $HOLD_PATHS"
+          fi
+          echo merge=true >> "$GITHUB_OUTPUT"
       # A merge made with GITHUB_TOKEN starts no workflow on main; the App's token does,
-      # so main's CI runs on Dependabot updates too.
+      # so main's CI and deploy checks run on Dependabot updates too.
       - id: app-token
-        if: steps.metadata.outputs.update-type != 'version-update:semver-major' && steps.metadata.outputs.package-ecosystem != 'github_actions' && steps.site.outputs.changed != 'true'
+        if: steps.policy.outputs.merge == 'true'
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: Iv23liGHSk5KypxJ5KoF
