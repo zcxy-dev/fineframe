@@ -16,7 +16,7 @@ labels: todo
 
 ## Next
 
-<!-- The next concrete step; the handoff keeps this current. Decisions go in the repository's docs, not here. -->
+<!-- The next concrete step; the handoff keeps this current. Decisions go in the pull request that carries them out. -->
 
 ## Open questions
 
