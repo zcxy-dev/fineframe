@@ -1,13 +1,15 @@
--- The rules of `public.subscriptions` and `apply_paddle_subscription`
--- (migrations/20261022022240_subscriptions.sql). Run with `supabase test db`.
+-- The rules of `public.subscriptions`, `public.paddle_subscriptions_seen` and
+-- `apply_paddle_subscription` (migrations/20261022022240_subscriptions.sql,
+-- 20261106043000_paddle_subscription_seen.sql). Run with `supabase test db`.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(18);
+select plan(23);
 
 -- Two synthetic users, each with a live yearly subscription.
 insert into auth.users (id, email) values
   ('00000000-0000-4000-8000-000000000001', 'one@example.test'),
-  ('00000000-0000-4000-8000-000000000002', 'two@example.test');
+  ('00000000-0000-4000-8000-000000000002', 'two@example.test'),
+  ('00000000-0000-4000-8000-000000000003', 'three@example.test');
 select public.apply_paddle_subscription(
   '00000000-0000-4000-8000-000000000001', 'active', 'yearly', '2027-11-01T00:00:00Z', null,
   'sub_01aaaaaaaaaaaaaaaaaaaaaaaa', 'ctm_01aaaaaaaaaaaaaaaaaaaaaaaa', '2026-11-01T00:00:00Z'
@@ -136,6 +138,66 @@ select is(
   row('sub_01dddddddddddddddddddddddd', 'active', 'monthly', '2026-12-06T00:00:00Z'::timestamptz)::text,
   'a live subscription replaces an ended one'
 );
+
+-- A late event of a subscription that later ended is stale, though another subscription is in
+-- the row by then: it does not bring the ended subscription back.
+select public.apply_paddle_subscription(
+  '00000000-0000-4000-8000-000000000002', 'canceled', 'monthly', '2026-12-06T00:00:00Z', null,
+  'sub_01dddddddddddddddddddddddd', 'ctm_01bbbbbbbbbbbbbbbbbbbbbbbb', '2026-11-07T00:00:00Z'
+);
+select public.apply_paddle_subscription(
+  '00000000-0000-4000-8000-000000000002', 'active', 'yearly', '2027-11-01T00:00:00Z', null,
+  'sub_01bbbbbbbbbbbbbbbbbbbbbbbb', 'ctm_01bbbbbbbbbbbbbbbbbbbbbbbb', '2026-11-04T00:00:00Z'
+);
+select is(
+  (select row(paddle_subscription_id, status)::text from public.subscriptions
+    where user_id = '00000000-0000-4000-8000-000000000002'),
+  row('sub_01dddddddddddddddddddddddd', 'canceled')::text,
+  'an event older than one already seen for its subscription is ignored'
+);
+
+-- A new subscription's first event replaces an ended one even when Paddle sends it after the
+-- ended one's later update.
+select public.apply_paddle_subscription(
+  '00000000-0000-4000-8000-000000000003', 'canceled', 'monthly', '2026-11-03T00:00:00Z', null,
+  'sub_01eeeeeeeeeeeeeeeeeeeeeeee', 'ctm_01eeeeeeeeeeeeeeeeeeeeeeee', '2026-11-03T00:00:00Z'
+);
+select public.apply_paddle_subscription(
+  '00000000-0000-4000-8000-000000000003', 'active', 'yearly', '2027-11-02T00:00:00Z', null,
+  'sub_01ffffffffffffffffffffffff', 'ctm_01eeeeeeeeeeeeeeeeeeeeeeee', '2026-11-02T00:00:00Z'
+);
+select is(
+  (select row(paddle_subscription_id, status)::text from public.subscriptions
+    where user_id = '00000000-0000-4000-8000-000000000003'),
+  row('sub_01ffffffffffffffffffffffff', 'active')::text,
+  'a live subscription seen for the first time replaces an ended one'
+);
+
+-- An event the row turned away (an ended subscription beside a live one) still counts as seen.
+select public.apply_paddle_subscription(
+  '00000000-0000-4000-8000-000000000001', 'canceled', 'yearly', '2027-11-01T00:00:00Z', null,
+  'sub_01aaaaaaaaaaaaaaaaaaaaaaaa', 'ctm_01aaaaaaaaaaaaaaaaaaaaaaaa', '2026-11-08T00:00:00Z'
+);
+select public.apply_paddle_subscription(
+  '00000000-0000-4000-8000-000000000001', 'active', 'monthly', '2026-12-02T00:00:00Z', null,
+  'sub_01cccccccccccccccccccccccc', 'ctm_01aaaaaaaaaaaaaaaaaaaaaaaa', '2026-11-02T00:00:00Z'
+);
+select is(
+  (select row(paddle_subscription_id, status)::text from public.subscriptions
+    where user_id = '00000000-0000-4000-8000-000000000001'),
+  row('sub_01aaaaaaaaaaaaaaaaaaaaaaaa', 'canceled')::text,
+  'an event older than one the row turned away is ignored'
+);
+reset role;
+
+-- What the webhook has seen stays the service role's.
+set local role authenticated;
+select throws_ok($$ select * from public.paddle_subscriptions_seen $$, '42501',
+  'permission denied for table paddle_subscriptions_seen', 'authenticated cannot read what the webhook has seen');
+reset role;
+set local role anon;
+select throws_ok($$ select * from public.paddle_subscriptions_seen $$, '42501',
+  'permission denied for table paddle_subscriptions_seen', 'anon cannot read what the webhook has seen');
 reset role;
 
 select * from finish();

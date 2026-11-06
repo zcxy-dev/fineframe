@@ -102,4 +102,4 @@ The sandbox and the live account are separate: each has its own products, prices
 - in Pages, `NEXT_PUBLIC_PADDLE_ENVIRONMENT=production` and the live `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`, `NEXT_PUBLIC_PADDLE_PRICE_MONTHLY` and `NEXT_PUBLIC_PADDLE_PRICE_YEARLY`, then deploy again;
 - in Supabase's Edge Function secrets, `PADDLE_ENVIRONMENT=production` and the live `PADDLE_WEBHOOK_SECRET` and `PADDLE_API_KEY`.
 
-Rows that sandbox purchases left in `subscriptions` stay until they are deleted.
+Rows that sandbox purchases left in `subscriptions` and `paddle_subscriptions_seen` stay until they are deleted.
