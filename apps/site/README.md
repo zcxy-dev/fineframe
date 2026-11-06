@@ -48,3 +48,5 @@ The pages are styled with Tailwind CSS, and the home page's moving parts with [`
 `pnpm dev` and `pnpm build` first write the fonts into the git-ignored `public/fonts/` ([`scripts/fonts.ts`](scripts/fonts.ts)): Geist and Noto Sans TC, each cut to the characters the site's source uses. `pnpm build` writes the static site to `out/`. `pnpm preview` builds it and serves `out/` at http://127.0.0.1:4321 with Python's static file server.
 
 Deploying: [DEPLOY.md](DEPLOY.md).
+
+<!-- Rollback drill marker: verify-site-deploy reverts this line. -->
