@@ -126,7 +126,9 @@ jobs:
 
   # Whether a pull request changes what differs most between systems: the desktop app, the
   # toolchains, the dependencies or this workflow. Only then do the macOS and Windows runners,
-  # billed at a multiple of Linux minutes in a private repository, run for it.
+  # billed at a multiple of Linux minutes in a private repository, run for it. And whether it
+  # changes the website's database (its migrations, tests, config or seed) or this workflow, for
+  # the database tests.
   scope:
     if: github.event_name == 'pull_request' && !github.event.pull_request.draft
     runs-on: ubuntu-latest
@@ -135,16 +137,55 @@ jobs:
       pull-requests: read
     outputs:
       platforms: ${{ steps.files.outputs.platforms }}
+      site-db: ${{ steps.files.outputs.site-db }}
     steps:
       - id: files
         run: |
-          files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename')
+          # A renamed file counts under its old path too.
+          files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" \
+            --jq '.[] | .filename, (.previous_filename // empty)')
           if grep -qE "$PLATFORM_PATHS" <<<"$files"; then platforms=true; else platforms=false; fi
           echo "platforms=$platforms" | tee -a "$GITHUB_OUTPUT"
+          if grep -qE "$SITE_DB_PATHS" <<<"$files"; then site_db=true; else site_db=false; fi
+          echo "site-db=$site_db" | tee -a "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           PLATFORM_PATHS: '^(\.github/workflows/ci\.yml|apps/desktop/|apps/web/scripts/|mise\.toml|\.node-version|\.python-version|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|(worker|bench)/(pyproject\.toml|uv\.lock))'
+          SITE_DB_PATHS: '^(\.github/workflows/ci\.yml|apps/site/supabase/(migrations/|tests/|(config\.toml|seed\.sql)$))'
+
+  # The website's migrations on a local Supabase database, with the pgTAP tests in
+  # apps/site/supabase/tests. Runs on request and for a pull request whose scope includes it.
+  site-db:
+    needs: scope
+    if: >-
+      !cancelled() && (github.event_name == 'workflow_dispatch' ||
+      needs.scope.outputs.site-db == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The release binary pinned by version and SHA-256, as in the ci job; Dependabot does not
+      # update it.
+      - name: Install the Supabase CLI
+        run: |
+          mkdir -p "$RUNNER_TEMP/tools"
+          cd "$RUNNER_TEMP/tools"
+          curl -fsSL --retry 3 -o supabase.tar.gz \
+            https://github.com/supabase/cli/releases/download/v2.120.0/supabase_2.120.0_linux_amd64.tar.gz
+          echo "7074584113aa00495beeac661c41fb09f1ddd0a483cd7333894b0d080086dc6e  supabase.tar.gz" \
+            | sha256sum --check --quiet
+          tar -xzf supabase.tar.gz supabase supabase-go
+          echo "$RUNNER_TEMP/tools" >> "$GITHUB_PATH"
+      - name: Test the database rules (pgTAP)
+        working-directory: apps/site
+        run: |
+          supabase db start
+          supabase test db
 
   # The renderer on macOS (Apple silicon) and on Windows, with each one's pinned
   # FFmpeg: the engine tests, then a synthetic edit scored by vebench, and the worker's models: on
@@ -270,20 +311,21 @@ jobs:
             .errors == [] and .missing == [] and .render.clicks == 0 and .render.max_abs_drift_ms < 10)' \
             "$RUNNER_TEMP/report.json"
 
-  # The required check for macOS and Windows: it passes when they passed or were not needed,
-  # and fails when they, or the scope that decides, failed.
+  # The required check for macOS, Windows and the website's database tests: it passes when they
+  # passed or were not needed, and fails when they, or the scope that decides, failed.
   platforms-passed:
-    needs: [scope, platforms]
+    needs: [scope, platforms, site-db]
     if: always() && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions: {}
     steps:
       - run: |
-          echo "scope: $SCOPE, platforms: $PLATFORMS"
-          for result in "$SCOPE" "$PLATFORMS"; do
+          echo "scope: $SCOPE, platforms: $PLATFORMS, site-db: $SITE_DB"
+          for result in "$SCOPE" "$PLATFORMS" "$SITE_DB"; do
             case "$result" in failure | cancelled) exit 1 ;; esac
           done
         env:
           SCOPE: ${{ needs.scope.result }}
           PLATFORMS: ${{ needs.platforms.result }}
+          SITE_DB: ${{ needs.site-db.result }}

@@ -4,7 +4,7 @@ Automatic video editor: footage and a target length in, a finished cut with capt
 
 ## Commands
 - Dev: `mise run start` (port 3000; `PORT=3001 mise run start` if taken)
-- Check before a PR (what CI runs): `pnpm install --frozen-lockfile && pnpm lint && pnpm knip && pnpm typecheck && pnpm test && pnpm check-gen`; in `worker/` (with `UV_NO_GROUP=ml`) and in `bench/`: `uv sync --locked && uv run ruff format --check . && uv run ruff check . && uv run basedpyright && uv run pytest -q`; in `bench/`: `uv run vebench tables --check`; after a workflow change: `actionlint` and `zizmor --config .github/zizmor.yml .github/`; after a Markdown change: `git ls-files -z '*.md' | xargs -0 lychee --offline --include-fragments --index-files 'README.md,.'` (lychee 0.24.2, as `ci.yml` pins it).
+- Check before a PR (what CI runs): `pnpm install --frozen-lockfile && pnpm lint && pnpm knip && pnpm typecheck && pnpm test && pnpm check-gen`; in `worker/` (with `UV_NO_GROUP=ml`) and in `bench/`: `uv sync --locked && uv run ruff format --check . && uv run ruff check . && uv run basedpyright && uv run pytest -q`; in `bench/`: `uv run vebench tables --check`; in `apps/site/`, when its database changes: `supabase db reset && supabase test db`; after a workflow change: `actionlint` and `zizmor --config .github/zizmor.yml .github/`; after a Markdown change: `git ls-files -z '*.md' | xargs -0 lychee --offline --include-fragments --index-files 'README.md,.'` (lychee 0.24.2, as `ci.yml` pins it).
 - What CI skips (the worker's `big` ml tests, the `synth` extra, Chrome for HyperFrames and web capture, tests that call the Claude API) is in [CONTRIBUTING.md](CONTRIBUTING.md#setup).
 
 ## Release
