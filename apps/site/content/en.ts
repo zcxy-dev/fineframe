@@ -296,6 +296,7 @@ export const en: Content = {
       "Cancel anytime",
       "First payment refundable within 14 days",
       "Invoices in your account",
+      "Tax is calculated at checkout based on your location",
     ],
     afterTitle: "After you subscribe",
     after: [
