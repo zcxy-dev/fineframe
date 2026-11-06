@@ -11,12 +11,9 @@ name: desktop
 # (`gh workflow run desktop.yml --ref <branch>`).
 on:
   # Every pull request builds the installers, the desktop app's preview (AGENTS.md), except one
-  # that changes only Markdown or docs.
+  # that changes only Markdown or docs (the `scope` job).
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
   push:
     tags: ["v*"]
   workflow_dispatch:
@@ -28,9 +25,31 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Whether a pull request changes anything but Markdown or docs.
+  scope:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      pull-requests: read
+    outputs:
+      build: ${{ steps.files.outputs.build }}
+    steps:
+      - id: files
+        run: |
+          files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename')
+          if grep -qvE '(\.md$|^docs/)' <<<"$files"; then build=true; else build=false; fi
+          echo "build=$build" | tee -a "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+
   build:
     name: ${{ matrix.name }}
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    needs: scope
+    if: >-
+      !cancelled() && (github.event_name != 'pull_request' ||
+      needs.scope.outputs.build == 'true')
     strategy:
       fail-fast: false
       matrix:
@@ -173,6 +192,25 @@ jobs:
           else
             gh pr comment "$PR" --body "$body"
           fi
+
+  # The one check branch protection requires of this workflow: passes when the installers built
+  # and ran, or were not built for this pull request (a draft, or Markdown or docs only), and fails
+  # when they, or the scope that decides, failed.
+  desktop-passed:
+    needs: [scope, build]
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - run: |
+          echo "scope: $SCOPE, build: $BUILD"
+          for result in "$SCOPE" "$BUILD"; do
+            case "$result" in failure | cancelled) exit 1 ;; esac
+          done
+        env:
+          SCOPE: ${{ needs.scope.result }}
+          BUILD: ${{ needs.build.result }}
 
   release:
     needs: build
