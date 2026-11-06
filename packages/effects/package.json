@@ -20,7 +20,7 @@
     "@hyperframes/producer": "0.8.217",
     "@video-editor/schema": "workspace:*",
     "ajv": "8.20.0",
-    "htmlparser2": "10.1.0",
+    "htmlparser2": "12.0.0",
     "postcss": "8.5.32",
     "puppeteer-core": "25.16.0"
   }

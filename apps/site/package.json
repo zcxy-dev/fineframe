@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/fonts.ts && next dev --hostname 127.0.0.1",
-    "build": "node scripts/fonts.ts && next build",
+    "build": "node scripts/fonts.ts && next build && node scripts/version.ts",
     "preview": "pnpm build && python3 -m http.server 4321 --bind 127.0.0.1 --directory out",
     "typecheck": "tsc --noEmit",
     "test": "node --test"
