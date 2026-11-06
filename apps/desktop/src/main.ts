@@ -338,3 +338,4 @@ animation:run 1.4s cubic-bezier(.16,1,.3,1) infinite}
 @keyframes run{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
 @media (prefers-reduced-motion:reduce){i::after{animation:none;width:100%;opacity:.5}}</style></head>
 <body><main>${text}<i></i></main></body></html>`;
+export const broken = ;
