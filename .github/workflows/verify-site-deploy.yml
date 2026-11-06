@@ -34,7 +34,8 @@ jobs:
       contents: read
     steps:
       - name: Wait for the Cloudflare Pages check run
-        # Builds take about two minutes; a check run that never appears is a failure too.
+        # Builds take about two minutes; a check run that never completes is a failure too, unless
+        # the site already serves the commit.
         run: |
           deadline=$((SECONDS + 20 * 60))
           while :; do
@@ -46,6 +47,14 @@ jobs:
               [ "$conclusion" = success ] && exit 0
               echo "::error::The Cloudflare Pages deploy of $SHA did not succeed: $conclusion"
               exit 1
+            fi
+            # Pages builds one commit at a time and leaves a superseded build's check run in
+            # progress: a site already serving this commit or a newer one built on it deployed it.
+            served="$(curl -fsS --max-time 15 "https://fineframe.app/version.json?run=$GITHUB_RUN_ID" | jq -r '.commit // empty' || true)"
+            if [ -n "$served" ] && { [ "$served" = "$SHA" ] \
+              || [ "$(gh api "repos/$REPO/compare/$SHA...$served" --jq .status 2>/dev/null)" = ahead ]; }; then
+              echo "fineframe.app serves $served, which includes $SHA"
+              exit 0
             fi
             if [ "$SECONDS" -ge "$deadline" ]; then
               echo "::error::No completed Cloudflare Pages check run on $SHA after 20 minutes"
