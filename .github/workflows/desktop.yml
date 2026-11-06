@@ -7,7 +7,8 @@ name: desktop
 # app's preview, AGENTS.md); a tag v<version>
 # also uploads them, with copies under names without the version that the website's download page
 # links to, their checksums and the update feed, to Cloudflare R2, which downloads.fineframe.app
-# serves. Nothing goes to GitHub's releases. Any other branch builds them on request
+# serves, and gets a GitHub release whose notes list the merged pull requests and link to the
+# download page; the installers are not attached to it. Any other branch builds them on request
 # (`gh workflow run desktop.yml --ref <branch>`).
 on:
   # Every pull request builds the installers, the desktop app's preview (AGENTS.md), except one
@@ -306,3 +307,31 @@ jobs:
           exit 1
         env:
           TAG: ${{ github.ref_name }}
+
+  # The tag's GitHub release, once the installers are on R2: notes generated from the pull requests
+  # merged since the previous v* tag, after a link to the download page. No installers are attached.
+  # A tag that has a release already keeps it.
+  github-release:
+    needs: release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag=$GITHUB_REF_NAME
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "$tag has a release already"
+            exit 0
+          fi
+          previous=$(git ls-remote --tags --refs --sort=-v:refname "$GITHUB_SERVER_URL/$GH_REPO" 'v*' |
+            sed 's|.*refs/tags/||' | grep -A1 -Fx "$tag" | sed -n 2p)
+          args=(--verify-tag --generate-notes --title "$tag"
+            --notes "Download the latest Fineframe at https://fineframe.app/en/download/")
+          if [ -n "$previous" ]; then args+=(--notes-start-tag "$previous"); fi
+          gh release create "$tag" "${args[@]}"
