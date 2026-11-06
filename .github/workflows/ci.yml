@@ -127,7 +127,8 @@ jobs:
   # Whether a pull request changes what differs most between systems: the desktop app, the
   # toolchains, the dependencies or this workflow. Only then do the macOS and Windows runners,
   # billed at a multiple of Linux minutes in a private repository, run for it. And whether it
-  # changes the website's Supabase project or this workflow, for the database tests.
+  # changes the website's database (its migrations, tests, config or seed) or this workflow, for
+  # the database tests.
   scope:
     if: github.event_name == 'pull_request' && !github.event.pull_request.draft
     runs-on: ubuntu-latest
@@ -140,7 +141,9 @@ jobs:
     steps:
       - id: files
         run: |
-          files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename')
+          # A renamed file counts under its old path too.
+          files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" \
+            --jq '.[] | .filename, (.previous_filename // empty)')
           if grep -qE "$PLATFORM_PATHS" <<<"$files"; then platforms=true; else platforms=false; fi
           echo "platforms=$platforms" | tee -a "$GITHUB_OUTPUT"
           if grep -qE "$SITE_DB_PATHS" <<<"$files"; then site_db=true; else site_db=false; fi
@@ -149,7 +152,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           PLATFORM_PATHS: '^(\.github/workflows/ci\.yml|apps/desktop/|apps/web/scripts/|mise\.toml|\.node-version|\.python-version|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|(worker|bench)/(pyproject\.toml|uv\.lock))'
-          SITE_DB_PATHS: '^(\.github/workflows/ci\.yml|apps/site/supabase/)'
+          SITE_DB_PATHS: '^(\.github/workflows/ci\.yml|apps/site/supabase/(migrations/|tests/|(config\.toml|seed\.sql)$))'
 
   # The website's migrations on a local Supabase database, with the pgTAP tests in
   # apps/site/supabase/tests. Runs on request and for a pull request whose scope includes it.
@@ -176,7 +179,7 @@ jobs:
             https://github.com/supabase/cli/releases/download/v2.120.0/supabase_2.120.0_linux_amd64.tar.gz
           echo "7074584113aa00495beeac661c41fb09f1ddd0a483cd7333894b0d080086dc6e  supabase.tar.gz" \
             | sha256sum --check --quiet
-          tar -xzf supabase.tar.gz supabase
+          tar -xzf supabase.tar.gz supabase supabase-go
           echo "$RUNNER_TEMP/tools" >> "$GITHUB_PATH"
       - name: Test the database rules (pgTAP)
         working-directory: apps/site

@@ -32,6 +32,17 @@ test("a timestamp more than 300 s away fails", async () => {
   assert.equal(await signed(header(BODY, SECRET, TS), BODY, SECRET, NOW_MS - 301_000), false);
 });
 
+test("several h1, as during a secret rotation, pass when any one matches", async () => {
+  const valid = header(BODY, SECRET, TS);
+  const h1 = valid.split(";h1=")[1] ?? "";
+  assert.equal(await signed(`${valid};h1=deadbeef`, BODY, SECRET, NOW_MS), true);
+  assert.equal(await signed(`ts=${TS};h1=deadbeef;h1=${h1}`, BODY, SECRET, NOW_MS), true);
+  assert.equal(
+    await signed(`ts=${TS};h1=deadbeef;h1=${"0".repeat(64)}`, BODY, SECRET, NOW_MS),
+    false,
+  );
+});
+
 test("a missing or malformed h1 fails", async () => {
   const h1 = header(BODY, SECRET, TS).split(";h1=")[1] ?? "";
   for (const bad of [
@@ -39,7 +50,12 @@ test("a missing or malformed h1 fails", async () => {
     `ts=${TS};h1=`,
     `ts=${TS};h1=not-hex`,
     `ts=${TS};h1=${h1.slice(0, -2)}`,
-    `ts=${TS};h1=${h1.toUpperCase().replace(/./, "G")}`,
+    // The valid digest with an extra character, or with one character that is not hex.
+    `ts=${TS};h1=${h1}x`,
+    `ts=${TS};h1=${h1}0`,
+    `ts=${TS};h1=${h1.slice(0, 1)}z${h1.slice(2)}`,
+    `ts=${TS};h1=${h1.slice(0, -1)}z`,
+    `ts=${TS};h1=${h1.slice(0, -1)}`,
     "",
   ]) {
     assert.equal(await signed(bad, BODY, SECRET, NOW_MS), false, bad);

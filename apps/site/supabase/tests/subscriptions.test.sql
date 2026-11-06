@@ -23,7 +23,7 @@ select throws_ok(
   $$ insert into public.subscriptions values (
     '00000000-0000-4000-8000-000000000001', 'active', 'yearly', null, null, 'sub_x', 'ctm_x', now()
   ) $$,
-  '42501', null, 'anon cannot insert'
+  '42501', 'permission denied for table subscriptions', 'anon cannot insert'
 );
 select throws_ok($$ update public.subscriptions set status = 'active' $$, '42501', null,
   'anon cannot update');
@@ -54,7 +54,7 @@ select throws_ok(
   $$ insert into public.subscriptions values (
     '00000000-0000-4000-8000-000000000001', 'active', 'yearly', null, null, 'sub_x', 'ctm_x', now()
   ) $$,
-  '42501', null, 'authenticated cannot insert'
+  '42501', 'permission denied for table subscriptions', 'authenticated cannot insert'
 );
 select throws_ok($$ update public.subscriptions set status = 'active' $$, '42501', null,
   'authenticated cannot update');
@@ -96,7 +96,7 @@ select is(
   (select row(status, paddle_updated_at)::text from public.subscriptions
     where user_id = '00000000-0000-4000-8000-000000000001'),
   row('past_due', '2026-11-02T00:00:00Z'::timestamptz)::text,
-  'an event older than the row''s p_paddle_updated_at is ignored'
+  'an event older than the row''s paddle_updated_at is ignored'
 );
 
 -- The first user has a second, ended subscription: it does not replace the live one, even newer.
