@@ -7,6 +7,11 @@ on:
 
 permissions: {}
 
+# A new push to a pull request replaces its older run; runs on main always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   pr-shape:
     # Dependabot writes its own titles and descriptions.
@@ -23,4 +28,6 @@ jobs:
       - env:
           TITLE: ${{ github.event.pull_request.title }}
           BODY: ${{ github.event.pull_request.body }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: bash .github/scripts/pr-shape.sh

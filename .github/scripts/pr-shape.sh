@@ -5,6 +5,12 @@
 set -uo pipefail
 title=${TITLE-} body=${BODY-} errors=()
 
+# verify-deploy's automatic revert writes its own title and description, as Dependabot does; only a
+# workflow can open a pull request as github-actions[bot].
+if [[ ${AUTHOR-} == 'github-actions[bot]' && ${HEAD_REF-} == auto-revert/* ]]; then
+  echo "Automatic revert: its title and description are verify-deploy's."; exit 0
+fi
+
 [[ $title =~ ^[a-z]+(\([a-z0-9/._-]+\))?!?:\ [^\ ] ]] ||
   errors+=("Title: use 'type(scope): what changed', e.g. 'fix(ui): Try again refetches the page'.")
 (( ${#title} <= 72 )) || errors+=("Title: ${#title} characters; keep it to 72 or split the pull request.")
