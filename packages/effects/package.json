@@ -17,7 +17,7 @@
   "dependencies": {
     "@fontsource-variable/inter": "5.3.0",
     "@fontsource/noto-sans-tc": "5.3.1",
-    "@hyperframes/producer": "0.8.217",
+    "@hyperframes/producer": "0.8.220",
     "@video-editor/schema": "workspace:*",
     "ajv": "8.20.0",
     "htmlparser2": "12.0.0",
