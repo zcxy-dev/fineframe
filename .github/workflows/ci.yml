@@ -48,7 +48,7 @@ jobs:
       - name: Lint workflows (actionlint)
         run: actionlint
       - name: Audit workflows (zizmor)
-        run: zizmor --config .github/zizmor.yml --format github .github/
+        run: zizmor --format github .github/
         env:
           GH_TOKEN: ${{ github.token }}
       # Every relative link and its anchor in the Markdown; links to other sites are not fetched,
