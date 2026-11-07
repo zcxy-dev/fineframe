@@ -14,10 +14,6 @@ The [web page](../web/README.md) as an app of its own, for people with neither N
 - **Quitting** stops the server and everything it started (on Windows, with `taskkill` on its process tree); closing the window quits. If the app ends any other way, even force-quit, the server sees its stdin close and exits ([`lib/parent.ts`](../web/lib/parent.ts)).
 - **Updates** ([`src/updates.ts`](src/updates.ts)): an installed app checks `https://downloads.fineframe.app/` at start and every 4 hours with [electron-updater](https://www.electron.build/auto-update). Windows and Linux download a new version in the background and install it on restart or quit; the Mac app, not signed with a Developer ID, cannot install one, so the page links to the new DMG. The keys, the account, the Python environment and the caches stay.
 
-## Why Electron
-
-The editor's planner, renderer and page are TypeScript on Node, and the analysis is Python, so any shell has to carry a Node runtime and a way to install Python. Electron carries Node already and runs the server with it, so the app is one runtime and the shell is TypeScript like the rest of the code. Tauri's own shell is smaller, as it uses the system's web view, but it would still need a Node runtime bundled beside it, a Rust toolchain to build, and on Linux WebKitGTK, which renders the page and plays its video differently from the Chromium it is tested in. Against the 2 GB of Python the first start installs, the difference in size matters little.
-
 ## Building
 
 Each installer is built on the system it is for:
