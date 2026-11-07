@@ -1,6 +1,6 @@
 # Fineframe
 
-**A fully automatic video editor, in development.** The goal: drop in your footage, choose a length and an aspect ratio, and get back a finished video, cut, captioned, framed, graded and animated, with no manual steps. It is built for Mandarin, English and speech that switches between them. Captions come out in Taiwan Traditional Chinese.
+**A fully automatic video editor, in development.** Drop in your footage, choose a length and an aspect ratio, and get back a finished video, cut, captioned, framed, graded and animated, with no manual steps. It is built for Mandarin, English and speech that switches between them. Captions come out in Taiwan Traditional Chinese.
 
 [![CI](https://github.com/zcxy-dev/fineframe/actions/workflows/ci.yml/badge.svg)](https://github.com/zcxy-dev/fineframe/actions/workflows/ci.yml)
 [![License: proprietary](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
@@ -19,21 +19,26 @@ The desktop app needs nothing else installed: no Node, no Python, no command lin
 | Windows 10 or 11 (x64) | [`Fineframe-win-x64.exe`](https://downloads.fineframe.app/Fineframe-win-x64.exe) |
 | Linux (x86-64) | [`Fineframe-linux-x86_64.AppImage`](https://downloads.fineframe.app/Fineframe-linux-x86_64.AppImage) |
 
-These are always the latest version; each version also stays there as `Fineframe-<version>-mac-arm64.dmg`, `-win-x64.exe` and `-linux-x86_64.AppImage`.
+These are always the latest version; each version also stays there as `Fineframe-<version>-mac-arm64.dmg`, `-win-x64.exe` and `-linux-x86_64.AppImage`. Macs with an Intel processor are not supported. [`SHA256SUMS`](https://downloads.fineframe.app/SHA256SUMS) lets you check the file you downloaded, and `gh attestation verify <file> --repo zcxy-dev/fineframe` checks that GitHub Actions built it from this repository.
 
-Macs with an Intel processor are not supported: PyTorch and ONNX Runtime, which the analysis runs on, no longer publish builds for them.
+**macOS.** Open the DMG and drag Fineframe into Applications. The app is not signed with an Apple Developer ID, so the first time you open it, macOS says it cannot check the app for malicious software and offers only Done or Move to Trash. Choose Done, then open **System Settings → Privacy & Security**, scroll to Security, and choose **Open Anyway** next to the message about Fineframe; confirm with your password. Later launches open normally.
 
-**macOS.** Open the DMG and drag Fineframe into Applications. The app is not yet signed with an Apple Developer ID, so the first time you open it, macOS says it cannot check the app for malicious software and offers only Done or Move to Trash. Choose Done, then open **System Settings → Privacy & Security**, scroll to Security, and choose **Open Anyway** next to the message about Fineframe; confirm with your password. macOS remembers the choice, and later launches open normally. [`SHA256SUMS`](https://downloads.fineframe.app/SHA256SUMS) lets you check the file you downloaded, and `gh attestation verify <file> --repo zcxy-dev/fineframe` checks that GitHub Actions built it from this repository.
-
-**Windows.** Open the installer: it installs Fineframe for your user alone, with no administrator needed, and opens it. The installer is not yet signed with a code-signing certificate, so Microsoft Defender SmartScreen may show "Windows protected your PC". Choose **More info**, check that the app is Fineframe, then choose **Run anyway**.
+**Windows.** Open the installer: it installs Fineframe for your user alone, with no administrator needed, and opens it. The installer is not signed with a code-signing certificate, so Microsoft Defender SmartScreen may show "Windows protected your PC". Choose **More info**, check that the app is Fineframe, then choose **Run anyway**.
 
 **Linux.** Make the AppImage executable (`chmod +x Fineframe-*.AppImage`) and run it. AppImages need FUSE 2: on Ubuntu 24.04, `sudo apt install libfuse2t64`.
 
-**The first time it opens,** the app asks you to sign in to your Fineframe account, in your browser on fineframe.app; making an edit or planning one again needs that account, free during the public beta and with a [subscription](https://fineframe.app/en/pricing/) once paid plans open, while rendering, opening earlier projects and downloads work without one. The app checks the account before each edit and keeps working offline for 7 days after its last check. It then asks for your [Anthropic API key](https://console.anthropic.com/settings/keys) and checks it; Claude plans each edit, writes its motion graphics and checks its cuts, about US$0.20 to 0.60 for an edit of a minute or less and US$1 to 1.20 for one of five minutes ([measured](packages/engine/MEASUREMENTS.md#planner-measurements)). Meanwhile it installs the analysis once, about 2 GB of Python and PyTorch, with its progress in the window. The first edit then downloads what it needs on first use, each with its own bar: the speech model ([sizes](#which-speech-model-runs)), FFmpeg and the effects renderer, and yt-dlp for the first link imported. On a computer with less than 12 GB of memory, too little for the speech model, speech is heard on OpenRouter instead, with your [OpenRouter API key](https://openrouter.ai/settings/keys), for about US$0.03 an hour of footage; the app says so, and either can be chosen.
+**The first time it opens,** the app asks you to:
 
-The keys and the sign-in stay on your computer, in files only your user can read, in the app's folder (`~/Library/Application Support/Fineframe` on macOS, `%APPDATA%\Fineframe` on Windows, `~/.config/Fineframe` on Linux), with the Python it installed and your brand kits. The models and edits are in `.cache\video-editor` and `.cache\huggingface` in your user folder (`~/.cache/…` on macOS and Linux). To remove the app entirely, uninstall or delete it and delete those folders. On Windows and Linux the app updates itself: it downloads a new version in the background and installs it when you restart it ("Restart to update" in the window) or quit it. On a Mac, which cannot install an update of an app not signed with a Developer ID, the window says when a new version is out, with its download: install it over the old one. Either way the keys and downloads stay. Releases up to 0.3.0 were called Video Editor: Fineframe does not replace it and asks for the key again, since that app's folder is `Video Editor`; uninstall it and delete that folder. How the app is built: [`apps/desktop`](apps/desktop/README.md).
+1. Sign in to your Fineframe account, in your browser on fineframe.app. Making or replanning an edit needs the account, free during the public beta and with a [subscription](https://fineframe.app/en/pricing/) once paid plans open; rendering, opening earlier projects and downloads work without it. The app checks the account before each edit and keeps working offline for 7 days after its last check.
+2. Paste your [Anthropic API key](https://console.anthropic.com/settings/keys). Claude plans each edit, writes its motion graphics and checks its cuts: about US$0.20 to 0.60 for an edit of a minute or less and US$1 to 1.20 for one of five minutes ([measured](packages/engine/MEASUREMENTS.md#planner-measurements)).
 
-## Design
+Meanwhile it installs the analysis once, about 2 GB of Python and PyTorch. The first edit downloads the speech model ([sizes](#which-speech-model-runs)), FFmpeg and the effects renderer, and the first imported link downloads yt-dlp, each with its own progress bar. On a computer with less than 12 GB of memory, too little for the speech model, speech is heard on OpenRouter instead, with your [OpenRouter API key](https://openrouter.ai/settings/keys), for about US$0.03 an hour of footage; the app says so, and either can be chosen.
+
+**Where it keeps things.** The keys and the sign-in stay on your computer, in files only your user can read, in the app's folder (`~/Library/Application Support/Fineframe` on macOS, `%APPDATA%\Fineframe` on Windows, `~/.config/Fineframe` on Linux), with the Python it installed and your brand kits. Models and edits are in `.cache/video-editor` and `.cache/huggingface` in your user folder. To remove the app entirely, uninstall or delete it and delete those folders. The older app called Video Editor is separate: uninstall it and delete its `Video Editor` folder.
+
+**Updates.** On Windows and Linux the app downloads a new version in the background and installs it when you restart it ("Restart to update" in the window) or quit it. On a Mac the window says when a new version is out, with its download: install it over the old one. Either way the keys and downloads stay.
+
+## What it does
 
 ```text
 footage/ (any number of clips)  +  length (15 s … 1 h)  +  aspect (9:16 · 1:1 · 16:9)
@@ -48,42 +53,22 @@ check       review every cut, fix what is wrong, at most three passes
 finished.mp4  +  captions.srt
 ```
 
-A single web page drives it: drop the files or paste a video's link, pick the length and aspect ratio, press start, and download the result.
+One page drives it: drop the files or paste a video's link, pick the length and aspect ratio, press start, and download the result.
 
-## What works today
+- **Footage:** any number of clips, including rotated phone footage and HDR, or a public video's link from YouTube or another site [yt-dlp](https://github.com/yt-dlp/yt-dlp) reads, imported at up to 1080p.
+- **Transcript:** mixed Mandarin and English stays mixed, in Taiwan Traditional Chinese, timed word by word, heard on your computer or on OpenRouter. Optionally, Claude fixes misheard names, terms and homophones.
+- **Cut:** Claude picks the best takes and checks every cut; cuts fall between words, at the length asked.
+- **Several shorts:** up to 10 shorts from one long video, each with a title, a description and hashtags.
+- **Framing:** a virtual camera frames every clip in the edit's shape and follows whoever speaks.
+- **Picture and sound:** colour matching and grading, transitions, studio voice processing for each source, and loudness for publishing.
+- **Music:** a built-in library of 40 CC0 tracks, or tracks you supply, fitted to the edit and ducked under speech.
+- **Captions:** burned in word by word, with a SubRip file that matches the picture.
+- **Graphics:** animated titles, name cards, chapters, callouts and wipes, and motion graphics Claude writes for each edit.
+- **B-roll:** a rich edit, the default, cuts away to stock footage and captures of the pages the speaker names, from free sources.
+- **Brand kits:** a logo watermark, up to three colours, fonts and custom captions, kept as named kits and changed on a finished edit with a render alone.
+- **Changing an edit:** render a changed edit again without analysing or planning again, change it by conversation with the [agent skill](#use-it-from-an-ai-agent), or export it as a timeline for Final Cut Pro, DaVinci Resolve or Premiere Pro.
 
-- **Probe:** rotated phone footage, non-square pixels, HDR and every audio track, read as they play ([sources](packages/engine/README.md#what-it-renders)).
-- **Shot detection:** [TransNetV2](https://github.com/soCzech/TransNetV2) finds hard cuts and dissolves.
-- **Speech and pauses:** [Silero VAD](https://github.com/snakers4/silero-vad) finds where someone speaks.
-- **Loudness and audio events:** EBU R128 loudness, and laughter, applause and music from the [CED](https://github.com/RicherMans/CED) tagger ([details](worker/README.md#media-index)).
-- **Faces and who speaks:** [YuNet](https://huggingface.co/opencv/face_detection_yunet) faces tracked through each shot, and who speaks when ([details](worker/README.md#faces-and-speakers)).
-- **Long sources:** frames and speech stream through the analysis, so a source's length barely changes its memory; the speech model sets the peak ([sizes](#which-speech-model-runs), [shots](worker/README.md#media-index), [voice](worker/README.md#voice)).
-- **Transcript:** [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) keeps mixed Mandarin and English mixed, in Taiwan Traditional Chinese with [OpenCC](https://github.com/BYVoid/OpenCC), timed word by word, locally or on OpenRouter ([details](worker/README.md#word-timings)).
-- **Transcript correction** (opt-in): Claude fixes misheard names, terms and homophones, and only edits that keep every spoken word apply ([details](worker/README.md#transcript-correction)).
-- **Plan:** [Claude plans the edit](packages/engine/README.md#planning) and checks every cut; code cuts between words to the length asked ([measurements](packages/engine/MEASUREMENTS.md#planner-measurements)).
-- **Framing:** a [virtual camera](packages/engine/README.md#framing) frames every clip in the edit's shape and follows whoever speaks.
-- **Render:** [`project.json` to MP4](packages/engine/README.md#how-it-renders) with frame- and sample-exact cuts, transitions, B-roll, grading and loudness ([measurements](packages/engine/MEASUREMENTS.md#render-measurements)).
-- **Music:** a built-in library of 40 CC0 tracks, or tracks you supply, fitted to the edit and ducked under speech ([details](packages/engine/README.md#planning), [measurements](packages/engine/MEASUREMENTS.md#music-measurements)).
-- **Links:** a public video's link, from YouTube or another site [yt-dlp](https://github.com/yt-dlp/yt-dlp) reads, imported as footage at up to 1080p, in the page and in `pnpm edit` ([details](packages/engine/README.md#editing-footage)).
-- **One command:** [`pnpm edit`](packages/engine/README.md#editing-footage) turns a folder of footage into the finished video at the length and aspect asked ([measurements](packages/engine/MEASUREMENTS.md#edit-measurements)).
-- **Several shorts:** [`pnpm edit --shorts`](packages/engine/README.md#editing-footage) and the page make up to 10 shorts from one long video, each from one stretch of it, with a title, a description and hashtags.
-- **Desktop app:** [installers](#install) for Apple silicon Macs, Windows and Linux run the web page with nothing else to install ([details](apps/desktop/README.md)).
-- **Web page:** [one page](apps/web/README.md) runs `pnpm edit` on dropped footage, with live progress, cost estimates and downloads.
-- **Changing an edit:** [`pnpm render`](packages/engine/README.md#changing-an-edit) renders a changed `project.json` again, and the [agent skill](#use-it-from-an-ai-agent) changes an edit by conversation.
-- **Editing apps:** [`pnpm render --export`](packages/engine/README.md#exporting-to-an-editing-app) and the page's "Export to an editing app" turn a finished edit into timelines for Final Cut Pro, DaVinci Resolve and Premiere Pro, with its B-roll, music, captions and graphics.
-- **Effects:** five animated [templates](packages/effects/#templates) for titles, names, chapters, callouts and wipes, rendered with [HyperFrames](https://github.com/heygen-com/hyperframes) ([placement](packages/engine/README.md#planning)).
-- **B-roll:** a rich edit, the default, cuts away to stock footage and captures of the pages the speaker names, from free sources ([details](packages/engine/README.md#visuals)).
-- **Motion graphics:** Claude writes each edit's [graphics](packages/effects/#graphics) as HTML and CSS once its cut is known: corner labels and lower thirds over the speaker, a panel over the speaker at 9:16, and full-frame graphics, each checked as drawn and against the speech.
-- **Captions:** [burned in word by word](packages/engine/README.md#captions), with a SubRip file that matches the picture.
-- **Brand kits:** a logo watermark, up to three colours, fonts and custom captions, kept as [named kits](packages/engine/README.md#brand-kits) on the page or passed as `pnpm edit --brand`, and changed on a finished edit with a render alone.
-- **Studio voice:** each source's speech [denoised and processed](packages/engine/README.md#voice) by a chain chosen from its measurements ([measurements](packages/engine/MEASUREMENTS.md#voice-measurements)).
-- **Benchmark:** [`vebench`](bench/README.md#metrics) scores transcripts, shots, speakers, renders, music and edits across a corpus.
-- **File formats:** [JSON Schemas](packages/schema/) for the media index, `project.json` and progress lines, with generated types and validators.
-- **Ground truth drafts:** `vework draft-truth` drafts a corpus clip's transcript for a person to correct ([workflow](bench/README.md#ground-truth)).
-- **Platforms:** macOS on Apple silicon, Windows x64 and Linux x64. CI tests Linux on every change, and macOS and Windows for changes that can differ between systems ([checks](CONTRIBUTING.md#checks)). Intel Macs are not supported.
-- **Synthetic corpus:** [`vebench synth`](bench/README.md#synthetic-corpus) generates talks, conversations, a phone walk, screen recordings and music with exact truth.
-
-Analysis and rendering run locally; [SECURITY.md](SECURITY.md#scope) says what planning, the cut review, transcript correction, cloud speech, a rich edit's B-roll and link import send or fetch.
+Analysis and rendering run on your computer; [SECURITY.md](SECURITY.md#scope) says what planning, the cut review, transcript correction, cloud speech, B-roll and link import send or fetch.
 
 ## Quick start
 
@@ -93,7 +78,7 @@ From the source, for development and the command line; to only use the editor, [
 - macOS on Apple silicon, Windows 10 or 11 on x64, or Linux.
 - [mise](https://mise.jdx.dev), which installs the pinned Node, Python and `uv`; Node's corepack then provides the pinned pnpm. On Windows, install it with `winget install jdx.mise` and run the commands below in PowerShell, with [Git](https://git-scm.com/download/win) installed.
 - Disk space for the Python environment ([size](#install)) and the model weights downloaded on first use ([sizes](#which-speech-model-runs)).
-- An [Anthropic API key](https://console.anthropic.com/settings/keys): Claude plans the edit and checks its cuts ([cost](#install)).
+- An [Anthropic API key](https://console.anthropic.com/settings/keys) ([cost](#install)).
 
 ```bash
 git clone https://github.com/zcxy-dev/fineframe.git
@@ -109,16 +94,12 @@ From the command line, once `mise run start` has set things up (or after `mise i
 pnpm edit footage/ --length 60s --aspect 9:16 -o out/edit.mp4
 ```
 
-`pnpm edit --help` lists the options; [`packages/engine`](packages/engine/README.md#editing-footage) says what the command writes and how it reports progress. The analysis on its own writes one file's media index:
+`pnpm edit --help` lists the options, among them `--shorts`, `--brand`, `--names`, `--correct` and `--asr cloud`. [`packages/engine`](packages/engine/README.md#editing-footage) says what the command writes, how it reports progress, and how [`pnpm render`](packages/engine/README.md#changing-an-edit) renders a changed edit or [exports](packages/engine/README.md#exporting-to-an-editing-app) it to an editing app. The analysis on its own writes one file's [media index](packages/schema/media-index.schema.json):
 
 ```bash
 cd worker
-# Shots, speech, a transcript with word timings, loudness, audio events, faces and who speaks,
-# and voice measurements, with the denoised speech beside the index (talk.voice.wav).
 uv run vework analyze talk.mp4 -o talk.index.json
 ```
-
-The [media index format](packages/schema/media-index.schema.json) is defined with the other file formats in [`packages/schema`](packages/schema/).
 
 ### Which speech model runs
 
@@ -128,17 +109,15 @@ The [media index format](packages/schema/media-index.schema.json) is defined wit
 | Qwen3-ASR-1.7B | 5.9 GB | ~14× the clip's length | ~14 GB |
 | `--asr cloud` | 1.8 GB (the aligner) | ~0.5× the clip's length, with OpenRouter responding quickly | ~3.3 GB |
 
-Weight sizes include the aligner. `vework` uses 1.7B with a CUDA GPU and 0.6B otherwise; `--asr-model` overrides that. With `--asr cloud` (`pnpm edit --asr cloud`), OpenRouter hears the speech and only the aligner runs here. The key goes in `.env` as `OPENROUTER_API_KEY` ([cloud speech](worker/README.md#cloud-speech)). On Linux and Windows, the lockfile installs a CPU-only PyTorch, so the models run on the CPU there. On a Mac with Apple silicon the speech model runs on its GPU, falling back to the CPU by itself, and the aligner on the CPU ([Apple silicon](worker/README.md#apple-silicon)).
-
-To plan or render on its own, see [`packages/engine`](packages/engine/). To score outputs against ground truth, see [`bench/`](bench/).
+Weight sizes include the aligner. `vework` uses 1.7B with a CUDA GPU and 0.6B otherwise; `--asr-model` overrides that. With `--asr cloud` (`pnpm edit --asr cloud`), OpenRouter hears the speech and only the aligner runs here; the key goes in `.env` as `OPENROUTER_API_KEY` ([cloud speech](worker/README.md#cloud-speech)). On Linux and Windows the models run on the CPU. On a Mac with Apple silicon the speech model runs on its GPU, falling back to the CPU by itself, and the aligner on the CPU ([Apple silicon](worker/README.md#apple-silicon)).
 
 ## Use it from an AI agent
 
-The [`video-editor` skill](skills/video-editor/SKILL.md) teaches Claude Code, Codex and other agents that read [Agent Skills](https://agentskills.io) to run the editor: check the setup, make an edit, and then change the finished edit as you ask for it, such as "cut the part about pricing", "the caption says 阿者, it should be 阿哲", "call it 剪輯師的一天" or "turn the music down". Each change edits the edit's `project.json` and renders it again, without analysing or planning again, into a new version beside the last.
+The [`video-editor` skill](skills/video-editor/SKILL.md) teaches Claude Code, Codex and other agents that read [Agent Skills](https://agentskills.io) to run the editor: check the setup, make an edit, and then change the finished edit as you ask for it, such as "cut the part about pricing", "the caption says 阿者, it should be 阿哲", "call it 剪輯師的一天" or "turn the music down". Each change renders a new version beside the last, without analysing or planning again.
 
-**With the desktop app:** choose "Install Command Line Tool…" and "Install Agent Skill…" in its menu (the Fineframe menu on macOS, File on Windows and Linux). The first puts a `fineframe` command on your PATH: `fineframe edit` and `fineframe render` take the same options as `pnpm edit` and `pnpm render`, and run with the app's own runtime and the keys saved in it, with no Node or clone; `fineframe edit` needs the account signed in in the app. The second copies the skill into `~/.claude/skills/video-editor` for Claude Code and `~/.agents/skills/video-editor` for Codex. Each dialog says where it installed and how to remove it. The app updates the command and the skill it installed when it updates itself.
+**With the desktop app:** choose "Install Command Line Tool…" and "Install Agent Skill…" in its menu (the Fineframe menu on macOS, File on Windows and Linux). The first puts a `fineframe` command on your PATH: `fineframe edit` and `fineframe render` take the same options as `pnpm edit` and `pnpm render`, and run with the app's own runtime and the keys saved in it; `fineframe edit` needs the account signed in in the app. The second copies the skill into `~/.claude/skills/video-editor` for Claude Code and `~/.agents/skills/video-editor` for Codex. Each dialog says where it installed and how to remove it. The app updates both when it updates itself.
 
-**From a clone,** for working on the editor: set it up as in the [quick start](#quick-start). The skill is the folder [`skills/video-editor`](skills/video-editor/SKILL.md); link it into the clone's own skills folder, so nothing outside the clone changes:
+**From a clone:** set it up as in the [quick start](#quick-start), then link the skill into the clone's own skills folder, so nothing outside the clone changes:
 
 ```bash
 # Claude Code
@@ -151,7 +130,7 @@ Start a new session in the clone and ask it to edit a folder of footage, or to c
 
 ## Contributing
 
-Setup, checks and the rules every change follows are in [CONTRIBUTING.md](CONTRIBUTING.md). Report security issues as described in [SECURITY.md](SECURITY.md).
+Setup, checks and the rules every change follows are in [CONTRIBUTING.md](CONTRIBUTING.md). How each part works: the [analysis](worker/README.md), [planning and rendering](packages/engine/README.md), [effects](packages/effects/), [file formats](packages/schema/), the [web page](apps/web/README.md), the [desktop app](apps/desktop/README.md) and the [benchmark](bench/README.md). Report security issues as described in [SECURITY.md](SECURITY.md).
 
 ## Acknowledgements
 
@@ -159,7 +138,7 @@ The editor is built on these models and libraries: [Qwen3-ASR and Qwen3-ForcedAl
 
 ## License
 
-The project's code is proprietary, all rights reserved ([LICENSE](LICENSE)). [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists every model, font and program it uses and every package it depends on directly, with its licence and how it reaches you, and keeps the notices of code adapted from other projects. Two of them need attention before commercial use or redistribution:
+The project's code is proprietary, all rights reserved ([LICENSE](LICENSE)). [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists every model, font and program it uses and every package it depends on directly, with its licence and how it reaches you. Two of them need attention before commercial use or redistribution:
 
 - **FFmpeg**: the builds the renderer downloads and the PyAV wheels the worker installs are GPL. Redistributing FFmpeg means meeting the GPL or shipping an LGPL build ([details](THIRD_PARTY_NOTICES.md#ffmpeg)); the desktop app's installers carry no FFmpeg, which downloads on first use ([details](THIRD_PARTY_NOTICES.md#desktop-installers)).
 - **Optional extras** install a few GPL packages: espeak-ng and phonemizer in the benchmark's `synth` extra ([details](THIRD_PARTY_NOTICES.md#copyleft-dependencies)).
