@@ -18,7 +18,7 @@
 // On Linux, run it under a display, such as `xvfb-run -a`. The clip's speech comes from the
 // system's voice: `say` on macOS, the speech synthesizer .NET ships on Windows, espeak-ng on Linux.
 import { execFile, spawnSync } from "node:child_process";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -109,6 +109,7 @@ async function makeClip(): Promise<string> {
           : ["espeak-ng", "-s", "150", "-w", file, sentence];
     const result = spawnSync(program as string, args, { stdio: "inherit" });
     if (result.status !== 0) throw new Error(`${program} could not speak the clip's sentences`);
+    say(`spoke ${i}: ${(await duration(file)).toFixed(2)} s, ${statSync(file).size} bytes`);
     voices.push(file);
   }
   // The repository's own pinned FFmpeg, in a cache of its own: the app downloads its copy itself.
@@ -127,6 +128,7 @@ async function makeClip(): Promise<string> {
     ...["-filter_complex", [...pads, joined].join(";"), "-map", "0:v", "-map", "[a]"],
     ...["-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", clip],
   ]);
+  say(`the clip is ${(await duration(clip)).toFixed(2)} s`);
   return clip;
 }
 
@@ -478,15 +480,17 @@ async function playInPage(page: Page) {
   });
 }
 
-/** The length of the video `file`, in seconds, by the repository's own FFmpeg. */
+/** The length of the media `file`, in seconds, by the repository's own FFmpeg; 0 when it has none. */
 async function duration(file: string): Promise<number> {
   const { ffmpeg, run } = await import("../../../packages/engine/src/ffmpeg.ts");
   process.env.XDG_CACHE_HOME = join(work, "smoke-cache");
-  const probe = await run(await ffmpeg(), [
+  const bin = await ffmpeg();
+  delete process.env.XDG_CACHE_HOME;
+  const probe = await run(bin, [
     ...["-hide_banner", "-i", file, "-map", "0", "-c", "copy", "-f", "null", "-"],
   ]);
   const [, h, m, s] = probe.stderr.match(/Duration: (\d+):(\d+):([\d.]+)/) ?? [];
-  return Number(h) * 3600 + Number(m) * 60 + Number(s);
+  return Number(h ?? 0) * 3600 + Number(m ?? 0) * 60 + Number(s ?? 0);
 }
 
 /** Makes the edit through the window; what went wrong, if anything. */
