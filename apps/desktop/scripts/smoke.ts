@@ -99,17 +99,22 @@ async function makeClip(): Promise<string> {
   const dir = join(work, "clip");
   await mkdir(dir, { recursive: true });
   const voices: string[] = [];
+  const spoken = new Map<string, number>();
   for (const [i, sentence] of SENTENCES.entries()) {
     const file = join(dir, `${i}.${process.platform === "darwin" ? "aiff" : "wav"}`);
+    // A named voice: on some of GitHub's macOS 26.7 runners the default one writes a file with no
+    // sound and still exits 0.
     const [program, ...args] =
       process.platform === "darwin"
-        ? ["say", "-o", file, sentence]
+        ? ["say", "-v", "Samantha", "-o", file, sentence]
         : process.platform === "win32"
           ? ["powershell", "-NoProfile", "-Command", windowsSpeech(file, sentence)]
           : ["espeak-ng", "-s", "150", "-w", file, sentence];
     const result = spawnSync(program as string, args, { stdio: "inherit" });
     if (result.status !== 0) throw new Error(`${program} could not speak the clip's sentences`);
-    say(`spoke ${i}: ${(await duration(file)).toFixed(2)} s, ${statSync(file).size} bytes`);
+    const seconds = await duration(file);
+    say(`spoke ${i}: ${seconds.toFixed(2)} s, ${statSync(file).size} bytes`);
+    spoken.set(sentence, seconds);
     voices.push(file);
   }
   // The repository's own pinned FFmpeg, in a cache of its own: the app downloads its copy itself.
@@ -128,7 +133,15 @@ async function makeClip(): Promise<string> {
     ...["-filter_complex", [...pads, joined].join(";"), "-map", "0:v", "-map", "[a]"],
     ...["-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", clip],
   ]);
-  say(`the clip is ${(await duration(clip)).toFixed(2)} s`);
+  const seconds = await duration(clip);
+  say(`the clip is ${seconds.toFixed(2)} s`);
+  if (seconds < LENGTH) {
+    const [sentence, shortest] = [...spoken].sort((a, b) => a[1] - b[1])[0] as [string, number];
+    throw new Error(
+      `the clip is ${seconds.toFixed(2)} s, too short for a ${LENGTH} s edit: ` +
+        `"${sentence}" was spoken for ${shortest.toFixed(2)} s`,
+    );
+  }
   return clip;
 }
 
