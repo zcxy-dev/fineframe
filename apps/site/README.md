@@ -25,7 +25,7 @@ Everything runs in the browser, against two services:
 - **Supabase** holds the accounts (Supabase Auth: email and password, and Google) and the `subscriptions` table. Its schema, row-level security and Edge Functions are in [`supabase/`](supabase/): the migrations in `supabase/migrations/`; in `supabase/functions/`, `paddle-webhook`, which keeps `subscriptions` up to date from Paddle's events, and `paddle-portal`, which opens Paddle's customer portal from the account page.
 - **Paddle Billing** sells the subscription, once `billing_enabled` in `app_config` is on ([DEPLOY.md](DEPLOY.md#billing-on-and-off)). The pricing page then opens Paddle's checkout for a signed-in user, with their user id in the checkout's `custom_data`.
 
-The desktop app signs in through the site and reads its own row of `subscriptions`: [ENTITLEMENT.md](ENTITLEMENT.md).
+The desktop app signs in through the site and reads its own rows of `subscriptions`: [ENTITLEMENT.md](ENTITLEMENT.md).
 
 ## Develop
 

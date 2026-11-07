@@ -60,6 +60,7 @@ test("only a subscription Paddle bills offers its customer portal", () => {
     plan: "yearly",
     current_period_end: null,
     cancel_at: null,
+    paddle_updated_at: "2026-11-01T00:00:00Z",
   } as const;
   assert.equal(
     paddleBilled({ ...row, paddle_customer_id: "ctm_01aaaaaaaaaaaaaaaaaaaaaaaa" }),

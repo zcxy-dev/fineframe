@@ -161,7 +161,7 @@ async function entitledNow(supabase: Supabase, token: string, now: number): Prom
     token,
   })) as { billing_enabled: boolean }[];
   if (config[0]?.billing_enabled !== true) return true;
-  // Row-level security returns the user's own row alone.
+  // Row-level security returns the user's own rows alone, one for each subscription.
   const rows = (await call(supabase, "/rest/v1/subscriptions?select=status,current_period_end", {
     token,
   })) as Subscription[];

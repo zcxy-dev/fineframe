@@ -4,9 +4,12 @@ import {
   isAuthWeakPasswordError,
   type SupabaseClient,
 } from "@supabase/supabase-js";
+import { shown } from "../supabase/functions/_shared/subscription.ts";
 import type { Content } from "./content.ts";
 import type { Plan } from "./paddle.ts";
 import { href, type Locale } from "./site.ts";
+
+export { entitled, paddleBilled, shown } from "../supabase/functions/_shared/subscription.ts";
 
 let client: SupabaseClient | undefined;
 
@@ -19,13 +22,14 @@ export function supabase(): SupabaseClient {
   return client;
 }
 
-/** A user's row of `subscriptions`, as ENTITLEMENT.md describes it. */
+/** One of a user's rows of `subscriptions`, one per subscription, as ENTITLEMENT.md describes it. */
 export type Subscription = {
   status: "active" | "trialing" | "past_due" | "paused" | "canceled";
   plan: "monthly" | "yearly";
   current_period_end: string | null;
   cancel_at: string | null;
   paddle_customer_id: string;
+  paddle_updated_at: string;
 };
 
 /** Whether Fineframe charges yet: `app_config.billing_enabled`, false during the free beta. */
@@ -35,32 +39,13 @@ export async function billingEnabled(): Promise<boolean> {
   return data.billing_enabled;
 }
 
+/** The signed-in user's subscription that speaks for them, as `shown` picks it. */
 export async function mySubscription(): Promise<Subscription | null> {
   const { data, error } = await supabase()
     .from("subscriptions")
-    .select("status,plan,current_period_end,cancel_at,paddle_customer_id")
-    .maybeSingle();
+    .select("status,plan,current_period_end,cancel_at,paddle_customer_id,paddle_updated_at");
   if (error) throw error;
-  return data;
-}
-
-/** The rule in ENTITLEMENT.md: whether the subscription lets its user use the app. */
-export function entitled(row: Subscription | null, now = new Date()): boolean {
-  if (!row) return false;
-  if (row.status === "active" || row.status === "trialing" || row.status === "past_due") {
-    return true;
-  }
-  return (
-    row.status === "canceled" &&
-    row.current_period_end !== null &&
-    new Date(row.current_period_end) > now
-  );
-}
-
-/** Whether Paddle bills the subscription, so its customer portal can manage it. */
-export function paddleBilled(row: Subscription): boolean {
-  // Paddle's customer ids are `ctm_…`; a row filed by hand has none.
-  return row.paddle_customer_id.startsWith("ctm_");
+  return shown(data);
 }
 
 /**
