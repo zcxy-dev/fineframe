@@ -1,4 +1,4 @@
-// Paddle's webhook: keeps `public.subscriptions` in step with each user's Paddle subscription.
+// Paddle's webhook: keeps `public.subscriptions` in step with Paddle, one row per subscription.
 // Paddle sends every `subscription.*` event here; the checkout's `custom_data.user_id` says whose
 // it is.
 import { createClient } from "@supabase/supabase-js";

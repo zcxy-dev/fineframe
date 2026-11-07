@@ -4,7 +4,7 @@
 -- `supabase test db`.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(25);
+select plan(26);
 
 -- Synthetic users; the first two each with a live yearly subscription.
 insert into auth.users (id, email) values
@@ -215,6 +215,19 @@ select ok(
   (select bool_or(status in ('active', 'trialing', 'past_due')) from public.subscriptions
     where user_id = '00000000-0000-4000-8000-000000000004'),
   'a live subscription keeps its user entitled when their other one ends'
+);
+
+-- A subscription seen before without a row of its own (one the earlier one-row-per-user table
+-- replaced): a late event of it stays out.
+insert into public.paddle_subscriptions_seen values
+  ('sub_01iiiiiiiiiiiiiiiiiiiiiiii', '00000000-0000-4000-8000-000000000004', '2026-11-05T00:00:00Z');
+select public.apply_paddle_subscription(
+  '00000000-0000-4000-8000-000000000004', 'active', 'monthly', '2026-12-03T00:00:00Z', null,
+  'sub_01iiiiiiiiiiiiiiiiiiiiiiii', 'ctm_01gggggggggggggggggggggggg', '2026-11-03T00:00:00Z'
+);
+select is_empty(
+  $$ select 1 from public.subscriptions where paddle_subscription_id = 'sub_01iiiiiiiiiiiiiiiiiiiiiiii' $$,
+  'an event older than one seen for a subscription without a row is ignored'
 );
 reset role;
 

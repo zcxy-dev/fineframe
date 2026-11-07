@@ -4,9 +4,12 @@ import {
   isAuthWeakPasswordError,
   type SupabaseClient,
 } from "@supabase/supabase-js";
+import { shown } from "../supabase/functions/_shared/subscription.ts";
 import type { Content } from "./content.ts";
 import type { Plan } from "./paddle.ts";
 import { href, type Locale } from "./site.ts";
+
+export { entitled, paddleBilled, shown } from "../supabase/functions/_shared/subscription.ts";
 
 let client: SupabaseClient | undefined;
 
@@ -43,41 +46,6 @@ export async function mySubscription(): Promise<Subscription | null> {
     .select("status,plan,current_period_end,cancel_at,paddle_customer_id,paddle_updated_at");
   if (error) throw error;
   return shown(data);
-}
-
-/**
- * Of a user's subscriptions, the one the site shows: a running one before one cancelled with time
- * left, either before one that does not entitle, and the newest among equals. So it entitles the
- * user exactly when any of them does.
- */
-export function shown(rows: readonly Subscription[], now = new Date()): Subscription | null {
-  const rank = (row: Subscription) =>
-    entitled(row, now) ? (row.status === "canceled" ? 1 : 2) : 0;
-  return (
-    [...rows].sort(
-      (a, b) =>
-        rank(b) - rank(a) || Date.parse(b.paddle_updated_at) - Date.parse(a.paddle_updated_at),
-    )[0] ?? null
-  );
-}
-
-/** The rule in ENTITLEMENT.md: whether the subscription lets its user use the app. */
-export function entitled(row: Subscription | null, now = new Date()): boolean {
-  if (!row) return false;
-  if (row.status === "active" || row.status === "trialing" || row.status === "past_due") {
-    return true;
-  }
-  return (
-    row.status === "canceled" &&
-    row.current_period_end !== null &&
-    new Date(row.current_period_end) > now
-  );
-}
-
-/** Whether Paddle bills the subscription, so its customer portal can manage it. */
-export function paddleBilled(row: Subscription): boolean {
-  // Paddle's customer ids are `ctm_…`; a row filed by hand has none.
-  return row.paddle_customer_id.startsWith("ctm_");
 }
 
 /**

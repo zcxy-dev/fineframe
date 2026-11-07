@@ -80,7 +80,7 @@ apikey: <FINEFRAME_SUPABASE_PUBLISHABLE_KEY>
 Authorization: Bearer <access_token>
 ```
 
-Row-level security returns only the signed-in user's rows: a JSON array with one row for each subscription they have had, or `[]` when they have never subscribed.
+Row-level security returns only the signed-in user's rows: a JSON array with a row for each of their subscriptions, or `[]` when they have none.
 
 | Column | Type | Meaning |
 |---|---|---|
