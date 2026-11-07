@@ -6,7 +6,7 @@ with the same numbers.
 
 ## Corpus layout
 
-Corpus footage is self-recorded or CC-licensed, and only its truth files may be committed. No real-footage corpus is published yet; the [synthetic corpus](#synthetic-corpus) is generated on demand.
+Corpus footage is self-recorded or CC-licensed, and only its truth files may be committed. No real-footage corpus is published; the [synthetic corpus](#synthetic-corpus) is downloaded or generated.
 
 ```text
 corpus/<clip>/
@@ -106,9 +106,7 @@ A run's `speakers.json` has the same shape, without `visible`, naming people by 
 ## Synthetic corpus
 
 `vebench synth` generates a corpus whose truth is known exactly, because every word, cut and
-beat in it was placed by the generator. It needs no footage or permission to publish, and
-stands in for real footage: no hand-checked corpus of it exists, and the measurements that would
-need one (word timings, framing, captions and edits on real clips) are not made.
+beat in it was placed by the generator.
 
 ```bash
 uv run vebench synthetic synthetic/    # the published seed-0 corpus, 64 MB
@@ -135,14 +133,11 @@ Every clip mixes Chinese and English within sentences, and has fillers (嗯, 那
 pauses of 2 to 5 s and retakes. The talk clips run at 25 fps, the others at 30 or 60.
 
 - **Speech:** [Kokoro-82M-v1.1-zh](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh), offline
-  on a CPU, voices `zf_001` (A) and `zm_010` (B). Each line is synthesized whole. Between two
-  words, the boundary is the model's own phoneme durations, which the audio is decoded from, on
-  its 25 ms frames. Where a word meets silence, the edge is where its sound starts or stops in
-  the clean synthesized signal, to 5 ms: the model stretches a phrase's last syllable over the
-  silence after it. Both voices are Mandarin speakers reading the English too.
+  on a CPU, voices `zf_001` (A) and `zm_010` (B), both Mandarin speakers reading the English
+  too. A word boundary between two words comes from the model's phoneme durations, on its 25 ms
+  frames; where a word meets silence, from the synthesized signal, to 5 ms.
 - **Pictures:** drawn with numpy and Pillow. The presenters are cartoon figures whose mouths open
-  with their own speech. Their faces have eye whites, brows, a nose and a shaded edge, which is
-  enough for YuNet to find them, so who speaks can be scored here.
+  with their own speech, drawn in enough detail for YuNet to find their faces.
 - **Truth:** `transcript.json` (each word also names its `speaker`), `shots.json` (a cut on the
   new shot's first frame; a dissolve from its first blended frame to the first frame of the new
   shot alone), `edit.json` and `speakers.json`, and for clips with screens `regions.json`: the
@@ -154,7 +149,7 @@ pauses of 2 to 5 s and retakes. The talk clips run at 25 fps, the others at 30 o
   dissolve, in either shot.
 
 `synthetic/music/` holds drum-and-bass tracks with known beats for beat-synced cuts,
-`beat-<bpm>.wav` beside `beat-<bpm>.json`:
+`beat-<bpm>.wav` beside `beat-<bpm>.json` (`beat-096`, `beat-112`, `beat-128`):
 
 ```jsonc
 {"bpm": 112, "meter": 4, "duration": 71.142854, "beats": [0.5, 1.035714, 1.571429, …],
@@ -162,10 +157,9 @@ pauses of 2 to 5 s and retakes. The talk clips run at 25 fps, the others at 30 o
  "sections": [{"start": 0.0, "end": 18.714286, "parts": "hb"}, …]}
 ```
 
-Kicks land on beats 1 and 3, snares on 2 and 4, hi-hats on every eighth and a bass note on 1
-and 3; a track can start a beat or two of hi-hats before its first downbeat. Each track has an
-intro, a main section with everything and an outro, each of whole 4-bar phrases; `parts` names
-what plays in each: `k`ick, `s`nare, `h`i-hats and `b`ass.
+A track can start a beat or two of hi-hats before its first downbeat. Each has an intro, a
+main section and an outro of whole 4-bar phrases; `parts` names what plays in each: `k`ick,
+`s`nare, `h`i-hats and `b`ass.
 
 ## ASCEND
 
@@ -178,9 +172,9 @@ uv sync --extra synth          # OpenCC, for the Taiwan Traditional transcripts
 uv run vebench ascend corpus/  # 200 utterances of the test split, seed 0
 ```
 
-It takes a seeded sample of the test split's utterances of 1.5 s or more, downloads each from
-Hugging Face's dataset viewer (15.8 minutes of speech), checks it against the SHA-256 in
-[`ascend.json`](src/vebench/ascend.json) and joins each recording session's into a clip:
+It takes a seeded sample of the test split's utterances of 1.5 s or more (15.8 minutes of
+speech), checks each against the SHA-256 in [`ascend.json`](src/vebench/ascend.json) and joins
+each recording session's into a clip:
 `corpus/ascend-s<session>/source.mp4`, the utterances in the order they were said, 1 s apart,
 over a black picture, and `truth/transcript.txt`, their transcripts converted to Taiwan
 Traditional Chinese with OpenCC's `s2twp`, as the worker converts its own. ASCEND has no word
@@ -212,8 +206,7 @@ A measurement's table lives as data: `bench/results/<name>.json` holds
 document shows it between `<!-- results:<name> -->` and `<!-- /results -->`.
 `uv run vebench tables` writes every table into its document; CI runs it with `--check` and
 fails when a document's table differs from its data. Change the JSON, never the table, and when
-two pull requests touch the same document, run `vebench tables` again after the rebase. Older
-tables are moved to data when they are next measured.
+two pull requests touch the same document, run `vebench tables` again after the rebase.
 
 ## Reference machine
 
@@ -240,8 +233,7 @@ Run times and memory in this repository's docs were measured on 8 cores of an EP
   a cut would read as a click in the finished sound.
 - **`render.drift_ms`:** where the decoded audio ends minus where the last video frame ends;
   positive means the audio runs late. A late audio start and gaps are filled from the stream
-  timestamps, so they count. Encoder padding kept at each cut makes the audio fall further
-  behind the picture with every cut. ITU-R BT.1359 puts the detectable lag at about 125 ms.
+  timestamps, so they count. ITU-R BT.1359 puts the detectable lag at about 125 ms.
 - **`mix`:** whether speech stays clear over music, from a render's voice and music stems,
   each metered by FFmpeg's EBU R128 meter in 400 ms windows every 100 ms. Talking is the
   voice's windows within 10 LU of its own gated loudness, as BS.1770 gates. `over_music_db` is
@@ -258,8 +250,7 @@ Run times and memory in this repository's docs were measured on 8 cores of an EP
   source at `<clip>/source.<ext>` is scored with `<clip>/truth/`. A clip is judged where its
   sound starts and ends: at `soundIn` and `soundOut` when it has them, the sound edges a cut
   in a pause too short for a frame sets inside the clip's first or last frame, and at
-  `in` and `out` otherwise. `--edges picture` judges every clip at `in` and `out`, as `edit`
-  did before sound edges.
+  `in` and `out` otherwise. `--edges picture` judges every clip at `in` and `out`.
   - `length`: the edit's length against its target, and whether it lands within the tolerance.
   - `cuts`: clip edges strictly inside a timed truth word (`in_words`), and the deepest, in
     milliseconds. `in_words_heard` counts those of them where the edge is heard: the
