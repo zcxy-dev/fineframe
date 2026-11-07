@@ -1,15 +1,10 @@
 # Engine measurements
 
-How the engine's behaviour, described in the [README](README.md), measures on the [synthetic corpus](../../bench/README.md#synthetic-corpus) and on openly licensed footage. Times are on the [reference machine](../../bench/README.md#reference-machine). The edit table's synthetic rows and the planner table are measured with rich visuals, the default, without stock footage; every other measurement here was made before rich visuals and holds for `--visuals minimal`.
+How the engine's behaviour, described in the [README](README.md), measures on the [synthetic corpus](../../bench/README.md#synthetic-corpus) and on openly licensed footage. Times are on the [reference machine](../../bench/README.md#reference-machine). Each section says whether its edits had rich visuals (the default, here always without stock footage) or `--visuals minimal`.
 
 ## Edit measurements
 
-Each row is one `pnpm edit` run with the real API on the reference machine. Every file was analysed with the 0.6B speech model and no transcript correction. The table mixes two kinds of row, as its Visuals column says:
-
-- **The two synthetic rows** come from the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0), edited with rich visuals, without stock footage (no Pexels or Pixabay key), and `--quality best`, one edit at a time. The first was edited with the motion graphics Claude writes for each edit, the second at 5dc8da9, which drew full-frame cards in their place. Claude asked for no web capture in either. The first edit found the clips analysed; the second analysed them again, since a names file changes the analysis.
-- **The two real rows** are openly licensed web recordings whose transcripts nobody has corrected yet, so their cuts are checked against the words as the analysis timed them. They were measured with `--visuals minimal`, on the machine shared with other jobs (load average 8 to 10); their analysis time is from the first edit of that footage, the rest from a later one that found the indexes cached.
-
-`vebench edit` scores each project and `vebench render` each video.
+Each row is one `pnpm edit` run with the real API, every file analysed with the 0.6B speech model and no transcript correction; `vebench edit` scores each project and `vebench render` each video. The synthetic rows are the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0), edited at `--quality best` without a Pexels or Pixabay key; the second gives the corpus's three synthetic tracks and a names file, and its Visuals column says which visuals it had. The real rows are openly licensed web recordings without corrected transcripts, so their cuts are checked against the words as the analysis timed them, on the machine shared with other jobs.
 
 ```bash
 PEXELS_API_KEY= PIXABAY_API_KEY= pnpm -s edit bench/synthetic/chat-b{1,2,3}/source.mp4 --length 60s --aspect 9:16 \
@@ -29,16 +24,15 @@ uv run vebench render --media synthetic/chat-b1/runs/edit-60s/output.mp4 \
 | Live talks with slides, 3 clips, 8.8 min | minimal, measured before rich visuals | 5 min, 16:9 | 301.5 s (+0.5 %) | 0 of 57 | 0 | 0 of 28, 0.0 ms | 16.0 min | 52 s, 60 s, 21 s | $0.13 |
 <!-- /results -->
 
-- **Music and effects:** in the second chat-b edit Claude chose the 96 BPM track, which plays from 1.9 s to the end with the voice 21.0 dB over it while anyone talks (15.0 dB in the quietest 5 %, `vebench mix` on the stems of the same project rendered again), and its one join does not click; it showed the guest's name and role in a lower third, popped two keywords and pushed in on 3 of the 6 clips, at most 1.19 times; the sound measures -13.9 LUFS at -3.1 dBTP.
-- **Visuals:** the first edit shows 8 of the 10 graphics Claude wrote: 2 labels and 1 lower third over the speaker, 3 panels over the speaker and 2 full-frame graphics, on screen for 61 % of the edit and full frame for 22 %, 8 icons among them, with a soft sound on 4. The placer left out a lower third too close to the graphic before, and the checks a panel that filled too little of its area. The second, measured with cards, cuts to 5 full-frame cards, 3.0 to 3.5 s each and 29 % of the edit.
-- **Cost:** $0.57 with motion graphics, $0.47 of it for the graphics (writing them, $0.29, and one request to fix the ones the checks failed), against $0.19 and $0.20 with cards and $0.10 before rich visuals ([effects](#effect-measurements)).
-- **Time:** the second chat-b edit analysed its 6.7 min of footage and 3.7 min of music in 9.9 min; on its own, without the names, the footage took 3.2 min, all three clips at once. Shot detection takes about a fifth of an analysis, faces an eighth, transcribing and aligning the rest. Another edit of the same footage starts at the plan and took 4.5 min with motion graphics, 3.2 min of it planning, writing and checking the graphics; 1.8 min with cards, and 41 s to 2.3 min without rich visuals.
-- **Pictures:** in the 9:16 edits the crop follows whoever is on screen, and cuts to the listener's shot with the source. The interview's cuts join two answers inside one camera's shot, so they show as jump cuts; the talks cut between the host and the speaker at a pause.
-- **Captions:** on the synthetic edit measured before rich visuals, each caption appears within 23 ms of its first word's true start at the median and 118 ms at the 95th percentile, and stays up about 0.4 s past its last word. This was not measured again.
+- **Music and effects:** in the second chat-b edit Claude chose the 96 BPM track, with the voice 21.0 dB over it while anyone talks (15.0 dB in the quietest 5 %, `vebench mix`), and its one join does not click; the sound measures -13.9 LUFS at -3.1 dBTP.
+- **Visuals:** the first edit shows 8 of the 10 graphics Claude wrote, on screen for 61 % of the edit and full frame for 22 %; the placer left out one too close to the graphic before, and the checks a panel that filled too little of its area.
+- **Cost:** $0.57 for the first edit, $0.47 of it for the graphics (writing them, $0.29, and one request to fix the ones the checks failed).
+- **Time:** shot detection takes about a fifth of an analysis, faces an eighth, transcribing and aligning the rest. Another edit of the same footage starts at the plan: 4.5 min for the first edit, 3.2 min of it planning, writing and checking the graphics.
+- **Captions:** on a synthetic edit with `--visuals minimal`, each caption appears within 23 ms of its first word's true start at the median and 118 ms at the 95th percentile, and stays up about 0.4 s past its last word.
 
 ## Shorts measurements
 
-Each row is one `pnpm edit --shorts` run with the real API, with rich visuals without stock footage and `--quality best`, from cached indexes: real-2 with `--asr cloud` on the command line, talk-a from the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0) through the web page. `vebench render` scores each short's video and `vebench edit` its length; no hand-checked transcript exists for these clips, so every main-track clip's edges are checked against the words as the analysis timed them. Times are not given: other jobs ran on the machine.
+Each row is one `pnpm edit --shorts` run with the real API, with rich visuals and `--quality best`, from cached indexes: real-2 with `--asr cloud`, talk-a from the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0). `vebench render` scores each short's video and `vebench edit` its length; every clip edge is checked against the words as the analysis timed them. Times are not given: other jobs ran on the machine.
 
 ```bash
 pnpm -s edit bench/corpus/real-2/source.mp4 --shorts 5 --length 30-60s --aspect 9:16 --asr cloud \
@@ -56,13 +50,12 @@ uv run vebench edit --project ../out/shorts/01/edit.project.json
 | talk-a: synthetic talk, 3 clips, 7.0 min | 2 of 15–30 s, 9:16 | 2: 26 and 30 s | +0.7 and +4.8 % | 0 of 3, 0.0 ms | 0 of 10 | $0.05, $0.34–0.36, $0.75 |
 <!-- /results -->
 
-- **Moments:** Claude found 6 moments in real-2 and 3 in talk-a, at most one per 2 minutes of footage; the best five and all three were made. Each short plays only its stretch: 66 to 95 s of the source for real-2's shorts of 45 to 51 s. One talk-a short opens on a line from later in its stretch, then plays from its start: the hook first.
-- **Fitting:** Claude is asked for a stretch of about 1.5 times the short's length, and a short whose plan still reaches less than its length is fitted to the length it reaches; no moment was left out for falling short here.
-- **Cost:** finding the moments reads every transcript once: $0.05 for 7 minutes and $0.07 for 14, at most about $0.30 an hour. Each short costs about what an edit of its length does ([edit measurements](#edit-measurements)), most of it the motion graphics. `estimateShortsCost` is fitted to these runs.
+- **Moments:** Claude found 6 moments in real-2 and 3 in talk-a; the best five and all three were made. Each short plays only its stretch: 66 to 95 s of the source for real-2's shorts of 45 to 51 s.
+- **Cost:** finding the moments reads every transcript once: $0.05 for 7 minutes and $0.07 for 14, at most about $0.30 an hour. Each short costs about what an edit of its length does, most of it the motion graphics. `estimateShortsCost` is fitted to these runs.
 
 ## Planner measurements
 
-These runs use the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0), each clip analysed at 5dc8da9 with the 0.6B speech model and no transcript correction. Each footage was planned, rendered and reviewed at each length its speech allows, with rich visuals and their motion graphics, without stock footage (no Pexels or Pixabay key), and `--quality best`, one edit at a time: the two groups at 16:9, the single clips at 9:16 except the screen recording. The baseline keeps every clip whole, in file order, cut off at the target. `vebench edit` scores both, and `vebench render` the planner's renders.
+Each footage of the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0), analysed with the 0.6B speech model and no transcript correction, planned, rendered and reviewed at each length its speech allows, with rich visuals and `--quality best`: the two groups at 16:9, the single clips at 9:16 except the screen recording. The naive baseline keeps every clip whole, in file order, cut off at the target. `vebench edit` scores both, and `vebench render` the planner's renders. Costs are those of Claude's recorded replies, which the script replays.
 
 ```bash
 # Each clip is analysed once into the index cache, then read from it
@@ -90,25 +83,24 @@ cd ../../bench && uv run vebench report synthetic/
 | screen-d (75 s) | 60 s | +0.0 % / +1.3 % | 1 / 0 → 0 of 6 | 0 of 5 | 1 of 1 | 2 (6 s) / 0 | 0 of 2, 0.0 ms | 8 (49 %, full frame 19 %) | $0.30 |
 <!-- /results -->
 
-- **How they were made:** the edits were made again on the final code, replaying the plans and the graphics Claude had written from its recorded replies; the costs are those of the replies when first asked.
 - **Length:** all 14 edits land within ±5 %, 1.2 % off on average and 3.3 % at most.
 - **Cuts inside words:** none as planned and none of 168 after review; the baseline's cut at the target falls inside a word in 7 of 14 edits. In a separate check, the review passed a cut 30 ms before a word and caught one 100 ms into it.
 - **Retakes:** the kept take was the right one in all 12 groups the edits used.
 - **Dead air:** none left, against 50 silences of a second or more, 109 s in all, in the baseline.
 - **Renders:** 0 clicks at 70 cuts, and 0.0 ms of drift.
-- **Fillers:** recall is low, 14 of 91; no other word was cut between clips. The synthetic voice runs each filler straight into the next word: the median gap after one is 0 s, and only 2 of 69 leave the 0.13 s a cut needs. Real speech is measured under [Filler measurements](#filler-measurements).
-- **Visuals:** the 14 edits show 120 graphics Claude wrote: 50 labels and 26 lower thirds over the speaker, 23 panels over the speaker at 9:16 and 21 full-frame graphics, 43 of them with an icon and none with a logo, and 54 soft sounds. Graphics are on screen for 34 to 66 % of an edit and full frame for at most 22 %. 23 more were left out: 7 that filled too little of their area (2 of them with overlapping text), 4 over a face, 2 outside the safe area, 2 that showed the sentence the captions show, 1 under the captions and 1 with a word the speaker does not say; the other 6 had no room, too close to the graphic before, giving way to a panel or full-frame graphic, or too near the end. Claude asked for two web captures: talk-a at 300 s shows 3.5 s of the Claude product page as the speaker says Claude decides the cut, and the other page did not load in time and was left out.
-- **Cost:** $6.62 for all 14 edits, $0.22 to $0.59 for a 30 or 60 s edit and $0.98 and $1.19 for the 300 s ones. The graphics are $5.34 of it: one request per 3 min of the edit to write them, and one to fix the ones the checks failed. Planning is $1.06. The cut checks cost $0.02, and those escalated to Opus $0.19. One review changed an edit.
+- **Fillers:** recall is low, 14 of 91: the synthetic voice runs each filler straight into the next word, so only 2 of 69 leave the 0.13 s a cut needs. Real speech is under [Filler measurements](#filler-measurements).
+- **Visuals:** 120 graphics: 50 labels, 26 lower thirds, 23 panels and 21 full-frame graphics, 43 with an icon, and 54 soft sounds; on screen for 34 to 66 % of an edit and full frame for at most 22 %. 23 more were left out: 17 by the checks (too little of their area filled, over a face, outside the safe area, restating the captions, under the captions, a word not said) and 6 for lack of room.
+- **Cost:** $6.62 for all 14 edits, $0.22 to $0.59 for a 30 or 60 s edit and $0.98 and $1.19 for the 300 s ones. The graphics are $5.34 of it, planning $1.06, the cut checks $0.02 and the checks escalated to Opus $0.19.
 
 ## Callout measurements
 
-Measured with `--visuals minimal`. On six frames of the synthetic screen recording screen-d, each where a thing on screen is named, `claude-haiku-5-5` boxed the API key, model and output folder fields and the Save button at 0.98 to 1.00 intersection over union with the generator's truth (`truth/regions.json`), answered not found for an `edit` command the terminal never shows, and boxed the timecodes of a scrolling editor, which the stillness check then rejects. Each request costs $0.0002: about 1,600 tokens in, for a 1280 × 720 frame. screen-d was planned four times at 45 s and 16:9 on the same index. Each time, Claude asked for the same three callouts: the API key field, the length in the terminal command and the subtitle file's timecodes. The length was never found and the timecodes were left out as moving. The API key callout, on target at 0.977 IoU (`vebench edit`), played in both edits planned with callouts, running on across a jump cut. Finding the things cost $0.0008 in three requests the first time, then $0.0002, $0.0003 and nothing, as the cache answered, on top of plans of $0.036 to $0.062. Every edit lands within ±5 % (at most 0.07 % off), with no cut inside a word, the retake chosen right and no dead air, and the render with its callout has 0 clicks and 0.0 ms of drift. At 9:16, where the screen shows whole, the same callout plays on target at 0.974 IoU.
+With `--visuals minimal`. On six frames of the synthetic screen recording screen-d, `claude-haiku-5-5` boxed the named fields and button at 0.98 to 1.00 intersection over union with the generator's truth (`truth/regions.json`), answered not found for a command the terminal never shows, and boxed the timecodes of a scrolling editor, which the stillness check then rejects. Each request costs $0.0002 (about 1,600 tokens for a 1280 × 720 frame). Planned four times at 45 s and 16:9, screen-d's API key callout played on target at 0.977 IoU (`vebench edit`), across a jump cut, and at 0.974 IoU at 9:16; every edit lands within ±5 % with no cut inside a word, no dead air, 0 clicks and 0.0 ms of drift. A second plan of the same footage asks the cache rather than Claude.
 
 ## Speech the transcript missed
 
-`place.ts` keeps cuts out of speech no word covers, and keeps clicks in a source's sound and its shot changes out of the silence a clip opens or closes with ([What code does](README.md#planning)). On 10 CC BY clips of the [corpus](../../bench/README.md#corpus-layout), analysed with `--asr cloud`, the voice stems hold 2.8 to 193.7 s of speech no word covers, 2 to 23 % of each clip, the most in real-4, a street walk. 0 to 40 % of the gaps between words that a cut would fit in hold some of it and take no cut (real-6, two people talking over each other, loses the most: 590 of its gaps to 354).
+`place.ts` keeps cuts out of speech no word covers, and keeps clicks and shot changes out of the silence a clip opens or closes with ([What code does](README.md#planning)). On 10 CC BY clips of the [corpus](../../bench/README.md#corpus-layout), analysed with `--asr cloud`, the voice stems hold 2.8 to 193.7 s of speech no word covers, 2 to 23 % of each clip, the most in real-4, a street walk; 0 to 40 % of the gaps between words that a cut would fit in hold some of it and take no cut. The quietest 5 % of the words' frames sit 23 to 45 dB under the median level of the source's words.
 
-Each edit below was made with `pnpm edit --asr cloud --quality best` and `--visuals minimal`. Every edge was checked against scribe-v2's own word timings on 3 s of source either side, and every edge inside a word was looked at on a spectrogram. One remains unclear: a real-4 clip starts 140 ms into a syllable that scribe-v2 hears and the recording shows faintly under street noise, while the denoised speech is at the level of the pauses there. The real-4 and real-9 edits were made before clicks and shot changes anywhere in a clip's opening or closing silence were checked.
+Each edit below was made with `pnpm edit --asr cloud --quality best --visuals minimal`. Every edge was checked against scribe-v2's word timings on 3 s of source either side, and every edge inside a word looked at on a spectrogram. One is unclear: a real-4 clip starts 140 ms into a syllable faint under street noise, where the denoised speech is at the level of the pauses.
 
 <!-- results:engine-unheard -->
 | Footage | Asked | Made | Clicks, drift | Edges checked | Claude |
@@ -118,11 +110,9 @@ Each edit below was made with `pnpm edit --asr cloud --quality best` and `--visu
 | real-9: couch conversation, English, 16.5 min | 3 min, 16:9 | 171.3 s (-4.8 %) | 0 of 5, 0.0 ms | 12: none inside a word | $0.23 |
 <!-- /results -->
 
-**real-3's own splice:** the creator cut their call at about 472.3 s: the picture changes take at 472.305 s and the sound jumps at 472.443 s, where the next sound starts. TransNetV2 finds no shot change there (frame-to-frame change 4.2 at most, as in ordinary motion, against 25.7 at the shot change it finds at 473.106 s), and the jump sits at the start of that sound rather than in the silence before it, so neither rule moves the cut: the first frame after the jump, 472.473 s, is 30 ms into the sound. The re-edit starts that clip at 472.339 s, on the new take's picture, 0.1 s before the jump, which plays inside the clip as it does in the source; `vebench render` counts no click at the cut.
-
 ## Quality measurements
 
-The talk-a and chat-b groups were planned, rendered and reviewed at 60 and 300 s, at 9:16 and 16:9, twice each, at both qualities: 32 edits, from indexes of the 720p corpus (seed 0) that `vework analyze` wrote at 277effa. They were measured with `--visuals minimal`, so their costs are those of edits without them.
+The talk-a and chat-b groups of the 720p corpus (seed 0), planned, rendered and reviewed at 60 and 300 s, at 9:16 and 16:9, twice each, at both qualities: 32 edits with `--visuals minimal`, so their costs are those of edits without rich visuals.
 
 ```bash
 node scripts/plan-corpus.ts <corpus> --group talk-a --group chat-b --lengths 60,300 \
@@ -141,18 +131,17 @@ cd ../../bench && uv run vebench report <corpus>
 | chat-b | 300 s | best | 0.1 / 0.2 % | 0 of 206 | 9 of 92 | 0 | 12 of 12 | 0 | 0 of 99, 0.0 ms | $0.178 ($0.151–0.209) |
 | chat-b | 300 s | economy | 0.1 / 0.3 % | 0 of 206 | 10 of 92 | 0 | 12 of 12 | 0 | 0 of 99, 0.0 ms | $0.076 ($0.071–0.087) |
 
-- **Cost:** $0.138 an edit on average at `best` and $0.068 at `economy`, 49 % of it. At `best`, the plan is 78 % of the cost and the judging of doubtful checks 18 %: Opus writes 2,000 to 6,000 tokens for a plan, mostly thinking, at $20 a million. Sonnet writes about as many at half the price, and judges a doubtful check for $0.005 against Opus's $0.013. The Haiku checks cost $0.001 to $0.007 an edit. Every edit was reviewed once: no review changed it.
-- **Quality:** every edit lands within ±5 %, with no cut inside a word, no dead air, no clicks and no drift. Each kept take is the right one, at both qualities. Sonnet's edits land nearer the target length. Other words cut between clips are timed truth words that are not fillers, cut out between clips under 3 s apart in their source, which `vebench` counts against filler precision. Here they are short whole lines a 60 s edit leaves out of the story, such as 「所以這個 project 想做的事情很單純，」; `best` leaves out such lines in some runs too. Which moments each quality picks, and how the story reads, is not measured: people have not rated these edits yet.
-- **Caching:** the system prompt and the packed transcripts, 7,200 to 8,300 tokens, are the only prefix requests repeat. A plan's first request writes them at 1.25 times the input price; another plan of the same footage within 5 minutes, at another aspect or asking for more material, reads them at a twentieth of Opus's input price or a tenth of Sonnet's. A 60 s and a 300 s plan differ in their instructions and schema, so they do not share it. Over these runs, 7 of 17 economy plans and 3 of 16 best plans read it: caching saved 6 % of economy's planning cost and cost best 1 % more. The cut checks and judgements each send a different picture after an instruction too short to cache.
+- **Cost:** $0.138 an edit on average at `best` and $0.068 at `economy`, 49 % of it. At `best`, the plan is 78 % of the cost and judging doubtful checks 18 %; Sonnet judges a doubtful check for $0.005 against Opus's $0.013. The Haiku checks cost $0.001 to $0.007 an edit. No review changed an edit.
+- **Quality:** every edit lands within ±5 %, with no cut inside a word, no dead air, no clicks and no drift, and each kept take is the right one, at both qualities. "Other words cut between clips" are whole short lines a 60 s edit leaves out of the story, which `vebench` counts against filler precision. How the story reads is not measured.
+- **Caching:** the system prompt and packed transcripts (7,200 to 8,300 tokens) are the prefix requests repeat; another plan of the same footage within 5 minutes reads them at a twentieth of Opus's input price or a tenth of Sonnet's. Over these runs caching saved 6 % of economy's planning cost and cost best 1 % more.
 
 ## Filler measurements
 
-How many fillers an edit cuts with `--fillers natural`, the default, before filler modes (ea6906f: hesitations, 那個 and 就是 marked, and a filler cut only with 0.13 s of silence on each side) and after them, where a filler said straight into the next word is also cut where the speech dips 20 dB under both words (`joinAt`). Each edit was planned, rendered and reviewed once at 16:9 with `--visuals minimal` and `--quality best`, from indexes the 0.6B speech model wrote without correction; the two real ones are cut from 3 min of their clip with `--within`. `--fillers aggressive` and `off` were not measured.
+Fillers cut with `--fillers natural`, the default. Each cell reads A → B: A cuts a filler only with 0.13 s of silence on each side; B, as the planner now cuts, also where the speech dips 20 dB under both words (`joinAt`). Each edit was planned, rendered and reviewed once at 16:9 with `--visuals minimal` and `--quality best`, from indexes the 0.6B speech model wrote without correction; the two real ones are cut from 3 min of their clip with `--within`.
 
-- **Truth on real speech:** in 3 min of each of two openly licensed recordings, every filler, stutter and false start was marked against the audio. Each was found from the aligner's timings and a second transcript by ElevenLabs scribe-v2 (on OpenRouter), and each edge was set on a spectrogram crop; where a filler runs straight into the next word, scribe-v2 also heard the two sides cut apart. real-2 holds 21 (11 verbal tics, 5 hesitations, 3 false starts, 2 stutters), real-9 27 (16 verbal tics, 6 stutters, 4 false starts, 1 hesitation). The truth words beside each filler end where it starts; the others keep the aligner's timings. `vebench edit` scores them as it scores synthetic truth.
-- **What the speech model wrote:** all 21 of real-2's as words of their own. In real-9 it left out 5, each merged into the word beside it (3 false starts, a hesitation and a verbal tic), which no plan can cut.
-- **What a cut allows:** by the aligner's timings and `joinAt`, 4 of real-2's 21 fillers and 2 of real-9's can be cut on both sides; with only pauses of 80 ms or more, 3 and none. The rest stay, said into the word beside them without a dip.
-- **Sound edges:** the after edits cut at a sound edge (`soundIn`, `soundOut`) at 3 points of the real clips, both real-2 edits at the same 2, and 12 times in the synthetic ones. Each of the 3 real points, looked at on a spectrogram, lies in a pause or in the dip between two words.
+- **Truth on real speech:** in 3 min of each of two openly licensed recordings, every filler, stutter and false start was marked against the audio and each edge set on a spectrogram: real-2 holds 21, real-9 27. `vebench edit` scores them as it scores synthetic truth.
+- **What the speech model wrote:** all 21 of real-2's as words of their own; in real-9 it merged 5 into the word beside them, which no plan can cut.
+- **What a cut allows:** by the aligner's timings and `joinAt`, 4 of real-2's 21 fillers and 2 of real-9's can be cut on both sides; the rest are said into the word beside them without a dip.
 
 <!-- results:engine-fillers -->
 | Footage | Target | Length | Fillers cut | Other words cut inside lines | Cuts inside words, strict / heard | Clicks, drift | Claude |
@@ -166,13 +155,12 @@ How many fillers an edit cuts with `--fillers natural`, the default, before fill
 | chat-b (3 clips, 6.7 min) | 300 s | 300.9 → 300.0 s | 1 of 23 → 8 of 23 | 0 → 0 | 0 / 0 of 48 → 2 / 0 of 62 | 0 of 23 → 0 of 30, 0.0 ms | $0.14 → $0.25 |
 <!-- /results -->
 
-- **Cuts inside words:** "strict" counts the sound edges strictly inside a truth word (`in_words`), "heard" those where the recording over the 20 ms beside the edge on the side that plays is less than 20 dB under the quieter word (`in_words_heard`). The 3 strict ones are sound edges where two synthetic words meet, 2 to 21 ms off the generator's boundary, each in the dip between them. At the picture's edges (`--edges picture`), which play muted where they pass a sound edge, the after edits have 1 cut inside a word on real-9 (24 ms) and 9 on the synthetic ones (up to 24 ms), 3 of them heard.
-- **Other words cut:** real-2 at 150 s leaves out the last line of a segment to fit the length, and chat-b at 60 s a line Claude did not choose for the story; no edit cut a word inside a line that is not a filler.
-- **Cost:** a 1-minute edit of real-2's 3 min with the defaults, rich visuals included, cost $0.32 before and $0.35 after with the filler instructions, its plan $0.076 and $0.081; cutting where the speech dips changes no request.
+- **Cuts inside words:** "strict" counts sound edges strictly inside a truth word (`in_words`), "heard" those where the recording beside the edge on the side that plays is less than 20 dB under the quieter word (`in_words_heard`). The 3 strict ones are sound edges where two synthetic words meet, each in the dip between them.
+- **Other words cut:** real-2 at 150 s leaves out the last line of a segment to fit the length, and chat-b at 60 s a line Claude did not choose; no edit cut a word inside a line that is not a filler.
 
 ## Music measurements
 
-The two synthetic groups, each with a silent 20 s test pattern added as B-roll, were planned, rendered and reviewed at 16:9 with the corpus's three synthetic tracks offered; so was a two-clip talk show from the corpus (5.5 min, Mandarin, three people on a sofa) with four licensed tracks: a jazz trio and an orchestral piece and a synth track (CC BY 4.0), and a chill electronic groove (CC0). `vebench report` scores them from the stems the renderer writes.
+The two synthetic groups, each with a silent 20 s test pattern added as B-roll, planned, rendered and reviewed at 16:9 with the corpus's three synthetic tracks offered; and a two-clip talk show from the corpus (5.5 min, Mandarin, three people) with four licensed tracks. `--visuals minimal`. `vebench report` scores them from the stems the renderer writes.
 
 ```bash
 # Each track analysed first: vework analyze-music <track> -o <track>.music.json --license "CC0 1.0"
@@ -192,13 +180,12 @@ cd ../../bench && uv run vebench report synthetic/
 | talk show | 60 s | the chill groove, its first section | +1.6 % | 19.9 dB, 12.6 dB | – |
 | talk show | 150 s | the chill groove, its first section | +0.8 % | 21.9 dB, 13.9 dB | – |
 
-- **Speech over music:** the voice, through each source's [voice chain](README.md#voice), stays at least 19.9 dB over the music while anyone talks, against the 18 dB aimed for. The quietest 5 % of 400 ms windows, the ends of phrases, keep 12.6 dB or more. Under the talk show's quieter guests the render rides the music further down.
-- **Beats:** every B-roll end lands on a beat, and so does every start with a beat within 150 ms of its line, 18 of 24 edges in all, at most 25 ms from the true beat on the 25 fps frame grid. The other 6 starts had no beat that near.
-- **Clicks and drift:** none at the 65 cuts, measured in the sound without the music, nor at the music's 15 joins; no drift. Planned without music, the same footage and lengths had no clicks at 66 cuts either, and lengths within ±4.2 % (±3.7 % with music).
-- **Choice:** Claude put the 112 BPM track under the energetic short talks and the 96 BPM one, from its quiet intro, under the conversations and the long talk; under the talk show it chose the chill groove. A 300 s edit plays the 71 s track's intro and main part five times, then its outro, and ends on the track's ending.
-- **Not measured yet:** how people rate the result.
+- **Speech over music:** the voice stays at least 19.9 dB over the music while anyone talks, against the 18 dB aimed for; the quietest 5 % of 400 ms windows keep 12.6 dB or more.
+- **Beats:** every B-roll end lands on a beat, and so does every start with a beat within 150 ms of its line, 18 of 24 edges in all, at most 25 ms from the true beat on the 25 fps frame grid.
+- **Clicks and drift:** none at the 65 cuts, nor at the music's 15 joins; no drift.
+- **Choice:** Claude put the 112 BPM track under the energetic short talks and the 96 BPM one under the conversations and the long talk. A 300 s edit plays the 71 s track's intro and main part five times, then its outro, and ends on the track's ending.
 
-Every plan request lists the built-in library's 40 tracks, about 10,000 characters, when the user gives no music. Three `pnpm edit` runs of the synthetic talk-a (seed 0), at 16:9 with `--visuals minimal`, the library offered and no stock footage, measured what that listing costs; `estimateCost` is fitted to them.
+Every plan request lists the built-in library's 40 tracks, about 10,000 characters, when the user gives no music. These `pnpm edit` runs of the synthetic talk-a (seed 0), at 16:9 with `--visuals minimal` and the library offered, measure what that listing costs; `estimateCost` is fitted to them.
 
 ```bash
 PEXELS_API_KEY= PIXABAY_API_KEY= node --env-file=../../.env src/edit/cli.ts ../../bench/synthetic/talk-a{1,2,3}/source.mp4 \
@@ -215,7 +202,7 @@ PEXELS_API_KEY= PIXABAY_API_KEY= node --env-file=../../.env src/edit/cli.ts ../.
 
 ## Changing an edit
 
-Measured with `--visuals minimal`, on a 60 s 9:16 edit of the [synthetic](../../bench/README.md#synthetic-corpus) conversation chat-b (seed 0) with music, a lower third and two keywords: a fresh agent with only the skill made three versions from what a person would say, twice. It cut the 4.1 s segment about clicks at the joins with `--cut 29.14-32.72` and `--retarget`, fixed a misheard caption (能比如說 to 嗯　比如說) and added a title, shortened to end where the first keyword starts. The planned edit rendered in 32 s on the reference machine; the agents' renders took 39 s to 2.8 min, with other renders running beside them. By hand, one more cut took a sentence out of the middle of a clip (`--cut 43.56-47.56 --retarget`), which split it in the pauses on either side, and two more versions covered the other recipes: a lower third's role, a keyword removed and one added, a chapter, the music 3 dB down, then no music and the `warm` look. `vebench report` on all of them:
+A 60 s 9:16 edit of the [synthetic](../../bench/README.md#synthetic-corpus) chat-b (seed 0) with music, a lower third and two keywords, `--visuals minimal`, changed by a fresh agent with only the skill from what a person would say, twice, and by hand for the other recipes. `vebench report` on every version:
 
 | Version | Length | Cuts inside words | Clicks, drift |
 |---|---|---|---|
@@ -225,11 +212,11 @@ Measured with `--visuals minimal`, on a 60 s 9:16 edit of the [synthetic](../../
 | A sentence cut from inside a clip | 54.83 s | 0 of 16 | 0 of 7, 0.0 ms |
 | The other recipes, two versions | 59.57 s | 0 of 14 | 0 of 6, 0.0 ms |
 
-On frames from each version the captions showed the words then said and lit the word being said, the keyword added landed on its word, and every frame after the cut matched the planned edit's frame 4.133 s later, captions included.
+The planned edit rendered in 32 s. On frames from each version the captions showed the words then said, the keyword added landed on its word, and every frame after the cut matched the planned edit's frame 4.133 s later.
 
 ## Analysis measurements
 
-Three openly licensed 1080p web recordings, each analysed cold (`vework analyze --asr cloud`, no index cached) on the reference machine with nothing else running (1-minute load average under 0.4 at the start), one after another. Each step's time is from the progress lines. Transcription is OpenRouter's response time.
+Three openly licensed 1080p web recordings, each analysed cold (`vework analyze --asr cloud`) on the otherwise idle reference machine, one after another. Each step's time is from the progress lines; transcription is OpenRouter's response time.
 
 | Source | Length | Codec, fps | Analysis | Shots | Faces | Transcription | Alignment |
 |---|---|---|---|---|---|---|---|
@@ -237,24 +224,24 @@ Three openly licensed 1080p web recordings, each analysed cold (`vework analyze 
 | Recording B | 13.9 min | H.264, 30 | 415 s (0.50×) | 135 s | 46 s | 54 s | 119 s |
 | Recording C, two people talking | 20.9 min | AV1, 60 | 789 s (0.63×) | 403 s | 111 s | 31 s | 176 s |
 
-- **Under the source's length:** every analysis took less than the source lasts. With three edits running at once (load average about 24), the same files took 2 to 5 times their length: 5 to 8 times as long as here.
-- **Shot detection** is the longest step, a third to a half of the run, and grows with the frame count: 60 fps footage takes twice as long a minute as 30 fps. Scoring fewer frames of 60 fps footage would halve it but would change what TransNetV2 sees.
+- **Under the source's length:** every analysis took less than the source lasts. With three edits running at once, the same files took 2 to 5 times their length.
+- **Shot detection** is the longest step, a third to a half of the run, and grows with the frame count: 60 fps footage takes twice as long a minute as 30 fps.
 
 ## Framing measurements
 
-On the synthetic corpus's three conversations, framed 9:16, the face of the person talking is inside the crop 99.4 % of the time it is on screen, missing only replies too short to turn to; a centre crop holds it 80.5 % of the time, and in the wide shots shows the empty space between the two people. Each talker is taken as the face the analysis names most while the corpus's truth has them talking in a shot. With split screens, 31 s of the three clips' wide shots, where both people take turns, show both at once, one above the other, and the share is the same 99.4 % of 3,131 samples; in 106 s of close shots, where a drawn head touches the picture's top, the crop reaches past the picture under a blurred band. Cut together from eight clips, the moving crops add no clicks and no drift (`vebench render`: 0 of 7 cuts, 0.0 ms).
+On the synthetic corpus's three conversations, framed 9:16, the face of the person talking is inside the crop 99.4 % of the time it is on screen, missing only replies too short to turn to; a centre crop holds it 80.5 % of the time. The share is the same with split screens, which show both people in 31 s of wide shots. Cut together from eight clips, the moving crops add no clicks and no drift (`vebench render`: 0 of 7 cuts, 0.0 ms).
 
 ## Caption measurements
 
-The planner's edits of the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0) talk-a2, 30 s at 9:16, and chat-b, 60 s at 16:9, rendered with their captions score as they do without them in `vebench report`: 1.7 % and 2.3 % off the length, no cut inside a word, 0 clicks and 0.0 ms drift. On a 62.6 s 9:16 edit of a corpus interview, libass draws the `bold` captions (1,260 events over 1,566 frames at 1080×1920) in 3.2 s more than decoding the frames alone takes, about 2 ms a frame. Captions are drawn by libass rather than as web pages: an effect page takes 48 to 128 ms a frame at 1080×1920 ([effects](#effect-measurements)), about 25 to 60 times as long. The two have not been compared by look.
+The planner's edits of the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0) talk-a2, 30 s at 9:16, and chat-b, 60 s at 16:9, rendered with their captions score as they do without them in `vebench report`: 1.7 % and 2.3 % off the length, no cut inside a word, 0 clicks and 0.0 ms drift. On a 62.6 s 9:16 edit, libass draws the `bold` captions (1,260 events over 1,566 frames at 1080×1920) in about 2 ms a frame.
 
-**Caption text.** The six talk-a and chat-b clips of the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0) were analysed with the everyday dictionaries, the Latin words split from full-width marks and Chinese numerals by Latin words in digits ([Taiwan Traditional Chinese](../../worker/README.md#taiwan-traditional-chinese)), with the local speech model. Against the corpus's truth (`vebench transcript`), the mixed error rate is 6.34 % on talk-a2, where 文件 stays where the script says 檔案, and 3.27 % on talk-a1, where the speech model's 支持 stays where the script says 不支援. A mark the transcript puts in front of an English word (了 。OK, 對 ，um) stays with the word before it. The planner's edits of chat-b at 60 s 9:16 and talk-a at 60 s 16:9 land at 61.1 and 60.0 s, with no cut inside a word (0 of 12 and 0 of 14), 0 clicks and 0.0 ms of drift. On a 60 s 9:16 edit of a CC BY product review the captions show Pocket 3, 4P, 60mm and 類型, as the speaker's own burned-in subtitles write them; its transcript times OK，, Let's and go as three words, and the line 到底值不值得？OK，Let's go, which this edit leaves out, lays out at 9:16 as 等了這麼久 / 到底值不值得？ then OK, Let's go.
+**Caption text.** Against the corpus's truth (`vebench transcript`), the six talk-a and chat-b clips, analysed with the local speech model and [Taiwan Traditional Chinese](../../worker/README.md#taiwan-traditional-chinese) conversion, have a mixed error rate of 6.34 % on talk-a2 and 3.27 % on talk-a1. The planner's edits of chat-b at 60 s 9:16 and talk-a at 60 s 16:9 land at 61.1 and 60.0 s, with no cut inside a word (0 of 12 and 0 of 14), 0 clicks and 0.0 ms of drift.
 
-**Caption styles.** The planner's edits of the [synthetic corpus](../../bench/README.md#synthetic-corpus) (seed 0) chat-b at 60 s 9:16 and talk-a at 60 s 16:9, each rendered again from its `project.json` in `creator`, `minimal`, `pop` and `none` with no new plan, score as the `bold` render does in `vebench report`: 60.0 s and 61.5 s (within 2.5 %), no cut inside a word (0 of 22), 0 clicks at 9 cuts and 0.0 ms of drift. The SubRip file follows each style's captions (24 cues of chat-b in `bold`, 57 in `creator`, 18 in `minimal`, 25 in `pop`) and in `none` is `bold`'s. Graphics are planned clear of every style's captions: over four edits (chat-b, talk-a, and 60 s 9:16 edits of two CC BY 3.0 talking-head videos) one graphic was left out for lying under the captions.
+**Caption styles.** The same two edits rendered again in `creator`, `minimal`, `pop` and `none` with no new plan score as the `bold` render does: within 2.5 % of the length, no cut inside a word (0 of 22), 0 clicks at 9 cuts and 0.0 ms of drift. The SubRip file follows each style's captions (24 cues of chat-b in `bold`, 57 in `creator`, 18 in `minimal`, 25 in `pop`) and in `none` is `bold`'s. Over four edits one graphic was left out for lying under a style's captions.
 
 ## Render measurements
 
-These runs use synthetic footage from `scripts/synthetic-edit.ts`. The script renders two edits from test patterns at 1920×1080, the first also with effect overlays across its cuts. The sources cover 24, 25, 30 and 60 fps, a variable rate, a rotated phone clip, 10-bit PQ, a file without sound and a silent track, each with its own tone.
+`scripts/synthetic-edit.ts` renders two edits from test patterns at 1920×1080, the first also with effect overlays across its cuts. The sources cover 24, 25, 30 and 60 fps, a variable rate, a rotated phone clip, 10-bit PQ, a file without sound and a silent track, each with its own tone.
 
 ```bash
 node scripts/synthetic-edit.ts /tmp/synthetic-edit --width 1920 --height 1080
@@ -263,11 +250,18 @@ cd ../../bench && uv run vebench report /tmp/synthetic-edit
 
 | `vebench report` | Cuts | Clicks | Max \|drift\| |
 |---|---|---|---|
-| This renderer: 14 hard cuts, then dissolves, a dip, B-roll and framing | 18 | 0 | 0.0 ms |
-| The same 14 cuts with each clip encoded alone with 30 ms fades and joined with `-c copy` | 13 | 0 | 57.6 ms |
+| 14 hard cuts, then dissolves, a dip, B-roll and framing | 18 | 0 | 0.0 ms |
 | The same 14 cuts with five effect overlays across them | 13 | 0 | 0.0 ms |
 
-Peak memory of the whole render without overlays, every FFmpeg process included, on 0.4–0.5 s clips. Each overlay a piece spans adds one VP9 decoder ([its memory](../effects/README.md#rendering)).
+**Fades at cuts.** The 14-clip edit at 320×180, every cut splicing two different tones, scored with `vebench render` for each fade at every cut. The renderer uses a 5 ms raised cosine, twice what it needs:
+
+| Fade at each cut | 0 | 1 ms | 2.5 ms | 5 ms | 10 ms |
+|---|---|---|---|---|---|
+| Triangle | 12/13 clicks | 6 | 0 | 0 | 0 |
+| Quarter sine (equal power) | 12 | 4 | 1 | 0 | 0 |
+| Raised cosine | 12 | 0 | 0 | 0 | 0 |
+
+**Memory.** Peak memory of the whole render without overlays, every FFmpeg process included, on 0.4–0.5 s clips, against one FFmpeg with an input per clip. Each overlay a piece spans adds one VP9 decoder ([its memory](../effects/README.md#rendering)).
 
 | Source | Clips | One FFmpeg with an input per clip | Pieces |
 |---|---|---|---|
@@ -276,9 +270,9 @@ Peak memory of the whole render without overlays, every FFmpeg process included,
 
 ## Effect measurements
 
-The effects and motion graphics render with [HyperFrames](../effects/README.md#rendering) in Chrome Headless Shell; these were measured with HyperFrames 0.8.164 and Chrome Headless Shell 149.
+The effects and motion graphics render with [HyperFrames](../effects/README.md#rendering) in Chrome Headless Shell (HyperFrames 0.8.164, Chrome Headless Shell 149).
 
-**Speed.** The same content at the same sizes and frame counts: two full-frame checklists of 105 frames at 1080×1920 and 1920×1080, and two lower thirds of 120 frames with alpha. Each figure is seconds for both renders of a pair, with 4 workers.
+**Speed.** Two full-frame checklists of 105 frames at 1080×1920 and 1920×1080, and two lower thirds of 120 frames with alpha. Each figure is seconds for both renders of a pair, with 4 workers.
 
 | Machine | Full frame | Lower thirds |
 |---|--:|--:|
@@ -287,11 +281,11 @@ The effects and motion graphics render with [HyperFrames](../effects/README.md#r
 | GitHub's macOS runner (arm64) | 49–58 | 22–26 |
 | GitHub's Windows runner | 44–46 | 31–32 |
 
-- **Lower thirds at their own size:** a label or lower third renders only at the box it draws in, with alpha: 9.5 s on Linux, 15 to 17 s on macOS and 18 s on Windows for the pair.
-- **Opaque pages:** a full-frame graphic or panel renders as H.264 without alpha, which HyperFrames captures faster on Linux: 48 ms a frame for a 1080×1920 graphic, against 128 ms for the same page with alpha.
-- **Same frames every time:** every file's decoded frames hashed the same over three renders on each system (`framemd5`). The WebM files' bytes differ between runs, in their mux metadata. Frames differ between systems, each of which runs its own Chrome build.
+- **Lower thirds at their own size:** a label or lower third renders only at the box it draws in: 9.5 s on Linux, 15 to 17 s on macOS and 18 s on Windows for the pair.
+- **Opaque pages:** a full-frame graphic or panel renders as H.264 without alpha: 48 ms a frame for a 1080×1920 graphic on Linux, against 128 ms with alpha.
+- **Same frames every time:** every file's decoded frames hashed the same over three renders on each system (`framemd5`). Frames differ between systems, each of which runs its own Chrome build.
 
-**Graphics on real footage.** Six edits of CC BY clips of the [corpus](../../bench/README.md#corpus-layout) were made with `pnpm edit --asr cloud --quality best`. Claude wrote each edit's graphics in one request and fixed the ones the checks failed in one more; what still failed was left out.
+**Graphics on real footage.** Six edits of CC BY clips of the [corpus](../../bench/README.md#corpus-layout) with `pnpm edit --asr cloud --quality best`. Claude wrote each edit's graphics in one request and fixed the ones the checks failed in one more; what still failed was left out.
 
 | Edit | Written | Kept | With icons | Left out because | Claude: all, graphics |
 |---|--:|--:|--:|---|---|
@@ -302,17 +296,14 @@ The effects and motion graphics render with [HyperFrames](../effects/README.md#r
 | real-2, 3 min at 16:9 | 21 | 20 | 10 | 1 too near the end | $0.76, $0.63 |
 | real-6, 3 min at 16:9 | 18 | 15 | 6 | 1 texts overlap, 1 a word not said, 1 too close to the one before | $0.93, $0.74 |
 
-- **Cost:** a 60 s edit cost $0.41 to $0.51 in all, a 3 min one $0.76 and $0.93. The graphics are 75 to 85 % of it; writing them is half to most of that, the fix request the rest.
+- **Cost:** a 60 s edit cost $0.41 to $0.51 in all, a 3 min one $0.76 and $0.93. The graphics are 75 to 85 % of it.
 - **Hard rules:** every edit lands within ±5 % of its length (−3.2 to +4.4 %), with 0 clicks at 18 cuts and 0.0 ms of drift.
 - **Icons and logos:** 28 of the 72 graphics kept mark their words with an icon. None shows a logo: no clip names a brand among the bundled logos.
-- **Which checks:** the real-2 and real-8 60 s edits were made with the checks that count a unit said after a number as said (27 and 歲 apart) and a graphic's icons toward how much of its area it fills; the other four before those two checks.
-- **Still stretches:** real-2 at 60 s was made with the request for a graphic where the picture holds still longer than the shape allows: 2 of its 13 graphics were written for such stretches. The planner table and the other edits here were measured before that request, and before a capture had to be named in its line.
-- **Restating a phrase:** the table's real-2 60 s edit opens on a panel reading 害怕 becoming thirty？ over the line 會害怕 becoming thirty 嗎？, which the check for a run of eight passes. The check for most of a phrase leaves such a panel out: the same footage edited with it opens on 害怕 and THIRTY: 8 graphics, 60.0 s, 0 clicks, Claude $0.57.
 - **What the checks do not see:** text already drawn into the footage. Some of real-6's lower thirds land on its own titles.
 
 ## Colour measurements
 
-`scripts/finishing-preview.ts` draws one synthetic scene, a colour chart and six skin tones beside a face, and records it through four cameras with known differences: the reference; one warm and dark (white balance R ×1.18, B ×0.80, −0.4 stop); one cool, flat and bright (R ×0.88, B ×1.15, +0.3 stop, saturation ×0.9, contrast ×0.85); and one punchy and green (G ×1.06, saturation ×1.2, contrast ×1.12). White balance and exposure act in linear light, saturation and contrast in R'G'B', and each is clipped to 8 bits as a camera records. The four are cut into one edit and graded as the planner grades it, and every patch's mean colour is compared with the reference camera's by CIEDE2000.
+`scripts/finishing-preview.ts` draws one synthetic scene, a colour chart and six skin tones beside a face, and records it through four cameras with known differences: the reference; one warm and dark (white balance R ×1.18, B ×0.80, −0.4 stop); one cool, flat and bright (R ×0.88, B ×1.15, +0.3 stop, saturation ×0.9, contrast ×0.85); and one punchy and green (G ×1.06, saturation ×1.2, contrast ×1.12), each clipped to 8 bits as a camera records. The four are cut into one edit and graded as the planner grades it, and every patch's mean colour is compared with the reference camera's by CIEDE2000.
 
 ```bash
 node scripts/finishing-preview.ts out/finishing --scene <clip folder>@<seconds> --edit <run folder>
@@ -326,13 +317,13 @@ node scripts/finishing-preview.ts out/finishing --scene <clip folder>@<seconds> 
 | Cool, flat and bright | 5.48 / 7.03 / 6.29 | 1.11 / 3.61 / 1.00 | 1.28 / 3.20 / 1.64 |
 | Punchy and green | 4.63 / 6.38 / 4.79 | 0.95 / 5.52 / 0.97 | 0.97 / 5.49 / 1.03 |
 
-**The bar: a mean ΔE00 of 2 or less for each camera.** A ΔE00 of about 1 is the smallest difference seen with two colours side by side; display calibration commonly accepts an average under 2 as accurate. Shots in an edit are seen one after another, not side by side, so a camera within 2 of the reference on average reads as the same camera. Every matched camera meets it, and so do its skin tones. The largest differences left for the cool and punchy cameras are on the white patch, which they recorded past 255: no correction brings back what was not recorded.
+**The bar: a mean ΔE00 of 2 or less for each camera**, which reads as the same camera when shots are seen one after another. Every matched camera meets it, and so do its skin tones. The largest differences left are on the white patch, which the cool and punchy cameras recorded past 255.
 
-**Real footage.** A corpus interview is cut from three cameras: a wide two-shot and a close-up of each person. Each camera's footage was cut into its own source, and an edit alternating between them was graded as the planner grades it. Both cameras were left unmatched ([matching](README.md#matching)), so each surface differs as much afterwards as before. One person's cheek, in the wide shot and in the close-up the edit uses most, differs by ΔE00 17.4, mostly in chroma (C* 39.6 against 15.0). The other person's cheek, in the wide shot and in that person's close-up, differs by 10.2. The angle of the light on a face changes with the camera, so not all of these differences are the cameras'.
+**Real footage.** A corpus interview cut from three cameras, a wide two-shot and a close-up of each person: the wide shot leaves a residual of 0.056 against the close-up used most and the other close-up 0.033, so neither is matched ([matching](README.md#matching)). One person's cheek differs between the wide shot and the close-up by ΔE00 17.4, mostly in chroma; the other person's by 10.2. The angle of the light on a face changes with the camera, so not all of these differences are the cameras'.
 
 ## Voice measurements
 
-**Synthetic.** Two [synthetic-corpus](../../bench/README.md#synthetic-corpus) clips degraded on purpose: `phone-c` (voice B, 77 s, rendered 9:16 to -14 LUFS) and `screen-d` (voice A, 75 s, 16:9 to -16 LUFS). Each was given pink noise at 20 and 10 dB SNR against its speech, a synthetic room (exponentially decaying noise, as loud as the direct sound) of RT60 0.6 s, a 0.5 s room with noise at 15 dB, or its level stepped down by 12 dB and then up to -5 dB over half a second each, as a speaker turning away does. `vework analyze` measured each, `planVoice` chose its chain, and it was rendered whole and cut at its pauses, without a voice chain ("plain") and with one. The speech-only measures read the synthetic truth's word times; "room under the speech" is speech loudness minus the noise floor; a word's drop is its level against the clip as generated, less the median of all words' change.
+**Synthetic.** Two [synthetic-corpus](../../bench/README.md#synthetic-corpus) clips degraded on purpose: `phone-c` (voice B, 77 s, rendered 9:16 to -14 LUFS) and `screen-d` (voice A, 75 s, 16:9 to -16 LUFS). Each was given pink noise at 20 and 10 dB SNR, a synthetic room of RT60 0.6 s, a 0.5 s room with noise at 15 dB, or its level stepped down by 12 dB and up to -5 dB, as a speaker turning away does. `vework analyze` measured each, `planVoice` chose its chain, and it was rendered whole and cut at its pauses, without a voice chain ("plain") and with one. "Room under the speech" is speech loudness minus the noise floor; a word's drop is its level against the clip as generated, less the median of all words' change.
 
 | Degradation | Clip | Chain chosen | Room under the speech | Loudness range | Spread of the thirds | RT60 | Words over 6 dB down (worst) |
 |---|---|---|---|---|---|---|---|
@@ -349,12 +340,12 @@ node scripts/finishing-preview.ts out/finishing --scene <clip folder>@<seconds> 
 | Level steps of -12 and -5 dB | phone | denoise 25.1 dB, leveller, EQ -3.5 / +3.6, 2:1 | 27 → 41 dB | 7.0 → 3.2 LU | 5.0 → 0.3 dB | 0.13 → 0.09 s | 0 (-5.8) → 2 (-6.4) |
 | Level steps of -12 and -5 dB | screen | denoise 23.5 dB, leveller, EQ +4, 2:1 | 28 → 43 dB | 10.6 → 2.9 LU | 7.7 → 0.8 dB | 0.10 → 0.09 s | 43 (-9.5) → 2 (-7.8) |
 
-- **Noise:** the room ends 12 to 25 dB further under the speech than in the plain render, at the same loudness; the plain render's dynamic loudness pass lifts it by up to 4 dB over the source. DeepFilterNet lowers reverberation as well: the 0.6 s rooms read 0.25 s in its output and about 0.35 s after the chain, whose compression lifts the tail after each word again.
-- **Levels:** every voice render reads its speech at -13.5 to -13.6 LUFS (9:16) or -15.6 (16:9) whatever was done to it; the plain renders spread over 1.4 LU. The leveller turns the stepped clips' 12 dB between their thirds into 0.3 and 0.8 dB, where the plain render's dynamic loudness pass leaves 5.0 and 7.7.
-- **No word is gated, but heavy noise costs voice B a few soft syllables.** The denoised stem keeps every word of the clean clips within 0.2 dB of the rest, and voice A within 6 dB everywhere. Most drops in the table are the EQ's work on hummed words such as "um" under the low-mid cut. In noise at 15 dB or less, the denoiser also lowers a few of voice B's soft syllables, the nasal 名 by 9 dB at 10 dB SNR and by 15 dB in the noisy room; mixing the recording back by its limit does not bring them back. The plain renders' drops are the level steps themselves.
-- **Peaks:** with the limiter, loudness normalisation reaches its target with one linear gain on every voice render (true peak -3.1 to -7.2 dBTP); every plain render needed loudnorm's dynamic mode. No render has a sample within 0.1 dB of full scale.
+- **Noise:** the room ends 12 to 25 dB further under the speech than in the plain render, at the same loudness. The 0.6 s rooms read about 0.35 s after the chain.
+- **Levels:** every voice render reads its speech at -13.5 to -13.6 LUFS (9:16) or -15.6 (16:9); the plain renders spread over 1.4 LU. The leveller turns the stepped clips' 12 dB between their thirds into 0.3 and 0.8 dB.
+- **Words:** no word is gated. Most drops in the table are the EQ's low-mid cut on hummed words such as "um"; in noise at 15 dB or less the denoiser also lowers a few of voice B's soft syllables, by up to 15 dB.
+- **Peaks:** with the limiter, loudness normalisation reaches its target with one linear gain on every voice render (true peak -3.1 to -7.2 dBTP). No render has a sample within 0.1 dB of full scale.
 
-**Real recordings.** Three openly licensed [corpus](../../bench/README.md#corpus-layout) clips with audible rooms, measured the same way against their own recording and the words `vework` transcribed from it (their transcripts are not hand-checked yet): `wikilive-d1` and `wikilive-d2`, a webcam livestream talk show of one host and two guests (172 s and 159 s), and `wikidata-openrefine`, a meetup filmed across the room (176 s, about 60 % speech). All three are 16:9, rendered to -16 LUFS. "Room under the speech" is given for the recording, the plain render and the voice render; so is the loudness range.
+**Real recordings.** Three openly licensed [corpus](../../bench/README.md#corpus-layout) clips with audible rooms, measured the same way against their own recording and the words `vework` transcribed from it: `wikilive-d1` and `wikilive-d2`, a webcam livestream talk show of one host and two guests (172 s and 159 s), and `wikidata-openrefine`, a meetup filmed across the room (176 s, about 60 % speech), all 16:9 at -16 LUFS. "Room under the speech" and the loudness range are given for the recording, the plain render and the voice render.
 
 | Clip | Chain chosen | Room under the speech | Loudness range | Spread of the thirds | True peak, plain → voice |
 |---|---|---|---|---|---|
@@ -362,14 +353,13 @@ node scripts/finishing-preview.ts out/finishing --scene <clip folder>@<seconds> 
 | `wikilive-d2` | denoise 30 dB, leveller, 2:1 | 8 / 7 → 21 dB | 15.9 / 11.1 → 3.7 LU | 2.1 / 1.5 → 1.0 dB | -1.2 → -5.7 dBTP |
 | `wikidata-openrefine` | denoise 30 dB, leveller, EQ +1.7, 2:1 | 21 / 17 → 32 dB | 16.9 / 13.5 → 10.5 LU | 8.5 / 5.3 → 2.1 dB | -1.0 → -5.4 dBTP |
 
-- **Noise:** the room ends 14 to 16 dB further under the speech than in the plain render. `wikilive-d2` has under a second of pause away from speech, so its noise floor is not measured and it is denoised by the most, as its measured twin is.
-- **Levels:** the host and guests come out at one level: the loudness range falls from 13 to 16 LU to 3.6 and 3.7 LU on the talk show, and the spread between the thirds of the speech to 1 dB or less. The meetup's range, over a track that is about 40 % without speech, stays at 10.5 LU, while its speech's thirds come within 2.0 dB of each other.
-- **Words:** the denoiser keeps the words that stand clear of the room. Of the words 12 dB or more above it, it lowers 4 of 67, 7 of 63 and 11 of 290 by more than 6 dB against the rest; words within 6 dB of the room lose what was noise in them. After the denoiser, compression and the leveller take the loudest words down several dB towards the rest, as intended. No sample comes within 0.1 dB of full scale in any recording or render.
-- **Peaks:** the AAC encoder adds to the mastered sound's peak, so the renderer measures the encoded true peak and normalises again through a limiter while it is over the target ([loudness](README.md#how-it-renders)). The plain renders in the table were measured with one such try after the first: on `wikilive-d1` the encoder's overshoot fell from 3.2 dB to 0.5 dB as the limiter went lower, so that try lands 2.8 dB under the target and its loudness 0.6 LU under -16 LUFS; these clips were not rendered again with the search near the target. The voice renders peak far enough under the target that they are not limited. The cut renders have 0 clicks and 0.0 ms of drift. The synthetic edits (`scripts/synthetic-edit.ts`) need no limiter: noisy transients at 8 and 30 s peak at -1.1 and -1.4 dBTP on Linux.
+- **Noise:** the room ends 14 to 16 dB further under the speech than in the plain render.
+- **Levels:** the host and guests come out at one level: 3.6 and 3.7 LU on the talk show, the thirds of the speech within 1 dB. The meetup's range, over a track about 40 % without speech, stays at 10.5 LU, its speech's thirds within 2.1 dB.
+- **Words:** of the words 12 dB or more above the room, the denoiser lowers 4 of 67, 7 of 63 and 11 of 290 by more than 6 dB against the rest. No sample comes within 0.1 dB of full scale.
 
-**Cuts:** `vebench report` on the renders cut at every pause, both clips of each synthetic degradation pooled (124 cuts each way) and the three real clips pooled (57 cuts each way): 0 clicks and 0.0 ms of drift, plain and voice alike, in every group.
+**Cuts:** `vebench report` on the renders cut at every pause, synthetic (124 cuts each way) and real (57 cuts each way): 0 clicks and 0.0 ms of drift, plain and voice alike.
 
-**Word timings** stay put. `vework analyze` transcribed the processed render of `phone-c` with 10 dB of noise, and `vebench report` scored it against the clip's truth beside the degraded audio's transcript; with the noise gone the aligner finds word ends better:
+**Word timings** stay put. `phone-c` with 10 dB of noise, transcribed by `vework analyze` and scored by `vebench report` against the clip's truth:
 
 | `phone-c`, pink noise at 10 dB SNR, transcribed from | MER | Start error p50 / p95 | End error p50 / p95 | Within 50 / 100 ms |
 |---|---|---|---|---|
@@ -377,4 +367,4 @@ node scripts/finishing-preview.ts out/finishing --scene <clip folder>@<seconds> 
 | The processed render | 4.9 % | 22 / 76 ms | 30 / 133 ms | 61 / 88 % |
 | For reference, the clip as generated | 5.2 % | 27 / 75 ms | 27 / 75 ms | 65 / 93 % |
 
-On the real clips, without a hand-checked transcript, the render's transcript was scored against the recording's. The two agree on word timings (starts 15 to 23 ms apart at the median) but not always on the words: the mixed-script error between them is 5.0 % on `wikilive-d2`, 13.1 % on `wikilive-d1` and 37.8 % on `wikidata-openrefine`, whose crosstalk the speech model misreads differently in each, in places hearing more words in the render. Which of each pair is right waits for the corrected transcripts.
+On the real clips, the render's transcript and the recording's agree on word timings (starts 15 to 23 ms apart at the median).

@@ -11,7 +11,7 @@ import {
 } from "./timeline.ts";
 
 /** 5 ms fades on the sound at a hard cut: twice what the click measurement needed, far too short
- * to hear (packages/engine/README.md). */
+ * to hear (packages/engine/MEASUREMENTS.md#render-measurements). */
 export const EDGE_FADE_SAMPLES = 240;
 /** Fades on the sound where a clip's sound starts after its first sample or ends before its last
  * (`soundIn`, `soundOut`): the edge of a word said straight into the one cut. */

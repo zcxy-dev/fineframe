@@ -8,8 +8,8 @@ import { decimal } from "./inputs.ts";
 const FORMAT = `aformat=sample_fmts=fltp:sample_rates=${SAMPLE_RATE}:channel_layouts=stereo`;
 
 /** Raised-cosine fades at cuts: they start and end with zero slope, so the splice has no corner
- * to click, where a quarter-sine fade starts steeply (packages/engine/README.md has the
- * measurement). */
+ * to click, where a quarter-sine fade starts steeply (measured in
+ * packages/engine/MEASUREMENTS.md#render-measurements). */
 const EDGE_CURVE = "hsin";
 
 /**
