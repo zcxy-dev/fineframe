@@ -2,7 +2,16 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { AuthApiError, AuthWeakPasswordError } from "@supabase/supabase-js";
 import { en } from "../content/en.ts";
-import { errorText, nextPath, nextPlan, paddleBilled, signUpHref } from "./supabase.ts";
+import {
+  entitled,
+  errorText,
+  nextPath,
+  nextPlan,
+  paddleBilled,
+  type Subscription,
+  shown,
+  signUpHref,
+} from "./supabase.ts";
 
 const rejected = (code: string) => new AuthApiError("rejected", 400, code);
 
@@ -60,10 +69,44 @@ test("only a subscription Paddle bills offers its customer portal", () => {
     plan: "yearly",
     current_period_end: null,
     cancel_at: null,
+    paddle_updated_at: "2026-11-01T00:00:00Z",
   } as const;
   assert.equal(
     paddleBilled({ ...row, paddle_customer_id: "ctm_01aaaaaaaaaaaaaaaaaaaaaaaa" }),
     true,
   );
   assert.equal(paddleBilled({ ...row, paddle_customer_id: "comp" }), false);
+});
+
+test("of a user's subscriptions, the site shows one that entitles them when any does", () => {
+  const now = new Date("2026-11-07T00:00:00Z");
+  const row = (
+    status: Subscription["status"],
+    paddle_updated_at: string,
+    current_period_end: string | null = null,
+  ): Subscription => ({
+    status,
+    plan: "monthly",
+    current_period_end,
+    cancel_at: null,
+    paddle_customer_id: "ctm_01aaaaaaaaaaaaaaaaaaaaaaaa",
+    paddle_updated_at,
+  });
+  const active = row("active", "2026-11-02T00:00:00Z");
+  const ended = row("canceled", "2026-11-04T00:00:00Z", "2026-11-04T00:00:00Z");
+  const leaving = row("canceled", "2026-11-05T00:00:00Z", "2026-12-01T00:00:00Z");
+  const paused = row("paused", "2026-11-06T00:00:00Z");
+
+  // The issue's case: the newer event ended one subscription while another still runs.
+  assert.equal(shown([ended, active], now), active);
+  assert.equal(shown([leaving, paused, active], now), active);
+  assert.equal(shown([paused, leaving], now), leaving);
+  assert.equal(shown([ended, paused], now), paused);
+  assert.equal(shown([], now), null);
+  for (const rows of [[ended], [ended, paused], [ended, active], [leaving, ended]]) {
+    assert.equal(
+      entitled(shown(rows, now), now),
+      rows.some((r) => entitled(r, now)),
+    );
+  }
 });

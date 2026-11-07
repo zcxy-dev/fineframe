@@ -72,7 +72,7 @@ Authorization: Bearer <access_token>
 
 The answer is `[{"billing_enabled": false}]` during the free public beta, and `true` once paid plans open. Anyone may read it, signed in or not.
 
-Then, when it is `true`, the user's subscription:
+Then, when it is `true`, the user's subscriptions:
 
 ```
 GET <FINEFRAME_SUPABASE_URL>/rest/v1/subscriptions?select=status,plan,current_period_end,cancel_at
@@ -80,7 +80,7 @@ apikey: <FINEFRAME_SUPABASE_PUBLISHABLE_KEY>
 Authorization: Bearer <access_token>
 ```
 
-Row-level security returns only the signed-in user's row: a JSON array with one row, or `[]` when they have never subscribed.
+Row-level security returns only the signed-in user's rows: a JSON array with one row for each subscription they have had, or `[]` when they have never subscribed.
 
 | Column | Type | Meaning |
 |---|---|---|
@@ -93,11 +93,11 @@ Row-level security returns only the signed-in user's row: a JSON array with one 
 
 While `billing_enabled` is `false`, every signed-in user is entitled.
 
-While it is `true`, the user is entitled while **either**:
+While it is `true`, the user is entitled while **any** of their rows has **either**:
 
 - `status` is `active`, `trialing` or `past_due`; **or**
 - `status` is `canceled` and `current_period_end` is later than now.
 
-Otherwise, and when the subscriptions array is empty, they are not: the app shows that a subscription is needed, with a link to `https://fineframe.app/<locale>/pricing/`. The account page is `https://fineframe.app/<locale>/account/`, with `<locale>` `en` or `zh-tw`.
+Otherwise, and when the array is empty, they are not: the app shows that a subscription is needed, with a link to `https://fineframe.app/<locale>/pricing/`. The account page is `https://fineframe.app/<locale>/account/`, with `<locale>` `en` or `zh-tw`.
 
 A user who cancels keeps `status` `active`, with `cancel_at` set, until the period ends; Paddle then changes the status to `canceled`.

@@ -1,6 +1,7 @@
 // The account page's "Manage billing": a signed-in user's link into Paddle's customer portal,
 // signed in as their Paddle customer.
 import { createClient } from "@supabase/supabase-js";
+import { portalSubscription } from "./subscription.ts";
 
 const PADDLE_API =
   Deno.env.get("PADDLE_ENVIRONMENT") === "production"
@@ -26,11 +27,11 @@ Deno.serve(async (req) => {
   const { data: auth } = await db.auth.getUser(jwt);
   if (!auth.user) return reply(401, { error: "Sign in first" });
 
-  const { data: row } = await db
+  const { data: rows } = await db
     .from("subscriptions")
-    .select("paddle_customer_id,paddle_subscription_id")
-    .eq("user_id", auth.user.id)
-    .maybeSingle();
+    .select("status,paddle_customer_id,paddle_subscription_id,paddle_updated_at")
+    .eq("user_id", auth.user.id);
+  const row = portalSubscription(rows ?? []);
   if (!row) return reply(404, { error: "No subscription" });
 
   const res = await fetch(`${PADDLE_API}/customers/${row.paddle_customer_id}/portal-sessions`, {

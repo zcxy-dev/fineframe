@@ -19,13 +19,14 @@ export function supabase(): SupabaseClient {
   return client;
 }
 
-/** A user's row of `subscriptions`, as ENTITLEMENT.md describes it. */
+/** One of a user's rows of `subscriptions`, one per subscription, as ENTITLEMENT.md describes it. */
 export type Subscription = {
   status: "active" | "trialing" | "past_due" | "paused" | "canceled";
   plan: "monthly" | "yearly";
   current_period_end: string | null;
   cancel_at: string | null;
   paddle_customer_id: string;
+  paddle_updated_at: string;
 };
 
 /** Whether Fineframe charges yet: `app_config.billing_enabled`, false during the free beta. */
@@ -35,13 +36,29 @@ export async function billingEnabled(): Promise<boolean> {
   return data.billing_enabled;
 }
 
+/** The signed-in user's subscription that speaks for them, as `shown` picks it. */
 export async function mySubscription(): Promise<Subscription | null> {
   const { data, error } = await supabase()
     .from("subscriptions")
-    .select("status,plan,current_period_end,cancel_at,paddle_customer_id")
-    .maybeSingle();
+    .select("status,plan,current_period_end,cancel_at,paddle_customer_id,paddle_updated_at");
   if (error) throw error;
-  return data;
+  return shown(data);
+}
+
+/**
+ * Of a user's subscriptions, the one the site shows: a running one before one cancelled with time
+ * left, either before one that does not entitle, and the newest among equals. So it entitles the
+ * user exactly when any of them does.
+ */
+export function shown(rows: readonly Subscription[], now = new Date()): Subscription | null {
+  const rank = (row: Subscription) =>
+    entitled(row, now) ? (row.status === "canceled" ? 1 : 2) : 0;
+  return (
+    [...rows].sort(
+      (a, b) =>
+        rank(b) - rank(a) || Date.parse(b.paddle_updated_at) - Date.parse(a.paddle_updated_at),
+    )[0] ?? null
+  );
 }
 
 /** The rule in ENTITLEMENT.md: whether the subscription lets its user use the app. */
