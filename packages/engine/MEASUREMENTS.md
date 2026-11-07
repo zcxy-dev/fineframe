@@ -100,7 +100,7 @@ With `--visuals minimal`. On six frames of the synthetic screen recording screen
 
 `place.ts` keeps cuts out of speech no word covers, and keeps clicks and shot changes out of the silence a clip opens or closes with ([What code does](README.md#planning)). On 10 CC BY clips of the [corpus](../../bench/README.md#corpus-layout), analysed with `--asr cloud`, the voice stems hold 2.8 to 193.7 s of speech no word covers, 2 to 23 % of each clip, the most in real-4, a street walk; 0 to 40 % of the gaps between words that a cut would fit in hold some of it and take no cut. The quietest 5 % of the words' frames sit 23 to 45 dB under the median level of the source's words.
 
-Each edit below was made with `pnpm edit --asr cloud --quality best --visuals minimal`. Every edge was checked against scribe-v2's word timings on 3 s of source either side, and every edge inside a word looked at on a spectrogram. One is unclear: a real-4 clip starts 140 ms into a syllable faint under street noise, where the denoised speech is at the level of the pauses.
+Each edit below was made with `pnpm edit --asr cloud --quality best --visuals minimal`. Every edge was checked against scribe-v2's word timings on 3 s of source either side, and every edge inside a word looked at on a spectrogram. One is unclear: a real-4 clip starts 140 ms into a syllable faint under street noise, where the denoised speech is at the level of the pauses. The real-4 and real-9 edits predate the check for clicks and shot changes in a clip's opening and closing silence.
 
 <!-- results:engine-unheard -->
 | Footage | Asked | Made | Clicks, drift | Edges checked | Claude |
@@ -261,7 +261,7 @@ cd ../../bench && uv run vebench report /tmp/synthetic-edit
 | Quarter sine (equal power) | 12 | 4 | 1 | 0 | 0 |
 | Raised cosine | 12 | 0 | 0 | 0 | 0 |
 
-**Memory.** Peak memory of the whole render without overlays, every FFmpeg process included, on 0.4–0.5 s clips, against one FFmpeg with an input per clip. Each overlay a piece spans adds one VP9 decoder ([its memory](../effects/README.md#rendering)).
+**Memory.** Peak memory of the whole render without overlays, every FFmpeg process included, on 0.4–0.5 s clips, against one FFmpeg with an input per clip. Each overlay a piece spans adds one VP9 decoder ([overlay format](../effects/README.md#rendering)).
 
 | Source | Clips | One FFmpeg with an input per clip | Pieces |
 |---|---|---|---|
