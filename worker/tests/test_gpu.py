@@ -233,12 +233,14 @@ def test_the_denoiser_on_the_gpu_removes_what_the_cpu_does(mac_gpu, monkeypatch,
 
 @pytest.fixture
 def spoken_video(tmp_path):
-    """Six seconds of the system's voice over a test pattern, from macOS's `say`."""
+    """Six seconds of Samantha's voice over a test pattern, from macOS's `say`."""
     if shutil.which("say") is None:
         pytest.skip("needs macOS's say")
     voice, out = tmp_path / "voice.aiff", tmp_path / "talk.mp4"
-    subprocess.run(["say", "-o", str(voice), "Hello everyone. Today we look at a new camera."],
-                   check=True)  # fmt: skip
+    # A named voice: the default one sometimes writes a file with no sound on CI's Macs (#315).
+    subprocess.run(["say", "-v", "Samantha", "-o", str(voice),
+                    "Hello everyone. Today we look at a new camera."], check=True)  # fmt: skip
+    assert voice.stat().st_size > 10_000, f"say wrote no speech ({voice.stat().st_size} bytes)"
     ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x180:r=30:d=6", "-i", str(voice), "-af",
            "adelay=500:all=1,apad", "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac",
            "-t", "6", str(out))  # fmt: skip

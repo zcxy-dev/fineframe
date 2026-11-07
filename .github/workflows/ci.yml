@@ -290,13 +290,22 @@ jobs:
         working-directory: worker
         run: uv run pytest -q -m "ml and not big"
       # The runners' Apple M1 exposes MPS and VideoToolbox, so the models run on the GPU, and one
-      # analysis prints where each of its steps ran (-rP).
+      # analysis prints where each of its steps ran (-rP). Some runners' virtual GPU does not
+      # support Metal 2.0, which MPS needs: there the GPU tests skip with a warning, and on any
+      # other runner without MPS the step fails.
       - name: Test the worker's models on the GPU
         if: runner.os == 'macOS'
         working-directory: worker
         run: |
+          sysctl -n hw.model machdep.cpu.brand_string
+          ioreg -rd1 -c IOAccelerator | grep -E '"(IOClass|MetalPluginName)"' || true
           uv sync --locked
-          uv run python -c "import torch; assert torch.backends.mps.is_available(), 'no MPS'"
+          mps=$(uv run python -W always -c "import torch; print(torch.backends.mps.is_available())" 2>&1)
+          echo "$mps"
+          if [ "$(tail -n 1 <<<"$mps")" != True ]; then
+            grep -q "does not support Metal 2.0" <<<"$mps" || { echo "::error::no MPS"; exit 1; }
+            echo "::warning title=No Metal 2.0 GPU::This runner's GPU does not support Metal 2.0, so the worker's GPU tests skip."
+          fi
           uv run pytest -q -m "ml and not big" -rP tests/test_gpu.py
           uv run pytest -q -m "ml and not big" --ignore tests/test_gpu.py
       # copy-joined is the `-c copy` join the engine is measured against; every other run must
